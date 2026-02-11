@@ -21,6 +21,8 @@ public final class ModItems {
             ITEMS.register("blockhutcreateshop", () -> new ItemBlockHut(ModBlocks.HUT_CREATE_SHOP.get(), new Item.Properties()));
     public static final DeferredItem<Item> CREATE_SHOP_PICKUP =
             ITEMS.register("create_shop_pickup", () -> new BlockItem(ModBlocks.CREATE_SHOP_PICKUP.get(), new Item.Properties()));
+    public static final DeferredItem<Item> CREATE_SHOP_OUTPUT =
+            ITEMS.register("create_shop_output", () -> new BlockItem(ModBlocks.CREATE_SHOP_OUTPUT.get(), new Item.Properties()));
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);

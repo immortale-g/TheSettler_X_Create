@@ -113,6 +113,8 @@ public class TheSettlerXCreate {
     private void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.CREATE_SHOP_PICKUP.get(),
                 (be, side) -> be.getItemHandler(side));
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.CREATE_SHOP_OUTPUT.get(),
+                (be, side) -> be.getItemHandler(side));
     }
 
     @SubscribeEvent
@@ -182,6 +184,7 @@ public class TheSettlerXCreate {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.NETWORK_LINK_TUNER);
             event.accept(ModItems.CREATE_SHOP_PICKUP);
+            event.accept(ModItems.CREATE_SHOP_OUTPUT);
         }
         if (event.getTabKey() == com.minecolonies.api.creativetab.ModCreativeTabs.HUTS.getKey()) {
             event.accept(ModItems.HUT_CREATE_SHOP);

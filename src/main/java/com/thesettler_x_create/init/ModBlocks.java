@@ -2,6 +2,7 @@ package com.thesettler_x_create.init;
 
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.CreateShopBlock;
+import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.minecolonies.block.BlockHutCreateShop;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -22,6 +23,9 @@ public final class ModBlocks {
                             .noCollission()
                             .noOcclusion()
                             .strength(-1.0f, 3600000.0f)));
+    public static final DeferredBlock<CreateShopOutputBlock> CREATE_SHOP_OUTPUT =
+            BLOCKS.register("create_shop_output", () ->
+                    new CreateShopOutputBlock(BlockBehaviour.Properties.of().strength(1.5f)));
 
     public static void register(IEventBus bus) {
         BLOCKS.register(bus);

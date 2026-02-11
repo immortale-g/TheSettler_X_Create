@@ -82,7 +82,7 @@ public final class CreateShopResolverInjector {
         int shops = 0;
         int pruned = 0;
         java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>> allowedShopResolvers = new java.util.HashSet<>();
-        for (var entry : colony.getBuildingManager().getBuildings().entrySet()) {
+        for (var entry : colony.getServerBuildingManager().getBuildings().entrySet()) {
             if (!(entry.getValue() instanceof BuildingCreateShop shop)) {
                 continue;
             }

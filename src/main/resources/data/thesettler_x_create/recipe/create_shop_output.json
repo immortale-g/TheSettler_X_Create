@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:barrel" },
+    { "item": "minecraft:redstone" }
+  ],
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:create_shop_output"
+  }
+}

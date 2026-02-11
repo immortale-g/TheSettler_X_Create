@@ -39,7 +39,7 @@ public class CreateShopStockModuleView extends AbstractBuildingModuleView {
 
     @Override
     public BOWindow getWindow() {
-        return new CreateShopStockModuleWindow(getBuildingView(), this);
+        return new CreateShopStockModuleWindow(this);
     }
 
     @Override
@@ -48,7 +48,7 @@ public class CreateShopStockModuleView extends AbstractBuildingModuleView {
     }
 
     @Override
-    public String getDesc() {
-        return "com.thesettler_x_create.gui.createshop.stock";
+    public net.minecraft.network.chat.Component getDesc() {
+        return net.minecraft.network.chat.Component.translatable("com.thesettler_x_create.gui.createshop.stock");
     }
 }

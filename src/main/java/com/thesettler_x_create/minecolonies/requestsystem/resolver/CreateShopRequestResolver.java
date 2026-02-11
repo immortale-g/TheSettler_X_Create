@@ -758,7 +758,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         if (colony == null) {
             return 0;
         }
-        var building = colony.getBuildingManager().getBuilding(getLocation().getInDimensionLocation());
+        var building = colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
         BuildingCreateShop shop = building instanceof BuildingCreateShop createShop ? createShop : null;
         if (shop == null) {
             return 0;
@@ -782,7 +782,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         if (colony == null) {
             return null;
         }
-        var building = colony.getBuildingManager().getBuilding(getLocation().getInDimensionLocation());
+        var building = colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
         if (building instanceof BuildingCreateShop shop) {
             return shop;
         }

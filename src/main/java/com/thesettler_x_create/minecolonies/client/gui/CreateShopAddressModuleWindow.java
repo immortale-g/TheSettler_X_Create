@@ -3,28 +3,29 @@ package com.thesettler_x_create.minecolonies.client.gui;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.Text;
 import com.ldtteam.blockui.controls.TextField;
-import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.core.client.gui.AbstractModuleWindow;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
 import com.thesettler_x_create.network.SetCreateShopAddressPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Locale;
 
-public class CreateShopAddressModuleWindow extends AbstractModuleWindow {
-    private final IBuildingView building;
+public class CreateShopAddressModuleWindow extends AbstractModuleWindow<CreateShopAddressModuleView> {
+    private final com.minecolonies.api.colony.buildings.views.IBuildingView building;
     private final CreateShopAddressModuleView moduleView;
     private final TextField addressInput;
 
-    public CreateShopAddressModuleWindow(IBuildingView building, CreateShopAddressModuleView moduleView) {
-        super(building, "thesettler_x_create:gui/layouthuts/layoutcreateshop_address.xml");
-        this.building = building;
+    public CreateShopAddressModuleWindow(CreateShopAddressModuleView moduleView) {
+        super(moduleView, ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_address.xml"));
+        this.building = moduleView.getBuildingView();
         this.moduleView = moduleView;
 
         Text desc = findPaneOfTypeByID("desc", Text.class);
         if (desc != null) {
-            desc.setText(Component.translatableEscape(moduleView.getDesc().toLowerCase(Locale.US)));
+            desc.setText(moduleView.getDesc());
         }
 
         addressInput = findPaneOfTypeByID("addressInput", TextField.class);

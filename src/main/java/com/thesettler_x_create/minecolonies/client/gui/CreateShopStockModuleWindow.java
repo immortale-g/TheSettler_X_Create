@@ -5,9 +5,9 @@ import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
 import com.ldtteam.blockui.controls.TextField;
 import com.ldtteam.blockui.views.ScrollingList;
-import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.core.client.gui.AbstractModuleWindow;
 import com.simibubi.create.content.logistics.BigItemStack;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
 import com.thesettler_x_create.network.CreateShopBatchRequestPayload;
 import com.thesettler_x_create.network.CreateShopStockRefreshPayload;
@@ -24,8 +24,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-public class CreateShopStockModuleWindow extends AbstractModuleWindow {
-    private final IBuildingView building;
+public class CreateShopStockModuleWindow extends AbstractModuleWindow<CreateShopStockModuleView> {
+    private final com.minecolonies.api.colony.buildings.views.IBuildingView building;
     private final CreateShopStockModuleView moduleView;
     private final ScrollingList stockList;
     private List<BigItemStack> stock = new ArrayList<>();
@@ -35,14 +35,14 @@ public class CreateShopStockModuleWindow extends AbstractModuleWindow {
     private final Set<String> infiniteItems = new HashSet<>();
     private int refreshTicks;
 
-    public CreateShopStockModuleWindow(IBuildingView building, CreateShopStockModuleView moduleView) {
-        super(building, "thesettler_x_create:gui/layouthuts/layoutcreateshop_stock.xml");
-        this.building = building;
+    public CreateShopStockModuleWindow(CreateShopStockModuleView moduleView) {
+        super(moduleView, net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_stock.xml"));
+        this.building = moduleView.getBuildingView();
         this.moduleView = moduleView;
 
         Text desc = findPaneOfTypeByID("desc", Text.class);
         if (desc != null) {
-            desc.setText(Component.translatableEscape(moduleView.getDesc().toLowerCase(Locale.US)));
+            desc.setText(moduleView.getDesc());
         }
 
         stockList = findPaneOfTypeByID("stockList", ScrollingList.class);

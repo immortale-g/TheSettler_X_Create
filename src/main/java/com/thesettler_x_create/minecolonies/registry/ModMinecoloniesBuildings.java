@@ -7,13 +7,18 @@ import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.WorkerBuildingModule;
 import com.minecolonies.core.colony.buildings.moduleviews.WorkerBuildingModuleView;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry.ModuleProducer;
+import com.minecolonies.api.blocks.AbstractColonyBlock;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopAddressModule;
+import com.thesettler_x_create.minecolonies.module.CreateShopOutputModule;
+import com.thesettler_x_create.minecolonies.module.CreateShopPermaModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopStockModule;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
+import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleView;
+import com.thesettler_x_create.minecolonies.moduleview.CreateShopPermaModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesJobs;
 import net.minecraft.resources.ResourceLocation;
@@ -32,7 +37,7 @@ public final class ModMinecoloniesBuildings {
             BUILDINGS.register("createshop", () ->
                     new BuildingEntry.Builder()
                             .setRegistryName(ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "createshop"))
-                            .setBuildingBlock(ModBlocks.HUT_CREATE_SHOP.get())
+                            .setBuildingBlock((AbstractColonyBlock<?>) ModBlocks.HUT_CREATE_SHOP.get())
                             .setBuildingProducer((colony, pos) -> new BuildingCreateShop(colony, pos))
                             .setBuildingViewProducer(() -> (colonyView, pos) -> new EmptyView(colonyView, pos))
                             .addBuildingModuleProducer(new ModuleProducer<>(
@@ -57,6 +62,16 @@ public final class ModMinecoloniesBuildings {
                                     "createshop_stock",
                                     CreateShopStockModule::new,
                                     () -> CreateShopStockModuleView::new
+                            ))
+                            .addBuildingModuleProducer(new ModuleProducer<>(
+                                    "createshop_perma",
+                                    CreateShopPermaModule::new,
+                                    () -> CreateShopPermaModuleView::new
+                            ))
+                            .addBuildingModuleProducer(new ModuleProducer<>(
+                                    "createshop_output",
+                                    CreateShopOutputModule::new,
+                                    () -> CreateShopOutputModuleView::new
                             ))
                             .createBuildingEntry()
             );

@@ -19,7 +19,7 @@ public class CreateShopAddressModuleView extends AbstractBuildingModuleView {
 
     @Override
     public BOWindow getWindow() {
-        return new CreateShopAddressModuleWindow(getBuildingView(), this);
+        return new CreateShopAddressModuleWindow(this);
     }
 
     @Override
@@ -28,7 +28,7 @@ public class CreateShopAddressModuleView extends AbstractBuildingModuleView {
     }
 
     @Override
-    public String getDesc() {
-        return "com.thesettler_x_create.gui.createshop.address";
+    public net.minecraft.network.chat.Component getDesc() {
+        return net.minecraft.network.chat.Component.translatable("com.thesettler_x_create.gui.createshop.address");
     }
 }

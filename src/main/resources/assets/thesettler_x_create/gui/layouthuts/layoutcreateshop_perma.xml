@@ -1,0 +1,17 @@
+<window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd"
+    size="190 244">
+    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="190 244"/>
+    <text id="desc" size="130 11" pos="30 14" color="black" textalign="MIDDLE"/>
+
+    <button label="$(com.thesettler_x_create.gui.createshop.perma.wait_full_off)" id="waitFull" size="150 17" pos="20 28"
+            source="minecolonies:textures/gui/builderhut/builder_button_medium.png" color="black"/>
+
+    <list id="oreList" size="164 160" pos="13 50">
+        <box size="100% 17" linewidth="1">
+            <itemicon id="itemIcon" size="16 16" pos="2 0"/>
+            <text id="itemName" size="100 12" pos="22 1" textalign="MIDDLE_LEFT" color="black"/>
+            <button id="toggle" label="$(com.thesettler_x_create.gui.createshop.perma.off)" size="32 15" pos="124 1"
+                    source="minecolonies:textures/gui/builderhut/builder_button_very_small.png" color="black"/>
+        </box>
+    </list>
+</window>

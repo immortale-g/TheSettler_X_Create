@@ -7,6 +7,8 @@ import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
 import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.network.SetCreateShopPermaOrePayload;
+import com.thesettler_x_create.network.SetCreateShopPermaWaitPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -25,6 +27,8 @@ public final class ModNetwork {
     public static void registerPayloads(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(TheSettlerXCreate.MODID).versioned("1");
         registrar.playToServer(SetCreateShopAddressPayload.TYPE, SetCreateShopAddressPayload.STREAM_CODEC, ModNetwork::handleSetAddress);
+        registrar.playToServer(SetCreateShopPermaOrePayload.TYPE, SetCreateShopPermaOrePayload.STREAM_CODEC, ModNetwork::handleSetPermaOre);
+        registrar.playToServer(SetCreateShopPermaWaitPayload.TYPE, SetCreateShopPermaWaitPayload.STREAM_CODEC, ModNetwork::handleSetPermaWait);
         registrar.playToServer(CreateShopTestRequestPayload.TYPE, CreateShopTestRequestPayload.STREAM_CODEC, ModNetwork::handleTestRequest);
         registrar.playToServer(CreateShopBatchRequestPayload.TYPE, CreateShopBatchRequestPayload.STREAM_CODEC, ModNetwork::handleBatchRequest);
         registrar.playToServer(CreateShopStockRefreshPayload.TYPE, CreateShopStockRefreshPayload.STREAM_CODEC, ModNetwork::handleStockRefresh);
@@ -41,6 +45,30 @@ public final class ModNetwork {
             shop.setShopAddress(address);
             BlockState state = shop.getBlockState();
             shop.getLevel().sendBlockUpdated(payload.pos(), state, state, 3);
+        });
+    }
+
+    private static void handleSetPermaOre(SetCreateShopPermaOrePayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            TileEntityCreateShop shop = getShop(context, payload.pos());
+            if (shop == null || shop.getBuilding() == null) {
+                return;
+            }
+            if (shop.getBuilding() instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop building) {
+                building.setPermaOre(payload.oreId(), payload.enabled());
+            }
+        });
+    }
+
+    private static void handleSetPermaWait(SetCreateShopPermaWaitPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            TileEntityCreateShop shop = getShop(context, payload.pos());
+            if (shop == null || shop.getBuilding() == null) {
+                return;
+            }
+            if (shop.getBuilding() instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop building) {
+                building.setPermaWaitFullStack(payload.enabled());
+            }
         });
     }
 

@@ -1,0 +1,6 @@
+{
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "thesettler_x_create:block/base"
+  }
+}

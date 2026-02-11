@@ -8,36 +8,93 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
+import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.MessageUtils;
+import com.minecolonies.api.util.WorldUtil;
+import net.minecraft.util.Tuple;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseModule;
+import com.minecolonies.core.colony.jobs.JobBuilder;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
 import com.minecolonies.core.tileentities.TileEntityRack;
+import com.ldtteam.structurize.blueprints.v1.Blueprint;
+import com.ldtteam.structurize.blueprints.v1.BlueprintUtil;
+import com.ldtteam.structurize.api.RotationMirror;
+import com.ldtteam.structurize.util.BlockInfo;
 import com.thesettler_x_create.block.CreateShopBlock;
+import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import com.thesettler_x_create.init.ModBlocks;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
+
+import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     public static final String SCHEMATIC_NAME = "createshop";
+    private static final int PERMA_MIN_BUILDING_LEVEL = 2;
+    private static final long PERMA_REQUEST_INTERVAL_TICKS = 200L;
+    private static final ResourceLocation BELT_BLUEPRINT_L1 =
+            ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "blueprints_internal/createshop1_belt.blueprint");
+    private static final ResourceLocation BELT_BLUEPRINT_L2 =
+            ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "blueprints_internal/createshop2_belt.blueprint");
+    private static final ResourceLocation BELT_ITEM_ID =
+            ResourceLocation.fromNamespaceAndPath("create", "belt_connector");
+    private static final Set<ResourceLocation> BELT_ANCHOR_BLOCK_IDS = Set.of(
+            ResourceLocation.fromNamespaceAndPath("structurize", "blocksubstitution"),
+            ResourceLocation.fromNamespaceAndPath("structurize", "blocksolidsubstitution"),
+            ResourceLocation.fromNamespaceAndPath("structurize", "blocktagsubstitution"),
+            ResourceLocation.fromNamespaceAndPath("structurize", "blockfluidsubstitution")
+    );
+    private static final ResourceLocation SHAFT_BLOCK_ID =
+            ResourceLocation.fromNamespaceAndPath("create", "shaft");
+    private static final ResourceLocation ENCASED_SHAFT_BLOCK_ID =
+            ResourceLocation.fromNamespaceAndPath("create", "andesite_encased_shaft");
     private static final long MISSING_NETWORK_WARNING_COOLDOWN = 6000L;
     private static final boolean DEBUG_REQUESTS = true;
     private static final String TAG_PICKUP_POS = "PickupPos";
+    private static final String TAG_OUTPUT_POS = "OutputPos";
+    private static final String TAG_PERMA_ORES = "PermaOres";
+    private static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
+    private static final String TAG_BELT_PLACED = "BeltPlaced";
+    private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
     private static final long COURIER_DEBUG_COOLDOWN = 200L;
     private static final long COURIER_ENTITY_DEBUG_COOLDOWN = 400L;
 
@@ -60,6 +117,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     private IToken<?> deliveryResolverToken;
     private IToken<?> pickupResolverToken;
     private BlockPos pickupPos;
+    private BlockPos outputPos;
+    private final Set<ResourceLocation> permaOres = new HashSet<>();
+    private boolean permaWaitFullStack;
+    private long lastPermaRequestTick;
+    private final Map<IToken<?>, PendingPermaRequest> permaPendingRequests = new java.util.HashMap<>();
+    private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
+    private boolean beltPlaced;
+    private BlockPos builderHutPos;
 
     public BuildingCreateShop(IColony colony, BlockPos location) {
         super(colony, location);
@@ -74,6 +139,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         this.lastWarehouseCompareDump = "";
         this.warehouseRegistered = false;
         this.shopResolver = null;
+        this.permaWaitFullStack = false;
+        this.lastPermaRequestTick = 0L;
+        this.beltPlaced = false;
+        this.builderHutPos = null;
     }
 
     @Override
@@ -83,7 +152,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
     @Override
     public int getMaxBuildingLevel() {
-        return 1;
+        return 2;
     }
 
     @Override
@@ -132,9 +201,57 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         return pickupPos;
     }
 
+    @Nullable
+    public CreateShopOutputBlockEntity getOutputBlockEntity() {
+        if (outputPos == null) {
+            return null;
+        }
+        Level level = getColony() == null ? null : getColony().getWorld();
+        if (level == null) {
+            return null;
+        }
+        BlockEntity entity = level.getBlockEntity(outputPos);
+        if (entity instanceof CreateShopOutputBlockEntity output) {
+            return output;
+        }
+        return null;
+    }
+
+    @Nullable
+    public BlockPos getOutputPos() {
+        return outputPos;
+    }
+
+    public boolean isPermaWaitFullStack() {
+        return permaWaitFullStack;
+    }
+
+    public Set<ResourceLocation> getPermaOres() {
+        return java.util.Collections.unmodifiableSet(permaOres);
+    }
+
+    public boolean canUsePermaRequests() {
+        return isBuilt() && getBuildingLevel() >= PERMA_MIN_BUILDING_LEVEL;
+    }
+
     @Override
     public boolean hasContainerPosition(BlockPos pos) {
         return containerList.contains(pos) || getLocation().getInDimensionLocation().equals(pos);
+    }
+
+    @Override
+    public Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> getRequiredItemsAndAmount() {
+        Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> base = super.getRequiredItemsAndAmount();
+        if (beltPlaced) {
+            return base;
+        }
+        Item beltItem = BuiltInRegistries.ITEM.get(BELT_ITEM_ID);
+        if (beltItem == null || beltItem == net.minecraft.world.item.Items.AIR) {
+            return base;
+        }
+        Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> result = new java.util.HashMap<>(base);
+        result.put(stack -> stack != null && stack.getItem() == beltItem, new Tuple<>(1, Boolean.TRUE));
+        return result;
     }
 
     @Override
@@ -159,6 +276,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(getColony());
         ensurePickupLink();
+        trySpawnBeltBlueprint(getColony());
     }
 
     @Override
@@ -168,6 +286,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(getColony());
         ensurePickupLink();
+        trySpawnBeltBlueprint(getColony());
     }
 
     @Override
@@ -177,6 +296,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(colony);
         ensurePickupLink();
+        trySpawnBeltBlueprint(colony);
+        tickPermaRequests(colony);
         if (colony != null) {
             CreateShopRequestResolver resolver = getOrCreateShopResolver();
             if (resolver != null) {
@@ -192,6 +313,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
         try {
             super.onRequestedRequestCancelled(manager, request);
+            clearPermaPending(request);
         } catch (Exception ex) {
             String token = request == null ? "<null>" : String.valueOf(request.getId());
             String msg = ex.getClass().getSimpleName() + ":" + (ex.getMessage() == null ? "<null>" : ex.getMessage());
@@ -210,6 +332,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
         try {
             super.onRequestedRequestComplete(manager, request);
+            clearPermaPending(request);
         } catch (Exception ex) {
             String token = request == null ? "<null>" : String.valueOf(request.getId());
             String msg = ex.getClass().getSimpleName() + ":" + (ex.getMessage() == null ? "<null>" : ex.getMessage());
@@ -225,7 +348,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     @Override
     public void onDestroyed() {
         super.onDestroyed();
-        getColony().getBuildingManager().removeWareHouse(this);
+        getColony().getServerBuildingManager().removeWareHouse(this);
         warehouseRegistered = false;
     }
 
@@ -236,6 +359,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             BlockEntity entity = world.getBlockEntity(pos);
             if (entity instanceof CreateShopBlockEntity shopBlock) {
                 shopBlock.setShopPos(getLocation().getInDimensionLocation());
+            }
+        }
+        if (block instanceof CreateShopOutputBlock) {
+            outputPos = pos;
+            BlockEntity entity = world.getBlockEntity(pos);
+            if (entity instanceof CreateShopOutputBlockEntity output) {
+                output.setShopPos(getLocation().getInDimensionLocation());
             }
         }
         if (block instanceof AbstractBlockMinecoloniesRack) {
@@ -331,7 +461,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (warehouseRegistered || getColony() == null) {
             return;
         }
-        var manager = getColony().getBuildingManager();
+        var manager = getColony().getServerBuildingManager();
         if (manager == null) {
             return;
         }
@@ -460,6 +590,751 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
                 shopBlock.setShopPos(getLocation().getInDimensionLocation());
             }
         }
+    }
+
+    public void setPermaWaitFullStack(boolean enabled) {
+        permaWaitFullStack = enabled;
+        setDirty();
+    }
+
+    public void setPermaOre(ResourceLocation itemId, boolean enabled) {
+        if (itemId == null) {
+            return;
+        }
+        if (enabled) {
+            permaOres.add(itemId);
+        } else {
+            permaOres.remove(itemId);
+        }
+        setDirty();
+    }
+
+    private void setDirty() {
+        if (getColony() != null) {
+            getColony().markDirty();
+        }
+    }
+
+    private void tickPermaRequests(IColony colony) {
+        if (colony == null || permaOres.isEmpty() || !canUsePermaRequests()) {
+            return;
+        }
+        Level level = colony.getWorld();
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (now - lastPermaRequestTick < PERMA_REQUEST_INTERVAL_TICKS) {
+            return;
+        }
+        lastPermaRequestTick = now;
+
+        IRequestManager manager = colony.getRequestManager();
+        if (manager == null) {
+            return;
+        }
+        IRequester requester = getRequester();
+        if (requester == null) {
+            return;
+        }
+
+        List<ResourceLocation> ordered = new ArrayList<>(permaOres);
+        ordered.sort(Comparator.comparing(ResourceLocation::toString));
+
+        for (ResourceLocation itemId : ordered) {
+            Item item = BuiltInRegistries.ITEM.get(itemId);
+            if (item == null || item == net.minecraft.world.item.Items.AIR) {
+                continue;
+            }
+            ItemStack stack = new ItemStack(item, 1);
+            int available = countInWarehouses(stack);
+            int pending = permaPendingCounts.getOrDefault(itemId, 0);
+            int requestable = Math.max(0, available - pending);
+            if (requestable <= 0) {
+                continue;
+            }
+            int maxStack = Math.max(1, stack.getMaxStackSize());
+            int amount = permaWaitFullStack
+                    ? (requestable / maxStack) * maxStack
+                    : requestable;
+            if (amount <= 0) {
+                continue;
+            }
+            Stack deliverable = new Stack(stack, amount, 1);
+            IToken<?> token = manager.createRequest(requester, deliverable);
+            if (token != null) {
+                permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
+                permaPendingCounts.merge(itemId, amount, Integer::sum);
+            }
+        }
+    }
+
+    private int countInWarehouses(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || getColony() == null) {
+            return 0;
+        }
+        var manager = getColony().getServerBuildingManager();
+        if (manager == null) {
+            return 0;
+        }
+        List<IWareHouse> warehouses = manager.getWareHouses();
+        if (warehouses == null || warehouses.isEmpty()) {
+            return 0;
+        }
+        int total = 0;
+        for (IWareHouse warehouse : warehouses) {
+            if (warehouse == null || warehouse == this) {
+                continue;
+            }
+            if (!(warehouse.getTileEntity() instanceof AbstractTileEntityWareHouse wareHouse)) {
+                continue;
+            }
+            for (var entry : wareHouse.getMatchingItemStacksInWarehouse(match -> matchesStack(match, stack))) {
+                ItemStack found = entry.getA();
+                if (found == null || found.isEmpty()) {
+                    continue;
+                }
+                total += found.getCount();
+            }
+        }
+        return Math.max(0, total);
+    }
+
+    private boolean matchesStack(ItemStack candidate, ItemStack target) {
+        if (candidate == null || target == null) {
+            return false;
+        }
+        return ItemStack.isSameItemSameComponents(candidate, target);
+    }
+
+    private void trySpawnBeltBlueprint(IColony colony) {
+        logBelt("trySpawn start: placed={} built={} level={} loc={}",
+                beltPlaced, isBuilt(), getBuildingLevel(), getLocation().getInDimensionLocation());
+        if (beltPlaced || colony == null || !isBuilt()) {
+            logBelt("trySpawn early-exit: placed={} colonyNull={} built={}",
+                    beltPlaced, colony == null, isBuilt());
+            return;
+        }
+        Level level = colony.getWorld();
+        if (!(level instanceof ServerLevel serverLevel)) {
+            logBelt("trySpawn exit: not server level: {}", level == null ? "<null>" : level.getClass().getName());
+            return;
+        }
+        Blueprint blueprint = loadBeltBlueprint(serverLevel);
+        if (blueprint == null) {
+            logBelt("trySpawn exit: belt blueprint missing");
+            return;
+        }
+        Blueprint baseBlueprint = loadBaseShopBlueprint(serverLevel);
+        BlockPos basePrimaryOffset = baseBlueprint == null ? null : baseBlueprint.getPrimaryBlockOffset();
+        BlockPos beltPrimaryOffset = blueprint.getPrimaryBlockOffset();
+        BlockPos beltAnchor = findBeltAnchor(blueprint);
+        if (beltAnchor != null) {
+            logBelt("belt anchor found at {}", beltAnchor);
+            if (placeBeltBlueprintAtAnchor(serverLevel, blueprint, beltAnchor, beltPrimaryOffset)) {
+                consumeBeltItem(colony);
+                beltPlaced = true;
+                setDirty();
+                logBelt("trySpawn completed: beltPlaced=true");
+                return;
+            }
+        } else {
+            logBelt("belt anchor missing (substitution blocks). knownBlocks={}", dumpBlueprintBlocks(blueprint, 12));
+        }
+        if (placeBeltBlueprintAtBuilding(serverLevel, blueprint, basePrimaryOffset, beltPrimaryOffset)) {
+            consumeBeltItem(colony);
+            beltPlaced = true;
+            setDirty();
+            logBelt("trySpawn completed: beltPlaced=true");
+            return;
+        }
+        List<BlockPos> blueprintAnchors = findAnchorShafts(blueprint);
+        if (blueprintAnchors.size() < 2 && baseBlueprint != null) {
+            List<BlockPos> baseAnchors = findAnchorShafts(baseBlueprint);
+            if (baseAnchors.size() >= 2) {
+                logBelt("using anchors from base blueprint");
+                blueprintAnchors = baseAnchors;
+            }
+        }
+        if (blueprintAnchors.size() < 2) {
+            logBelt("trySpawn exit: blueprint anchors <2 count={}", blueprintAnchors.size());
+            return;
+        }
+        List<BlockPos> worldAnchors = findWorldAnchorShafts(serverLevel, getLocation().getInDimensionLocation(), 10);
+        if (worldAnchors.size() < 2) {
+            logBelt("trySpawn exit: world anchors <2 count={}", worldAnchors.size());
+            return;
+        }
+        BeltTransform transform = findTransform(blueprintAnchors, worldAnchors, BlockPos.ZERO);
+        if (transform == null) {
+            logBelt("trySpawn exit: transform not found");
+            return;
+        }
+        placeBeltBlueprint(serverLevel, blueprint, transform);
+        boolean consumed = consumeBeltItem(colony);
+        logBelt("trySpawn placed belt blocks, consumedItem={}", consumed);
+        beltPlaced = true;
+        setDirty();
+        logBelt("trySpawn completed: beltPlaced=true");
+    }
+
+    @Nullable
+    private Blueprint loadBeltBlueprint(ServerLevel level) {
+        ResourceLocation primary = getBeltBlueprintPath();
+        ResourceLocation fallback = BELT_BLUEPRINT_L1;
+        logBelt("load blueprint: primary={} fallback={}", primary, fallback);
+        Blueprint blueprint = loadBeltBlueprintFromPath(level, primary);
+        if (blueprint != null) {
+            return blueprint;
+        }
+        if (!primary.equals(fallback)) {
+            return loadBeltBlueprintFromPath(level, fallback);
+        }
+        return null;
+    }
+
+    @Nullable
+    private Blueprint loadBeltBlueprintFromPath(ServerLevel level, ResourceLocation path) {
+        if (path == null) {
+            return null;
+        }
+        try {
+            var resourceManager = level.getServer().getResourceManager();
+            var resourceOpt = resourceManager.getResource(path);
+            if (resourceOpt.isEmpty()) {
+                logBelt("load blueprint missing resource: {}", path);
+                return null;
+            }
+            try (var input = resourceOpt.get().open()) {
+                CompoundTag tag = NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+                Blueprint blueprint = BlueprintUtil.readBlueprintFromNBT(tag, level.registryAccess());
+                logBelt("load blueprint ok: {} blocks={}", path,
+                        blueprint == null ? 0 : blueprint.getBlockInfoAsList().size());
+                return blueprint;
+            }
+        } catch (Exception ex) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] belt blueprint load failed: {}", ex.getMessage());
+            }
+            return null;
+        }
+    }
+
+    @Nullable
+    private Blueprint loadBaseShopBlueprint(ServerLevel level) {
+        String path = getBaseShopBlueprintPath();
+        if (path == null) {
+            return null;
+        }
+        try (var input = TheSettlerXCreate.class.getClassLoader().getResourceAsStream(path)) {
+            if (input == null) {
+                logBelt("base blueprint missing resource: {}", path);
+                return null;
+            }
+            CompoundTag tag = NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+            Blueprint blueprint = BlueprintUtil.readBlueprintFromNBT(tag, level.registryAccess());
+            logBelt("base blueprint ok: {} blocks={}", path,
+                    blueprint == null ? 0 : blueprint.getBlockInfoAsList().size());
+            return blueprint;
+        } catch (Exception ex) {
+            logBelt("base blueprint load failed: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    @Nullable
+    private String getBaseShopBlueprintPath() {
+        int level = Math.max(1, getBuildingLevel());
+        if (level >= 2) {
+            return "blueprints/" + TheSettlerXCreate.MODID + "/craftsmanship/storage/createshop2.blueprint";
+        }
+        return "blueprints/" + TheSettlerXCreate.MODID + "/craftsmanship/storage/createshop1.blueprint";
+    }
+
+    @Nullable
+    private ResourceLocation getBeltBlueprintPath() {
+        int level = Math.max(1, getBuildingLevel());
+        if (level >= 2) {
+            return BELT_BLUEPRINT_L2;
+        }
+        return BELT_BLUEPRINT_L1;
+    }
+
+    private List<BlockPos> findAnchorShafts(Blueprint blueprint) {
+        List<BlockPos> anchors = new ArrayList<>();
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null) {
+                continue;
+            }
+            if (isAnchorShaft(info.getState())) {
+                anchors.add(info.getPos());
+                if (anchors.size() >= 2) {
+                    break;
+                }
+            }
+        }
+        logBelt("blueprint anchors found count={} anchors={}", anchors.size(), anchors);
+        return anchors;
+    }
+
+    private List<BlockPos> findWorldAnchorShafts(ServerLevel level, BlockPos center, int radius) {
+        List<BlockPos> anchors = new ArrayList<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -3; dy <= 5; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    BlockPos pos = center.offset(dx, dy, dz);
+                    BlockState state = level.getBlockState(pos);
+                    if (isAnchorShaft(state)) {
+                        anchors.add(pos);
+                    }
+                }
+            }
+        }
+        logBelt("world anchors found count={} center={} radius={}", anchors.size(), center, radius);
+        return anchors;
+    }
+
+    private boolean isAnchorShaft(BlockState state) {
+        if (state == null) {
+            return false;
+        }
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        if (id == null) {
+            return false;
+        }
+        return SHAFT_BLOCK_ID.equals(id) || ENCASED_SHAFT_BLOCK_ID.equals(id);
+    }
+
+    @Nullable
+    private BeltTransform findTransform(List<BlockPos> blueprintAnchors, List<BlockPos> worldAnchors, BlockPos blueprintOffset) {
+        if (blueprintAnchors.size() < 2 || worldAnchors.size() < 2) {
+            return null;
+        }
+        BlockPos a = blueprintAnchors.get(0);
+        BlockPos b = blueprintAnchors.get(1);
+        List<Rotation> rotations = List.of(
+                Rotation.NONE,
+                Rotation.CLOCKWISE_90,
+                Rotation.CLOCKWISE_180,
+                Rotation.COUNTERCLOCKWISE_90
+        );
+
+        for (Rotation rotation : rotations) {
+            BlockPos ra = rotatePos(a, rotation);
+            BlockPos rb = rotatePos(b, rotation);
+            for (int i = 0; i < worldAnchors.size(); i++) {
+                for (int j = i + 1; j < worldAnchors.size(); j++) {
+                    BlockPos wa = worldAnchors.get(i);
+                    BlockPos wb = worldAnchors.get(j);
+                    if (vectorEquals(ra, rb, wa, wb)) {
+                        logBelt("transform match rotation={} anchorA={} anchorB={} worldA={} worldB={}",
+                                rotation, ra, rb, wa, wb);
+                        return new BeltTransform(rotation, wa.subtract(ra), blueprintOffset);
+                    }
+                    if (vectorEquals(ra, rb, wb, wa)) {
+                        logBelt("transform match rotation={} anchorA={} anchorB={} worldA={} worldB={}",
+                                rotation, ra, rb, wb, wa);
+                        return new BeltTransform(rotation, wb.subtract(ra), blueprintOffset);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean vectorEquals(BlockPos a, BlockPos b, BlockPos c, BlockPos d) {
+        return (b.getX() - a.getX()) == (d.getX() - c.getX())
+                && (b.getY() - a.getY()) == (d.getY() - c.getY())
+                && (b.getZ() - a.getZ()) == (d.getZ() - c.getZ());
+    }
+
+    private BlockPos rotatePos(BlockPos pos, Rotation rotation) {
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
+        return switch (rotation) {
+            case CLOCKWISE_90 -> new BlockPos(-z, y, x);
+            case CLOCKWISE_180 -> new BlockPos(-x, y, -z);
+            case COUNTERCLOCKWISE_90 -> new BlockPos(z, y, -x);
+            default -> pos;
+        };
+    }
+
+    private boolean placeBeltBlueprintAtBuilding(ServerLevel level, Blueprint blueprint, BlockPos basePrimaryOffset, BlockPos beltPrimaryOffset) {
+        if (level == null || blueprint == null) {
+            return false;
+        }
+        RotationMirror rotationMirror = getRotationMirror();
+        if (rotationMirror == null) {
+            rotationMirror = RotationMirror.NONE;
+        }
+        BlockPos baseOffset = basePrimaryOffset == null ? BlockPos.ZERO : basePrimaryOffset;
+        BlockPos beltOffset = beltPrimaryOffset == null ? BlockPos.ZERO : beltPrimaryOffset;
+        BlockPos adjust = baseOffset.subtract(beltOffset);
+        BlockPos buildingPos = getLocation().getInDimensionLocation();
+        BlockPos translation = buildingPos.subtract(baseOffset);
+        logBelt("place by rotationMirror={} basePrimary={} beltPrimary={} adjust={} translation={}",
+                rotationMirror, baseOffset, beltOffset, adjust, translation);
+        int placedCount = 0;
+        int logged = 0;
+        BlockPos min = null;
+        BlockPos max = null;
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null) {
+                continue;
+            }
+            BlockState state = info.getState();
+            if (state == null || state.isAir() || isBeltAnchor(state)) {
+                continue;
+            }
+            BlockPos local = info.getPos().offset(adjust);
+            BlockPos rotated = rotationMirror.applyToPos(local, baseOffset);
+            BlockPos worldPos = rotated.offset(translation);
+            BlockState placed = rotationMirror.applyToBlockState(state, level, worldPos);
+            level.setBlockAndUpdate(worldPos, placed);
+            applyTileEntityData(level, worldPos, info);
+            if (min == null) {
+                min = worldPos;
+                max = worldPos;
+            } else {
+                min = new BlockPos(
+                        Math.min(min.getX(), worldPos.getX()),
+                        Math.min(min.getY(), worldPos.getY()),
+                        Math.min(min.getZ(), worldPos.getZ())
+                );
+                max = new BlockPos(
+                        Math.max(max.getX(), worldPos.getX()),
+                        Math.max(max.getY(), worldPos.getY()),
+                        Math.max(max.getZ(), worldPos.getZ())
+                );
+            }
+            if (logged < 10) {
+                BlockState actual = level.getBlockState(worldPos);
+                logBelt("place block pos={} expected={} actual={}",
+                        worldPos, getBlockId(placed), getBlockId(actual));
+                logged++;
+            }
+            placedCount++;
+        }
+        logBelt("placed belt blocks (rotationMirror) count={} boundsMin={} boundsMax={}", placedCount, min, max);
+        return placedCount > 0;
+    }
+
+    private boolean placeBeltBlueprintAtAnchor(ServerLevel level, Blueprint blueprint, BlockPos beltAnchor, BlockPos beltPrimaryOffset) {
+        if (level == null || blueprint == null || beltAnchor == null) {
+            return false;
+        }
+        RotationMirror rotationMirror = getRotationMirror();
+        if (rotationMirror == null) {
+            rotationMirror = RotationMirror.NONE;
+        }
+        BlockPos beltOffset = beltPrimaryOffset == null ? BlockPos.ZERO : beltPrimaryOffset;
+        BlockPos hutPos = getPosition();
+        if (hutPos == null) {
+            hutPos = getLocation().getInDimensionLocation();
+        }
+        BlockPos targetAnchor = hutPos.below();
+        BlockPos rotatedAnchor = rotationMirror.applyToPos(beltAnchor, beltOffset);
+        BlockPos translation = targetAnchor.subtract(rotatedAnchor);
+        logBelt("place by belt anchor rotationMirror={} beltPrimary={} beltAnchor={} targetAnchor={} translation={}",
+                rotationMirror, beltOffset, beltAnchor, targetAnchor, translation);
+        int placedCount = 0;
+        int logged = 0;
+        BlockPos min = null;
+        BlockPos max = null;
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null) {
+                continue;
+            }
+            BlockState state = info.getState();
+            if (state == null || state.isAir() || isBeltAnchor(state)) {
+                continue;
+            }
+            BlockPos local = info.getPos();
+            BlockPos rotated = rotationMirror.applyToPos(local, beltOffset);
+            BlockPos worldPos = rotated.offset(translation);
+            BlockState placed = rotationMirror.applyToBlockState(state, level, worldPos);
+            level.setBlockAndUpdate(worldPos, placed);
+            applyTileEntityData(level, worldPos, info);
+            if (min == null) {
+                min = worldPos;
+                max = worldPos;
+            } else {
+                min = new BlockPos(
+                        Math.min(min.getX(), worldPos.getX()),
+                        Math.min(min.getY(), worldPos.getY()),
+                        Math.min(min.getZ(), worldPos.getZ())
+                );
+                max = new BlockPos(
+                        Math.max(max.getX(), worldPos.getX()),
+                        Math.max(max.getY(), worldPos.getY()),
+                        Math.max(max.getZ(), worldPos.getZ())
+                );
+            }
+            if (logged < 10) {
+                BlockState actual = level.getBlockState(worldPos);
+                logBelt("place block pos={} expected={} actual={}",
+                        worldPos, getBlockId(placed), getBlockId(actual));
+                logged++;
+            }
+            placedCount++;
+        }
+        logBelt("placed belt blocks (anchor) count={} boundsMin={} boundsMax={}", placedCount, min, max);
+        return placedCount > 0;
+    }
+
+    @Nullable
+    private BlockPos findBeltAnchor(Blueprint blueprint) {
+        if (blueprint == null) {
+            return null;
+        }
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null) {
+                continue;
+            }
+            if (isBeltAnchor(info.getState())) {
+                return info.getPos();
+            }
+        }
+        return null;
+    }
+
+    private boolean isBeltAnchor(BlockState state) {
+        if (state == null) {
+            return false;
+        }
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        if (id == null) {
+            return false;
+        }
+        return BELT_ANCHOR_BLOCK_IDS.contains(id);
+    }
+
+    private List<String> dumpBlueprintBlocks(Blueprint blueprint, int limit) {
+        List<String> ids = new ArrayList<>();
+        if (blueprint == null || limit <= 0) {
+            return ids;
+        }
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null || info.getState() == null) {
+                continue;
+            }
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(info.getState().getBlock());
+            if (id == null) {
+                continue;
+            }
+            String value = id.toString();
+            if (!ids.contains(value)) {
+                ids.add(value);
+                if (ids.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        return ids;
+    }
+
+    private void placeBeltBlueprint(ServerLevel level, Blueprint blueprint, BeltTransform transform) {
+        int placedCount = 0;
+        int logged = 0;
+        BlockPos min = null;
+        BlockPos max = null;
+        for (BlockInfo info : blueprint.getBlockInfoAsList()) {
+            if (info == null) {
+                continue;
+            }
+            BlockState state = info.getState();
+            if (state == null || state.isAir() || isBeltAnchor(state)) {
+                continue;
+            }
+            BlockPos local = info.getPos();
+            if (transform.blueprintOffset != null && !transform.blueprintOffset.equals(BlockPos.ZERO)) {
+                local = local.offset(transform.blueprintOffset);
+            }
+            BlockPos rotated = rotatePos(local, transform.rotation);
+            BlockPos worldPos = rotated.offset(transform.translation);
+            BlockState placed = state.rotate(transform.rotation);
+            level.setBlockAndUpdate(worldPos, placed);
+            applyTileEntityData(level, worldPos, info);
+            if (min == null) {
+                min = worldPos;
+                max = worldPos;
+            } else {
+                min = new BlockPos(
+                        Math.min(min.getX(), worldPos.getX()),
+                        Math.min(min.getY(), worldPos.getY()),
+                        Math.min(min.getZ(), worldPos.getZ())
+                );
+                max = new BlockPos(
+                        Math.max(max.getX(), worldPos.getX()),
+                        Math.max(max.getY(), worldPos.getY()),
+                        Math.max(max.getZ(), worldPos.getZ())
+                );
+            }
+            if (logged < 10) {
+                BlockState actual = level.getBlockState(worldPos);
+                logBelt("place block pos={} expected={} actual={}",
+                        worldPos, getBlockId(placed), getBlockId(actual));
+                logged++;
+            }
+            placedCount++;
+        }
+        logBelt("placed belt blocks count={} rotation={} translation={} offset={} boundsMin={} boundsMax={}",
+                placedCount, transform.rotation, transform.translation, transform.blueprintOffset, min, max);
+    }
+
+    private void applyTileEntityData(ServerLevel level, BlockPos worldPos, BlockInfo info) {
+        if (info == null || !info.hasTileEntityData()) {
+            return;
+        }
+        BlockEntity entity = level.getBlockEntity(worldPos);
+        if (entity == null) {
+            logBelt("tile entity missing at {}", worldPos);
+            return;
+        }
+        CompoundTag tag = info.getTileEntityData();
+        if (tag == null) {
+            return;
+        }
+        CompoundTag copy = tag.copy();
+        copy.putInt("x", worldPos.getX());
+        copy.putInt("y", worldPos.getY());
+        copy.putInt("z", worldPos.getZ());
+        try {
+            Class<?> providerClass = Class.forName("net.minecraft.core.HolderLookup$Provider");
+            var method = entity.getClass().getMethod("loadWithComponents", CompoundTag.class, providerClass);
+            method.invoke(entity, copy, level.registryAccess());
+            entity.setChanged();
+            return;
+        } catch (Exception ignored) {
+        }
+        try {
+            var method = entity.getClass().getMethod("load", CompoundTag.class);
+            method.invoke(entity, copy);
+            entity.setChanged();
+        } catch (Exception ex) {
+            logBelt("tile entity load failed at {} type={} err={}",
+                    worldPos, entity.getClass().getName(), ex.getMessage());
+        }
+    }
+
+    private String getBlockId(BlockState state) {
+        if (state == null) {
+            return "<null>";
+        }
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        return id == null ? "<unknown>" : id.toString();
+    }
+
+    private boolean consumeBeltItem(IColony colony) {
+        if (colony == null) {
+            logBelt("consume belt item skipped: colony null");
+            return false;
+        }
+        Item beltItem = BuiltInRegistries.ITEM.get(BELT_ITEM_ID);
+        if (beltItem == null || beltItem == net.minecraft.world.item.Items.AIR) {
+            logBelt("consume belt item skipped: belt item missing id={}", BELT_ITEM_ID);
+            return false;
+        }
+        return consumeFromBuilderHut(colony, beltItem);
+    }
+
+    private boolean consumeFromBuilderHut(IColony colony, Item beltItem) {
+        updateBuilderHutPos(colony);
+        var manager = colony.getCitizenManager();
+        if (manager == null || builderHutPos == null) {
+            logBelt("consume belt item skipped: builder hut missing managerNull={} hutPos={}",
+                    manager == null, builderHutPos);
+            return false;
+        }
+        var buildingManager = colony.getServerBuildingManager();
+        if (buildingManager == null) {
+            logBelt("consume belt item skipped: building manager missing");
+            return false;
+        }
+        var builderBuilding = buildingManager.getBuilding(builderHutPos);
+        if (builderBuilding == null) {
+            logBelt("consume belt item skipped: builder building missing at {}", builderHutPos);
+            return false;
+        }
+        for (var citizen : builderBuilding.getAllAssignedCitizen()) {
+            if (citizen == null || !(citizen.getJob() instanceof JobBuilder)) {
+                continue;
+            }
+            var inventory = citizen.getInventory();
+            if (inventory == null) {
+                continue;
+            }
+            if (removeOneFromHandler(inventory, beltItem)) {
+                logBelt("consume belt item ok: citizen={}", citizen.getName());
+                return true;
+            }
+        }
+        logBelt("consume belt item failed: no belt item found in builder hut inventory {}", builderHutPos);
+        return false;
+    }
+
+    private void updateBuilderHutPos(IColony colony) {
+        if (colony == null) {
+            return;
+        }
+        var workManager = colony.getWorkManager();
+        if (workManager == null) {
+            return;
+        }
+        var workOrders = workManager.getWorkOrdersOfType(com.minecolonies.core.colony.workorders.WorkOrderBuilding.class);
+        if (workOrders == null || workOrders.isEmpty()) {
+            logBelt("update builder hut: no work orders");
+            return;
+        }
+        BlockPos location = getLocation().getInDimensionLocation();
+        for (var order : workOrders) {
+            if (order == null || order.getLocation() == null) {
+                continue;
+            }
+            if (!order.getLocation().equals(location)) {
+                continue;
+            }
+            if (order.isClaimed() && order.getClaimedBy() != null) {
+                builderHutPos = order.getClaimedBy();
+                logBelt("update builder hut: claimed by {}", builderHutPos);
+                return;
+            }
+        }
+        logBelt("update builder hut: no claimed work order for {}", location);
+    }
+
+    private boolean removeOneFromHandler(net.neoforged.neoforge.items.IItemHandler handler, Item item) {
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            ItemStack stack = handler.getStackInSlot(slot);
+            if (stack.isEmpty() || stack.getItem() != item) {
+                continue;
+            }
+            ItemStack extracted = handler.extractItem(slot, 1, false);
+            if (!extracted.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final class BeltTransform {
+        private final Rotation rotation;
+        private final BlockPos translation;
+        private final BlockPos blueprintOffset;
+
+        private BeltTransform(Rotation rotation, BlockPos translation, BlockPos blueprintOffset) {
+            this.rotation = rotation;
+            this.translation = translation;
+            this.blueprintOffset = blueprintOffset;
+        }
+    }
+
+    private void logBelt(String message, Object... args) {
+        if (!DEBUG_REQUESTS) {
+            return;
+        }
+        TheSettlerXCreate.LOGGER.info("[CreateShop] belt: " + message, args);
     }
 
     private void debugCourierAssignments(IColony colony) {
@@ -700,7 +1575,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (colony == null) {
             return;
         }
-        var manager = colony.getBuildingManager();
+        var manager = colony.getServerBuildingManager();
         if (manager == null) {
             return;
         }
@@ -764,7 +1639,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (colony == null) {
             return;
         }
-        var manager = colony.getBuildingManager();
+        var manager = colony.getServerBuildingManager();
         if (manager == null) {
             return;
         }
@@ -1315,12 +2190,74 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         return base;
     }
 
+    private void clearPermaPending(com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
+        if (request == null || request.getId() == null) {
+            return;
+        }
+        PendingPermaRequest pending = permaPendingRequests.remove(request.getId());
+        if (pending == null) {
+            return;
+        }
+        permaPendingCounts.merge(pending.itemId, -pending.count, Integer::sum);
+        if (permaPendingCounts.getOrDefault(pending.itemId, 0) <= 0) {
+            permaPendingCounts.remove(pending.itemId);
+        }
+    }
+
+    public static List<ItemStack> getOreCandidates() {
+        List<ItemStack> stacks = new ArrayList<>();
+        TagKey<Item> primary = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "ores"));
+        TagKey<Item> fallback = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("forge", "ores"));
+        if (!collectTagItems(primary, stacks)) {
+            collectTagItems(fallback, stacks);
+        }
+        stacks.sort(Comparator.comparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
+        return stacks;
+    }
+
+    private static boolean collectTagItems(TagKey<Item> tag, List<ItemStack> stacks) {
+        var optional = BuiltInRegistries.ITEM.getTag(tag);
+        if (optional.isEmpty()) {
+            return false;
+        }
+        for (Holder<Item> holder : optional.get()) {
+            Item item = holder.value();
+            if (item == null || item == net.minecraft.world.item.Items.AIR) {
+                continue;
+            }
+            stacks.add(new ItemStack(item, 1));
+        }
+        return !stacks.isEmpty();
+    }
+
     @Override
     public void deserializeNBT(net.minecraft.core.HolderLookup.Provider provider, CompoundTag compound) {
         super.deserializeNBT(provider, compound);
         if (compound.contains(TAG_PICKUP_POS)) {
             pickupPos = BlockPos.of(compound.getLong(TAG_PICKUP_POS));
         }
+        if (compound.contains(TAG_OUTPUT_POS)) {
+            outputPos = BlockPos.of(compound.getLong(TAG_OUTPUT_POS));
+        }
+        if (compound.contains(TAG_BUILDER_HUT_POS)) {
+            builderHutPos = BlockPos.of(compound.getLong(TAG_BUILDER_HUT_POS));
+        }
+        permaOres.clear();
+        if (compound.contains(TAG_PERMA_ORES)) {
+            var list = compound.getList(TAG_PERMA_ORES, net.minecraft.nbt.Tag.TAG_STRING);
+            for (int i = 0; i < list.size(); i++) {
+                String key = list.getString(i);
+                if (key == null || key.isBlank()) {
+                    continue;
+                }
+                ResourceLocation id = ResourceLocation.tryParse(key);
+                if (id != null) {
+                    permaOres.add(id);
+                }
+            }
+        }
+        permaWaitFullStack = compound.getBoolean(TAG_PERMA_WAIT_FULL);
+        beltPlaced = compound.getBoolean(TAG_BELT_PLACED);
     }
 
     @Override
@@ -1329,7 +2266,36 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (pickupPos != null) {
             tag.putLong(TAG_PICKUP_POS, pickupPos.asLong());
         }
+        if (outputPos != null) {
+            tag.putLong(TAG_OUTPUT_POS, outputPos.asLong());
+        }
+        if (!permaOres.isEmpty()) {
+            net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+            for (ResourceLocation id : permaOres) {
+                list.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
+            }
+            tag.put(TAG_PERMA_ORES, list);
+        }
+        if (permaWaitFullStack) {
+            tag.putBoolean(TAG_PERMA_WAIT_FULL, true);
+        }
+        if (beltPlaced) {
+            tag.putBoolean(TAG_BELT_PLACED, true);
+        }
+        if (builderHutPos != null) {
+            tag.putLong(TAG_BUILDER_HUT_POS, builderHutPos.asLong());
+        }
         return tag;
+    }
+
+    private static final class PendingPermaRequest {
+        private final ResourceLocation itemId;
+        private final int count;
+
+        private PendingPermaRequest(ResourceLocation itemId, int count) {
+            this.itemId = itemId;
+            this.count = count;
+        }
     }
 
 }
