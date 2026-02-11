@@ -1,0 +1,15 @@
+{
+  "icon": "wooden.png",
+  "name": "TheSettler_x_Create",
+  "authors": [
+    "Gionatan"
+  ],
+  "desc": "Custom MineColonies pack for TheSettler_x_Create buildings.",
+  "mods": [
+    "structurize",
+    "minecolonies",
+    "thesettler_x_create"
+  ],
+  "version": "1",
+  "pack-format": "1"
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " L ",
+    "CCC",
+    "AAA"
+  ],
+  "key": {
+    "L": {
+      "item": "minecraft:lightning_rod"
+    },
+    "C": {
+      "item": "create:copper_sheet"
+    },
+    "A": {
+      "item": "create:andesite_alloy"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:network_link_tuner"
+  }
+}

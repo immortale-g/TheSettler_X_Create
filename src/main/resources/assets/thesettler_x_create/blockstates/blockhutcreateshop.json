@@ -1,0 +1,8 @@
+﻿{
+  "variants": {
+    "facing=east": { "model": "thesettler_x_create:block/blockhutcreateshop", "y": 0 },
+    "facing=south": { "model": "thesettler_x_create:block/blockhutcreateshop", "y": 90 },
+    "facing=west": { "model": "thesettler_x_create:block/blockhutcreateshop", "y": 180 },
+    "facing=north": { "model": "thesettler_x_create:block/blockhutcreateshop", "y": 270 }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PBP",
+    "PSP",
+    "PPP"
+  ],
+  "key": {
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "B": {
+      "item": "structurize:sceptergold"
+    },
+    "S": {
+      "item": "create:stock_link"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:blockhutcreateshop"
+  }
+}
