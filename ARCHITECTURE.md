@@ -3,6 +3,15 @@
 ## Purpose
 TheSettler_X_Create extends MineColonies with a Create-based shop building that can fulfill requests using Create stock networks and warehouse racks. The mod adds a Create Shop building, custom request resolver logic, and helper blocks to integrate the Create logistics system with MineColonies deliveries.
 
+## Provenance and API Constraints
+The module layout and class patterns in this project are constrained by the MineColonies request system and Create
+logistics APIs. Resolver factories, token-based serialization, and logistics summary calls follow the canonical
+patterns those APIs expect. Similar structure across mods that integrate with MineColonies and Create is therefore
+expected and does not imply shared code.
+
+TheSettler_X_Create differentiates itself through Create Shop-specific behavior (perma requests, belt blueprint
+placement, pickup/output block reservation logic, and Create network routing).
+
 ## Core Concepts
 - Create Shop building: a MineColonies building with its own request resolver that can fulfill requests from Create stock or racks.
 - Output and pickup blocks: custom block entities used to coordinate deliveries and reservations.
