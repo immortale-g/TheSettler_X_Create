@@ -6,7 +6,16 @@
     <button label="$(com.thesettler_x_create.gui.createshop.perma.wait_full_off)" id="waitFull" size="150 17" pos="20 28"
             source="minecolonies:textures/gui/builderhut/builder_button_medium.png" color="black"/>
 
-    <list id="oreList" size="164 160" pos="13 50">
+    <text id="searchLabel" size="150 10" pos="20 48" textalign="MIDDLE_LEFT" color="black"
+          label="$(com.thesettler_x_create.gui.createshop.perma.search)"/>
+    <input id="searchInput" size="150 16" pos="20 58" maxlength="64"/>
+
+    <button label="$(com.thesettler_x_create.gui.createshop.perma.all_on)" id="selectAll" size="70 14" pos="20 76"
+            source="minecolonies:textures/gui/builderhut/builder_button_very_small.png" color="black"/>
+    <button label="$(com.thesettler_x_create.gui.createshop.perma.all_off)" id="selectNone" size="70 14" pos="100 76"
+            source="minecolonies:textures/gui/builderhut/builder_button_very_small.png" color="black"/>
+
+    <list id="oreList" size="164 130" pos="13 92">
         <box size="100% 17" linewidth="1">
             <itemicon id="itemIcon" size="16 16" pos="2 0"/>
             <text id="itemName" size="100 12" pos="22 1" textalign="MIDDLE_LEFT" color="black"/>
