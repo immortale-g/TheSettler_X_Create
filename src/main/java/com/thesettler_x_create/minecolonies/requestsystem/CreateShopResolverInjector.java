@@ -46,7 +46,19 @@ public final class CreateShopResolverInjector {
 
         var resolverHandler = manager.getResolverHandler();
         var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
+        if (resolverHandler == null || store == null) {
+            if (allowDebugLog) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] Global resolver skipped (resolver handler/store missing)");
+            }
+            return;
+        }
         var assignments = store.getAssignments();
+        if (assignments == null) {
+            if (allowDebugLog) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] Global resolver skipped (assignments missing)");
+            }
+            return;
+        }
         var deliverableList = assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new java.util.ArrayList<>());
         var requestableList = assignments.computeIfAbsent(TypeConstants.REQUESTABLE, key -> new java.util.ArrayList<>());
         var toolList = assignments.computeIfAbsent(TypeConstants.TOOL, key -> new java.util.ArrayList<>());
@@ -220,6 +232,9 @@ public final class CreateShopResolverInjector {
         var resolverHandler = manager.getResolverHandler();
         var requestHandler = manager.getRequestHandler();
         var identities = manager.getRequestIdentitiesDataStore().getIdentities();
+        if (resolverHandler == null || requestHandler == null || identities == null) {
+            return;
+        }
         var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
         var typeAssignmentsStore = manager.getRequestableTypeRequestResolverAssignmentDataStore();
         var typeAssignments = typeAssignmentsStore == null ? null : typeAssignmentsStore.getAssignments();

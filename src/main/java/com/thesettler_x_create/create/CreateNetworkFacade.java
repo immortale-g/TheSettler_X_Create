@@ -184,17 +184,27 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
         if (!order.isEmpty()) {
             PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
-            LogisticsManager.broadcastPackageRequest(
-                    shop.getStockNetworkId(),
-                    LogisticallyLinkedBehaviour.RequestType.PLAYER,
-                    request,
-                    null,
-                    shop.getShopAddress()
-            );
-            if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-                com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                        "[CreateShop] Requested {} stack(s) from network {} to address '{}'",
-                        order.size(), shop.getStockNetworkId(), shop.getShopAddress());
+            try {
+                LogisticsManager.broadcastPackageRequest(
+                        shop.getStockNetworkId(),
+                        LogisticallyLinkedBehaviour.RequestType.PLAYER,
+                        request,
+                        null,
+                        shop.getShopAddress()
+                );
+                if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+                    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                            "[CreateShop] Requested {} stack(s) from network {} to address '{}'",
+                            order.size(), shop.getStockNetworkId(), shop.getShopAddress());
+                }
+            } catch (Exception ex) {
+                if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+                    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                            "[CreateShop] requestItems broadcast failed for {}: {}",
+                            shop.getStockNetworkId(),
+                            ex.getMessage() == null ? "<null>" : ex.getMessage());
+                }
+                return Collections.emptyList();
             }
         } else if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -223,7 +233,17 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         if (!hasNetwork()) {
             return null;
         }
-        return LogisticsManager.getSummaryOfNetwork(shop.getStockNetworkId(), true);
+        try {
+            return LogisticsManager.getSummaryOfNetwork(shop.getStockNetworkId(), true);
+        } catch (Exception ex) {
+            if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+                com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] Network summary lookup failed for {}: {}",
+                        shop.getStockNetworkId(),
+                        ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
+            return null;
+        }
     }
 
     private InventorySummary getSummaryWithLogging() {

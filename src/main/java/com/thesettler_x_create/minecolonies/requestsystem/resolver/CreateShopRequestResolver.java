@@ -96,7 +96,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
     @Override
     public boolean canResolveRequest(@NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+        if (manager == null || manager.getColony() == null) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (manager/colony missing)");
+            }
+            return false;
+        }
         Level level = manager.getColony().getWorld();
+        if (level == null) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (level missing)");
+            }
+            return false;
+        }
         if (level.isClientSide) {
             if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (no level or client)");
@@ -199,7 +211,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public List<IToken<?>> attemptResolveRequest(@NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+        if (manager == null || manager.getColony() == null) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (manager/colony missing)");
+            }
+            return Lists.newArrayList();
+        }
         Level level = manager.getColony().getWorld();
+        if (level == null) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (level missing)");
+            }
+            return Lists.newArrayList();
+        }
         if (level.isClientSide) {
             if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (no level or client)");
@@ -397,6 +421,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
     @SuppressWarnings("unchecked")
     public void tickPendingDeliveries(IRequestManager manager) {
+        if (manager == null || manager.getColony() == null || manager.getColony().getWorld() == null) {
+            return;
+        }
         if (!(manager instanceof IStandardRequestManager standardManager)) {
             return;
         }
@@ -638,7 +665,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     private void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
-        if (manager == null || request == null) {
+        if (manager == null || request == null || manager.getColony() == null) {
             return;
         }
         if (!(request.getRequest() instanceof Delivery delivery)) {
@@ -652,6 +679,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         ItemStack stack = delivery.getStack() == null ? ItemStack.EMPTY : delivery.getStack().copy();
 
         Level level = manager.getColony().getWorld();
+        if (level == null) {
+            pendingRequestCounts.put(parentToken, Math.max(1, stack.getCount()));
+            clearDeliveriesCreated(parentToken);
+            return;
+        }
         CreateShopBlockEntity pickup = null;
         BuildingCreateShop shop = getShop(manager);
         if (shop != null) {
@@ -705,11 +737,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-        if (manager == null || request == null) {
+        if (manager == null || request == null || manager.getColony() == null) {
             return;
         }
         IToken<?> parentToken = request.getParent();
         if (parentToken == null) {
+            return;
+        }
+        if (manager.getColony().getWorld() == null) {
+            clearDeliveriesCreated(parentToken);
+            pendingRequestCounts.remove(parentToken);
             return;
         }
         clearDeliveriesCreated(parentToken);
@@ -821,6 +858,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     private BuildingCreateShop getShop(IRequestManager manager) {
+        if (manager == null) {
+            return null;
+        }
         IColony colony = manager.getColony();
         if (colony == null) {
             return null;
@@ -935,7 +975,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         if (requester != null && !(requester instanceof SafeRequester)) {
             requester = new SafeRequester(requester);
         }
-        IToken<?> token = manager.createRequest(requester, delivery);
+        IToken<?> token;
+        try {
+            token = manager.createRequest(requester, delivery);
+        } catch (Exception ex) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] delivery create failed requester={} error={}",
+                        requester == null ? "<null>" : requester.getClass().getName(),
+                        ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
+            return Lists.newArrayList();
+        }
         if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
             String key = String.valueOf(token);
             if (deliveryCreateLogged.add(key)) {
