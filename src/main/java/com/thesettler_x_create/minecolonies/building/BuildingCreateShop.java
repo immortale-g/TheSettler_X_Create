@@ -89,6 +89,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             ResourceLocation.fromNamespaceAndPath("create", "andesite_encased_shaft");
     private static final long MISSING_NETWORK_WARNING_COOLDOWN = 6000L;
     private static final boolean DEBUG_REQUESTS = false;
+    private static final java.util.Set<String> REFLECTION_WARNED =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final String TAG_PICKUP_POS = "PickupPos";
     private static final String TAG_OUTPUT_POS = "OutputPos";
     private static final String TAG_PERMA_ORES = "PermaOres";
@@ -1270,13 +1272,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         copy.putInt("x", worldPos.getX());
         copy.putInt("y", worldPos.getY());
         copy.putInt("z", worldPos.getZ());
-        try {
-            Class<?> providerClass = Class.forName("net.minecraft.core.HolderLookup$Provider");
-            var method = entity.getClass().getMethod("loadWithComponents", CompoundTag.class, providerClass);
-            method.invoke(entity, copy, level.registryAccess());
-            entity.setChanged();
+        if (tryLoadWithComponents(entity, copy, level, worldPos)) {
             return;
-        } catch (Exception ignored) {
         }
         try {
             var method = entity.getClass().getMethod("load", CompoundTag.class);
@@ -1285,6 +1282,24 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         } catch (Exception ex) {
             logBelt("tile entity load failed at {} type={} err={}",
                     worldPos, entity.getClass().getName(), ex.getMessage());
+        }
+    }
+
+    private boolean tryLoadWithComponents(BlockEntity entity, CompoundTag copy, ServerLevel level, BlockPos worldPos) {
+        try {
+            var method = entity.getClass().getMethod(
+                    "loadWithComponents",
+                    CompoundTag.class,
+                    net.minecraft.core.HolderLookup.Provider.class);
+            method.invoke(entity, copy, level.registryAccess());
+            entity.setChanged();
+            return true;
+        } catch (NoSuchMethodException ignored) {
+            return false;
+        } catch (Exception ex) {
+            logBelt("tile entity loadWithComponents failed at {} type={} err={}",
+                    worldPos, entity.getClass().getName(), ex.getMessage());
+            return false;
         }
     }
 
@@ -2048,8 +2063,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     private Object getCitizenEntity(ICitizenData citizen, Level level) {
-        Object entityOpt = tryInvoke(citizen, "getEntity");
-        if (entityOpt instanceof java.util.Optional<?> opt && opt.isPresent()) {
+        java.util.Optional<com.minecolonies.api.entity.citizen.AbstractEntityCitizen> opt = citizen.getEntity();
+        if (opt.isPresent()) {
             return opt.get();
         }
         Object uuidValue = tryInvoke(citizen, "getUUID");
@@ -2157,27 +2172,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (citizen == null) {
             return "<unknown>";
         }
-        try {
-            var method = citizen.getClass().getMethod("getEntity");
-            Object entity = method.invoke(citizen);
-            if (entity != null) {
-                if (entity instanceof net.minecraft.world.entity.Entity mcEntity) {
-                    var pos = mcEntity.blockPosition();
-                    var dim = mcEntity.level().dimension();
-                    return "pos=" + pos + " dim=" + dim.location();
-                }
-                Object pos = tryInvoke(entity, "blockPosition");
-                if (pos != null) {
-                    return pos.toString();
-                }
-                pos = tryInvoke(entity, "position");
-                if (pos != null) {
-                    return pos.toString();
-                }
-            }
-            return "<entity-null>";
-        } catch (Exception ignored) {
-            // Ignore.
+        java.util.Optional<com.minecolonies.api.entity.citizen.AbstractEntityCitizen> entityOpt = citizen.getEntity();
+        if (entityOpt.isPresent()) {
+            var mcEntity = entityOpt.get();
+            var pos = mcEntity.blockPosition();
+            var dim = mcEntity.level().dimension();
+            return "pos=" + pos + " dim=" + dim.location();
         }
         try {
             var method = citizen.getClass().getMethod("getPosition");
@@ -2198,9 +2198,24 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         try {
             var method = target.getClass().getMethod(methodName);
             return method.invoke(target);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            logReflectionFailure(target, methodName, ex);
             return null;
         }
+    }
+
+    private void logReflectionFailure(Object target, String methodName, Exception ex) {
+        if (!DEBUG_REQUESTS || target == null) {
+            return;
+        }
+        String key = target.getClass().getName() + "#" + methodName + ":" + ex.getClass().getSimpleName();
+        if (!REFLECTION_WARNED.add(key)) {
+            return;
+        }
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] reflection call failed {} err={}",
+                key,
+                ex.getMessage() == null ? "<null>" : ex.getMessage());
     }
 
     private String describeTask(Object task) {

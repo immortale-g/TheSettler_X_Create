@@ -1374,8 +1374,13 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             if (value instanceof IStandardRequestManager standard) {
                 return standard;
             }
-        } catch (Exception ignored) {
-            // Ignore unwrap errors.
+        } catch (Exception ex) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] unwrap manager failed type={} err={}",
+                        manager.getClass().getName(),
+                        ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
         }
         return null;
     }

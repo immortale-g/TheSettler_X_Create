@@ -19,6 +19,8 @@ public final class CreateShopResolverInjector {
     private static long lastDeliveryDebugTime = 0L;
     private static int lastIdentityCount = -1;
     private static long lastIdentityLogTime = 0L;
+    private static final java.util.Set<String> REFLECTION_WARNED =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final java.util.Set<String> CHILD_CYCLE_LOGGED =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final long CHAIN_SANITIZE_COOLDOWN = 200L;
@@ -712,8 +714,23 @@ public final class CreateShopResolverInjector {
         try {
             var method = target.getClass().getMethod(methodName);
             return method.invoke(target);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            logReflectionFailure(target, methodName, ex);
             return null;
         }
+    }
+
+    private static void logReflectionFailure(Object target, String methodName, Exception ex) {
+        if (!Config.DEBUG_LOGGING.getAsBoolean() || target == null) {
+            return;
+        }
+        String key = target.getClass().getName() + "#" + methodName + ":" + ex.getClass().getSimpleName();
+        if (!REFLECTION_WARNED.add(key)) {
+            return;
+        }
+        TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] reflection call failed {} err={}",
+                key,
+                ex.getMessage() == null ? "<null>" : ex.getMessage());
     }
 }
