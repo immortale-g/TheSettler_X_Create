@@ -18,7 +18,6 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
-import com.thesettler_x_create.Config;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.create.ICreateNetworkFacade;
@@ -48,49 +47,33 @@ import java.util.UUID;
 public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver {
     // Keep above building/warehouse resolvers so CreateShop is evaluated before them.
     private static final int PRIORITY = 210;
-private static final java.util.Map<IToken<?>, Long> ORDERED_REQUESTS =
-            new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.Set<IToken<?>> DELIVERIES_CREATED =
+    private static final int MAX_CHAIN_SANITIZE_NODES = 512;
+
+    private final java.util.Map<IToken<?>, Long> orderedRequests = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<IToken<?>> deliveriesCreated =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final java.util.Map<IToken<?>, DeliveryParentInfo> DELIVERY_PARENTS =
+    private final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
             new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.Map<IToken<?>, Integer> PENDING_REQUEST_COUNTS =
+    private final java.util.Map<IToken<?>, Long> pendingNotices =
             new java.util.concurrent.ConcurrentHashMap<>();
-private static final java.util.Map<IToken<?>, Long> PENDING_NOTICES =
-        new java.util.concurrent.ConcurrentHashMap<>();
-private static long lastDeliveryAssignmentDebugTime = 0L;
-private static long lastTickPendingDebugTime = 0L;
-private static final java.util.Set<String> DELIVERY_LINK_LOGGED =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-private static final java.util.Set<String> DELIVERY_CREATE_LOGGED =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-private static final java.util.Set<String> COMPLETED_CHILD_LOGGED =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-private static final java.util.Map<IToken<?>, String> PARENT_CHILDREN_SNAPSHOTS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-private static final java.util.Map<IToken<?>, Long> PARENT_CHILDREN_RECHECK =
-        new java.util.concurrent.ConcurrentHashMap<>();
-private static final java.util.Map<IToken<?>, String> REQUEST_STATE_SNAPSHOTS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-private static final java.util.Map<IToken<?>, String> PENDING_REASON_SNAPSHOTS =
-        new java.util.concurrent.ConcurrentHashMap<>();
-private static final java.util.Set<String> CHAIN_CYCLE_LOGGED =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-private static final int MAX_CHAIN_SANITIZE_NODES = 512;
-
-    private static final class DeliveryParentInfo {
-        private final IToken<?> parentRequestToken;
-        private final java.util.UUID parentRequestId;
-        private final BlockPos pickupPos;
-        private final ItemStack stack;
-
-        private DeliveryParentInfo(IToken<?> parentRequestToken, java.util.UUID parentRequestId, BlockPos pickupPos, ItemStack stack) {
-            this.parentRequestToken = parentRequestToken;
-            this.parentRequestId = parentRequestId;
-            this.pickupPos = pickupPos;
-            this.stack = stack == null ? ItemStack.EMPTY : stack.copy();
-        }
-    }
+    private long lastDeliveryAssignmentDebugTime = 0L;
+    private long lastTickPendingDebugTime = 0L;
+    private final java.util.Set<String> deliveryLinkLogged =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private final java.util.Set<String> deliveryCreateLogged =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private final java.util.Set<String> completedChildLogged =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private final java.util.Map<IToken<?>, String> parentChildrenSnapshots =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<IToken<?>, Long> parentChildrenRecheck =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<IToken<?>, String> requestStateSnapshots =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<IToken<?>, String> pendingReasonSnapshots =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> chainCycleLogged =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     public CreateShopRequestResolver(ILocation location, IToken<?> token) {
         super(location, token);
@@ -299,7 +282,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             }
             // Track pending requests so we can detect items arriving in racks.
             markRequestOrdered(level, request.getId());
-            PENDING_REQUEST_COUNTS.put(request.getId(), Math.max(1, needed));
+            pendingRequestCounts.put(request.getId(), Math.max(1, needed));
             return Lists.newArrayList();
         }
 
@@ -362,7 +345,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
     public void resolveRequest(@NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
         // Do not complete requests that are still waiting on ordered goods.
         Level level = manager.getColony().getWorld();
-        boolean ordered = ORDERED_REQUESTS.containsKey(request.getId());
+        boolean ordered = orderedRequests.containsKey(request.getId());
         boolean cooldown = isRequestOnCooldown(level, request.getId());
         if (ordered || cooldown) {
             if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -430,7 +413,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         if (assigned != null) {
             pendingTokens.addAll(assigned);
         }
-        pendingTokens.addAll(ORDERED_REQUESTS.keySet());
+        pendingTokens.addAll(orderedRequests.keySet());
         if (pendingTokens.isEmpty()) {
             if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
                 TheSettlerXCreate.LOGGER.info(
@@ -440,7 +423,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         }
         if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
             int assignedCount = assigned == null ? 0 : assigned.size();
-            int orderedCount = ORDERED_REQUESTS.size();
+            int orderedCount = orderedRequests.size();
             TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] tickPending: assigned={}, ordered={}, total={}",
                     assignedCount,
@@ -482,8 +465,8 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             try {
                 request = requestHandler.getRequest(token);
             } catch (IllegalArgumentException ex) {
-                ORDERED_REQUESTS.remove(token);
-                PENDING_REQUEST_COUNTS.remove(token);
+                orderedRequests.remove(token);
+                pendingRequestCounts.remove(token);
                 continue;
             }
             logRequestStateChange(standardManager, token, "tickPending");
@@ -522,7 +505,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             int reservedForRequest = pickup.getReservedForRequest(requestId);
             int pendingCount = reservedForRequest;
             if (pendingCount <= 0) {
-                pendingCount = PENDING_REQUEST_COUNTS.getOrDefault(request.getId(), 0);
+                pendingCount = pendingRequestCounts.getOrDefault(request.getId(), 0);
             }
             if (pendingCount <= 0) {
                 logPendingReasonChange(
@@ -592,7 +575,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             if (reservedForRequest > 0) {
                 pickup.release(requestId);
             }
-            PENDING_REQUEST_COUNTS.remove(request.getId());
+            pendingRequestCounts.remove(request.getId());
             clearRequestCooldown(request.getId());
             if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
@@ -611,45 +594,97 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
     }
 
     public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
+        CreateShopRequestResolver resolver = findResolverForDelivery(manager, request);
+        if (resolver != null) {
+            resolver.handleDeliveryCancelled(manager, request);
+        }
+    }
+
+    public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+        CreateShopRequestResolver resolver = findResolverForDelivery(manager, request);
+        if (resolver != null) {
+            resolver.handleDeliveryComplete(manager, request);
+        }
+    }
+
+    private static CreateShopRequestResolver findResolverForDelivery(IRequestManager manager, IRequest<?> request) {
+        if (manager == null || request == null) {
+            return null;
+        }
+        IStandardRequestManager standard = unwrapStandardManager(manager);
+        if (standard == null) {
+            return null;
+        }
+        IRequest<?> parent = null;
+        try {
+            IToken<?> parentToken = request.getParent();
+            if (parentToken != null && standard.getRequestHandler() != null) {
+                parent = standard.getRequestHandler().getRequest(parentToken);
+            }
+        } catch (Exception ignored) {
+            // Ignore lookup errors.
+        }
+        try {
+            var resolver = parent == null
+                    ? standard.getResolverHandler().getResolverForRequest(request)
+                    : standard.getResolverHandler().getResolverForRequest(parent);
+            if (resolver instanceof CreateShopRequestResolver shopResolver) {
+                return shopResolver;
+            }
+        } catch (Exception ignored) {
+            // Ignore lookup errors.
+        }
+        return null;
+    }
+
+    private void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
+        if (manager == null || request == null) {
+            return;
+        }
         if (!(request.getRequest() instanceof Delivery delivery)) {
             return;
         }
-        DeliveryParentInfo info = DELIVERY_PARENTS.remove(request.getId());
-        if (info == null || info.parentRequestToken == null || info.parentRequestId == null) {
+        IToken<?> parentToken = request.getParent();
+        if (parentToken == null) {
             return;
         }
+        UUID parentRequestId = toRequestId(parentToken);
+        ItemStack stack = delivery.getStack() == null ? ItemStack.EMPTY : delivery.getStack().copy();
+
         Level level = manager.getColony().getWorld();
         CreateShopBlockEntity pickup = null;
-        if (info.pickupPos != null) {
-            BlockEntity entity = level.getBlockEntity(info.pickupPos);
-            if (entity instanceof CreateShopBlockEntity shopPickup) {
-                pickup = shopPickup;
-            }
+        BuildingCreateShop shop = getShop(manager);
+        if (shop != null) {
+            pickup = shop.getPickupBlockEntity();
         }
         if (pickup == null) {
-            BlockPos start = delivery.getStart().getInDimensionLocation();
-            BlockEntity entity = level.getBlockEntity(start);
-            if (entity instanceof CreateShopBlockEntity shopPickup) {
-                pickup = shopPickup;
+            BlockPos start = delivery.getStart() == null ? null : delivery.getStart().getInDimensionLocation();
+            if (start != null) {
+                BlockEntity entity = level.getBlockEntity(start);
+                if (entity instanceof CreateShopBlockEntity shopPickup) {
+                    pickup = shopPickup;
+                }
             }
         }
-        int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(info.parentRequestId);
-        int pendingCount = reservedForRequest > 0 ? reservedForRequest : Math.max(1, info.stack.getCount());
+
+        int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
+        int pendingCount = reservedForRequest > 0 ? reservedForRequest : Math.max(1, stack.getCount());
         if (pickup != null) {
-            pickup.release(info.parentRequestId);
+            pickup.release(parentRequestId);
         }
-        PENDING_REQUEST_COUNTS.put(info.parentRequestToken, pendingCount);
-        markRequestOrdered(level, info.parentRequestToken);
-        clearDeliveriesCreated(info.parentRequestToken);
+        pendingRequestCounts.put(parentToken, pendingCount);
+        markRequestOrdered(level, parentToken);
+        clearDeliveriesCreated(parentToken);
+
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(info.stack);
+            int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
             logDeliveryDiagnostics(
                     "cancel",
                     manager,
                     request.getId(),
-                    info.parentRequestId,
+                    parentRequestId,
                     pickup == null ? null : pickup.getBlockPos(),
-                    info.stack,
+                    stack,
                     delivery.getTarget(),
                     reservedForRequest,
                     -1,
@@ -657,35 +692,43 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} reserved={} pickup={}",
                     request.getId(),
-                    info.parentRequestToken,
+                    parentToken,
                     pendingCount,
                     reservedForRequest,
                     pickup == null ? "<none>" : pickup.getBlockPos());
-            if (manager instanceof IStandardRequestManager standardManager) {
-                logParentChildrenState(standardManager, info.parentRequestToken, "delivery-cancel");
-                scheduleParentChildRecheck(standardManager, info.parentRequestToken);
+            IStandardRequestManager standard = unwrapStandardManager(manager);
+            if (standard != null) {
+                logParentChildrenState(standard, parentToken, "delivery-cancel");
+                scheduleParentChildRecheck(standard, parentToken);
             }
         }
     }
 
-    public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-        DeliveryParentInfo info = DELIVERY_PARENTS.remove(request.getId());
-        if (info != null && info.parentRequestToken != null) {
-            clearDeliveriesCreated(info.parentRequestToken);
-            PENDING_REQUEST_COUNTS.remove(info.parentRequestToken);
-            if (Config.DEBUG_LOGGING.getAsBoolean() && manager instanceof IStandardRequestManager standardManager) {
+    private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+        if (manager == null || request == null) {
+            return;
+        }
+        IToken<?> parentToken = request.getParent();
+        if (parentToken == null) {
+            return;
+        }
+        clearDeliveriesCreated(parentToken);
+        pendingRequestCounts.remove(parentToken);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            IStandardRequestManager standard = unwrapStandardManager(manager);
+            if (standard != null) {
                 try {
-                    var handler = standardManager.getRequestHandler();
-                    IRequest<?> parent = handler.getRequest(info.parentRequestToken);
+                    var handler = standard.getRequestHandler();
+                    IRequest<?> parent = handler.getRequest(parentToken);
                     String parentState = String.valueOf(parent.getState());
                     boolean hasChildren = parent.hasChildren();
                     TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] delivery complete parent={} state={} hasChildren={}",
-                            info.parentRequestToken,
+                            parentToken,
                             parentState,
                             hasChildren);
-                    logParentChildrenState(standardManager, info.parentRequestToken, "delivery-complete");
-                    scheduleParentChildRecheck(standardManager, info.parentRequestToken);
+                    logParentChildrenState(standard, parentToken, "delivery-complete");
+                    scheduleParentChildRecheck(standard, parentToken);
                 } catch (Exception ignored) {
                     // Ignore lookup errors.
                 }
@@ -698,7 +741,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         releaseReservation(manager, request);
         clearRequestCooldown(request.getId());
         clearDeliveriesCreated(request.getId());
-        PENDING_REQUEST_COUNTS.remove(request.getId());
+        pendingRequestCounts.remove(request.getId());
     }
 
     @Override
@@ -706,14 +749,14 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         releaseReservation(manager, request);
         clearRequestCooldown(request.getId());
         clearDeliveriesCreated(request.getId());
-        PENDING_REQUEST_COUNTS.remove(request.getId());
+        pendingRequestCounts.remove(request.getId());
     }
 
     @Override
     public void onRequestedRequestComplete(@NotNull IRequestManager manager, @NotNull IRequest<?> request) {
         clearRequestCooldown(request.getId());
         clearDeliveriesCreated(request.getId());
-        PENDING_REQUEST_COUNTS.remove(request.getId());
+        pendingRequestCounts.remove(request.getId());
         if (request.getRequest() instanceof IDeliverable) {
             releaseReservation(manager, (IRequest<? extends IDeliverable>) request);
         }
@@ -723,7 +766,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
     public void onRequestedRequestCancelled(@NotNull IRequestManager manager, @NotNull IRequest<?> request) {
         clearRequestCooldown(request.getId());
         clearDeliveriesCreated(request.getId());
-        PENDING_REQUEST_COUNTS.remove(request.getId());
+        pendingRequestCounts.remove(request.getId());
         if (request.getRequest() instanceof IDeliverable) {
             releaseReservation(manager, (IRequest<? extends IDeliverable>) request);
         }
@@ -895,7 +938,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         IToken<?> token = manager.createRequest(requester, delivery);
         if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
             String key = String.valueOf(token);
-            if (DELIVERY_CREATE_LOGGED.add(key)) {
+            if (deliveryCreateLogged.add(key)) {
                 TheSettlerXCreate.LOGGER.info(
                         "[CreateShop] delivery create token={} requesterClass={} managerClass={}",
                         token,
@@ -928,28 +971,21 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
                 }
             }
         }
-        if (token != null) {
-            DELIVERY_PARENTS.put(token, new DeliveryParentInfo(
-                    request.getId(),
+        if (token != null && Config.DEBUG_LOGGING.getAsBoolean()) {
+            int reservedForRequest = pickup.getReservedForRequest(toRequestId(request.getId()));
+            int reservedForDeliverable = request.getRequest() == null ? -1 : pickup.getReservedForDeliverable(request.getRequest());
+            int reservedForStack = pickup.getReservedFor(selected);
+            logDeliveryDiagnostics(
+                    "create",
+                    manager,
+                    token,
                     toRequestId(request.getId()),
                     startPos,
-                    selected.copy()));
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-                int reservedForRequest = pickup.getReservedForRequest(toRequestId(request.getId()));
-                int reservedForDeliverable = request.getRequest() == null ? -1 : pickup.getReservedForDeliverable(request.getRequest());
-                int reservedForStack = pickup.getReservedFor(selected);
-                logDeliveryDiagnostics(
-                        "create",
-                        manager,
-                        token,
-                        toRequestId(request.getId()),
-                        startPos,
-                        selected,
-                        request.getRequester() == null ? null : request.getRequester().getLocation(),
-                        reservedForRequest,
-                        reservedForDeliverable,
-                        reservedForStack);
-            }
+                    selected,
+                    request.getRequester() == null ? null : request.getRequester().getLocation(),
+                    reservedForRequest,
+                    reservedForDeliverable,
+                    reservedForStack);
         }
         if (token != null && manager instanceof IStandardRequestManager standardManager) {
             try {
@@ -1140,7 +1176,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         return token == null ? Lists.newArrayList() : Lists.newArrayList(token);
     }
 
-    public static void logParentChildrenState(
+    public void logParentChildrenState(
             IStandardRequestManager manager,
             IToken<?> parentToken,
             String phase
@@ -1171,7 +1207,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             }
             snapshot = builder.toString();
         }
-        String previous = PARENT_CHILDREN_SNAPSHOTS.put(parentToken, snapshot);
+        String previous = parentChildrenSnapshots.put(parentToken, snapshot);
         if (!snapshot.equals(previous)) {
             TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] parent children {} parent={} {}",
@@ -1181,7 +1217,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         }
     }
 
-    private static void logRequestStateChange(
+    private void logRequestStateChange(
             IStandardRequestManager manager,
             IToken<?> token,
             String phase
@@ -1193,7 +1229,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
             var handler = manager.getRequestHandler();
             IRequest<?> request = handler.getRequest(token);
             String state = String.valueOf(request.getState());
-            String previous = REQUEST_STATE_SNAPSHOTS.put(token, state);
+            String previous = requestStateSnapshots.put(token, state);
             if (state.equals(previous)) {
                 return;
             }
@@ -1214,11 +1250,11 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         }
     }
 
-    private static void logPendingReasonChange(IToken<?> token, String reason) {
+    private void logPendingReasonChange(IToken<?> token, String reason) {
         if (!Config.DEBUG_LOGGING.getAsBoolean()) {
             return;
         }
-        String previous = PENDING_REASON_SNAPSHOTS.put(token, reason);
+        String previous = pendingReasonSnapshots.put(token, reason);
         if (reason.equals(previous)) {
             return;
         }
@@ -1229,17 +1265,17 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
                 previous == null ? "<none>" : previous);
     }
 
-    private static void scheduleParentChildRecheck(IStandardRequestManager manager, IToken<?> parentToken) {
+    private void scheduleParentChildRecheck(IStandardRequestManager manager, IToken<?> parentToken) {
         var level = manager.getColony().getWorld();
-        PARENT_CHILDREN_RECHECK.put(parentToken, level.getGameTime() + 20L);
+        parentChildrenRecheck.put(parentToken, level.getGameTime() + 20L);
     }
 
-    private static void processParentChildRechecks(IStandardRequestManager manager, Level level) {
-        if (PARENT_CHILDREN_RECHECK.isEmpty()) {
+    private void processParentChildRechecks(IStandardRequestManager manager, Level level) {
+        if (parentChildrenRecheck.isEmpty()) {
             return;
         }
         long now = level.getGameTime();
-        var iterator = PARENT_CHILDREN_RECHECK.entrySet().iterator();
+        var iterator = parentChildrenRecheck.entrySet().iterator();
         while (iterator.hasNext()) {
             var entry = iterator.next();
             Long due = entry.getValue();
@@ -1251,7 +1287,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         }
     }
 
-    private static void sanitizeRequestChain(IRequestManager manager, IRequest<?> root) {
+    private void sanitizeRequestChain(IRequestManager manager, IRequest<?> root) {
         if (manager == null || root == null) {
             return;
         }
@@ -1302,7 +1338,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
                 parent.removeChild(childToken);
                 if (Config.DEBUG_LOGGING.getAsBoolean()) {
                     String key = "self:" + parentToken;
-                    if (CHAIN_CYCLE_LOGGED.add(key)) {
+                    if (chainCycleLogged.add(key)) {
                         TheSettlerXCreate.LOGGER.info("[CreateShop] removed self-cycle in request chain {}", parentToken);
                     }
                 }
@@ -1312,7 +1348,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
                 parent.removeChild(childToken);
                 if (Config.DEBUG_LOGGING.getAsBoolean()) {
                     String key = "cycle:" + parentToken + ":" + childToken;
-                    if (CHAIN_CYCLE_LOGGED.add(key)) {
+                    if (chainCycleLogged.add(key)) {
                         TheSettlerXCreate.LOGGER.info(
                                 "[CreateShop] removed request chain cycle parent={} child={}",
                                 parentToken,
@@ -1385,14 +1421,14 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         return null;
     }
 
-    private static void logDeliveryLinkState(
+    private void logDeliveryLinkState(
             String stage,
             IStandardRequestManager manager,
             IToken<?> parentToken,
             IToken<?> childToken
     ) {
         String key = stage + ":" + childToken;
-        if (!DELIVERY_LINK_LOGGED.add(key)) {
+        if (!deliveryLinkLogged.add(key)) {
             return;
         }
         try {
@@ -1419,49 +1455,49 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
     }
 
 
-    private static boolean isRequestOnCooldown(Level level, IToken<?> token) {
-        Long until = ORDERED_REQUESTS.get(token);
+    private boolean isRequestOnCooldown(Level level, IToken<?> token) {
+        Long until = orderedRequests.get(token);
         if (until == null) {
             return false;
         }
         long now = level.getGameTime();
         if (now >= until) {
-            ORDERED_REQUESTS.remove(token);
+            orderedRequests.remove(token);
             return false;
         }
         return true;
     }
 
-    private static void markRequestOrdered(Level level, IToken<?> token) {
-        ORDERED_REQUESTS.put(token, level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong());
+    private void markRequestOrdered(Level level, IToken<?> token) {
+        orderedRequests.put(token, level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong());
     }
 
-    private static void clearRequestCooldown(IToken<?> token) {
-        ORDERED_REQUESTS.remove(token);
+    private void clearRequestCooldown(IToken<?> token) {
+        orderedRequests.remove(token);
     }
 
-    private static boolean hasDeliveriesCreated(IToken<?> token) {
-        return DELIVERIES_CREATED.contains(token);
+    private boolean hasDeliveriesCreated(IToken<?> token) {
+        return deliveriesCreated.contains(token);
     }
 
-    private static void markDeliveriesCreated(IToken<?> token) {
-        DELIVERIES_CREATED.add(token);
+    private void markDeliveriesCreated(IToken<?> token) {
+        deliveriesCreated.add(token);
     }
 
-    private static void clearDeliveriesCreated(IToken<?> token) {
-        DELIVERIES_CREATED.remove(token);
+    private void clearDeliveriesCreated(IToken<?> token) {
+        deliveriesCreated.remove(token);
     }
 
     private boolean shouldNotifyPending(Level level, IToken<?> token) {
         if (level == null || token == null) {
             return false;
         }
-        Long next = PENDING_NOTICES.get(token);
+        Long next = pendingNotices.get(token);
         long now = level.getGameTime();
         if (next != null && now < next) {
             return false;
         }
-        PENDING_NOTICES.put(token, now + Config.PENDING_NOTICE_COOLDOWN.getAsLong());
+        pendingNotices.put(token, now + Config.PENDING_NOTICE_COOLDOWN.getAsLong());
         return true;
     }
 
@@ -1639,4 +1675,6 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         return type.getMiningLevel(stack);
     }
 }
+
+
 
