@@ -44,8 +44,8 @@ import org.jetbrains.annotations.NotNull;
  * Request resolver that fulfills deliverable requests from Create Shop stock and warehouse racks.
  */
 public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver {
-  // Keep above building/warehouse resolvers so CreateShop is evaluated before them.
-  private static final int PRIORITY = 210;
+    // Keep below warehouse resolvers so MineColonies prefers warehouse stock before Create Shop.
+    private static final int PRIORITY = 140;
   private static final int MAX_CHAIN_SANITIZE_NODES = 512;
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
