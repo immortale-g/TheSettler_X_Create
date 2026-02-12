@@ -22,6 +22,10 @@ eclipse
 run
 runs
 run-data
+tmp_blueprint_dump
+tmp_minecolonies_xml
+tmp_requesthandler_javap.txt
+tmp_resolverhandler_javap.txt
 
 repo
 Backups/
