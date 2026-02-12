@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -126,30 +127,30 @@ public class CreateShopBlockEntity extends BlockEntity {
         return total;
     }
 
-    public int consumeReserved(ItemStack key, int amount) {
-        if (amount <= 0) {
-            return 0;
-        }
-        cleanExpired();
-        int remaining = amount;
-        Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
-        while (iterator.hasNext() && remaining > 0) {
-            Reservation reservation = iterator.next().getValue();
-            if (!matches(reservation.stackKey, key)) {
-                continue;
-            }
-            int taken = Math.min(remaining, reservation.reservedAmount);
-            reservation.reservedAmount -= taken;
-            remaining -= taken;
-            if (reservation.reservedAmount <= 0) {
-                iterator.remove();
-            }
-        }
-        if (remaining != amount) {
-            setChanged();
-        }
-        return amount - remaining;
-    }
+//    public int consumeReserved(ItemStack key, int amount) {
+//        if (amount <= 0) {
+//            return 0;
+//        }
+//        cleanExpired();
+//        int remaining = amount;
+//        Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
+//        while (iterator.hasNext() && remaining > 0) {
+//            Reservation reservation = iterator.next().getValue();
+//            if (!matches(reservation.stackKey, key)) {
+//                continue;
+//            }
+//            int taken = Math.min(remaining, reservation.reservedAmount);
+//            reservation.reservedAmount -= taken;
+//            remaining -= taken;
+//            if (reservation.reservedAmount <= 0) {
+//                iterator.remove();
+//            }
+//        }
+//        if (remaining != amount) {
+//            setChanged();
+//        }
+//        return amount - remaining;
+//    }
 
     public java.util.List<ItemStack> getReservedStacksSnapshot() {
         cleanExpired();
@@ -195,7 +196,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+    public void loadAdditional(@NotNull CompoundTag tag, @NotNull net.minecraft.core.HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.contains(TAG_SHOP_POS)) {
             shopPos = BlockPos.of(tag.getLong(TAG_SHOP_POS));
@@ -221,7 +222,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+    public void saveAdditional(@NotNull CompoundTag tag, @NotNull net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         if (shopPos != null) {
             tag.putLong(TAG_SHOP_POS, shopPos.asLong());
@@ -238,6 +239,7 @@ public class CreateShopBlockEntity extends BlockEntity {
         tag.put(TAG_RESERVATIONS, resTag);
     }
 
+    @SuppressWarnings("unused")
     public IItemHandler getItemHandler(@Nullable Direction side) {
         return itemHandler;
     }
