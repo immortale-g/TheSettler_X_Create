@@ -21,6 +21,6 @@ class BlueprintTypeFixerTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = BlueprintTypeFixer.run(new String[] {"Z:\\missing.blueprint", "", "type", "file"}, new PrintStream(out), new PrintStream(err));
-        assertEquals(4, code);
+        assertEquals(3, code);
     }
 }

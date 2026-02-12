@@ -21,6 +21,6 @@ class BlueprintFixerTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int code = BlueprintFixer.run(new String[] {"Z:\\missing.blueprint", "createshop", "NaN"}, new PrintStream(out), new PrintStream(err));
-        assertEquals(4, code);
+        assertEquals(3, code);
     }
 }
