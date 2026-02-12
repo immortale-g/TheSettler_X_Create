@@ -67,6 +67,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
+/**
+ * Create Shop building integration with MineColonies request system and Create network.
+ */
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     public static final String SCHEMATIC_NAME = "createshop";
     private static final int PERMA_MIN_BUILDING_LEVEL = 2;

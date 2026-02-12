@@ -8,6 +8,9 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 
+/**
+ * Hooks Create Shop request resolvers into the MineColonies request system.
+ */
 public final class CreateShopResolverInjector {
     private static final java.util.Map<com.minecolonies.api.colony.requestsystem.token.IToken<?>, Long> REASSIGN_ATTEMPTS =
             new java.util.concurrent.ConcurrentHashMap<>();

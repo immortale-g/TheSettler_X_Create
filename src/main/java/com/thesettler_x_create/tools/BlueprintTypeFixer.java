@@ -10,6 +10,9 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 
+/**
+ * CLI tool that updates hut tile entity metadata inside a blueprint.
+ */
 public final class BlueprintTypeFixer {
     private BlueprintTypeFixer() {
     }

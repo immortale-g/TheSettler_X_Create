@@ -9,6 +9,9 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 
+/**
+ * CLI tool that dumps key metadata fields from a Structurize/MineColonies blueprint NBT.
+ */
 public final class BlueprintDump {
     private BlueprintDump() {
     }

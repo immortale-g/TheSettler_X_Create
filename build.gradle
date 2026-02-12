@@ -127,6 +127,7 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
     testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

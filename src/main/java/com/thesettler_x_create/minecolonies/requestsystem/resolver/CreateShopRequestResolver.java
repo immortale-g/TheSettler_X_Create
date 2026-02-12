@@ -41,6 +41,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Request resolver that fulfills deliverable requests from Create Shop stock and warehouse racks.
+ */
 public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver {
     // Keep above building/warehouse resolvers so CreateShop is evaluated before them.
     private static final int PRIORITY = 210;
