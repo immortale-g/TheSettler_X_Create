@@ -6,29 +6,30 @@ import com.thesettler_x_create.minecolonies.client.gui.CreateShopAddressModuleWi
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
 public class CreateShopAddressModuleView extends AbstractBuildingModuleView {
-    private String address = "";
+  private String address = "";
 
-    @Override
-    public void deserialize(RegistryFriendlyByteBuf buf) {
-        address = buf.readUtf(64);
-    }
+  @Override
+  public void deserialize(RegistryFriendlyByteBuf buf) {
+    address = buf.readUtf(64);
+  }
 
-    public String getAddress() {
-        return address == null ? "" : address;
-    }
+  public String getAddress() {
+    return address == null ? "" : address;
+  }
 
-    @Override
-    public BOWindow getWindow() {
-        return new CreateShopAddressModuleWindow(this);
-    }
+  @Override
+  public BOWindow getWindow() {
+    return new CreateShopAddressModuleWindow(this);
+  }
 
-    @Override
-    public String getIcon() {
-        return "settings";
-    }
+  @Override
+  public String getIcon() {
+    return "settings";
+  }
 
-    @Override
-    public net.minecraft.network.chat.Component getDesc() {
-        return net.minecraft.network.chat.Component.translatable("com.thesettler_x_create.gui.createshop.address");
-    }
+  @Override
+  public net.minecraft.network.chat.Component getDesc() {
+    return net.minecraft.network.chat.Component.translatable(
+        "com.thesettler_x_create.gui.createshop.address");
+  }
 }

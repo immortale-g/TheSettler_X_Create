@@ -9,27 +9,27 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 public record CreateShopTestRequestPayload(BlockPos pos, ItemStack stack, int amount)
-        implements CustomPacketPayload {
+    implements CustomPacketPayload {
 
-    public static final Type<CreateShopTestRequestPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "create_shop_test_request"));
+  public static final Type<CreateShopTestRequestPayload> TYPE =
+      new Type<>(
+          ResourceLocation.fromNamespaceAndPath(
+              TheSettlerXCreate.MODID, "create_shop_test_request"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, CreateShopTestRequestPayload> STREAM_CODEC =
-            StreamCodec.of(
-                    (buf, payload) -> {
-                        buf.writeBlockPos(payload.pos);
-                        ItemStack.STREAM_CODEC.encode(buf, payload.stack);
-                        buf.writeVarInt(payload.amount);
-                    },
-                    buf -> new CreateShopTestRequestPayload(
-                            buf.readBlockPos(),
-                            ItemStack.STREAM_CODEC.decode(buf),
-                            buf.readVarInt()
-                    )
-            );
+  public static final StreamCodec<RegistryFriendlyByteBuf, CreateShopTestRequestPayload>
+      STREAM_CODEC =
+          StreamCodec.of(
+              (buf, payload) -> {
+                buf.writeBlockPos(payload.pos);
+                ItemStack.STREAM_CODEC.encode(buf, payload.stack);
+                buf.writeVarInt(payload.amount);
+              },
+              buf ->
+                  new CreateShopTestRequestPayload(
+                      buf.readBlockPos(), ItemStack.STREAM_CODEC.decode(buf), buf.readVarInt()));
 
-    @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
+  @Override
+  public Type<? extends CustomPacketPayload> type() {
+    return TYPE;
+  }
 }

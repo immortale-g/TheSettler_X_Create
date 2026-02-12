@@ -9,13 +9,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 public class CreateShopOutputBlock extends Block implements EntityBlock {
-    public CreateShopOutputBlock(Properties properties) {
-        super(properties);
-    }
+  public CreateShopOutputBlock(Properties properties) {
+    super(properties);
+  }
 
-    @Nullable
-    @Override
-    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new CreateShopOutputBlockEntity(pos, state);
-    }
+  @Nullable
+  @Override
+  public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+    return new CreateShopOutputBlockEntity(pos, state);
+  }
 }

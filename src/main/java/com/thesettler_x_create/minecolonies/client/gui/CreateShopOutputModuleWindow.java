@@ -7,29 +7,32 @@ import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleVie
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.Locale;
-
 public class CreateShopOutputModuleWindow extends AbstractModuleWindow<CreateShopOutputModuleView> {
-    private final CreateShopOutputModuleView moduleView;
+  private final CreateShopOutputModuleView moduleView;
 
-    public CreateShopOutputModuleWindow(CreateShopOutputModuleView moduleView) {
-        super(moduleView, ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_output.xml"));
-        this.moduleView = moduleView;
+  public CreateShopOutputModuleWindow(CreateShopOutputModuleView moduleView) {
+    super(
+        moduleView,
+        ResourceLocation.fromNamespaceAndPath(
+            TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_output.xml"));
+    this.moduleView = moduleView;
 
-        Text desc = findPaneOfTypeByID("desc", Text.class);
-        if (desc != null) {
-            desc.setText(moduleView.getDesc());
-        }
-
-        Text status = findPaneOfTypeByID("status", Text.class);
-        if (status != null) {
-            if (moduleView.isLinked()) {
-                status.setText(Component.translatable(
-                        "com.thesettler_x_create.gui.createshop.output.linked",
-                        String.valueOf(moduleView.getOutputPos())));
-            } else {
-                status.setText(Component.translatable("com.thesettler_x_create.gui.createshop.output.missing"));
-            }
-        }
+    Text desc = findPaneOfTypeByID("desc", Text.class);
+    if (desc != null) {
+      desc.setText(moduleView.getDesc());
     }
+
+    Text status = findPaneOfTypeByID("status", Text.class);
+    if (status != null) {
+      if (moduleView.isLinked()) {
+        status.setText(
+            Component.translatable(
+                "com.thesettler_x_create.gui.createshop.output.linked",
+                String.valueOf(moduleView.getOutputPos())));
+      } else {
+        status.setText(
+            Component.translatable("com.thesettler_x_create.gui.createshop.output.missing"));
+      }
+    }
+  }
 }

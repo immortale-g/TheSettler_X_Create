@@ -1,20 +1,19 @@
 package com.thesettler_x_create.create;
 
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import java.util.List;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.List;
-
 public interface ICreateNetworkFacade {
-    int getAvailable(IDeliverable deliverable);
+  int getAvailable(IDeliverable deliverable);
 
-    int getAvailable(ItemStack stack);
+  int getAvailable(ItemStack stack);
 
-    List<ItemStack> getAvailableStacks();
+  List<ItemStack> getAvailableStacks();
 
-    ItemStack extract(ItemStack stack, int amount, boolean simulate);
+  ItemStack extract(ItemStack stack, int amount, boolean simulate);
 
-    List<ItemStack> planItems(IDeliverable deliverable, int amount);
+  List<ItemStack> planItems(IDeliverable deliverable, int amount);
 
-    List<ItemStack> requestItems(IDeliverable deliverable, int amount);
+  List<ItemStack> requestItems(IDeliverable deliverable, int amount);
 }

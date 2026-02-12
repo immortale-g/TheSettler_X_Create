@@ -11,16 +11,17 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 public final class ModMenus {
-    private ModMenus() {
-    }
+  private ModMenus() {}
 
-    public static final DeferredRegister<MenuType<?>> MENUS =
-            DeferredRegister.create(Registries.MENU, TheSettlerXCreate.MODID);
+  public static final DeferredRegister<MenuType<?>> MENUS =
+      DeferredRegister.create(Registries.MENU, TheSettlerXCreate.MODID);
 
-    public static final DeferredHolder<MenuType<?>, MenuType<CreateShopMenu>> CREATE_SHOP =
-            MENUS.register("create_shop", () -> IMenuTypeExtension.create((IContainerFactory<CreateShopMenu>) CreateShopMenu::new));
+  public static final DeferredHolder<MenuType<?>, MenuType<CreateShopMenu>> CREATE_SHOP =
+      MENUS.register(
+          "create_shop",
+          () -> IMenuTypeExtension.create((IContainerFactory<CreateShopMenu>) CreateShopMenu::new));
 
-    public static void register(IEventBus bus) {
-        MENUS.register(bus);
-    }
+  public static void register(IEventBus bus) {
+    MENUS.register(bus);
+  }
 }

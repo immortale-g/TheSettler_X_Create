@@ -8,19 +8,18 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
 
 public final class MineColoniesPickupCompat {
-    private MineColoniesPickupCompat() {
-    }
+  private MineColoniesPickupCompat() {}
 
-    public static boolean isValidPickupSource(Level level, BlockPos pos) {
-        if (level == null || pos == null) {
-            return false;
-        }
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be == null) {
-            return false;
-        }
-        BlockState state = be.getBlockState();
-        return Capabilities.ItemHandler.BLOCK.getCapability(level, pos, state, be, Direction.UP) != null
-                || Capabilities.ItemHandler.BLOCK.getCapability(level, pos, state, be, null) != null;
+  public static boolean isValidPickupSource(Level level, BlockPos pos) {
+    if (level == null || pos == null) {
+      return false;
     }
+    BlockEntity be = level.getBlockEntity(pos);
+    if (be == null) {
+      return false;
+    }
+    BlockState state = be.getBlockState();
+    return Capabilities.ItemHandler.BLOCK.getCapability(level, pos, state, be, Direction.UP) != null
+        || Capabilities.ItemHandler.BLOCK.getCapability(level, pos, state, be, null) != null;
+  }
 }

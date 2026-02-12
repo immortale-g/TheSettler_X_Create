@@ -6,13 +6,12 @@ import com.minecolonies.core.entity.ai.workers.AbstractAISkeleton;
 import com.thesettler_x_create.minecolonies.ai.EntityAIWorkCreateShop;
 
 public class JobCreateShop extends AbstractJob<AbstractAISkeleton<JobCreateShop>, JobCreateShop> {
-    public JobCreateShop(final ICitizenData citizen) {
-        super(citizen);
-    }
+  public JobCreateShop(final ICitizenData citizen) {
+    super(citizen);
+  }
 
-    @Override
-    public AbstractAISkeleton<JobCreateShop> generateAI() {
-        return new EntityAIWorkCreateShop(this);
-    }
-
+  @Override
+  public AbstractAISkeleton<JobCreateShop> generateAI() {
+    return new EntityAIWorkCreateShop(this);
+  }
 }

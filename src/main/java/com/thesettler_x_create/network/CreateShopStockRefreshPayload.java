@@ -8,17 +8,19 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record CreateShopStockRefreshPayload(BlockPos pos) implements CustomPacketPayload {
-    public static final Type<CreateShopStockRefreshPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "create_shop_stock_refresh"));
+  public static final Type<CreateShopStockRefreshPayload> TYPE =
+      new Type<>(
+          ResourceLocation.fromNamespaceAndPath(
+              TheSettlerXCreate.MODID, "create_shop_stock_refresh"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, CreateShopStockRefreshPayload> STREAM_CODEC =
-            StreamCodec.of(
-                    (buf, payload) -> buf.writeBlockPos(payload.pos),
-                    buf -> new CreateShopStockRefreshPayload(buf.readBlockPos())
-            );
+  public static final StreamCodec<RegistryFriendlyByteBuf, CreateShopStockRefreshPayload>
+      STREAM_CODEC =
+          StreamCodec.of(
+              (buf, payload) -> buf.writeBlockPos(payload.pos),
+              buf -> new CreateShopStockRefreshPayload(buf.readBlockPos()));
 
-    @Override
-    public Type<? extends CustomPacketPayload> type() {
-        return TYPE;
-    }
+  @Override
+  public Type<? extends CustomPacketPayload> type() {
+    return TYPE;
+  }
 }
