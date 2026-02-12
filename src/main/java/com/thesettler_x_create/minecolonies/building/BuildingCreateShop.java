@@ -88,7 +88,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     private static final ResourceLocation ENCASED_SHAFT_BLOCK_ID =
             ResourceLocation.fromNamespaceAndPath("create", "andesite_encased_shaft");
     private static final long MISSING_NETWORK_WARNING_COOLDOWN = 6000L;
-    private static final boolean DEBUG_REQUESTS = true;
+    private static final boolean DEBUG_REQUESTS = false;
     private static final String TAG_PICKUP_POS = "PickupPos";
     private static final String TAG_OUTPUT_POS = "OutputPos";
     private static final String TAG_PERMA_ORES = "PermaOres";
@@ -264,7 +264,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         super.requestRepair(pos);
         beltRebuildPending = true;
-        trySpawnBeltBlueprint(getColony());
     }
 
     @Override
@@ -296,7 +295,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(colony);
         ensurePickupLink();
-        if (beltRebuildPending && isBuilt()) {
+        if (beltRebuildPending && isBuilt() && !hasActiveWorkOrder(colony)) {
             if (trySpawnBeltBlueprint(colony)) {
                 beltRebuildPending = false;
             }
@@ -621,24 +620,47 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
     private void tickPermaRequests(IColony colony) {
         if (colony == null || permaOres.isEmpty() || !canUsePermaRequests()) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",
+                        colony == null ? "<null>" : colony.getID(),
+                        permaOres.size(),
+                        canUsePermaRequests());
+            }
             return;
         }
         Level level = colony.getWorld();
         if (level == null || level.isClientSide) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: level={}", level);
+            }
             return;
         }
         long now = level.getGameTime();
         if (now - lastPermaRequestTick < PERMA_REQUEST_INTERVAL_TICKS) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] perma tick throttled: now={} last={} diff={}",
+                        now,
+                        lastPermaRequestTick,
+                        now - lastPermaRequestTick);
+            }
             return;
         }
         lastPermaRequestTick = now;
 
         IRequestManager manager = colony.getRequestManager();
         if (manager == null) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: request manager null");
+            }
             return;
         }
         IRequester requester = getRequester();
         if (requester == null) {
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: requester null");
+            }
             return;
         }
 
@@ -648,12 +670,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         for (ResourceLocation itemId : ordered) {
             Item item = BuiltInRegistries.ITEM.get(itemId);
             if (item == null || item == net.minecraft.world.item.Items.AIR) {
+                if (DEBUG_REQUESTS) {
+                    TheSettlerXCreate.LOGGER.info("[CreateShop] perma skip: missing item {}", itemId);
+                }
                 continue;
             }
             ItemStack stack = new ItemStack(item, 1);
             int available = countInWarehouses(stack);
             int pending = permaPendingCounts.getOrDefault(itemId, 0);
             int requestable = Math.max(0, available - pending);
+            if (DEBUG_REQUESTS) {
+                TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] perma eval item={} available={} pending={} requestable={} waitFull={}",
+                        itemId, available, pending, requestable, permaWaitFullStack);
+            }
             if (requestable <= 0) {
                 continue;
             }
@@ -669,6 +699,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             if (token != null) {
                 permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
                 permaPendingCounts.merge(itemId, amount, Integer::sum);
+                if (DEBUG_REQUESTS) {
+                    TheSettlerXCreate.LOGGER.info(
+                            "[CreateShop] perma request created token={} item={} amount={}",
+                            token, itemId, amount);
+                }
             }
         }
     }
@@ -732,6 +767,27 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             logBelt("trySpawn completed: beltPlacedLevel={}", beltLevel);
         }
         return true;
+    }
+
+    private boolean hasActiveWorkOrder(IColony colony) {
+        if (colony == null || colony.getWorkManager() == null) {
+            return false;
+        }
+        var workOrders = colony.getWorkManager()
+                .getWorkOrdersOfType(com.minecolonies.core.colony.workorders.WorkOrderBuilding.class);
+        if (workOrders == null || workOrders.isEmpty()) {
+            return false;
+        }
+        BlockPos location = getLocation().getInDimensionLocation();
+        for (var order : workOrders) {
+            if (order == null || order.getLocation() == null) {
+                continue;
+            }
+            if (order.getLocation().equals(location)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean trySpawnBeltBlueprintForLevel(IColony colony, ServerLevel serverLevel, int beltLevel) {
