@@ -93,7 +93,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     private static final String TAG_OUTPUT_POS = "OutputPos";
     private static final String TAG_PERMA_ORES = "PermaOres";
     private static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
-    private static final String TAG_BELT_PLACED = "BeltPlaced";
     private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
     private static final long COURIER_DEBUG_COOLDOWN = 200L;
     private static final long COURIER_ENTITY_DEBUG_COOLDOWN = 400L;
@@ -123,8 +122,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     private long lastPermaRequestTick;
     private final Map<IToken<?>, PendingPermaRequest> permaPendingRequests = new java.util.HashMap<>();
     private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
-    private boolean beltPlaced;
     private BlockPos builderHutPos;
+    private boolean beltRebuildPending;
 
     public BuildingCreateShop(IColony colony, BlockPos location) {
         super(colony, location);
@@ -141,8 +140,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         this.shopResolver = null;
         this.permaWaitFullStack = false;
         this.lastPermaRequestTick = 0L;
-        this.beltPlaced = false;
         this.builderHutPos = null;
+        this.beltRebuildPending = false;
     }
 
     @Override
@@ -242,9 +241,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     @Override
     public Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> getRequiredItemsAndAmount() {
         Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> base = super.getRequiredItemsAndAmount();
-        if (beltPlaced) {
-            return base;
-        }
         Item beltItem = BuiltInRegistries.ITEM.get(BELT_ITEM_ID);
         if (beltItem == null || beltItem == net.minecraft.world.item.Items.AIR) {
             return base;
@@ -267,6 +263,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             }
         }
         super.requestRepair(pos);
+        beltRebuildPending = true;
+        trySpawnBeltBlueprint(getColony());
     }
 
     @Override
@@ -276,6 +274,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(getColony());
         ensurePickupLink();
+        beltRebuildPending = true;
         trySpawnBeltBlueprint(getColony());
     }
 
@@ -286,6 +285,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(getColony());
         ensurePickupLink();
+        beltRebuildPending = true;
         trySpawnBeltBlueprint(getColony());
     }
 
@@ -296,7 +296,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         ensureDeliverableAssignment();
         com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector.ensureGlobalResolver(colony);
         ensurePickupLink();
-        trySpawnBeltBlueprint(colony);
+        if (beltRebuildPending && isBuilt()) {
+            if (trySpawnBeltBlueprint(colony)) {
+                beltRebuildPending = false;
+            }
+        }
         tickPermaRequests(colony);
         if (colony != null) {
             CreateShopRequestResolver resolver = getOrCreateShopResolver();
@@ -707,46 +711,52 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         return ItemStack.isSameItemSameComponents(candidate, target);
     }
 
-    private void trySpawnBeltBlueprint(IColony colony) {
-        logBelt("trySpawn start: placed={} built={} level={} loc={}",
-                beltPlaced, isBuilt(), getBuildingLevel(), getLocation().getInDimensionLocation());
-        if (beltPlaced || colony == null || !isBuilt()) {
-            logBelt("trySpawn early-exit: placed={} colonyNull={} built={}",
-                    beltPlaced, colony == null, isBuilt());
-            return;
+    private boolean trySpawnBeltBlueprint(IColony colony) {
+        int targetLevel = Math.max(1, getBuildingLevel());
+        logBelt("trySpawn start: targetLevel={} built={} level={} loc={}",
+                targetLevel, isBuilt(), getBuildingLevel(), getLocation().getInDimensionLocation());
+        if (colony == null || !isBuilt()) {
+            logBelt("trySpawn early-exit: targetLevel={} colonyNull={} built={}",
+                    targetLevel, colony == null, isBuilt());
+            return false;
         }
         Level level = colony.getWorld();
         if (!(level instanceof ServerLevel serverLevel)) {
             logBelt("trySpawn exit: not server level: {}", level == null ? "<null>" : level.getClass().getName());
-            return;
+            return false;
         }
-        Blueprint blueprint = loadBeltBlueprint(serverLevel);
+        for (int beltLevel = 1; beltLevel <= targetLevel; beltLevel++) {
+            if (!trySpawnBeltBlueprintForLevel(colony, serverLevel, beltLevel)) {
+                return false;
+            }
+            logBelt("trySpawn completed: beltPlacedLevel={}", beltLevel);
+        }
+        return true;
+    }
+
+    private boolean trySpawnBeltBlueprintForLevel(IColony colony, ServerLevel serverLevel, int beltLevel) {
+        Blueprint blueprint = loadBeltBlueprint(serverLevel, beltLevel);
         if (blueprint == null) {
-            logBelt("trySpawn exit: belt blueprint missing");
-            return;
+            logBelt("trySpawn exit: belt blueprint missing level={}", beltLevel);
+            return false;
         }
         Blueprint baseBlueprint = loadBaseShopBlueprint(serverLevel);
         BlockPos basePrimaryOffset = baseBlueprint == null ? null : baseBlueprint.getPrimaryBlockOffset();
         BlockPos beltPrimaryOffset = blueprint.getPrimaryBlockOffset();
         BlockPos beltAnchor = findBeltAnchor(blueprint);
         if (beltAnchor != null) {
-            logBelt("belt anchor found at {}", beltAnchor);
+            logBelt("belt anchor found at {} (level={})", beltAnchor, beltLevel);
             if (placeBeltBlueprintAtAnchor(serverLevel, blueprint, beltAnchor, beltPrimaryOffset)) {
                 consumeBeltItem(colony);
-                beltPlaced = true;
-                setDirty();
-                logBelt("trySpawn completed: beltPlaced=true");
-                return;
+                return true;
             }
         } else {
-            logBelt("belt anchor missing (substitution blocks). knownBlocks={}", dumpBlueprintBlocks(blueprint, 12));
+            logBelt("belt anchor missing (substitution blocks) level={} knownBlocks={}",
+                    beltLevel, dumpBlueprintBlocks(blueprint, 12));
         }
         if (placeBeltBlueprintAtBuilding(serverLevel, blueprint, basePrimaryOffset, beltPrimaryOffset)) {
             consumeBeltItem(colony);
-            beltPlaced = true;
-            setDirty();
-            logBelt("trySpawn completed: beltPlaced=true");
-            return;
+            return true;
         }
         List<BlockPos> blueprintAnchors = findAnchorShafts(blueprint);
         if (blueprintAnchors.size() < 2 && baseBlueprint != null) {
@@ -757,30 +767,28 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             }
         }
         if (blueprintAnchors.size() < 2) {
-            logBelt("trySpawn exit: blueprint anchors <2 count={}", blueprintAnchors.size());
-            return;
+            logBelt("trySpawn exit: blueprint anchors <2 count={} level={}", blueprintAnchors.size(), beltLevel);
+            return false;
         }
         List<BlockPos> worldAnchors = findWorldAnchorShafts(serverLevel, getLocation().getInDimensionLocation(), 10);
         if (worldAnchors.size() < 2) {
-            logBelt("trySpawn exit: world anchors <2 count={}", worldAnchors.size());
-            return;
+            logBelt("trySpawn exit: world anchors <2 count={} level={}", worldAnchors.size(), beltLevel);
+            return false;
         }
         BeltTransform transform = findTransform(blueprintAnchors, worldAnchors, BlockPos.ZERO);
         if (transform == null) {
-            logBelt("trySpawn exit: transform not found");
-            return;
+            logBelt("trySpawn exit: transform not found level={}", beltLevel);
+            return false;
         }
         placeBeltBlueprint(serverLevel, blueprint, transform);
         boolean consumed = consumeBeltItem(colony);
-        logBelt("trySpawn placed belt blocks, consumedItem={}", consumed);
-        beltPlaced = true;
-        setDirty();
-        logBelt("trySpawn completed: beltPlaced=true");
+        logBelt("trySpawn placed belt blocks level={} consumedItem={}", beltLevel, consumed);
+        return true;
     }
 
     @Nullable
-    private Blueprint loadBeltBlueprint(ServerLevel level) {
-        ResourceLocation primary = getBeltBlueprintPath();
+    private Blueprint loadBeltBlueprint(ServerLevel level, int beltLevel) {
+        ResourceLocation primary = getBeltBlueprintPath(beltLevel);
         ResourceLocation fallback = BELT_BLUEPRINT_L1;
         logBelt("load blueprint: primary={} fallback={}", primary, fallback);
         Blueprint blueprint = loadBeltBlueprintFromPath(level, primary);
@@ -854,6 +862,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     @Nullable
     private ResourceLocation getBeltBlueprintPath() {
         int level = Math.max(1, getBuildingLevel());
+        return getBeltBlueprintPath(level);
+    }
+
+    @Nullable
+    private ResourceLocation getBeltBlueprintPath(int beltLevel) {
+        int level = Math.max(1, beltLevel);
         if (level >= 2) {
             return BELT_BLUEPRINT_L2;
         }
@@ -2257,7 +2271,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             }
         }
         permaWaitFullStack = compound.getBoolean(TAG_PERMA_WAIT_FULL);
-        beltPlaced = compound.getBoolean(TAG_BELT_PLACED);
     }
 
     @Override
@@ -2278,9 +2291,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         if (permaWaitFullStack) {
             tag.putBoolean(TAG_PERMA_WAIT_FULL, true);
-        }
-        if (beltPlaced) {
-            tag.putBoolean(TAG_BELT_PLACED, true);
         }
         if (builderHutPos != null) {
             tag.putLong(TAG_BUILDER_HUT_POS, builderHutPos.asLong());

@@ -1,9 +1,22 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "ingredients": [
-    { "item": "minecraft:barrel" },
-    { "item": "minecraft:redstone" }
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PBP",
+    "PSP",
+    "PPP"
   ],
+  "key": {
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "B": {
+      "item": "structurize:sceptergold"
+    },
+    "S": {
+      "item": "create:packager"
+    }
+  },
   "result": {
     "count": 1,
     "id": "thesettler_x_create:create_shop_output"
