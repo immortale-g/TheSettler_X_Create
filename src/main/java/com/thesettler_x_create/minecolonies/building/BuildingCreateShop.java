@@ -33,6 +33,7 @@ import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
+import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
@@ -72,8 +73,6 @@ import java.util.function.Predicate;
  */
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     public static final String SCHEMATIC_NAME = "createshop";
-    private static final int PERMA_MIN_BUILDING_LEVEL = 2;
-    private static final long PERMA_REQUEST_INTERVAL_TICKS = 200L;
     private static final ResourceLocation BELT_BLUEPRINT_L1 =
             ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "blueprints_internal/createshop1_belt.blueprint");
     private static final ResourceLocation BELT_BLUEPRINT_L2 =
@@ -90,8 +89,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             ResourceLocation.fromNamespaceAndPath("create", "shaft");
     private static final ResourceLocation ENCASED_SHAFT_BLOCK_ID =
             ResourceLocation.fromNamespaceAndPath("create", "andesite_encased_shaft");
-    private static final long MISSING_NETWORK_WARNING_COOLDOWN = 6000L;
-    private static final boolean DEBUG_REQUESTS = false;
+    private static boolean isDebugRequests() {
+        return Config.DEBUG_LOGGING.getAsBoolean();
+    }
     private static final java.util.Set<String> REFLECTION_WARNED =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final String TAG_PICKUP_POS = "PickupPos";
@@ -99,8 +99,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     private static final String TAG_PERMA_ORES = "PermaOres";
     private static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
     private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
-    private static final long COURIER_DEBUG_COOLDOWN = 200L;
-    private static final long COURIER_ENTITY_DEBUG_COOLDOWN = 400L;
 
     private long lastMissingNetworkWarning;
     private long lastCourierDebugTime;
@@ -163,7 +161,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     public boolean canAccessWareHouse(ICitizenData citizen) {
         CourierAssignmentModule module = getFirstModuleOccurance(CourierAssignmentModule.class);
         boolean result = module != null && module.hasAssignedCitizen(citizen);
-        if (DEBUG_REQUESTS) {
+        if (isDebugRequests()) {
             logAccessCheck(citizen, result);
         }
         return result;
@@ -235,7 +233,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     public boolean canUsePermaRequests() {
-        return isBuilt() && getBuildingLevel() >= PERMA_MIN_BUILDING_LEVEL;
+        return isBuilt() && getBuildingLevel() >= Config.PERMA_MIN_BUILDING_LEVEL.getAsInt();
     }
 
     @Override
@@ -419,7 +417,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
         builder.add(new PickupRequestResolver(location, pickupResolverToken));
 
-        if (DEBUG_REQUESTS) {
+        if (isDebugRequests()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] createResolvers at {} -> {}",
                     getLocation().getInDimensionLocation(), builder.build().size()
@@ -456,7 +454,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             return;
         }
         long gameTime = shop.getLevel().getGameTime();
-        if (gameTime - lastMissingNetworkWarning <= MISSING_NETWORK_WARNING_COOLDOWN) {
+        if (gameTime - lastMissingNetworkWarning <= Config.MISSING_NETWORK_WARNING_COOLDOWN.getAsLong()) {
             return;
         }
         lastMissingNetworkWarning = gameTime;
@@ -508,12 +506,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             try {
                 resolverHandler.registerResolver(shopResolver);
                 registered = true;
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] registered resolver {}", shopResolver.getId());
                 }
             } catch (Exception ex) {
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] resolver registration failed: {}", ex.getMessage());
                 }
@@ -527,21 +525,21 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             var toolList = assignments.computeIfAbsent(TypeConstants.TOOL, key -> new java.util.ArrayList<>());
             if (!deliverableList.contains(shopResolver.getId())) {
                 deliverableList.add(shopResolver.getId());
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] added resolver {} to DELIVERABLE assignment list", shopResolver.getId());
                 }
             }
             if (!requestableList.contains(shopResolver.getId())) {
                 requestableList.add(shopResolver.getId());
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] added resolver {} to REQUESTABLE assignment list", shopResolver.getId());
                 }
             }
             if (!toolList.contains(shopResolver.getId())) {
                 toolList.add(shopResolver.getId());
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] added resolver {} to TOOL assignment list", shopResolver.getId());
                 }
@@ -625,7 +623,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
     private void tickPermaRequests(IColony colony) {
         if (colony == null || permaOres.isEmpty() || !canUsePermaRequests()) {
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info(
                         "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",
                         colony == null ? "<null>" : colony.getID(),
@@ -636,14 +634,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         Level level = colony.getWorld();
         if (level == null || level.isClientSide) {
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: level={}", level);
             }
             return;
         }
         long now = level.getGameTime();
-        if (now - lastPermaRequestTick < PERMA_REQUEST_INTERVAL_TICKS) {
-            if (DEBUG_REQUESTS) {
+        if (now - lastPermaRequestTick < Config.PERMA_REQUEST_INTERVAL_TICKS.getAsLong()) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info(
                         "[CreateShop] perma tick throttled: now={} last={} diff={}",
                         now,
@@ -656,14 +654,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
         IRequestManager manager = colony.getRequestManager();
         if (manager == null) {
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: request manager null");
             }
             return;
         }
         IRequester requester = getRequester();
         if (requester == null) {
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: requester null");
             }
             return;
@@ -675,7 +673,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         for (ResourceLocation itemId : ordered) {
             Item item = BuiltInRegistries.ITEM.get(itemId);
             if (item == null || item == net.minecraft.world.item.Items.AIR) {
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     TheSettlerXCreate.LOGGER.info("[CreateShop] perma skip: missing item {}", itemId);
                 }
                 continue;
@@ -684,7 +682,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             int available = countInWarehouses(stack);
             int pending = permaPendingCounts.getOrDefault(itemId, 0);
             int requestable = Math.max(0, available - pending);
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info(
                         "[CreateShop] perma eval item={} available={} pending={} requestable={} waitFull={}",
                         itemId, available, pending, requestable, permaWaitFullStack);
@@ -704,7 +702,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             if (token != null) {
                 permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
                 permaPendingCounts.merge(itemId, amount, Integer::sum);
-                if (DEBUG_REQUESTS) {
+                if (isDebugRequests()) {
                     TheSettlerXCreate.LOGGER.info(
                             "[CreateShop] perma request created token={} item={} amount={}",
                             token, itemId, amount);
@@ -882,7 +880,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
                 return blueprint;
             }
         } catch (Exception ex) {
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 TheSettlerXCreate.LOGGER.info("[CreateShop] belt blueprint load failed: {}", ex.getMessage());
             }
             return null;
@@ -1419,19 +1417,19 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     private void logBelt(String message, Object... args) {
-        if (!DEBUG_REQUESTS) {
+        if (!isDebugRequests()) {
             return;
         }
         TheSettlerXCreate.LOGGER.info("[CreateShop] belt: " + message, args);
     }
 
     private void debugCourierAssignments(IColony colony) {
-        if (!DEBUG_REQUESTS || colony == null) {
+        if (!isDebugRequests() || colony == null) {
             return;
         }
         Level level = colony.getWorld();
         long now = level == null ? 0L : level.getGameTime();
-        if (now != 0L && now - lastCourierDebugTime < COURIER_DEBUG_COOLDOWN) {
+        if (now != 0L && now - lastCourierDebugTime < Config.COURIER_DEBUG_COOLDOWN.getAsLong()) {
             return;
         }
         lastCourierDebugTime = now;
@@ -1570,7 +1568,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             entries.add(describeCitizenAssignmentDetail(citizen));
             String key = describeCitizenKey(citizen);
             currentInfo.put(key, describeCitizenAssignmentDetail(citizen));
-            if (DEBUG_REQUESTS) {
+            if (isDebugRequests()) {
                 logCitizenUuidLookup(citizen);
             }
         }
@@ -1889,7 +1887,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
     private boolean shouldLogCourierEntity(Level level) {
         long now = level == null ? 0L : level.getGameTime();
-        if (now == 0L || now - lastCourierEntityDebugTime >= COURIER_ENTITY_DEBUG_COOLDOWN) {
+        if (now == 0L || now - lastCourierEntityDebugTime >= Config.COURIER_ENTITY_DEBUG_COOLDOWN.getAsLong()) {
             lastCourierEntityDebugTime = now;
             return true;
         }
@@ -1902,7 +1900,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         long now = level.getGameTime();
         long last = lastEntityRepairAttemptTime.getOrDefault(key, 0L);
-        if (now == 0L || now - last >= COURIER_ENTITY_DEBUG_COOLDOWN) {
+        if (now == 0L || now - last >= Config.COURIER_ENTITY_DEBUG_COOLDOWN.getAsLong()) {
             lastEntityRepairAttemptTime.put(key, now);
             return true;
         }
@@ -2208,7 +2206,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     private void logReflectionFailure(Object target, String methodName, Exception ex) {
-        if (!DEBUG_REQUESTS || target == null) {
+        if (!isDebugRequests() || target == null) {
             return;
         }
         String key = target.getClass().getName() + "#" + methodName + ":" + ex.getClass().getSimpleName();

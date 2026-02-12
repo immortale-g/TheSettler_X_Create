@@ -18,6 +18,7 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.Config;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.create.ICreateNetworkFacade;
@@ -47,8 +48,7 @@ import java.util.UUID;
 public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver {
     // Keep above building/warehouse resolvers so CreateShop is evaluated before them.
     private static final int PRIORITY = 210;
-    private static final long ORDER_TTL_TICKS = 20L * 60L * 5L;
-    private static final java.util.Map<IToken<?>, Long> ORDERED_REQUESTS =
+private static final java.util.Map<IToken<?>, Long> ORDERED_REQUESTS =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Set<IToken<?>> DELIVERIES_CREATED =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -56,12 +56,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<IToken<?>, Integer> PENDING_REQUEST_COUNTS =
             new java.util.concurrent.ConcurrentHashMap<>();
-    private static final long PENDING_NOTICE_COOLDOWN = 20L * 10L;
 private static final java.util.Map<IToken<?>, Long> PENDING_NOTICES =
         new java.util.concurrent.ConcurrentHashMap<>();
-private static final long DELIVERY_ASSIGNMENT_DEBUG_COOLDOWN = 200L;
 private static long lastDeliveryAssignmentDebugTime = 0L;
-private static final long TICK_PENDING_DEBUG_COOLDOWN = 200L;
 private static long lastTickPendingDebugTime = 0L;
 private static final java.util.Set<String> DELIVERY_LINK_LOGGED =
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -606,7 +603,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
 
     private boolean shouldLogTickPending(Level level) {
         long now = level.getGameTime();
-        if (now == 0L || now - lastTickPendingDebugTime >= TICK_PENDING_DEBUG_COOLDOWN) {
+        if (now == 0L || now - lastTickPendingDebugTime >= Config.TICK_PENDING_DEBUG_COOLDOWN.getAsLong()) {
             lastTickPendingDebugTime = now;
             return true;
         }
@@ -1064,9 +1061,9 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
                 if (assigned == null && "<none>".equals(resolverForRequest)) {
                     Level level = manager.getColony().getWorld();
                     long now = level == null ? 0L : level.getGameTime();
-                    if (now == 0L || now - lastDeliveryAssignmentDebugTime >= DELIVERY_ASSIGNMENT_DEBUG_COOLDOWN) {
-                        lastDeliveryAssignmentDebugTime = now;
-                        var typeStore = standardManager.getRequestableTypeRequestResolverAssignmentDataStore();
+            if (now == 0L || now - lastDeliveryAssignmentDebugTime >= Config.DELIVERY_ASSIGNMENT_DEBUG_COOLDOWN.getAsLong()) {
+                lastDeliveryAssignmentDebugTime = now;
+                var typeStore = standardManager.getRequestableTypeRequestResolverAssignmentDataStore();
                         var typeAssignments = typeStore == null ? null : typeStore.getAssignments();
                         java.util.Collection<IToken<?>> requestableResolvers =
                                 typeAssignments == null ? null : typeAssignments.get(TypeConstants.REQUESTABLE);
@@ -1436,7 +1433,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
     }
 
     private static void markRequestOrdered(Level level, IToken<?> token) {
-        ORDERED_REQUESTS.put(token, level.getGameTime() + ORDER_TTL_TICKS);
+        ORDERED_REQUESTS.put(token, level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong());
     }
 
     private static void clearRequestCooldown(IToken<?> token) {
@@ -1464,7 +1461,7 @@ private static final int MAX_CHAIN_SANITIZE_NODES = 512;
         if (next != null && now < next) {
             return false;
         }
-        PENDING_NOTICES.put(token, now + PENDING_NOTICE_COOLDOWN);
+        PENDING_NOTICES.put(token, now + Config.PENDING_NOTICE_COOLDOWN.getAsLong());
         return true;
     }
 

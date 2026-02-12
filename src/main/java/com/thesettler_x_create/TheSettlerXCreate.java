@@ -44,10 +44,8 @@ import java.util.Map;
 public class TheSettlerXCreate {
     public static final String MODID = "thesettler_x_create";
     public static final Logger LOGGER = LogUtils.getLogger();
-    private static final long GLOBAL_INJECTOR_LOG_COOLDOWN = 200L;
     private static long lastGlobalInjectorLogTime = 0L;
     private static int lastGlobalInjectorColonyCount = -1;
-    private static final long GLOBAL_REQUEST_LOG_COOLDOWN = 200L;
     private static long lastGlobalRequestLogTime = 0L;
     private static int lastGlobalRequestCount = -1;
     private static String lastGlobalRequestDump = "";
@@ -130,7 +128,7 @@ public class TheSettlerXCreate {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
             long now = event.getServer() == null ? 0L : event.getServer().getTickCount();
             boolean logTick = now == 0L
-                    || now - lastGlobalInjectorLogTime >= GLOBAL_INJECTOR_LOG_COOLDOWN
+                    || now - lastGlobalInjectorLogTime >= Config.GLOBAL_INJECTOR_LOG_COOLDOWN.getAsLong()
                     || colonies.size() != lastGlobalInjectorColonyCount;
             if (logTick) {
                 lastGlobalInjectorLogTime = now;
@@ -150,7 +148,7 @@ public class TheSettlerXCreate {
             long now = event.getServer() == null ? 0L : event.getServer().getTickCount();
             boolean logRequests = identities.size() != lastGlobalRequestCount
                     || now == 0L
-                    || now - lastGlobalRequestLogTime >= GLOBAL_REQUEST_LOG_COOLDOWN;
+                    || now - lastGlobalRequestLogTime >= Config.GLOBAL_REQUEST_LOG_COOLDOWN.getAsLong();
             if (logRequests) {
                 int logged = 0;
                 java.util.List<String> entries = new java.util.ArrayList<>();

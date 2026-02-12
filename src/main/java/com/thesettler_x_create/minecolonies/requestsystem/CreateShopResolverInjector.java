@@ -16,9 +16,7 @@ public final class CreateShopResolverInjector {
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<com.minecolonies.api.colony.requestsystem.token.IToken<?>, String> DELIVERY_DUMP_CACHE =
             new java.util.concurrent.ConcurrentHashMap<>();
-    private static final long DEBUG_LOG_COOLDOWN = 200L;
     private static long lastDebugLogTime = 0L;
-    private static final long DELIVERY_DEBUG_COOLDOWN = 200L;
     private static long lastDeliveryDebugTime = 0L;
     private static int lastIdentityCount = -1;
     private static long lastIdentityLogTime = 0L;
@@ -26,7 +24,6 @@ public final class CreateShopResolverInjector {
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private static final java.util.Set<String> CHILD_CYCLE_LOGGED =
             java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-    private static final long CHAIN_SANITIZE_COOLDOWN = 200L;
     private static long lastChainSanitizeTime = 0L;
     private static final java.util.Map<com.minecolonies.api.colony.requestsystem.token.IToken<?>, String> REQUEST_STATE_CACHE =
             new java.util.concurrent.ConcurrentHashMap<>();
@@ -45,7 +42,7 @@ public final class CreateShopResolverInjector {
         var level = colony.getWorld();
         long now = level == null ? 0L : level.getGameTime();
         boolean allowDebugLog = Config.DEBUG_LOGGING.getAsBoolean()
-                && (now == 0L || now - lastDebugLogTime >= DEBUG_LOG_COOLDOWN);
+                && (now == 0L || now - lastDebugLogTime >= Config.RESOLVER_INJECTOR_DEBUG_COOLDOWN.getAsLong());
 
         var resolverHandler = manager.getResolverHandler();
         var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
@@ -228,9 +225,9 @@ public final class CreateShopResolverInjector {
         var typeAssignments = typeAssignmentsStore == null ? null : typeAssignmentsStore.getAssignments();
         sanitizeAllRequestChains(manager, requestHandler, gameTime);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            boolean logIdentity = identities.size() != lastIdentityCount
+                boolean logIdentity = identities.size() != lastIdentityCount
                     || gameTime == 0L
-                    || gameTime - lastIdentityLogTime >= DEBUG_LOG_COOLDOWN;
+                    || gameTime - lastIdentityLogTime >= Config.RESOLVER_INJECTOR_DEBUG_COOLDOWN.getAsLong();
             if (logIdentity) {
                 lastIdentityCount = identities.size();
                 lastIdentityLogTime = gameTime;
@@ -311,7 +308,7 @@ public final class CreateShopResolverInjector {
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()
                 && unassignedDeliveries > 0
-                && (gameTime == 0L || gameTime - lastDeliveryDebugTime >= DELIVERY_DEBUG_COOLDOWN)) {
+                && (gameTime == 0L || gameTime - lastDeliveryDebugTime >= Config.RESOLVER_DELIVERY_DEBUG_COOLDOWN.getAsLong())) {
             lastDeliveryDebugTime = gameTime;
             java.util.Collection<com.minecolonies.api.colony.requestsystem.token.IToken<?>> requestableList =
                     typeAssignments == null ? null : typeAssignments.get(TypeConstants.REQUESTABLE);
@@ -546,7 +543,7 @@ public final class CreateShopResolverInjector {
         if (manager == null || requestHandler == null) {
             return;
         }
-        if (gameTime != 0L && gameTime - lastChainSanitizeTime < CHAIN_SANITIZE_COOLDOWN) {
+        if (gameTime != 0L && gameTime - lastChainSanitizeTime < Config.RESOLVER_CHAIN_SANITIZE_COOLDOWN.getAsLong()) {
             return;
         }
         lastChainSanitizeTime = gameTime;
