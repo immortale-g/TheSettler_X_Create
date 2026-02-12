@@ -69,5 +69,9 @@ public class Config {
             .comment("Cooldown (ticks) between pending delivery debug logs.")
             .defineInRange("tickPendingDebugCooldown", 200L, 0L, 24000L);
 
+    public static final ModConfigSpec.LongValue PERF_LOG_COOLDOWN = BUILDER
+            .comment("Cooldown (ticks) between performance timing summaries.")
+            .defineInRange("perfLogCooldown", 200L, 0L, 24000L);
+
     static final ModConfigSpec SPEC = BUILDER.build();
 }

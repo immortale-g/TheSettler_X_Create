@@ -48,6 +48,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     // Keep above building/warehouse resolvers so CreateShop is evaluated before them.
     private static final int PRIORITY = 210;
     private static final int MAX_CHAIN_SANITIZE_NODES = 512;
+    private long lastPerfLogTime = 0L;
+    private long lastTickPendingNanos = 0L;
 
     private final java.util.Map<IToken<?>, Long> orderedRequests = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<IToken<?>> deliveriesCreated =
@@ -427,6 +429,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         if (!(manager instanceof IStandardRequestManager standardManager)) {
             return;
         }
+        long perfStart = System.nanoTime();
         Level level = manager.getColony().getWorld();
         if (level.isClientSide) {
             return;
@@ -609,6 +612,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                         "[CreateShop] tickPending: " + requestIdLog + " skip assignRequest (delivery created)");
             }
         }
+        lastTickPendingNanos = System.nanoTime() - perfStart;
+        maybeLogPerf(level);
     }
 
     private boolean shouldLogTickPending(Level level) {
@@ -618,6 +623,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             return true;
         }
         return false;
+    }
+
+    private void maybeLogPerf(Level level) {
+        if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+            return;
+        }
+        if (level == null) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (now != 0L && now - lastPerfLogTime < Config.PERF_LOG_COOLDOWN.getAsLong()) {
+            return;
+        }
+        lastPerfLogTime = now;
+        TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] perf tickPending={}us",
+                lastTickPendingNanos / 1000L);
     }
 
     public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {

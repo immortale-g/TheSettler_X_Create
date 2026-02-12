@@ -27,6 +27,8 @@ public final class CreateShopResolverInjector {
     private static long lastChainSanitizeTime = 0L;
     private static final java.util.Map<com.minecolonies.api.colony.requestsystem.token.IToken<?>, String> REQUEST_STATE_CACHE =
             new java.util.concurrent.ConcurrentHashMap<>();
+    private static long lastPerfLogTime = 0L;
+    private static long lastEnsureNanos = 0L;
 
     private CreateShopResolverInjector() {
     }
@@ -35,6 +37,7 @@ public final class CreateShopResolverInjector {
         if (colony == null) {
             return;
         }
+        long perfStart = System.nanoTime();
         if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
             TheSettlerXCreate.LOGGER.info("[CreateShop] Global resolver skipped (no standard manager)");
             return;
@@ -223,6 +226,25 @@ public final class CreateShopResolverInjector {
         if (shops > 0) {
             tryReassignOpenDeliverables(manager);
         }
+        lastEnsureNanos = System.nanoTime() - perfStart;
+        maybeLogPerf(colony);
+    }
+
+    private static void maybeLogPerf(IColony colony) {
+        if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+            return;
+        }
+        if (colony == null || colony.getWorld() == null) {
+            return;
+        }
+        long now = colony.getWorld().getGameTime();
+        if (now != 0L && now - lastPerfLogTime < Config.PERF_LOG_COOLDOWN.getAsLong()) {
+            return;
+        }
+        lastPerfLogTime = now;
+        TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] perf injector ensureGlobalResolver={}us",
+                lastEnsureNanos / 1000L);
     }
 
     private static void tryReassignOpenDeliverables(IStandardRequestManager manager) {

@@ -18,6 +18,10 @@ import java.util.List;
 
 public class CreateNetworkFacade implements ICreateNetworkFacade {
     private final TileEntityCreateShop shop;
+    private long lastPerfLogTime = 0L;
+    private long lastSummaryNanos = 0L;
+    private long lastBroadcastNanos = 0L;
+    private int lastBroadcastCount = 0;
 
     public CreateNetworkFacade(TileEntityCreateShop shop) {
         this.shop = shop;
@@ -184,6 +188,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
         if (!order.isEmpty()) {
             PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
+            long start = System.nanoTime();
             try {
                 LogisticsManager.broadcastPackageRequest(
                         shop.getStockNetworkId(),
@@ -205,6 +210,10 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
                             ex.getMessage() == null ? "<null>" : ex.getMessage());
                 }
                 return Collections.emptyList();
+            } finally {
+                lastBroadcastNanos = System.nanoTime() - start;
+                lastBroadcastCount = order.size();
+                maybeLogPerf();
             }
         } else if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -233,6 +242,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         if (!hasNetwork()) {
             return null;
         }
+        long start = System.nanoTime();
         try {
             return LogisticsManager.getSummaryOfNetwork(shop.getStockNetworkId(), true);
         } catch (Exception ex) {
@@ -243,6 +253,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
                         ex.getMessage() == null ? "<null>" : ex.getMessage());
             }
             return null;
+        } finally {
+            lastSummaryNanos = System.nanoTime() - start;
+            maybeLogPerf();
         }
     }
 
@@ -262,5 +275,24 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             }
         }
         return summary;
+    }
+
+    private void maybeLogPerf() {
+        if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+            return;
+        }
+        if (shop == null || shop.getLevel() == null) {
+            return;
+        }
+        long now = shop.getLevel().getGameTime();
+        if (now != 0L && now - lastPerfLogTime < com.thesettler_x_create.Config.PERF_LOG_COOLDOWN.getAsLong()) {
+            return;
+        }
+        lastPerfLogTime = now;
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] perf summary: getSummary={}us broadcast={}us items={}",
+                lastSummaryNanos / 1000L,
+                lastBroadcastNanos / 1000L,
+                lastBroadcastCount);
     }
 }
