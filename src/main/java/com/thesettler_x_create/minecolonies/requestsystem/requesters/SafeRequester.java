@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.thesettler_x_create.Config;
 import net.minecraft.network.chat.MutableComponent;
 
 import java.util.Map;
@@ -46,7 +47,8 @@ public final class SafeRequester implements IRequester {
     public void onRequestedRequestComplete(final IRequestManager manager, final IRequest<?> request) {
         com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver.onDeliveryComplete(
                 manager, request);
-        if (request != null
+        if (Config.DEBUG_LOGGING.getAsBoolean()
+                && request != null
                 && request.getRequest() instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
                 && manager instanceof com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager standardManager) {
             try {
@@ -121,35 +123,37 @@ public final class SafeRequester implements IRequester {
     public void onRequestedRequestCancelled(final IRequestManager manager, final IRequest<?> request) {
         com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver.onDeliveryCancelled(
                 manager, request);
-        if (request != null
-                && request.getRequest() instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
-                && manager instanceof com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager standardManager) {
-            try {
-                var handler = standardManager.getRequestHandler();
-                IToken<?> token = request.getId();
-                IToken<?> parentToken = request.getParent();
-                IRequest<?> parent = parentToken == null || handler == null ? null : handler.getRequest(parentToken);
-                String parentState = parent == null ? "<null>" : String.valueOf(parent.getState());
-                boolean parentChildren = parent != null && parent.hasChildren();
-                com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                        "[CreateShop] delivery requester cancel token={} state={} parent={} parentState={} parentHasChildren={}",
-                        token,
-                        request.getState(),
-                        parentToken == null ? "<none>" : parentToken,
-                        parentState,
-                        parentChildren);
-            } catch (Exception ignored) {
-                // Ignore logging errors.
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            if (request != null
+                    && request.getRequest() instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
+                    && manager instanceof com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager standardManager) {
+                try {
+                    var handler = standardManager.getRequestHandler();
+                    IToken<?> token = request.getId();
+                    IToken<?> parentToken = request.getParent();
+                    IRequest<?> parent = parentToken == null || handler == null ? null : handler.getRequest(parentToken);
+                    String parentState = parent == null ? "<null>" : String.valueOf(parent.getState());
+                    boolean parentChildren = parent != null && parent.hasChildren();
+                    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                            "[CreateShop] delivery requester cancel token={} state={} parent={} parentState={} parentHasChildren={}",
+                            token,
+                            request.getState(),
+                            parentToken == null ? "<none>" : parentToken,
+                            parentState,
+                            parentChildren);
+                } catch (Exception ignored) {
+                    // Ignore logging errors.
+                }
             }
-        }
-        String token = request == null ? "<null>" : String.valueOf(request.getId());
-        if (request != null
-                && request.getRequest() instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
-                && CANCEL_TRACE_LOGGED.add(token)) {
-            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] delivery cancel trace {}",
-                    token,
-                    new RuntimeException("delivery cancel trace"));
+            String token = request == null ? "<null>" : String.valueOf(request.getId());
+            if (request != null
+                    && request.getRequest() instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
+                    && CANCEL_TRACE_LOGGED.add(token)) {
+                com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] delivery cancel trace {}",
+                        token,
+                        new RuntimeException("delivery cancel trace"));
+            }
         }
         if (delegate == null) {
             return;
@@ -167,6 +171,9 @@ public final class SafeRequester implements IRequester {
     }
 
     private void logOnce(final String action, final IRequest<?> request, final Exception ex) {
+        if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+            return;
+        }
         String token = request == null ? "<null>" : String.valueOf(request.getId());
         String msg = ex.getClass().getSimpleName() + ":" + (ex.getMessage() == null ? "<null>" : ex.getMessage());
         String key = action + ":" + token;
