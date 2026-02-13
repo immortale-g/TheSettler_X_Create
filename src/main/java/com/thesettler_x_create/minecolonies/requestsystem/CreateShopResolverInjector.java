@@ -652,6 +652,17 @@ public final class CreateShopResolverInjector {
       } catch (IllegalArgumentException ex) {
         child = null;
       }
+      if (child == null) {
+        request.removeChild(childToken);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          String key = "missing:" + token + ":" + childToken;
+          if (CHILD_CYCLE_LOGGED.add(key)) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] removed missing child token parent={} child={}", token, childToken);
+          }
+        }
+        continue;
+      }
       if (child == null || child.getChildren() == null || child.getChildren().isEmpty()) {
         continue;
       }
