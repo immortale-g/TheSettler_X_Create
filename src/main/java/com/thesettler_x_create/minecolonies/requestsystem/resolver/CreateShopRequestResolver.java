@@ -858,12 +858,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pickup.release(parentRequestId);
     }
     pendingRequestCounts.put(parentToken, pendingCount);
+    // Keep on cooldown so tickPending can retry once stock is available.
     markRequestOrdered(level, parentToken);
-    cancelledRequests.add(parentToken);
     clearDeliveriesCreated(parentToken);
-    orderedRequests.remove(parentToken);
-    pendingRequestCounts.remove(parentToken);
-    clearRequestCooldown(parentToken);
 
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
