@@ -612,8 +612,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   && child.getRequest()
                       instanceof
                       com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
-                var assigned = assignmentStore.getAssignmentForValue(childToken);
-                if (assigned == null) {
+                var childAssigned = assignmentStore.getAssignmentForValue(childToken);
+                if (childAssigned == null) {
                   boolean enqueued = tryEnqueueDelivery(standardManager, childToken);
                   if (Config.DEBUG_LOGGING.getAsBoolean()) {
                     TheSettlerXCreate.LOGGER.info(
