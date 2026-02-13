@@ -513,10 +513,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (warehouses == null) {
       return;
     }
+    if (!hasWarehouseModules()) {
+      warehouses.remove(this);
+      warehouseRegistered = false;
+      return;
+    }
     if (!warehouses.contains(this)) {
       warehouses.add(this);
     }
     warehouseRegistered = true;
+  }
+
+  private boolean hasWarehouseModules() {
+    return getModule(BuildingModules.WAREHOUSE_COURIERS) != null
+        && getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
   }
 
   private void ensureDeliverableAssignment() {
