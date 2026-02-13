@@ -33,6 +33,7 @@
   "com.thesettler_x_create.gui.createshop.output.linked": "Output block linked: %s",
   "com.thesettler_x_create.gui.createshop.output.missing": "No output block linked.",
   "com.thesettler_x_create.gui.createshop.address_label": "Shop Address",
+  "com.thesettler_x_create.gui.createshop.address_info": "Address must belong to this shop.\nPackages from the stock network are routed to this address.",
   "com.thesettler_x_create.gui.createshop.save": "Save",
   "com.thesettler_x_create.gui.createshop.amount": "Amount",
   "com.thesettler_x_create.gui.createshop.request": "Request",

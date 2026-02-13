@@ -18,3 +18,5 @@ Implementation notes:
 - This codebase intentionally uses MineColonies standard hut windows and modules where possible to
   reduce maintenance and keep UI behavior consistent with upstream.
 - Public API usage and platform constraints explain most structural similarity with other integrations.
+- UX copy and configuration guidance are written specifically for this mod (for example, in-hut
+  address panel descriptions that clarify expected routing behavior).
