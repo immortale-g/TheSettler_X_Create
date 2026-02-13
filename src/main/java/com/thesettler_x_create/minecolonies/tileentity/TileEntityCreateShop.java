@@ -9,7 +9,6 @@ import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.init.ModBlockEntities;
-import com.thesettler_x_create.menu.CreateShopMenu;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -81,7 +80,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
 
   @Override
   public AbstractContainerMenu createMenu(int id, Inventory playerInventory, Player player) {
-    return new CreateShopMenu(id, playerInventory, this);
+    return super.createMenu(id, playerInventory, player);
   }
 
   @Override
