@@ -85,6 +85,9 @@ public class Config {
           .comment("Cooldown (ticks) between pending delivery debug logs.")
           .defineInRange("tickPendingDebugCooldown", 200L, 0L, 24000L);
 
+  public static final ModConfigSpec.BooleanValue CHAT_MESSAGES_ENABLED =
+      BUILDER.comment("Enable Create Shop chat messages.").define("chatMessagesEnabled", true);
+
   public static final ModConfigSpec.LongValue PERF_LOG_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) between performance timing summaries.")

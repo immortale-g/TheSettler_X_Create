@@ -965,6 +965,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void sendShopChat(IRequestManager manager, String key, List<ItemStack> stacks) {
+    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
+      return;
+    }
     if (manager == null || manager.getColony() == null) {
       return;
     }
