@@ -7,6 +7,8 @@
           label="$(com.thesettler_x_create.gui.createshop.address_label)"/>
     <input id="addressInput" size="150 18" pos="20 46" maxlength="64"/>
 
-    <button label="$(com.thesettler_x_create.gui.createshop.save)" id="save" size="86 17" pos="52 72"
+    <text id="addressInfo" size="150 48" pos="20 72" textalign="MIDDLE_LEFT" color="black"
+          label="$(com.thesettler_x_create.gui.createshop.address_info)"/>
+    <button label="$(com.thesettler_x_create.gui.createshop.save)" id="save" size="86 17" pos="52 126"
             source="minecolonies:textures/gui/builderhut/builder_button_medium.png" color="black"/>
 </window>
