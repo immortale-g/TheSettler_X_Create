@@ -401,6 +401,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       } else {
         // Otherwise, order from network and wait for arrival.
         markRequestOrdered(level, request.getId());
+        pendingRequestCounts.put(request.getId(), Math.max(1, needed));
         sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
         sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       }
@@ -499,6 +500,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTokens.addAll(assigned);
     }
     pendingTokens.addAll(orderedRequests.keySet());
+    pendingTokens.addAll(pendingRequestCounts.keySet());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info(
@@ -580,8 +582,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       String requestIdLog = String.valueOf(request.getId());
-      if (!isRequestOnCooldown(level, request.getId())) {
-        logPendingReasonChange(request.getId(), "skip:no-cooldown");
+      UUID requestId = toRequestId(request.getId());
+      int reservedForRequest = pickup.getReservedForRequest(requestId);
+      boolean onCooldown = isRequestOnCooldown(level, request.getId());
+      if (!onCooldown && reservedForRequest <= 0) {
+        logPendingReasonChange(
+            request.getId(),
+            "skip:no-cooldown reserved=" + reservedForRequest + " pending="
+                + pendingRequestCounts.getOrDefault(request.getId(), 0));
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: " + requestIdLog + " skip (not on cooldown)");
@@ -678,8 +686,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
 
-      UUID requestId = toRequestId(request.getId());
-      int reservedForRequest = pickup.getReservedForRequest(requestId);
+      if (!onCooldown && reservedForRequest > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
+            requestIdLog,
+            reservedForRequest);
+      }
       int pendingCount = reservedForRequest;
       if (pendingCount <= 0) {
         pendingCount = pendingRequestCounts.getOrDefault(request.getId(), 0);
@@ -1794,7 +1806,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void markRequestOrdered(Level level, IToken<?> token) {
-    orderedRequests.put(token, level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong());
+    long until = level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong();
+    orderedRequests.put(token, until);
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] markRequestOrdered token={} resolver={} until={}",
+          token,
+          getId(),
+          until);
+    }
   }
 
   private void clearRequestCooldown(IToken<?> token) {
