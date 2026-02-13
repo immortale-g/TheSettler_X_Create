@@ -40,18 +40,18 @@ public class CreateShopRequestResolverFactory
       IFactoryController factoryController,
       CreateShopRequestResolver resolver) {
     CompoundTag tag = new CompoundTag();
-    tag.put(TAG_TOKEN, factoryController.serializeTag(registries, resolver.getId()));
-    tag.put(TAG_LOCATION, factoryController.serializeTag(registries, resolver.getLocation()));
+    tag.put(TAG_TOKEN, serializeToken(registries, factoryController, resolver));
+    tag.put(TAG_LOCATION, serializeLocation(registries, factoryController, resolver));
     return tag;
   }
 
   @Override
   public CreateShopRequestResolver deserialize(
       HolderLookup.Provider registries, IFactoryController factoryController, CompoundTag tag) {
-    IToken<?> token =
-        (IToken<?>) factoryController.deserializeTag(registries, tag.getCompound(TAG_TOKEN));
-    ILocation location =
-        (ILocation) factoryController.deserializeTag(registries, tag.getCompound(TAG_LOCATION));
+    CompoundTag tokenTag = requireTag(tag, TAG_TOKEN);
+    CompoundTag locationTag = requireTag(tag, TAG_LOCATION);
+    IToken<?> token = deserializeToken(registries, factoryController, tokenTag);
+    ILocation location = deserializeLocation(registries, factoryController, locationTag);
     return new CreateShopRequestResolver(location, token);
   }
 
@@ -67,13 +67,54 @@ public class CreateShopRequestResolverFactory
   @Override
   public CreateShopRequestResolver deserialize(
       IFactoryController factoryController, RegistryFriendlyByteBuf buffer) throws Throwable {
-    IToken<?> token = (IToken<?>) factoryController.deserialize(buffer);
-    ILocation location = (ILocation) factoryController.deserialize(buffer);
+    IToken<?> token = deserializeToken(factoryController, buffer);
+    ILocation location = deserializeLocation(factoryController, buffer);
     return new CreateShopRequestResolver(location, token);
   }
 
   @Override
   public short getSerializationId() {
     return SERIALIZATION_ID;
+  }
+
+  private static CompoundTag serializeToken(
+      HolderLookup.Provider registries,
+      IFactoryController factoryController,
+      CreateShopRequestResolver resolver) {
+    return factoryController.serializeTag(registries, resolver.getId());
+  }
+
+  private static CompoundTag serializeLocation(
+      HolderLookup.Provider registries,
+      IFactoryController factoryController,
+      CreateShopRequestResolver resolver) {
+    return factoryController.serializeTag(registries, resolver.getLocation());
+  }
+
+  private static IToken<?> deserializeToken(
+      HolderLookup.Provider registries, IFactoryController factoryController, CompoundTag tag) {
+    return (IToken<?>) factoryController.deserializeTag(registries, tag);
+  }
+
+  private static ILocation deserializeLocation(
+      HolderLookup.Provider registries, IFactoryController factoryController, CompoundTag tag) {
+    return (ILocation) factoryController.deserializeTag(registries, tag);
+  }
+
+  private static IToken<?> deserializeToken(
+      IFactoryController factoryController, RegistryFriendlyByteBuf buffer) throws Throwable {
+    return (IToken<?>) factoryController.deserialize(buffer);
+  }
+
+  private static ILocation deserializeLocation(
+      IFactoryController factoryController, RegistryFriendlyByteBuf buffer) throws Throwable {
+    return (ILocation) factoryController.deserialize(buffer);
+  }
+
+  private static CompoundTag requireTag(CompoundTag tag, String key) {
+    if (tag == null || !tag.contains(key)) {
+      throw new IllegalArgumentException("Missing " + key + " tag for CreateShopRequestResolver");
+    }
+    return tag.getCompound(key);
   }
 }
