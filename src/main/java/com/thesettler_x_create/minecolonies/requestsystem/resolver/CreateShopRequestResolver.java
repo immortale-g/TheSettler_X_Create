@@ -559,10 +559,66 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       if (request.hasChildren()) {
         logPendingReasonChange(request.getId(), "skip:has-children");
+        java.util.Collection<IToken<?>> children = request.getChildren();
+        int missing = 0;
+        if (children != null && !children.isEmpty()) {
+          for (IToken<?> childToken : java.util.List.copyOf(children)) {
+            try {
+              IRequest<?> child = requestHandler.getRequest(childToken);
+              if (child == null) {
+                missing++;
+                request.removeChild(childToken);
+              }
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                String childType =
+                    child == null || child.getRequest() == null
+                        ? "<null>"
+                        : child.getRequest().getClass().getName();
+                String childState = child == null ? "<null>" : String.valueOf(child.getState());
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} child {} type={} state={}",
+                    requestIdLog,
+                    childToken,
+                    childType,
+                    childState);
+                if (child == null) {
+                  TheSettlerXCreate.LOGGER.info(
+                      "[CreateShop] tickPending: {} child {} missing -> removed",
+                      requestIdLog,
+                      childToken);
+                }
+              }
+            } catch (Exception ex) {
+              missing++;
+              request.removeChild(childToken);
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} child {} lookup failed -> removed: {}",
+                    requestIdLog,
+                    childToken,
+                    ex.getMessage() == null ? "<null>" : ex.getMessage());
+              }
+            }
+          }
+        }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: " + requestIdLog + " skip (has children)");
           logParentChildrenState(standardManager, request.getId(), "tickPending");
+          if (children == null || children.isEmpty()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} children list empty despite hasChildren",
+                requestIdLog);
+          } else if (missing > 0) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} missing children={} total={}",
+                requestIdLog,
+                missing,
+                children.size());
+          }
+        }
+        if (missing > 0) {
+          continue;
         }
         continue;
       }
@@ -1110,6 +1166,30 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "[CreateShop] delivery create handler unavailable token={} unwrappedManager={}",
               token,
               standard == null ? "<null>" : "ok");
+        }
+      }
+    }
+    if (token != null) {
+      IStandardRequestManager standard = unwrapStandardManager(manager);
+      if (standard != null
+          && standard.getRequestHandler() != null
+          && standard.getRequestResolverRequestAssignmentDataStore() != null) {
+        var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
+        var assigned = assignmentStore.getAssignmentForValue(token);
+        if (assigned == null) {
+          try {
+            IRequest<?> created = standard.getRequestHandler().getRequest(token);
+            if (created != null) {
+              standard.getRequestHandler().assignRequest(created);
+            }
+          } catch (Exception ex) {
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery fallback assign failed token={} error={}",
+                  token,
+                  ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
+          }
         }
       }
     }
