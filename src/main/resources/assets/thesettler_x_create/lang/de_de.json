@@ -14,5 +14,8 @@
   "com.thesettler_x_create.gui.createshop.perma.empty": "No ore tags found.",
   "com.thesettler_x_create.gui.createshop.output": "Create Shop - Output",
   "com.thesettler_x_create.gui.createshop.output.linked": "Output block linked: %s",
-  "com.thesettler_x_create.gui.createshop.output.missing": "No output block linked."
+  "com.thesettler_x_create.gui.createshop.output.missing": "No output block linked.",
+  "com.thesettler_x_create.gui.createshop.address_label": "Shop-Adresse",
+  "com.thesettler_x_create.gui.createshop.address_info": "Die Adresse muss zum Shop gehoeren.\nPakete aus dem Stock-Network werden an diese Adresse geroutet.",
+  "com.thesettler_x_create.gui.createshop.save": "Speichern"
 }
