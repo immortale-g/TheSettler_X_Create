@@ -6,9 +6,13 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /** Wraps a requester and shields MineColonies from requester callback exceptions. */
 public final class SafeRequester implements IRequester {
@@ -151,6 +155,7 @@ public final class SafeRequester implements IRequester {
               parentToken == null ? "<none>" : parentToken,
               parentState,
               parentChildren);
+          logDeliveryCancelDetails(manager, request);
         } catch (Exception ignored) {
           // Ignore logging errors.
         }
@@ -173,6 +178,68 @@ public final class SafeRequester implements IRequester {
       delegate.onRequestedRequestCancelled(manager, request);
     } catch (Exception ex) {
       logOnce("cancel", request, ex);
+    }
+  }
+
+  private void logDeliveryCancelDetails(final IRequestManager manager, final IRequest<?> request) {
+    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+      return;
+    }
+    if (manager == null
+        || request == null
+        || !(request.getRequest()
+            instanceof
+            com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
+            delivery)) {
+      return;
+    }
+    try {
+      Level level = manager.getColony().getWorld();
+      var start = delivery.getStart().getInDimensionLocation();
+      var target = delivery.getTarget().getInDimensionLocation();
+      ItemStack stack = delivery.getStack();
+      if (level == null) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery cancel detail token={} start={} target={} stack={} level=<null>",
+            request.getId(),
+            start,
+            target,
+            stack.isEmpty() ? "<empty>" : stack.getHoverName().getString());
+        return;
+      }
+      var blockState = level.getBlockState(start);
+      var blockEntity = level.getBlockEntity(start);
+      String beName = blockEntity == null ? "<none>" : blockEntity.getClass().getName();
+      int handlerSlots = -1;
+      int matchSlot = -1;
+      int simExtract = 0;
+      if (blockEntity instanceof CreateShopBlockEntity shopPickup) {
+        var handler = shopPickup.getItemHandler(null);
+        handlerSlots = handler.getSlots();
+        for (int i = 0; i < handler.getSlots(); i++) {
+          var slotStack = handler.getStackInSlot(i);
+          if (slotStack.isEmpty() || !ItemStack.isSameItemSameComponents(slotStack, stack)) {
+            continue;
+          }
+          matchSlot = i;
+          var extracted = handler.extractItem(i, stack.getCount(), true);
+          simExtract = extracted.getCount();
+          break;
+        }
+      }
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] delivery cancel detail token={} start={} block={} be={} target={} stack={} slots={} matchSlot={} simExtract={}",
+          request.getId(),
+          start,
+          blockState.getBlock(),
+          beName,
+          target,
+          stack.isEmpty() ? "<empty>" : stack.getHoverName().getString(),
+          handlerSlots,
+          matchSlot,
+          simExtract);
+    } catch (Exception ignored) {
+      // Ignore logging errors.
     }
   }
 

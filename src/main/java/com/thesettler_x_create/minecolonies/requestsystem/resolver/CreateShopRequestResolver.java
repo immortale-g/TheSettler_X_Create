@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.google.common.collect.Lists;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -17,6 +18,9 @@ import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.api.util.MessageUtils;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
+import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
+import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.Config;
@@ -50,21 +54,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
-  private final java.util.Map<IToken<?>, Long> orderedRequests =
+  private static final java.util.Map<IToken<?>, Long> orderedRequests =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Set<IToken<?>> deliveriesCreated =
+  private static final java.util.Set<IToken<?>> deliveriesCreated =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
+  private static final java.util.Set<IToken<?>> cancelledRequests =
+      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private static final java.util.Map<IToken<?>, IToken<?>> deliveryParents =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> pendingNotices =
+  private static final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
   private long lastDeliveryAssignmentDebugTime = 0L;
   private long lastTickPendingDebugTime = 0L;
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
-      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final java.util.Set<String> completedChildLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Map<IToken<?>, String> parentChildrenSnapshots =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -92,26 +98,33 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   @Override
-  public MutableComponent getRequesterDisplayName(IRequestManager manager, IRequest<?> request) {
+  public @NotNull MutableComponent getRequesterDisplayName(
+      @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
     return Component.translatable("com.thesettler_x_create.coremod.buildings.createshop");
   }
 
   @Override
   public boolean canResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    if (manager == null || manager.getColony() == null) {
+    if (request.getState()
+        == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+      cancelledRequests.add(request.getId());
+    } else if (cancelledRequests.remove(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (manager/colony missing)");
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] cleared cancelled flag (state={}) {}",
+            request.getState(),
+            request.getId());
+      }
+    }
+    if (cancelledRequests.contains(request.getId())) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] canResolve=false (request cancelled) " + request.getId());
       }
       return false;
     }
     Level level = manager.getColony().getWorld();
-    if (level == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (level missing)");
-      }
-      return false;
-    }
     if (level.isClientSide) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (no level or client)");
@@ -134,12 +147,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return false;
     }
     IDeliverable deliverable = request.getRequest();
-    if (deliverable == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (deliverable is null)");
-      }
-      return false;
-    }
 
     BuildingCreateShop shop = getShop(manager);
     if (shop == null || !shop.isBuilt()) {
@@ -189,8 +196,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = getAvailableFromRacks(tile, deliverable);
+    int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
     int rackUsable = Math.max(0, rackAvailable - reservedForDeliverable);
-    int available = Math.max(0, networkAvailable + rackUsable);
+    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -221,23 +229,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   @Override
-  @SuppressWarnings({"unchecked", "rawtypes"})
   public List<IToken<?>> attemptResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    if (manager == null || manager.getColony() == null) {
+    if (request.getState()
+        == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+      cancelledRequests.add(request.getId());
+    } else {
+      cancelledRequests.remove(request.getId());
+    }
+    if (cancelledRequests.contains(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (manager/colony missing)");
+            "[CreateShop] attemptResolve skipped (request cancelled) " + request.getId());
       }
       return Lists.newArrayList();
     }
     Level level = manager.getColony().getWorld();
-    if (level == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (level missing)");
-      }
-      return Lists.newArrayList();
-    }
     if (level.isClientSide) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (no level or client)");
@@ -255,12 +262,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
     IDeliverable deliverable = request.getRequest();
-    if (deliverable == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (deliverable is null)");
-      }
-      return Lists.newArrayList();
-    }
     sanitizeRequestChain(manager, request);
 
     BuildingCreateShop shop = getShop(manager);
@@ -310,11 +311,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (!shop.isWorkerWorking()) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve deferred (worker not working) request={}",
-            request.getId());
+            "[CreateShop] attemptResolve deferred (worker not working) request=" + request.getId());
       }
       markRequestOrdered(level, request.getId());
-      pendingRequestCounts.put(request.getId(), Math.max(1, needed));
+      pendingRequestCounts.put(request.getId(), needed);
       return Lists.newArrayList();
     }
 
@@ -335,14 +335,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       // Track pending requests so we can detect items arriving in racks.
       markRequestOrdered(level, request.getId());
-      pendingRequestCounts.put(request.getId(), Math.max(1, needed));
+      pendingRequestCounts.put(request.getId(), needed);
       return Lists.newArrayList();
     }
 
-    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
-    if (rackUsable > 0) {
-      planned.addAll(planFromRacksWithPositions(tile, deliverable, Math.min(provide, rackUsable)));
-    }
+    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned =
+        planFromRacksWithPositions(tile, deliverable, Math.min(provide, rackUsable));
     List<ItemStack> ordered = extractStacks(planned);
     int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
     int remaining = Math.max(0, provide - plannedCount);
@@ -368,15 +366,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
               request.getId(),
               manager.getClass().getName(),
-              created == null ? "<null>" : created);
+              created);
         }
-        return created == null ? Lists.newArrayList() : created;
-      } else {
-        // Otherwise, order from network and wait for arrival.
-        markRequestOrdered(level, request.getId());
-        sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
-        sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
+        return created;
       }
+      // Otherwise, order from network and wait for arrival.
+      markRequestOrdered(level, request.getId());
+      pendingRequestCounts.put(request.getId(), needed);
+      sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
+      sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
     }
 
     // Reserve ordered items so they count as in-progress and avoid re-ordering.
@@ -434,7 +432,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     // Avoid AbstractWarehouseRequestResolver followup logic (casts to TileEntityWareHouse).
     java.util.List<IRequest<?>> followups = java.util.Collections.emptyList();
-    if (Config.DEBUG_LOGGING.getAsBoolean() && request != null) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int size = 0;
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] followup completion request={} state={} children={} followups={}",
@@ -449,16 +447,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return followups;
   }
 
-  @SuppressWarnings("unchecked")
   public void tickPendingDeliveries(IRequestManager manager) {
-    if (manager == null || manager.getColony() == null || manager.getColony().getWorld() == null) {
-      return;
-    }
     if (!(manager instanceof IStandardRequestManager standardManager)) {
       return;
     }
     long perfStart = System.nanoTime();
     Level level = manager.getColony().getWorld();
+    if (level == null) {
+      return;
+    }
     if (level.isClientSide) {
       return;
     }
@@ -472,6 +469,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTokens.addAll(assigned);
     }
     pendingTokens.addAll(orderedRequests.keySet());
+    pendingTokens.addAll(pendingRequestCounts.keySet());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info(
@@ -494,11 +492,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         try {
           IRequest<?> req = requestHandler.getRequest(token);
-          String type =
-              req == null || req.getRequest() == null
-                  ? "<null>"
-                  : req.getRequest().getClass().getName();
-          String state = req == null ? "<null>" : String.valueOf(req.getState());
+          String type = req == null ? "<null>" : req.getRequest().getClass().getName();
+          String state = req == null ? "<null>" : req.getState().toString();
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: candidate {} type={} state={}", token, type, state);
           logged++;
@@ -535,17 +530,50 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         pendingRequestCounts.remove(token);
         continue;
       }
+      if (cancelledRequests.contains(request.getId())) {
+        if (request.getState()
+            != com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+          cancelledRequests.remove(request.getId());
+        } else {
+          orderedRequests.remove(request.getId());
+          pendingRequestCounts.remove(request.getId());
+          clearRequestCooldown(request.getId());
+          clearDeliveriesCreated(request.getId());
+          logPendingReasonChange(request.getId(), "skip:cancelled");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: " + request.getId() + " skip (cancelled)");
+          }
+          continue;
+        }
+      }
+      if (request.getState()
+          == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
+        }
+        continue;
+      }
       logRequestStateChange(standardManager, token, "tickPending");
-      if (request == null || !(request.getRequest() instanceof IDeliverable deliverable)) {
+      if (!(request.getRequest() instanceof IDeliverable deliverable)) {
         logPendingReasonChange(token, "skip:not-deliverable");
         continue;
       }
-      String requestIdLog = String.valueOf(request.getId());
-      if (!isRequestOnCooldown(level, request.getId())) {
-        logPendingReasonChange(request.getId(), "skip:no-cooldown");
+      String requestIdLog = request.getId().toString();
+      UUID requestId = toRequestId(request.getId());
+      int reservedForRequest = pickup.getReservedForRequest(requestId);
+      boolean onCooldown = isRequestOnCooldown(level, request.getId());
+      if (!onCooldown && reservedForRequest <= 0) {
+        logPendingReasonChange(
+            request.getId(),
+            "skip:no-cooldown reserved="
+                + reservedForRequest
+                + " pending="
+                + pendingRequestCounts.getOrDefault(request.getId(), 0));
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: " + requestIdLog + " skip (not on cooldown)");
+              "[CreateShop] tickPending: {} skip (not on cooldown)", requestIdLog);
         }
         continue;
       }
@@ -553,22 +581,97 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         logPendingReasonChange(request.getId(), "skip:deliveries-created");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: " + requestIdLog + " skip (deliveries already created)");
+              "[CreateShop] tickPending: {} skip (deliveries already created)", requestIdLog);
         }
         continue;
       }
       if (request.hasChildren()) {
         logPendingReasonChange(request.getId(), "skip:has-children");
+        java.util.Collection<IToken<?>> children =
+            java.util.Objects.requireNonNull(request.getChildren(), "children");
+        int missing = 0;
+        if (!children.isEmpty()) {
+          for (IToken<?> childToken : java.util.List.copyOf(children)) {
+            try {
+              IRequest<?> child = requestHandler.getRequest(childToken);
+              if (child == null) {
+                missing++;
+                request.removeChild(childToken);
+              }
+              if (child != null
+                  && child.getRequest()
+                      instanceof
+                      com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
+                var childAssigned = assignmentStore.getAssignmentForValue(childToken);
+                if (childAssigned == null) {
+                  boolean enqueued = tryEnqueueDelivery(standardManager, childToken);
+                  if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                    TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] tickPending: {} child {} unassigned delivery -> enqueue={}",
+                        requestIdLog,
+                        childToken,
+                        enqueued ? "ok" : "none");
+                  }
+                }
+              }
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                String childType =
+                    child == null ? "<null>" : child.getRequest().getClass().getName();
+                String childState = child == null ? "<null>" : child.getState().toString();
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} child {} type={} state={}",
+                    requestIdLog,
+                    childToken,
+                    childType,
+                    childState);
+                if (child == null) {
+                  TheSettlerXCreate.LOGGER.info(
+                      "[CreateShop] tickPending: {} child {} missing -> removed",
+                      requestIdLog,
+                      childToken);
+                }
+              }
+            } catch (Exception ex) {
+              missing++;
+              request.removeChild(childToken);
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} child {} lookup failed -> removed: {}",
+                    requestIdLog,
+                    childToken,
+                    ex.getMessage() == null ? "<null>" : ex.getMessage());
+              }
+            }
+          }
+        }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: " + requestIdLog + " skip (has children)");
+              "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
           logParentChildrenState(standardManager, request.getId(), "tickPending");
+          if (children.isEmpty()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} children list empty despite hasChildren",
+                requestIdLog);
+          } else if (missing > 0) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} missing children={} total={}",
+                requestIdLog,
+                missing,
+                children.size());
+          }
+        }
+        if (missing > 0) {
+          continue;
         }
         continue;
       }
 
-      UUID requestId = toRequestId(request.getId());
-      int reservedForRequest = pickup.getReservedForRequest(requestId);
+      if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
+            requestIdLog,
+            reservedForRequest);
+      }
       int pendingCount = reservedForRequest;
       if (pendingCount <= 0) {
         pendingCount = pendingRequestCounts.getOrDefault(request.getId(), 0);
@@ -579,20 +682,24 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " skip (reservedForRequest="
-                  + reservedForRequest
-                  + ", pendingCount="
-                  + pendingCount
-                  + ")");
+              "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
+              requestIdLog,
+              reservedForRequest,
+              pendingCount);
         }
         continue;
       }
       int rackAvailable = getAvailableFromRacks(tile, deliverable);
-      if (rackAvailable < pendingCount) {
+      int totalAvailable = rackAvailable;
+      if (totalAvailable < pendingCount) {
         logPendingReasonChange(
-            request.getId(), "wait:rack-available=" + rackAvailable + " pending=" + pendingCount);
+            request.getId(),
+            "wait:available="
+                + totalAvailable
+                + " rack="
+                + rackAvailable
+                + " pending="
+                + pendingCount);
         if (shouldNotifyPending(level, request.getId())) {
           sendShopChat(
               manager,
@@ -601,13 +708,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " waiting (rackAvailable="
-                  + rackAvailable
-                  + ", pendingCount="
-                  + pendingCount
-                  + ")");
+              "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pendingCount={})",
+              requestIdLog,
+              totalAvailable,
+              rackAvailable,
+              pendingCount);
         }
         continue;
       }
@@ -617,39 +722,27 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         logPendingReasonChange(request.getId(), "wait:plan-empty");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " skip (planFromRacks empty, rackAvailable="
-                  + rackAvailable
-                  + ", pendingCount="
-                  + pendingCount
-                  + ")");
+              "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pendingCount={})",
+              requestIdLog,
+              rackAvailable,
+              pendingCount);
         }
         continue;
       }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: "
-                + requestIdLog
-                + " creating deliveries (stacks="
-                + stacks.size()
-                + ", pendingCount="
-                + pendingCount
-                + ", rackAvailable="
-                + rackAvailable
-                + ")");
+            "[CreateShop] tickPending: {} creating deliveries (stacks={}, pendingCount={}, rackAvailable={})",
+            requestIdLog,
+            stacks.size(),
+            pendingCount,
+            rackAvailable);
       }
-      @SuppressWarnings("unchecked")
-      List<IToken<?>> created =
-          createDeliveriesFromStacks(
-              manager, (IRequest<? extends IDeliverable>) request, stacks, pickup);
-      if (created == null || created.isEmpty()) {
+      List<IToken<?>> created = createDeliveriesFromStacks(manager, request, stacks, pickup);
+      if (created.isEmpty()) {
         logPendingReasonChange(request.getId(), "create:failed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " create failed (no deliveries created)");
+              "[CreateShop] tickPending: {} create failed (no deliveries created)", requestIdLog);
         }
         continue;
       }
@@ -664,7 +757,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       clearRequestCooldown(request.getId());
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: " + requestIdLog + " skip assignRequest (delivery created)");
+            "[CreateShop] tickPending: {} skip assignRequest (delivery created)", requestIdLog);
       }
     }
     lastTickPendingNanos = System.nanoTime() - perfStart;
@@ -713,7 +806,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private static CreateShopRequestResolver findResolverForDelivery(
       IRequestManager manager, IRequest<?> request) {
-    if (manager == null || request == null) {
+    if (manager == null) {
       return null;
     }
     IStandardRequestManager standard = unwrapStandardManager(manager);
@@ -744,18 +837,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
-    if (manager == null || request == null || manager.getColony() == null) {
-      return;
-    }
     if (!(request.getRequest() instanceof Delivery delivery)) {
       return;
     }
     IToken<?> parentToken = request.getParent();
     if (parentToken == null) {
+      parentToken = deliveryParents.remove(request.getId());
+    } else {
+      deliveryParents.remove(request.getId());
+    }
+    if (parentToken == null) {
       return;
     }
     UUID parentRequestId = toRequestId(parentToken);
-    ItemStack stack = delivery.getStack() == null ? ItemStack.EMPTY : delivery.getStack().copy();
+    ItemStack stack = delivery.getStack().copy();
 
     Level level = manager.getColony().getWorld();
     if (level == null) {
@@ -769,33 +864,33 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pickup = shop.getPickupBlockEntity();
     }
     if (pickup == null) {
-      BlockPos start =
-          delivery.getStart() == null ? null : delivery.getStart().getInDimensionLocation();
-      if (start != null) {
-        BlockEntity entity = level.getBlockEntity(start);
-        if (entity instanceof CreateShopBlockEntity shopPickup) {
-          pickup = shopPickup;
-        }
+      BlockPos start = delivery.getStart().getInDimensionLocation();
+      BlockEntity entity = level.getBlockEntity(start);
+      if (entity instanceof CreateShopBlockEntity shopPickup) {
+        pickup = shopPickup;
       }
     }
 
     int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
-    int pendingCount = reservedForRequest > 0 ? reservedForRequest : Math.max(1, stack.getCount());
+    int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
     if (pickup != null) {
       pickup.release(parentRequestId);
     }
     pendingRequestCounts.put(parentToken, pendingCount);
+    // Keep on cooldown so tickPending can retry once stock is available.
     markRequestOrdered(level, parentToken);
     clearDeliveriesCreated(parentToken);
 
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
+      BlockPos pickupPosition =
+          pickup == null ? delivery.getStart().getInDimensionLocation() : pickup.getBlockPos();
       logDeliveryDiagnostics(
           "cancel",
           manager,
           request.getId(),
           parentRequestId,
-          pickup == null ? null : pickup.getBlockPos(),
+          pickupPosition,
           stack,
           delivery.getTarget(),
           reservedForRequest,
@@ -817,19 +912,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-    if (manager == null || request == null || manager.getColony() == null) {
-      return;
-    }
     IToken<?> parentToken = request.getParent();
+    if (parentToken == null) {
+      parentToken = deliveryParents.remove(request.getId());
+    } else {
+      deliveryParents.remove(request.getId());
+    }
     if (parentToken == null) {
       return;
     }
-    if (manager.getColony().getWorld() == null) {
-      clearDeliveriesCreated(parentToken);
-      pendingRequestCounts.remove(parentToken);
-      return;
-    }
     clearDeliveriesCreated(parentToken);
+    orderedRequests.remove(parentToken);
+    pendingRequestCounts.remove(parentToken);
+    clearRequestCooldown(parentToken);
     pendingRequestCounts.remove(parentToken);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IStandardRequestManager standard = unwrapStandardManager(manager);
@@ -837,7 +932,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         try {
           var handler = standard.getRequestHandler();
           IRequest<?> parent = handler.getRequest(parentToken);
-          String parentState = String.valueOf(parent.getState());
+          if (parent == null) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] delivery complete parent={} missing", parentToken);
+            return;
+          }
+          String parentState = parent.getState().toString();
           boolean hasChildren = parent.hasChildren();
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] delivery complete parent={} state={} hasChildren={}",
@@ -856,19 +956,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    orderedRequests.remove(request.getId());
+    pendingRequestCounts.remove(request.getId());
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
   }
 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    orderedRequests.remove(request.getId());
+    pendingRequestCounts.remove(request.getId());
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
   }
 
   @Override
@@ -878,18 +980,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     clearDeliveriesCreated(request.getId());
     pendingRequestCounts.remove(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
-      releaseReservation(manager, (IRequest<? extends IDeliverable>) request);
+      releaseReservation(manager, request);
     }
   }
 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
+    orderedRequests.remove(request.getId());
+    pendingRequestCounts.remove(request.getId());
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
-      releaseReservation(manager, (IRequest<? extends IDeliverable>) request);
+      releaseReservation(manager, request);
     }
   }
 
@@ -909,19 +1012,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse ignored,
       IRequest<? extends IDeliverable> request) {
     IDeliverable deliverable = request.getRequest();
-    if (deliverable == null) {
-      return 0;
-    }
     var colonyManager = com.minecolonies.api.colony.IColonyManager.getInstance();
-    if (colonyManager == null) {
-      return 0;
-    }
     var colony =
         colonyManager.getColonyByPosFromDim(
             getLocation().getDimension(), getLocation().getInDimensionLocation());
-    if (colony == null) {
-      return 0;
-    }
     var building =
         colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
     BuildingCreateShop shop = building instanceof BuildingCreateShop createShop ? createShop : null;
@@ -947,9 +1041,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return null;
     }
     IColony colony = manager.getColony();
-    if (colony == null) {
-      return null;
-    }
     var building =
         colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
     if (building instanceof BuildingCreateShop shop) {
@@ -958,8 +1049,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return null;
   }
 
-  private void releaseReservation(
-      IRequestManager manager, IRequest<? extends IDeliverable> request) {
+  private void releaseReservation(IRequestManager manager, IRequest<?> request) {
     BuildingCreateShop shop = getShop(manager);
     if (shop == null) {
       return;
@@ -984,11 +1074,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
       return;
     }
-    if (manager == null || manager.getColony() == null) {
+    if (stacks == null || stacks.isEmpty()) {
       return;
     }
     for (ItemStack stack : stacks) {
-      if (stack == null || stack.isEmpty()) {
+      if (stack.isEmpty()) {
         continue;
       }
       MessageUtils.format(key, stack.getHoverName().getString(), stack.getCount())
@@ -999,10 +1089,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private List<IToken<?>> createDeliveriesFromStacks(
       IRequestManager manager,
-      IRequest<? extends IDeliverable> request,
+      IRequest<?> request,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks,
       CreateShopBlockEntity pickup) {
-    if (manager == null || request == null || pickup == null || stacks == null) {
+    if (manager == null || pickup == null || stacks == null) {
       return Lists.newArrayList();
     }
     BlockPos startPos = pickup.getBlockPos();
@@ -1012,7 +1102,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       ItemStack stack = entry.getA();
-      if (stack == null || stack.isEmpty()) {
+      if (stack.isEmpty()) {
         continue;
       }
       selected = stack.copy();
@@ -1025,27 +1115,24 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
     var factory = manager.getFactoryController();
+    Level pickupLevel = pickup.getLevel();
+    if (pickupLevel == null) {
+      return Lists.newArrayList();
+    }
     var pickupLocation =
-        factory.getNewInstance(TypeConstants.ILOCATION, startPos, pickup.getLevel().dimension());
+        factory.getNewInstance(TypeConstants.ILOCATION, startPos, pickupLevel.dimension());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       try {
         var targetLoc = request.getRequester().getLocation();
-        var targetPos = targetLoc == null ? null : targetLoc.getInDimensionLocation();
-        var level = pickup.getLevel();
-        String pickupState = "<unknown>";
-        String targetState = "<unknown>";
-        if (level != null) {
-          pickupState = String.valueOf(level.getBlockState(startPos).getBlock());
-          if (targetPos != null) {
-            targetState = String.valueOf(level.getBlockState(targetPos).getBlock());
-          }
-        }
+        var targetPos = targetLoc.getInDimensionLocation();
+        var pickupBlock = pickupLevel.getBlockState(startPos).getBlock();
+        var targetBlock = pickupLevel.getBlockState(targetPos).getBlock();
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery location pickupPos={} pickupBlock={} targetPos={} targetBlock={}",
+            "[CreateShop] delivery location pickupPosition={} pickupBlock={} targetPosition={} targetBlock={}",
             startPos,
-            pickupState,
+            pickupBlock,
             targetPos,
-            targetState);
+            targetBlock);
       } catch (Exception ignored) {
         // Do not fail delivery creation for debug output.
       }
@@ -1062,7 +1149,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
     var requester = request.getRequester();
-    if (requester != null && !(requester instanceof SafeRequester)) {
+    if (!(requester instanceof SafeRequester)) {
       requester = new SafeRequester(requester);
     }
     IToken<?> token;
@@ -1072,28 +1159,26 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create failed requester={} error={}",
-            requester == null ? "<null>" : requester.getClass().getName(),
+            requester.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
       return Lists.newArrayList();
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
-      String key = String.valueOf(token);
+    deliveryParents.put(token, request.getId());
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      String key = token.toString();
       if (deliveryCreateLogged.add(key)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create token={} requesterClass={} managerClass={}",
             token,
-            requester == null ? "<null>" : requester.getClass().getName(),
+            requester.getClass().getName(),
             manager.getClass().getName());
         IStandardRequestManager standard = unwrapStandardManager(manager);
         if (standard != null && standard.getRequestHandler() != null) {
           try {
             IRequest<?> created = standard.getRequestHandler().getRequest(token);
-            String createdRequester =
-                created == null || created.getRequester() == null
-                    ? "<null>"
-                    : created.getRequester().getClass().getName();
-            IToken<?> childParent = created == null ? null : created.getParent();
+            String createdRequester = created.getRequester().getClass().getName();
+            IToken<?> childParent = created.getParent();
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] delivery create handler token={} createdRequester={} childParent={}",
                 token,
@@ -1113,12 +1198,41 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    if (token != null && Config.DEBUG_LOGGING.getAsBoolean()) {
+    IStandardRequestManager standard = unwrapStandardManager(manager);
+    if (standard != null) {
+      var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
+      var assigned = assignmentStore.getAssignmentForValue(token);
+      if (assigned == null) {
+        try {
+          IRequest<?> created = standard.getRequestHandler().getRequest(token);
+          standard.getRequestHandler().assignRequest(created);
+        } catch (Exception ex) {
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] delivery fallback assign failed token={} error={}",
+                token,
+                ex.getMessage() == null ? "<null>" : ex.getMessage());
+          }
+        }
+        // If still unassigned, enqueue into a warehouse request queue with couriers.
+        var assignedAfter = assignmentStore.getAssignmentForValue(token);
+        if (assignedAfter == null) {
+          boolean enqueued = tryEnqueueDelivery(standard, token);
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] delivery fallback enqueue token={} result={}",
+                token,
+                enqueued ? "ok" : "none");
+          }
+        }
+      }
+    }
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int reservedForRequest = pickup.getReservedForRequest(toRequestId(request.getId()));
-      int reservedForDeliverable =
-          request.getRequest() == null
-              ? -1
-              : pickup.getReservedForDeliverable(request.getRequest());
+      int reservedForDeliverable = -1;
+      if (request.getRequest() instanceof IDeliverable deliverable) {
+        reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+      }
       int reservedForStack = pickup.getReservedFor(selected);
       logDeliveryDiagnostics(
           "create",
@@ -1127,35 +1241,35 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           toRequestId(request.getId()),
           startPos,
           selected,
-          request.getRequester() == null ? null : request.getRequester().getLocation(),
+          request.getRequester().getLocation(),
           reservedForRequest,
           reservedForDeliverable,
           reservedForStack);
     }
-    if (token != null && manager instanceof IStandardRequestManager standardManager) {
+    if (manager instanceof IStandardRequestManager standardManager) {
       try {
         var handler = standardManager.getRequestHandler();
-        IRequest<?> parent = request;
         IRequest<?> child = handler == null ? null : handler.getRequest(token);
-        if (parent != null && child != null) {
+        if (child != null) {
           if (child.getParent() == null) {
-            child.setParent(parent.getId());
+            child.setParent(request.getId());
           }
-          var children = parent.getChildren();
-          if (children == null || !children.contains(token)) {
-            parent.addChild(token);
+          var children = request.getChildren();
+          if (!children.contains(token)) {
+            request.addChild(token);
           }
-          if (!com.minecolonies.api.colony.requestsystem.request.RequestState.FOLLOWUP_IN_PROGRESS
-              .equals(parent.getState())) {
+          if (request.getState()
+              != com.minecolonies.api.colony.requestsystem.request.RequestState
+                  .FOLLOWUP_IN_PROGRESS) {
             standardManager.updateRequestState(
-                parent.getId(),
+                request.getId(),
                 com.minecolonies.api.colony.requestsystem.request.RequestState
                     .FOLLOWUP_IN_PROGRESS);
-            logRequestStateChange(standardManager, parent.getId(), "delivery-link");
+            logRequestStateChange(standardManager, request.getId(), "delivery-link");
           }
           logRequestStateChange(standardManager, token, "delivery-link-child");
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            logDeliveryLinkState("link", standardManager, parent.getId(), token);
+            logDeliveryLinkState("link", standardManager, request.getId(), token);
           }
         }
       } catch (Exception ex) {
@@ -1167,12 +1281,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    if (token != null && manager instanceof IStandardRequestManager standardManager) {
+    if (manager instanceof IStandardRequestManager standardManager) {
       try {
         var created = standardManager.getRequestHandler().getRequest(token);
-        if (created != null) {
-          standardManager.getRequestHandler().assignRequest(created);
-        }
+        standardManager.getRequestHandler().assignRequest(created);
       } catch (IllegalArgumentException ignored) {
         // Request missing; leave unassigned.
       } catch (Exception ex) {
@@ -1182,13 +1294,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    if (token != null && Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
       var created = manager.getRequestForToken(token);
-      if (created == null) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] delivery token {} not found in manager", token);
-      } else if (manager instanceof IStandardRequestManager standardManager) {
+      if (manager instanceof IStandardRequestManager standardManager) {
         var store = standardManager.getRequestResolverRequestAssignmentDataStore();
-        var assigned = store == null ? null : store.getAssignmentForValue(token);
+        var assigned = store.getAssignmentForValue(token);
         String resolverForRequest = "<unknown>";
         String resolverError = "<none>";
         if (assigned == null) {
@@ -1203,18 +1313,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery created {} state={} assigned={} resolverForRequest={} resolverError={}",
             token,
-            created.getState(),
-            assigned == null ? "<none>" : assigned.toString(),
+            created == null ? "<null>" : created.getState(),
+            assigned == null ? "<none>" : assigned,
             resolverForRequest,
             resolverError);
         if (assigned != null) {
-          boolean inAssignments = false;
           var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
-          if (assignmentStore != null) {
-            var assignments = assignmentStore.getAssignments();
-            var assignedRequests = assignments == null ? null : assignments.get(assigned);
-            inAssignments = assignedRequests != null && assignedRequests.contains(token);
-          }
+          var assignments = assignmentStore.getAssignments();
+          var assignedRequests = assignments.get(assigned);
+          boolean inAssignments = assignedRequests != null && assignedRequests.contains(token);
           String assignedResolverName = "<missing>";
           String assignedResolverInfo = "<none>";
           try {
@@ -1236,9 +1343,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               created.getState(),
               assignedResolverInfo);
         } else {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery assigned resolver=<none> store={}",
-              store == null ? "<null>" : "ok");
+          TheSettlerXCreate.LOGGER.info("[CreateShop] delivery assigned resolver=<none> store=ok");
         }
         if (assigned == null && "<none>".equals(resolverForRequest)) {
           Level level = manager.getColony().getWorld();
@@ -1248,65 +1353,63 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   >= Config.DELIVERY_ASSIGNMENT_DEBUG_COOLDOWN.getAsLong()) {
             lastDeliveryAssignmentDebugTime = now;
             var typeStore = standardManager.getRequestableTypeRequestResolverAssignmentDataStore();
-            var typeAssignments = typeStore == null ? null : typeStore.getAssignments();
+            var typeAssignments = typeStore.getAssignments();
             java.util.Collection<IToken<?>> requestableResolvers =
-                typeAssignments == null ? null : typeAssignments.get(TypeConstants.REQUESTABLE);
-            int resolverCount = requestableResolvers == null ? 0 : requestableResolvers.size();
+                typeAssignments.get(TypeConstants.REQUESTABLE);
+            if (requestableResolvers == null) {
+              requestableResolvers = com.google.common.collect.ImmutableList.of();
+            }
+            int resolverCount = requestableResolvers.size();
             int matchingResolvers = 0;
             java.util.List<String> examples = new java.util.ArrayList<>();
             int canResolveCount = 0;
             java.util.List<String> canResolveExamples = new java.util.ArrayList<>();
             java.util.List<String> canResolveErrors = new java.util.ArrayList<>();
-            if (requestableResolvers != null) {
-              for (var resolverToken : requestableResolvers) {
-                try {
-                  var resolver = standardManager.getResolverHandler().getResolver(resolverToken);
-                  com.google.common.reflect.TypeToken<?> typeToken = resolver.getRequestType();
-                  Class<?> requestType = typeToken == null ? null : typeToken.getRawType();
-                  boolean matches =
-                      requestType != null
-                          && (requestType.isAssignableFrom(Delivery.class)
-                              || requestType.isAssignableFrom(
-                                  com.minecolonies.api.colony.requestsystem.requestable.deliveryman
-                                      .IDeliverymanRequestable.class)
-                              || requestType.isAssignableFrom(
-                                  com.minecolonies.api.colony.requestsystem.requestable.IRequestable
-                                      .class));
-                  if (matches) {
-                    matchingResolvers++;
-                    if (examples.size() < 5) {
-                      examples.add(resolver.getClass().getName());
-                    }
+            for (var resolverToken : requestableResolvers) {
+              try {
+                var resolver = standardManager.getResolverHandler().getResolver(resolverToken);
+                com.google.common.reflect.TypeToken<?> typeToken = resolver.getRequestType();
+                Class<?> requestType = typeToken == null ? null : typeToken.getRawType();
+                boolean matches =
+                    requestType != null
+                        && (requestType.isAssignableFrom(Delivery.class)
+                            || requestType.isAssignableFrom(
+                                com.minecolonies.api.colony.requestsystem.requestable.deliveryman
+                                    .IDeliverymanRequestable.class)
+                            || requestType.isAssignableFrom(
+                                com.minecolonies.api.colony.requestsystem.requestable.IRequestable
+                                    .class));
+                if (matches) {
+                  matchingResolvers++;
+                  if (examples.size() < 5) {
+                    examples.add(resolver.getClass().getName());
                   }
-                  if (resolver
-                      instanceof
-                      com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver) {
-                    boolean canResolve = false;
-                    try {
-                      @SuppressWarnings("unchecked")
-                      var rawResolver =
-                          (com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver)
-                              resolver;
-                      @SuppressWarnings("unchecked")
-                      var rawRequest = (IRequest) created;
-                      canResolve = rawResolver.canResolveRequest(manager, rawRequest);
-                    } catch (Exception ex) {
-                      if (canResolveErrors.size() < 3) {
-                        String msg = ex.getMessage();
-                        canResolveErrors.add(
-                            resolver.getClass().getName() + (msg == null ? "" : " -> " + msg));
-                      }
-                    }
-                    if (canResolve) {
-                      canResolveCount++;
-                      if (canResolveExamples.size() < 5) {
-                        canResolveExamples.add(resolver.getClass().getName());
-                      }
-                    }
-                  }
-                } catch (IllegalArgumentException ignored) {
-                  // Missing resolver.
                 }
+                boolean canResolve = false;
+                try {
+                  var method =
+                      resolver
+                          .getClass()
+                          .getMethod("canResolveRequest", IRequestManager.class, IRequest.class);
+                  Object result = method.invoke(resolver, manager, created);
+                  if (result instanceof Boolean bool) {
+                    canResolve = bool;
+                  }
+                } catch (Exception ex) {
+                  if (canResolveErrors.size() < 3) {
+                    String msg = ex.getMessage();
+                    canResolveErrors.add(
+                        resolver.getClass().getName() + (msg == null ? "" : " -> " + msg));
+                  }
+                }
+                if (canResolve) {
+                  canResolveCount++;
+                  if (canResolveExamples.size() < 5) {
+                    canResolveExamples.add(resolver.getClass().getName());
+                  }
+                }
+              } catch (IllegalArgumentException ignored) {
+                // Missing resolver.
               }
             }
             TheSettlerXCreate.LOGGER.info(
@@ -1323,13 +1426,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    if (token != null
-        && Config.DEBUG_LOGGING.getAsBoolean()
+    if (Config.DEBUG_LOGGING.getAsBoolean()
         && manager instanceof IStandardRequestManager standardManager) {
       logParentChildrenState(standardManager, request.getId(), "delivery-create");
       logDeliveryLinkState("create", standardManager, request.getId(), token);
     }
-    return token == null ? Lists.newArrayList() : Lists.newArrayList(token);
+    return Lists.newArrayList(token);
   }
 
   public void logParentChildrenState(
@@ -1340,26 +1442,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var handler = manager.getRequestHandler();
     logRequestStateChange(manager, parentToken, phase);
     IRequest<?> parent = handler.getRequest(parentToken);
-    String snapshot;
-    if (parent == null) {
-      snapshot = "parent=<null>";
-    } else {
-      var children = parent.getChildren();
-      StringBuilder builder = new StringBuilder();
-      builder.append("count=").append(children == null ? 0 : children.size());
-      if (children != null) {
-        for (IToken<?> child : children) {
-          if (child == null) {
-            continue;
-          }
-          logRequestStateChange(manager, child, phase + "-child");
-          IRequest<?> childReq = handler.getRequest(child);
-          String childState = childReq == null ? "<null>" : String.valueOf(childReq.getState());
-          builder.append(" ").append(child).append(":").append(childState);
-        }
+    var children = java.util.Objects.requireNonNull(parent.getChildren(), "children");
+    StringBuilder builder = new StringBuilder();
+    builder.append("count=").append(children.size());
+    for (IToken<?> child : children) {
+      if (child == null) {
+        continue;
       }
-      snapshot = builder.toString();
+      logRequestStateChange(manager, child, phase + "-child");
+      IRequest<?> childReq = handler.getRequest(child);
+      String childState = childReq == null ? "<null>" : childReq.getState().toString();
+      builder.append(" ").append(child).append(":").append(childState);
     }
+    String snapshot = builder.toString();
     String previous = parentChildrenSnapshots.put(parentToken, snapshot);
     if (!snapshot.equals(previous)) {
       TheSettlerXCreate.LOGGER.info(
@@ -1375,15 +1470,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     try {
       var handler = manager.getRequestHandler();
       IRequest<?> request = handler.getRequest(token);
-      String state = String.valueOf(request.getState());
+      if (request == null) {
+        return;
+      }
+      String state = request.getState().toString();
       String previous = requestStateSnapshots.put(token, state);
       if (state.equals(previous)) {
         return;
       }
-      String parent = request.getParent() == null ? "<none>" : String.valueOf(request.getParent());
-      String type =
-          request.getRequest() == null ? "<none>" : request.getRequest().getClass().getName();
-      String hasChildren = String.valueOf(request.hasChildren());
+      String parent = request.getParent() == null ? "<none>" : request.getParent().toString();
+      String type = request.getRequest().getClass().getName();
+      boolean hasChildren = request.hasChildren();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] request state {} token={} state={} prev={} parent={} children={} type={}",
           phase,
@@ -1456,10 +1553,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     stack.push(root);
-    itStack.push(
-        root.getChildren() == null
-            ? java.util.Collections.<IToken<?>>emptyList().iterator()
-            : root.getChildren().iterator());
+    itStack.push(root.getChildren().iterator());
     visiting.add(rootToken);
     visited.add(rootToken);
     int steps = 0;
@@ -1469,7 +1563,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (it == null || !it.hasNext()) {
         IRequest<?> done = stack.pop();
         itStack.pop();
-        if (done != null && done.getId() != null) {
+        if (done.getId() != null) {
           visiting.remove(done.getId());
         }
         continue;
@@ -1479,10 +1573,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       IRequest<?> parent = stack.peek();
-      IToken<?> parentToken = parent == null ? null : parent.getId();
-      if (parent == null || parentToken == null) {
-        continue;
-      }
+      IToken<?> parentToken = parent.getId();
       if (childToken.equals(parentToken)) {
         parent.removeChild(childToken);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -1522,10 +1613,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       visited.add(childToken);
       visiting.add(childToken);
       stack.push(child);
-      itStack.push(
-          child.getChildren() == null
-              ? java.util.Collections.<IToken<?>>emptyList().iterator()
-              : child.getChildren().iterator());
+      itStack.push(child.getChildren().iterator());
     }
     if (steps >= MAX_CHAIN_SANITIZE_NODES && Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
@@ -1540,8 +1628,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     } catch (StackOverflowError error) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] request chain validation overflow for {}",
-            request == null ? "<null>" : request.getId());
+            "[CreateShop] request chain validation overflow for {}", request.getId());
       }
       return false;
     }
@@ -1582,14 +1669,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IRequest<?> child = handler.getRequest(childToken);
       IToken<?> childParent = child.getParent();
       IRequest<?> parent = handler.getRequest(parentToken);
-      Integer parentChildren = parent.getChildren() == null ? null : parent.getChildren().size();
+      int parentChildren = parent.getChildren().size();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] delivery link state {} parent={} child={} childParent={} parentChildren={}",
           stage,
           parentToken,
           childToken,
           childParent == null ? "<none>" : childParent,
-          parentChildren == null ? "<null>" : parentChildren);
+          parentChildren);
     } catch (Exception ex) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] delivery link state {} parent={} child={} error={}",
@@ -1614,7 +1701,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void markRequestOrdered(Level level, IToken<?> token) {
-    orderedRequests.put(token, level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong());
+    long until = level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong();
+    orderedRequests.put(token, until);
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] markRequestOrdered token={} resolver={} until={}", token, getId(), until);
+    }
   }
 
   private void clearRequestCooldown(IToken<?> token) {
@@ -1654,7 +1746,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       var getLocation = resolver.getClass().getMethod("getLocation");
       Object location = getLocation.invoke(resolver);
       if (location != null) {
-        return "location=" + location.toString();
+        return "location=" + location;
       }
     } catch (Exception ignored) {
       // Fall through.
@@ -1663,7 +1755,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       var getRequester = resolver.getClass().getMethod("getRequester");
       Object requester = getRequester.invoke(resolver);
       if (requester != null) {
-        return "requester=" + requester.toString();
+        return "requester=" + requester;
       }
     } catch (Exception ignored) {
       // Fall through.
@@ -1676,23 +1768,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IRequestManager manager,
       IToken<?> deliveryToken,
       UUID parentRequestId,
-      BlockPos pickupPos,
+      BlockPos pickupPosition,
       ItemStack stack,
       ILocation targetLocation,
       int reservedForRequest,
       int reservedForDeliverable,
       int reservedForStack) {
     Level level = manager.getColony().getWorld();
-    String tokenInfo = String.valueOf(deliveryToken);
+    String tokenInfo = deliveryToken == null ? "<null>" : deliveryToken.toString();
     String parentInfo = parentRequestId.toString();
     String itemInfo = stack.isEmpty() ? "<empty>" : stack.getItem().toString();
     int count = stack.getCount();
 
-    boolean pickupLoaded = pickupPos != null && WorldUtil.isBlockLoaded(level, pickupPos);
+    boolean pickupLoaded = WorldUtil.isBlockLoaded(level, pickupPosition);
     String pickupBlock =
-        pickupLoaded ? String.valueOf(level.getBlockState(pickupPos).getBlock()) : "<unloaded>";
-    BlockEntity pickupEntity =
-        pickupLoaded && pickupPos != null ? level.getBlockEntity(pickupPos) : null;
+        pickupLoaded ? level.getBlockState(pickupPosition).getBlock().toString() : "<unloaded>";
+    BlockEntity pickupEntity = pickupLoaded ? level.getBlockEntity(pickupPosition) : null;
     String pickupEntityName = pickupEntity == null ? "<none>" : pickupEntity.getClass().getName();
     IItemHandler handler = null;
     if (pickupEntity instanceof CreateShopBlockEntity shopPickup) {
@@ -1716,21 +1807,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
     }
 
-    BlockPos targetPos = targetLocation.getInDimensionLocation();
-    boolean targetLoaded = targetPos != null && WorldUtil.isBlockLoaded(level, targetPos);
+    BlockPos targetPosition = targetLocation.getInDimensionLocation();
+    boolean targetLoaded = WorldUtil.isBlockLoaded(level, targetPosition);
     String targetBlock =
-        targetLoaded ? String.valueOf(level.getBlockState(targetPos).getBlock()) : "<unloaded>";
+        targetLoaded ? level.getBlockState(targetPosition).getBlock().toString() : "<unloaded>";
     String reservedDel =
         reservedForDeliverable < 0 ? "<n/a>" : String.valueOf(reservedForDeliverable);
 
     TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] delivery diag {} token={} parent={} item={} count={} pickup={} pickupLoaded={} pickupBlock={} pickupEntity={} handlerSlots={} matchSlot={} simExtract={} reservedReq={} reservedDel={} reservedStack={} target={} targetLoaded={} targetBlock={}",
+        "[CreateShop] delivery diag {} token={} parent={} item={} count={} pickupPosition={} pickupLoaded={} pickupBlock={} pickupEntity={} handlerSlots={} matchSlot={} simExtract={} reservedReq={} reservedDel={} reservedStack={} targetPosition={} targetLoaded={} targetBlock={}",
         stage,
         tokenInfo,
         parentInfo,
         itemInfo,
         count,
-        pickupPos == null ? "<null>" : pickupPos.toString(),
+        pickupPosition,
         pickupLoaded,
         pickupBlock,
         pickupEntityName,
@@ -1740,18 +1831,49 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         reservedForRequest,
         reservedDel,
         reservedForStack,
-        targetPos == null ? "<null>" : targetPos.toString(),
+        targetPosition,
         targetLoaded,
         targetBlock);
   }
 
-  private int getAvailableFromRacks(TileEntityCreateShop tile, IDeliverable deliverable) {
-    int total = 0;
-    for (BlockPos pos : tile.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(tile.getLevel(), pos)) {
+  private static boolean tryEnqueueDelivery(IStandardRequestManager manager, IToken<?> token) {
+    if (manager == null || token == null) {
+      return false;
+    }
+    var buildingManager = manager.getColony().getServerBuildingManager();
+    if (buildingManager == null) {
+      return false;
+    }
+    for (var entry : buildingManager.getBuildings().entrySet()) {
+      if (!(entry.getValue() instanceof IWareHouse warehouse)) {
         continue;
       }
-      BlockEntity entity = tile.getLevel().getBlockEntity(pos);
+      CourierAssignmentModule couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
+      if (couriers == null || couriers.getAssignedCitizen().isEmpty()) {
+        continue;
+      }
+      WarehouseRequestQueueModule queue =
+          warehouse.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
+      if (queue == null) {
+        continue;
+      }
+      queue.addRequest(token);
+      return true;
+    }
+    return false;
+  }
+
+  private int getAvailableFromRacks(TileEntityCreateShop tile, IDeliverable deliverable) {
+    Level level = tile.getLevel();
+    if (level == null) {
+      return 0;
+    }
+    int total = 0;
+    for (BlockPos pos : tile.getBuilding().getContainers()) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = level.getBlockEntity(pos);
       if (!(entity instanceof AbstractTileEntityRack rack)) {
         continue;
       }
@@ -1760,9 +1882,34 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return Math.max(0, total);
   }
 
+  private int getAvailableFromPickup(CreateShopBlockEntity pickup, IDeliverable deliverable) {
+    if (pickup == null) {
+      return 0;
+    }
+    IItemHandler handler = pickup.getItemHandler(null);
+    if (handler == null) {
+      return 0;
+    }
+    int total = 0;
+    for (int i = 0; i < handler.getSlots(); i++) {
+      ItemStack stack = handler.getStackInSlot(i);
+      if (stack.isEmpty()) {
+        continue;
+      }
+      if (deliverable.matches(stack)) {
+        total += stack.getCount();
+      }
+    }
+    return Math.max(0, total);
+  }
+
   private List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromRacksWithPositions(
       TileEntityCreateShop tile, IDeliverable deliverable, int amount) {
     if (amount <= 0) {
+      return Lists.newArrayList();
+    }
+    Level level = tile.getLevel();
+    if (level == null) {
       return Lists.newArrayList();
     }
     int remaining = amount;
@@ -1781,7 +1928,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         break;
       }
       ItemStack stack = tuple.getA();
-      if (stack == null || stack.isEmpty()) {
+      if (stack.isEmpty()) {
         continue;
       }
       int toTake = Math.min(remaining, stack.getCount());
@@ -1791,6 +1938,56 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       remaining -= toTake;
     }
     return planned;
+  }
+
+  private List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
+      CreateShopBlockEntity pickup, IDeliverable deliverable, int amount) {
+    if (amount <= 0 || pickup == null) {
+      return Lists.newArrayList();
+    }
+    IItemHandler handler = pickup.getItemHandler(null);
+    if (handler == null) {
+      return Lists.newArrayList();
+    }
+    int remaining = amount;
+    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
+    BlockPos pickupPos = pickup.getBlockPos();
+    for (int i = 0; i < handler.getSlots(); i++) {
+      if (remaining <= 0) {
+        break;
+      }
+      ItemStack stack = handler.getStackInSlot(i);
+      if (stack.isEmpty()) {
+        continue;
+      }
+      if (!deliverable.matches(stack)) {
+        continue;
+      }
+      int toTake = Math.min(remaining, stack.getCount());
+      ItemStack copy = stack.copy();
+      copy.setCount(toTake);
+      planned.add(new com.minecolonies.api.util.Tuple<>(copy, pickupPos));
+      remaining -= toTake;
+    }
+    return planned;
+  }
+
+  private static int countPlanned(
+      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
+    if (planned == null || planned.isEmpty()) {
+      return 0;
+    }
+    int total = 0;
+    for (var entry : planned) {
+      if (entry == null) {
+        continue;
+      }
+      ItemStack stack = entry.getA();
+      if (!stack.isEmpty()) {
+        total += stack.getCount();
+      }
+    }
+    return total;
   }
 
   private static List<ItemStack> extractStacks(
@@ -1804,7 +2001,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       ItemStack stack = entry.getA();
-      if (stack != null && !stack.isEmpty()) {
+      if (!stack.isEmpty()) {
         result.add(stack.copy());
       }
     }
@@ -1812,13 +2009,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private int getToolLevel(Tool tool, ItemStack stack) {
-    if (tool == null || stack == null || stack.isEmpty()) {
+    if (tool == null || stack.isEmpty()) {
       return 0;
     }
     EquipmentTypeEntry type = tool.getEquipmentType();
-    if (type == null) {
-      return 0;
-    }
     return type.getMiningLevel(stack);
   }
 }

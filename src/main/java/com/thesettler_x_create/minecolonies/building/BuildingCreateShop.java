@@ -9,6 +9,8 @@ import com.ldtteam.structurize.util.BlockInfo;
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
+import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
@@ -21,6 +23,7 @@ import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.MessageUtils;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseModule;
 import com.minecolonies.core.colony.jobs.JobBuilder;
@@ -35,6 +38,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
+import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
@@ -446,6 +450,23 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return shopResolver;
   }
 
+  @Override
+  @SuppressWarnings("unchecked")
+  public <M extends IBuildingModule, V extends IBuildingModuleView> M getModule(
+      com.minecolonies.api.colony.buildings.registry.BuildingEntry.ModuleProducer<M, V> producer) {
+    M module = super.getModule(producer);
+    if (module != null) {
+      return module;
+    }
+    if (producer == BuildingModules.WAREHOUSE_COURIERS) {
+      var modules = getModulesByType(CreateShopCourierModule.class);
+      if (!modules.isEmpty()) {
+        return (M) modules.get(0);
+      }
+    }
+    return null;
+  }
+
   @Nullable
   public CreateShopRequestResolver getOrCreateShopResolver() {
     if (shopResolver == null) {
@@ -513,10 +534,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (warehouses == null) {
       return;
     }
+    if (!hasWarehouseModules()) {
+      warehouses.remove(this);
+      warehouseRegistered = false;
+      return;
+    }
     if (!warehouses.contains(this)) {
       warehouses.add(this);
     }
     warehouseRegistered = true;
+  }
+
+  private boolean hasWarehouseModules() {
+    return getModule(BuildingModules.WAREHOUSE_COURIERS) != null
+        && getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
   }
 
   private void ensureDeliverableAssignment() {

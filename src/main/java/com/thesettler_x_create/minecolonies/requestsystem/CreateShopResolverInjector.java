@@ -485,6 +485,10 @@ public final class CreateShopResolverInjector {
           String childState = child == null ? "<null>" : String.valueOf(child.getState());
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] child {} type={} state={}", childToken, childType, childState);
+          if (child == null) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] child {} missing in request handler (parent={})", childToken, token);
+          }
         }
         reassigned +=
             tryReassignRequest(
@@ -536,6 +540,12 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.api.colony.requestsystem.requestable.deliveryman
                     .IDeliverymanRequestable;
+    if (isDeliveryRequest) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (delivery request)", token);
+      }
+      return 0;
+    }
     if (state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS
             && assignedToken != null
             && !assignedToRetrying
@@ -640,6 +650,17 @@ public final class CreateShopResolverInjector {
         child = requestHandler.getRequest(childToken);
       } catch (IllegalArgumentException ex) {
         child = null;
+      }
+      if (child == null) {
+        request.removeChild(childToken);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          String key = "missing:" + token + ":" + childToken;
+          if (CHILD_CYCLE_LOGGED.add(key)) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] removed missing child token parent={} child={}", token, childToken);
+          }
+        }
+        continue;
       }
       if (child == null || child.getChildren() == null || child.getChildren().isEmpty()) {
         continue;
