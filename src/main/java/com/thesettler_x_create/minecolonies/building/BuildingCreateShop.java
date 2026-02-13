@@ -130,6 +130,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
   private BlockPos builderHutPos;
   private boolean beltRebuildPending;
+  private boolean skipBeltLevel1Once;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -148,6 +149,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastPermaRequestTick = 0L;
     this.builderHutPos = null;
     this.beltRebuildPending = false;
+    this.skipBeltLevel1Once = false;
   }
 
   @Override
@@ -293,6 +295,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         .ensureGlobalResolver(getColony());
     ensurePickupLink();
     beltRebuildPending = true;
+    if (newLevel >= 2) {
+      // Avoid re-spawning L1 belt during upgrade to L2.
+      skipBeltLevel1Once = true;
+    }
     trySpawnBeltBlueprint(getColony());
   }
 
@@ -835,6 +841,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   private boolean trySpawnBeltBlueprint(IColony colony) {
     int targetLevel = Math.max(1, getBuildingLevel());
+    boolean skipLevel1 = skipBeltLevel1Once;
+    skipBeltLevel1Once = false;
     logBelt(
         "trySpawn start: targetLevel={} built={} level={} loc={}",
         targetLevel,
@@ -856,7 +864,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           level == null ? "<null>" : level.getClass().getName());
       return false;
     }
-    for (int beltLevel = 1; beltLevel <= targetLevel; beltLevel++) {
+    int startLevel = skipLevel1 && targetLevel > 1 ? 2 : 1;
+    for (int beltLevel = startLevel; beltLevel <= targetLevel; beltLevel++) {
       if (!trySpawnBeltBlueprintForLevel(colony, serverLevel, beltLevel)) {
         return false;
       }
