@@ -536,6 +536,13 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.api.colony.requestsystem.requestable.deliveryman
                     .IDeliverymanRequestable;
+    if (isDeliveryRequest) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] skip reassign {} (delivery request)", token);
+      }
+      return 0;
+    }
     if (state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS
             && assignedToken != null
             && !assignedToRetrying
