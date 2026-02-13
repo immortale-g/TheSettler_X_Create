@@ -365,8 +365,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (pickupAvailable > 0) {
       planned.addAll(planFromPickupWithPositions(pickup, deliverable, Math.min(provide, pickupAvailable)));
     }
-    int plannedCount = countPlanned(planned);
-    int rackRemaining = Math.max(0, Math.min(provide, rackUsable) - plannedCount);
+    int plannedFromPickup = countPlanned(planned);
+    int rackRemaining = Math.max(0, Math.min(provide, rackUsable) - plannedFromPickup);
     if (rackRemaining > 0) {
       planned.addAll(planFromRacksWithPositions(tile, deliverable, rackRemaining));
     }
