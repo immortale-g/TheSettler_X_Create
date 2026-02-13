@@ -26,6 +26,7 @@ tmp_blueprint_dump
 tmp_minecolonies_xml
 tmp_requesthandler_javap.txt
 tmp_resolverhandler_javap.txt
+blueprint_backups/
 
 repo
 Backups/
