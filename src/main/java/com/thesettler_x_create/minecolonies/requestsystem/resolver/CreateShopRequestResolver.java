@@ -202,8 +202,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = getAvailableFromRacks(tile, deliverable);
+    int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
     int rackUsable = Math.max(0, rackAvailable - reservedForDeliverable);
-    int available = Math.max(0, networkAvailable + rackUsable);
+    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -341,8 +342,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = getAvailableFromRacks(tile, deliverable);
+    int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
     int rackUsable = Math.max(0, rackAvailable - reservedForDeliverable);
-    int available = Math.max(0, networkAvailable + rackUsable);
+    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
     int provide = Math.min(available, needed);
     if (provide <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -360,8 +362,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
-    if (rackUsable > 0) {
-      planned.addAll(planFromRacksWithPositions(tile, deliverable, Math.min(provide, rackUsable)));
+    if (pickupAvailable > 0) {
+      planned.addAll(planFromPickupWithPositions(pickup, deliverable, Math.min(provide, pickupAvailable)));
+    }
+    int plannedCount = countPlanned(planned);
+    int rackRemaining = Math.max(0, Math.min(provide, rackUsable) - plannedCount);
+    if (rackRemaining > 0) {
+      planned.addAll(planFromRacksWithPositions(tile, deliverable, rackRemaining));
     }
     List<ItemStack> ordered = extractStacks(planned);
     int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
@@ -379,8 +386,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           ordered.size());
     }
     if (!ordered.isEmpty()) {
-      // If we can satisfy from racks, create deliveries immediately.
-      if (rackUsable > 0) {
+      // If we can satisfy from pickup/racks, create deliveries immediately.
+      if (rackUsable > 0 || pickupAvailable > 0) {
         List<IToken<?>> created = createDeliveriesFromStacks(manager, request, planned, pickup);
         markDeliveriesCreated(request.getId());
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -410,7 +417,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     // If we ordered from the network, we wait for arrival and do not create deliveries yet.
-    if (rackUsable <= 0) {
+    if (rackUsable <= 0 && pickupAvailable <= 0) {
       return Lists.newArrayList();
     }
 
@@ -601,6 +608,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 missing++;
                 request.removeChild(childToken);
               }
+              if (child != null
+                  && child.getRequest()
+                      instanceof
+                      com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
+                var assigned = assignmentStore.getAssignmentForValue(childToken);
+                if (assigned == null) {
+                  boolean enqueued = tryEnqueueDelivery(standardManager, childToken);
+                  if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                    TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] tickPending: {} child {} unassigned delivery -> enqueue={}",
+                        requestIdLog,
+                        childToken,
+                        enqueued ? "ok" : "none");
+                  }
+                }
+              }
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 String childType =
                     child == null || child.getRequest() == null
@@ -677,44 +700,58 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         continue;
       }
-      int rackAvailable = getAvailableFromRacks(tile, deliverable);
-      if (rackAvailable < pendingCount) {
-        logPendingReasonChange(
-            request.getId(), "wait:rack-available=" + rackAvailable + " pending=" + pendingCount);
-        if (shouldNotifyPending(level, request.getId())) {
-          sendShopChat(
-              manager,
-              "com.thesettler_x_create.message.createshop.delivery_waiting",
-              java.util.Collections.singletonList(deliverable.getResult()));
-        }
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " waiting (rackAvailable="
-                  + rackAvailable
-                  + ", pendingCount="
-                  + pendingCount
-                  + ")");
-        }
-        continue;
+    int rackAvailable = getAvailableFromRacks(tile, deliverable);
+    int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
+    int totalAvailable = rackAvailable + pickupAvailable;
+    if (totalAvailable < pendingCount) {
+      logPendingReasonChange(
+          request.getId(),
+          "wait:available=" + totalAvailable + " rack=" + rackAvailable + " pending=" + pendingCount);
+      if (shouldNotifyPending(level, request.getId())) {
+        sendShopChat(
+            manager,
+            "com.thesettler_x_create.message.createshop.delivery_waiting",
+            java.util.Collections.singletonList(deliverable.getResult()));
       }
-      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks =
-          planFromRacksWithPositions(tile, deliverable, pendingCount);
-      if (stacks.isEmpty()) {
-        logPendingReasonChange(request.getId(), "wait:plan-empty");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: "
-                  + requestIdLog
-                  + " skip (planFromRacks empty, rackAvailable="
-                  + rackAvailable
-                  + ", pendingCount="
-                  + pendingCount
-                  + ")");
-        }
-        continue;
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: "
+                + requestIdLog
+                + " waiting (available="
+                + totalAvailable
+                + ", rackAvailable="
+                + rackAvailable
+                + ", pickupAvailable="
+                + pickupAvailable
+                + ", pendingCount="
+                + pendingCount
+                + ")");
       }
+      continue;
+    }
+    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks =
+        planFromPickupWithPositions(pickup, deliverable, pendingCount);
+    int plannedCount = countPlanned(stacks);
+    int remaining = Math.max(0, pendingCount - plannedCount);
+    if (remaining > 0) {
+      stacks.addAll(planFromRacksWithPositions(tile, deliverable, remaining));
+    }
+    if (stacks.isEmpty()) {
+      logPendingReasonChange(request.getId(), "wait:plan-empty");
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: "
+                + requestIdLog
+                + " skip (plan empty, rackAvailable="
+                + rackAvailable
+                + ", pickupAvailable="
+                + pickupAvailable
+                + ", pendingCount="
+                + pendingCount
+                + ")");
+      }
+      continue;
+    }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: "
@@ -1932,6 +1969,27 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return Math.max(0, total);
   }
 
+  private int getAvailableFromPickup(CreateShopBlockEntity pickup, IDeliverable deliverable) {
+    if (pickup == null || deliverable == null) {
+      return 0;
+    }
+    IItemHandler handler = pickup.getItemHandler(null);
+    if (handler == null) {
+      return 0;
+    }
+    int total = 0;
+    for (int i = 0; i < handler.getSlots(); i++) {
+      ItemStack stack = handler.getStackInSlot(i);
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      if (deliverable.matches(stack)) {
+        total += stack.getCount();
+      }
+    }
+    return Math.max(0, total);
+  }
+
   private List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromRacksWithPositions(
       TileEntityCreateShop tile, IDeliverable deliverable, int amount) {
     if (amount <= 0) {
@@ -1963,6 +2021,56 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       remaining -= toTake;
     }
     return planned;
+  }
+
+  private List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
+      CreateShopBlockEntity pickup, IDeliverable deliverable, int amount) {
+    if (amount <= 0 || pickup == null || deliverable == null) {
+      return Lists.newArrayList();
+    }
+    IItemHandler handler = pickup.getItemHandler(null);
+    if (handler == null) {
+      return Lists.newArrayList();
+    }
+    int remaining = amount;
+    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
+    BlockPos pickupPos = pickup.getBlockPos();
+    for (int i = 0; i < handler.getSlots(); i++) {
+      if (remaining <= 0) {
+        break;
+      }
+      ItemStack stack = handler.getStackInSlot(i);
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      if (!deliverable.matches(stack)) {
+        continue;
+      }
+      int toTake = Math.min(remaining, stack.getCount());
+      ItemStack copy = stack.copy();
+      copy.setCount(toTake);
+      planned.add(new com.minecolonies.api.util.Tuple<>(copy, pickupPos));
+      remaining -= toTake;
+    }
+    return planned;
+  }
+
+  private static int countPlanned(
+      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
+    if (planned == null || planned.isEmpty()) {
+      return 0;
+    }
+    int total = 0;
+    for (var entry : planned) {
+      if (entry == null) {
+        continue;
+      }
+      ItemStack stack = entry.getA();
+      if (stack != null && !stack.isEmpty()) {
+        total += stack.getCount();
+      }
+    }
+    return total;
   }
 
   private static List<ItemStack> extractStacks(
