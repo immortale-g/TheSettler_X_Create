@@ -307,6 +307,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       return Lists.newArrayList();
     }
+    if (!shop.isWorkerWorking()) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] attemptResolve deferred (worker not working) request={}",
+            request.getId());
+      }
+      markRequestOrdered(level, request.getId());
+      pendingRequestCounts.put(request.getId(), Math.max(1, needed));
+      return Lists.newArrayList();
+    }
 
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
     int networkAvailable = network.getAvailable(deliverable);
@@ -499,6 +509,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     BuildingCreateShop shop = getShop(manager);
     if (shop == null) {
+      return;
+    }
+    if (!shop.isWorkerWorking()) {
+      if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (worker not working)");
+      }
       return;
     }
     TileEntityCreateShop tile = shop.getCreateShopTileEntity();
