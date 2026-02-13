@@ -460,6 +460,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public void notifyMissingNetwork() {
+    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
+      return;
+    }
     TileEntityCreateShop shop = getCreateShopTileEntity();
     if (shop == null || shop.getLevel() == null) {
       return;
