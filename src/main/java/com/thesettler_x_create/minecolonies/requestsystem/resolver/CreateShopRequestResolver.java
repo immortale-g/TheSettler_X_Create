@@ -10,6 +10,10 @@ import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliv
 import com.minecolonies.api.colony.requestsystem.requestable.Tool;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
+import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
+import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
@@ -53,6 +57,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final java.util.Map<IToken<?>, Long> orderedRequests =
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Set<IToken<?>> deliveriesCreated =
+      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -99,6 +105,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public boolean canResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    if (request != null && cancelledRequests.contains(request.getId())) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] canResolve=false (request cancelled) {}", request.getId());
+      }
+      return false;
+    }
     if (manager == null || manager.getColony() == null) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (manager/colony missing)");
@@ -224,6 +237,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public List<IToken<?>> attemptResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    if (request != null && cancelledRequests.contains(request.getId())) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] attemptResolve skipped (request cancelled) {}", request.getId());
+      }
+      return Lists.newArrayList();
+    }
     if (manager == null || manager.getColony() == null) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
@@ -535,6 +555,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         pendingRequestCounts.remove(token);
         continue;
       }
+      if (request != null && cancelledRequests.contains(request.getId())) {
+        orderedRequests.remove(request.getId());
+        pendingRequestCounts.remove(request.getId());
+        clearRequestCooldown(request.getId());
+        clearDeliveriesCreated(request.getId());
+        logPendingReasonChange(request.getId(), "skip:cancelled");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} skip (cancelled)", request.getId());
+        }
+        continue;
+      }
       logRequestStateChange(standardManager, token, "tickPending");
       if (request == null || !(request.getRequest() instanceof IDeliverable deliverable)) {
         logPendingReasonChange(token, "skip:not-deliverable");
@@ -842,7 +874,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     pendingRequestCounts.put(parentToken, pendingCount);
     markRequestOrdered(level, parentToken);
+    cancelledRequests.add(parentToken);
     clearDeliveriesCreated(parentToken);
+    orderedRequests.remove(parentToken);
+    pendingRequestCounts.remove(parentToken);
+    clearRequestCooldown(parentToken);
 
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
@@ -885,7 +921,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingRequestCounts.remove(parentToken);
       return;
     }
+    cancelledRequests.add(parentToken);
     clearDeliveriesCreated(parentToken);
+    orderedRequests.remove(parentToken);
+    pendingRequestCounts.remove(parentToken);
+    clearRequestCooldown(parentToken);
     pendingRequestCounts.remove(parentToken);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IStandardRequestManager standard = unwrapStandardManager(manager);
@@ -912,19 +952,27 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    if (request != null) {
+      cancelledRequests.add(request.getId());
+      orderedRequests.remove(request.getId());
+      pendingRequestCounts.remove(request.getId());
+    }
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
   }
 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    if (request != null) {
+      cancelledRequests.add(request.getId());
+      orderedRequests.remove(request.getId());
+      pendingRequestCounts.remove(request.getId());
+    }
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
   }
 
   @Override
@@ -941,9 +989,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
+    if (request != null) {
+      cancelledRequests.add(request.getId());
+      orderedRequests.remove(request.getId());
+      pendingRequestCounts.remove(request.getId());
+      clearRequestCooldown(request.getId());
+      clearDeliveriesCreated(request.getId());
+    }
     if (request.getRequest() instanceof IDeliverable) {
       releaseReservation(manager, (IRequest<? extends IDeliverable>) request);
     }
@@ -1188,6 +1240,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   "[CreateShop] delivery fallback assign failed token={} error={}",
                   token,
                   ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
+          }
+          // If still unassigned, enqueue into a warehouse request queue with couriers.
+          var assignedAfter = assignmentStore.getAssignmentForValue(token);
+          if (assignedAfter == null) {
+            boolean enqueued = tryEnqueueDelivery(standard, token);
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery fallback enqueue token={} result={}",
+                  token,
+                  enqueued ? "ok" : "none");
             }
           }
         }
@@ -1823,6 +1886,35 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         targetPos == null ? "<null>" : targetPos.toString(),
         targetLoaded,
         targetBlock);
+  }
+
+  private static boolean tryEnqueueDelivery(
+      IStandardRequestManager manager, IToken<?> token) {
+    if (manager == null || token == null || manager.getColony() == null) {
+      return false;
+    }
+    var buildingManager = manager.getColony().getServerBuildingManager();
+    if (buildingManager == null) {
+      return false;
+    }
+    for (var entry : buildingManager.getBuildings().entrySet()) {
+      if (!(entry.getValue() instanceof IWareHouse warehouse)) {
+        continue;
+      }
+      CourierAssignmentModule couriers =
+          (CourierAssignmentModule) warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
+      if (couriers == null || couriers.getAssignedCitizen().isEmpty()) {
+        continue;
+      }
+      WarehouseRequestQueueModule queue =
+          (WarehouseRequestQueueModule) warehouse.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
+      if (queue == null) {
+        continue;
+      }
+      queue.addRequest(token);
+      return true;
+    }
+    return false;
   }
 
   private int getAvailableFromRacks(TileEntityCreateShop tile, IDeliverable deliverable) {
