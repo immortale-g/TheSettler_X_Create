@@ -542,8 +542,7 @@ public final class CreateShopResolverInjector {
                     .IDeliverymanRequestable;
     if (isDeliveryRequest) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] skip reassign {} (delivery request)", token);
+        TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (delivery request)", token);
       }
       return 0;
     }
