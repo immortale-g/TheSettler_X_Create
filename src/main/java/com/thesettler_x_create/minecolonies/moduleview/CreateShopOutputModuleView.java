@@ -30,6 +30,11 @@ public class CreateShopOutputModuleView extends AbstractBuildingModuleView {
   }
 
   @Override
+  public boolean isPageVisible() {
+    return false;
+  }
+
+  @Override
   public String getIcon() {
     return "settings";
   }
