@@ -459,6 +459,29 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         .anyMatch(citizen -> citizen.getJob() instanceof JobCreateShop);
   }
 
+  public boolean isWorkerWorking() {
+    for (var citizen : getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      if (citizen.getJobStatus() == com.minecolonies.api.entity.ai.JobStatus.WORKING) {
+        return true;
+      }
+      try {
+        var entity = citizen.getEntity();
+        if (entity != null && entity.isPresent()) {
+          String meta = entity.get().getRenderMetadata();
+          if ("working".equals(meta)) {
+            return true;
+          }
+        }
+      } catch (Exception ignored) {
+        // Ignore entity lookup issues.
+      }
+    }
+    return false;
+  }
+
   public void notifyMissingNetwork() {
     if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
       return;
@@ -647,7 +670,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   private void tickPermaRequests(IColony colony) {
-    if (colony == null || permaOres.isEmpty() || !canUsePermaRequests()) {
+    if (colony == null || permaOres.isEmpty() || !canUsePermaRequests() || !isWorkerWorking()) {
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",

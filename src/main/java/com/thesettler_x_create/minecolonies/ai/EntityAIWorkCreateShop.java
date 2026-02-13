@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.ai;
 import com.minecolonies.api.entity.ai.statemachine.AITarget;
 import com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState;
 import com.minecolonies.api.entity.ai.statemachine.states.IAIState;
+import com.minecolonies.api.entity.ai.statemachine.tickratestatemachine.IStateSupplier;
 import com.minecolonies.core.entity.ai.workers.AbstractEntityAIInteract;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
@@ -12,9 +13,9 @@ public class EntityAIWorkCreateShop
   public EntityAIWorkCreateShop(JobCreateShop job) {
     super(job);
     registerTargets(
-        new AITarget<>(AIWorkerState.PREPARING, this::prepare, 20),
-        new AITarget<>(AIWorkerState.START_WORKING, this::work, 20),
-        new AITarget<>(AIWorkerState.IDLE, this::idleState, 20));
+        new AITarget<>(AIWorkerState.PREPARING, (IStateSupplier<IAIState>) this::prepare, 20),
+        new AITarget<>(AIWorkerState.START_WORKING, (IStateSupplier<IAIState>) this::work, 20),
+        new AITarget<>(AIWorkerState.IDLE, (IStateSupplier<IAIState>) this::idleState, 20));
   }
 
   @Override
@@ -35,7 +36,6 @@ public class EntityAIWorkCreateShop
     }
   }
 
-  @Override
   public boolean hasWorkToDo() {
     return isWorkingTime();
   }
@@ -45,7 +45,6 @@ public class EntityAIWorkCreateShop
     return !isWorkingTime();
   }
 
-  @Override
   protected IAIState decide() {
     return isWorkingTime() ? AIWorkerState.PREPARING : AIWorkerState.IDLE;
   }
