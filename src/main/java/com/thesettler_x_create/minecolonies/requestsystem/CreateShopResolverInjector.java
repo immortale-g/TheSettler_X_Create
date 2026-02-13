@@ -485,6 +485,10 @@ public final class CreateShopResolverInjector {
           String childState = child == null ? "<null>" : String.valueOf(child.getState());
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] child {} type={} state={}", childToken, childType, childState);
+          if (child == null) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] child {} missing in request handler (parent={})", childToken, token);
+          }
         }
         reassigned +=
             tryReassignRequest(
