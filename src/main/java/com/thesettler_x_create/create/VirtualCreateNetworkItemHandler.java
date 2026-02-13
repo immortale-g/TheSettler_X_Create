@@ -65,17 +65,43 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
     int available = getAvailableFromRacks(key);
     if (available <= 0) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] extractItem failed (no rack stock) item={} reserved={} available={} simulate={}",
+            key.getHoverName().getString(),
+            shopBlockEntity.getReservedFor(key),
+            available,
+            simulate);
+      }
       return ItemStack.EMPTY;
     }
 
     int reserved = shopBlockEntity.getReservedFor(key);
     int extractable = reserved > 0 ? Math.min(amount, reserved) : Math.min(amount, available);
     if (extractable <= 0) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] extractItem failed (not extractable) item={} reserved={} available={} request={} simulate={}",
+            key.getHoverName().getString(),
+            reserved,
+            available,
+            amount,
+            simulate);
+      }
       return ItemStack.EMPTY;
     }
 
     ItemStack extracted = tryExtractFromRacks(key, extractable, simulate);
     if (extracted.isEmpty()) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] extractItem failed (rack extract empty) item={} reserved={} available={} request={} simulate={}",
+            key.getHoverName().getString(),
+            reserved,
+            available,
+            extractable,
+            simulate);
+      }
       return ItemStack.EMPTY;
     }
 
