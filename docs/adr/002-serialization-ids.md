@@ -10,7 +10,7 @@ breaking change.
 
 ## Decision
 Keep existing serialization IDs and tag keys unless a migration path is explicitly implemented. Any
-future change must include backward?compatible reads and documented rationale.
+future change must include backward-compatible reads and documented rationale.
 
 ## Consequences
 - Stable saves across versions.

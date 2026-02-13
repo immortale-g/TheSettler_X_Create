@@ -11,6 +11,9 @@ structure across mods is expected when integrating with MineColonies and Create;
 Differentiators in this project include perma-request workflows, belt blueprint placement logic, Create Shop
 pickup/output blocks with reservation handling, and Create-specific courier integration.
 
+This mod is designed as a bridge/adapter layer: the Create Shop uses MineColonies standard hut windows and
+module tabs, while Create integration lives behind the adapter components.
+
 This template repository can be directly cloned to get you started with a new
 mod. Simply create a new repository cloned from this one, by following the
 instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).

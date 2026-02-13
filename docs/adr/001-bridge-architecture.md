@@ -10,7 +10,7 @@ layer is required to integrate Create stock networks into MineColonies requests.
 
 ## Decision
 Implement a bridge/adapter architecture that wraps MineColonies request resolution and Create logistics
-access. The adapter is intentionally thin and follows API?mandated patterns to preserve compatibility
+access. The adapter is intentionally thin and follows API-mandated patterns to preserve compatibility
 and reduce risk during upstream updates.
 
 ## Consequences
