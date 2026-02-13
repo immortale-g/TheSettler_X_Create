@@ -36,7 +36,6 @@ public class EntityAIWorkCreateShop
     }
   }
 
-  @Override
   public boolean hasWorkToDo() {
     return isWorkingTime();
   }
@@ -46,7 +45,6 @@ public class EntityAIWorkCreateShop
     return !isWorkingTime();
   }
 
-  @Override
   protected IAIState decide() {
     return isWorkingTime() ? AIWorkerState.PREPARING : AIWorkerState.IDLE;
   }
