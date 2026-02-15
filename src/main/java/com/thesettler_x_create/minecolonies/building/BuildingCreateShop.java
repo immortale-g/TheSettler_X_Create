@@ -117,6 +117,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private String lastWarehouseCompareDump;
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   private boolean warehouseRegistered;
+  private long lastRackScanTick;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -143,6 +144,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastEntityRepairDump = "";
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
+    this.lastRackScanTick = -1L;
     this.shopResolver = null;
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
@@ -552,6 +554,72 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private boolean hasWarehouseModules() {
     return getModule(BuildingModules.WAREHOUSE_COURIERS) != null
         && getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
+  }
+
+  public void ensureRackContainers() {
+    if (getColony() == null) {
+      return;
+    }
+    Level level = getColony().getWorld();
+    if (level == null) {
+      return;
+    }
+    long now = level.getGameTime();
+    if (lastRackScanTick >= 0 && now - lastRackScanTick < 40L) {
+      return;
+    }
+    lastRackScanTick = now;
+    Tuple<BlockPos, BlockPos> corners = getCorners();
+    if (corners == null || corners.getA() == null || corners.getB() == null) {
+      return;
+    }
+    BlockPos a = corners.getA();
+    BlockPos b = corners.getB();
+    int minX = Math.min(a.getX(), b.getX());
+    int maxX = Math.max(a.getX(), b.getX());
+    int minY = Math.min(a.getY(), b.getY());
+    int maxY = Math.max(a.getY(), b.getY());
+    int minZ = Math.min(a.getZ(), b.getZ());
+    int maxZ = Math.max(a.getZ(), b.getZ());
+    long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+    if (volume > 20000L) {
+      return;
+    }
+    int added = 0;
+    for (int x = minX; x <= maxX; x++) {
+      for (int y = minY; y <= maxY; y++) {
+        for (int z = minZ; z <= maxZ; z++) {
+          BlockPos pos = new BlockPos(x, y, z);
+          if (!WorldUtil.isBlockLoaded(level, pos)) {
+            continue;
+          }
+          BlockState state = level.getBlockState(pos);
+          if (!(state.getBlock() instanceof AbstractBlockMinecoloniesRack)) {
+            continue;
+          }
+          if (containerList.contains(pos)) {
+            continue;
+          }
+          addContainerPosition(pos);
+          BlockEntity entity = level.getBlockEntity(pos);
+          if (entity instanceof TileEntityRack rack) {
+            rack.setInWarehouse(Boolean.TRUE);
+            var warehouseModules = getModulesByType(WarehouseModule.class);
+            if (!warehouseModules.isEmpty()) {
+              WarehouseModule warehouseModule = warehouseModules.get(0);
+              while (rack.getUpgradeSize() < warehouseModule.getStorageUpgrade()) {
+                rack.upgradeRackSize();
+              }
+            }
+          }
+          added++;
+        }
+      }
+    }
+    if (isDebugRequests() && added > 0) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
+    }
   }
 
   private void ensureDeliverableAssignment() {

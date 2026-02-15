@@ -2032,6 +2032,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (level == null) {
       return 0;
     }
+    if (tile.getBuilding() instanceof BuildingCreateShop shop) {
+      shop.ensureRackContainers();
+    }
     int total = 0;
     for (BlockPos pos : tile.getBuilding().getContainers()) {
       if (!WorldUtil.isBlockLoaded(level, pos)) {
@@ -2075,6 +2078,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     Level level = tile.getLevel();
     if (level == null) {
       return Lists.newArrayList();
+    }
+    if (tile.getBuilding() instanceof BuildingCreateShop shop) {
+      shop.ensureRackContainers();
     }
     int remaining = amount;
     List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
