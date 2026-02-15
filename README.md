@@ -18,7 +18,7 @@ Provenance / Attribution
 ========================
 This project is developed independently using only public APIs from MineColonies and Create. No third-party
 bridge code is included. If external references or ideas are used in the future, they will be credited in
-`docs/provenance.md` and `FEATURE_STATUS.md`.
+`docs/provenance.md`.
 
 Mapping Names:
 ============
