@@ -312,6 +312,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = getOrCreateShopResolver();
+      if (isDebugRequests() && resolver == null) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tick: resolver missing for shop {}", getLocation().getInDimensionLocation());
+      }
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }
@@ -2511,6 +2515,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     Object delivery = tryInvoke(task, "getDeliveryLocation");
     if (delivery != null) {
       detail.append("delivery=").append(delivery).append(" ");
+    }
+    Object start = tryInvoke(task, "getStart");
+    if (start != null) {
+      detail.append("start=").append(start).append(" ");
+    }
+    Object target = tryInvoke(task, "getTarget");
+    if (target != null) {
+      detail.append("target=").append(target).append(" ");
     }
     String result = detail.toString().trim();
     return result.isEmpty() ? task.toString() : result;
