@@ -19,14 +19,14 @@ import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.MessageUtils;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
+import com.minecolonies.core.colony.buildings.modules.AbstractAssignedCitizenModule;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.DeliverymanAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
-import com.minecolonies.core.colony.buildings.modules.AbstractAssignedCitizenModule;
+import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
-import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -756,8 +756,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           planFromPickupWithPositions(pickup, deliverable, deliverCount);
       int plannedCount = countPlanned(stacks);
       if (plannedCount < deliverCount) {
-        stacks.addAll(
-            planFromRacksWithPositions(tile, deliverable, deliverCount - plannedCount));
+        stacks.addAll(planFromRacksWithPositions(tile, deliverable, deliverCount - plannedCount));
       }
       if (stacks.isEmpty()) {
         logPendingReasonChange(request.getId(), "wait:plan-empty");
@@ -2134,12 +2133,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (building == null) {
         continue;
       }
-      CourierAssignmentModule warehouseCouriers = building.getModule(BuildingModules.WAREHOUSE_COURIERS);
+      CourierAssignmentModule warehouseCouriers =
+          building.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (warehouseCouriers != null) {
         checked += notifyCourierModule(warehouseCouriers, token);
         notified += notifyCourierJobs(warehouseCouriers, token);
       }
-      DeliverymanAssignmentModule deliverymanModule = building.getModule(BuildingModules.COURIER_WORK);
+      DeliverymanAssignmentModule deliverymanModule =
+          building.getModule(BuildingModules.COURIER_WORK);
       if (deliverymanModule != null) {
         checked += notifyCourierModule(deliverymanModule, token);
         notified += notifyCourierJobs(deliverymanModule, token);
@@ -2178,7 +2179,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       var job = citizen.getJob();
       if (job instanceof JobDeliveryman deliveryman) {
         try {
-          deliveryman.addRequest(token, AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
+          deliveryman.addRequest(
+              token, AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
           notified++;
         } catch (Exception ignored) {
           // Ignore enqueue errors.
@@ -2279,8 +2281,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         // Trim to requested amount.
         int plannedCount = countPlanned(planned);
         if (plannedCount > amount) {
-          List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> trimmed =
-              Lists.newArrayList();
+          List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> trimmed = Lists.newArrayList();
           int needed = amount;
           for (var entry : planned) {
             if (needed <= 0) {
@@ -2307,8 +2308,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       TileEntityCreateShop tile,
       IDeliverable deliverable,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
-    BuildingCreateShop shop =
-        tile.getBuilding() instanceof BuildingCreateShop b ? b : null;
+    BuildingCreateShop shop = tile.getBuilding() instanceof BuildingCreateShop b ? b : null;
     if (shop == null) {
       return 0;
     }
@@ -2342,7 +2342,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           }
           total += count;
           if (planned != null) {
-            for (ItemStack stack : InventoryUtils.filterItemHandler(rack.getInventory(), deliverable::matches)) {
+            for (ItemStack stack :
+                InventoryUtils.filterItemHandler(rack.getInventory(), deliverable::matches)) {
               planned.add(new com.minecolonies.api.util.Tuple<>(stack.copy(), pos));
             }
           }
