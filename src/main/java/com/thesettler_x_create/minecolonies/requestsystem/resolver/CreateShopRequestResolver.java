@@ -64,6 +64,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
       new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.Map<IToken<?>, String> pendingSources =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
   private long lastDeliveryAssignmentDebugTime = 0L;
@@ -315,6 +317,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       markRequestOrdered(level, request.getId());
       pendingRequestCounts.put(request.getId(), needed);
+      recordPendingSource(request.getId(), "attemptResolve:worker-not-working");
       return Lists.newArrayList();
     }
 
@@ -336,6 +339,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       // Track pending requests so we can detect items arriving in racks.
       markRequestOrdered(level, request.getId());
       pendingRequestCounts.put(request.getId(), needed);
+      recordPendingSource(request.getId(), "attemptResolve:insufficient");
       return Lists.newArrayList();
     }
 
@@ -373,6 +377,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       // Otherwise, order from network and wait for arrival.
       markRequestOrdered(level, request.getId());
       pendingRequestCounts.put(request.getId(), needed);
+      recordPendingSource(request.getId(), "attemptResolve:network-ordered");
       sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
       sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
     }
@@ -472,6 +477,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     pendingTokens.addAll(pendingRequestCounts.keySet());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
+        if (!orderedRequests.isEmpty() || !pendingRequestCounts.isEmpty()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
+              orderedRequests.size(),
+              pendingRequestCounts.size());
+        }
+      }
+      if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: no assigned or ordered requests for resolver {}", getId());
       }
@@ -528,6 +541,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       } catch (IllegalArgumentException ex) {
         orderedRequests.remove(token);
         pendingRequestCounts.remove(token);
+        pendingSources.remove(token);
         continue;
       }
       if (cancelledRequests.contains(request.getId())) {
@@ -537,6 +551,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         } else {
           orderedRequests.remove(request.getId());
           pendingRequestCounts.remove(request.getId());
+          pendingSources.remove(request.getId());
           clearRequestCooldown(request.getId());
           clearDeliveriesCreated(request.getId());
           logPendingReasonChange(request.getId(), "skip:cancelled");
@@ -690,7 +705,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       int rackAvailable = getAvailableFromRacks(tile, deliverable);
-      int totalAvailable = rackAvailable;
+      int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
+      int totalAvailable = rackAvailable + pickupAvailable;
       if (totalAvailable < pendingCount) {
         logPendingReasonChange(
             request.getId(),
@@ -698,6 +714,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 + totalAvailable
                 + " rack="
                 + rackAvailable
+                + " pickup="
+                + pickupAvailable
                 + " pending="
                 + pendingCount);
         if (shouldNotifyPending(level, request.getId())) {
@@ -708,34 +726,42 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pendingCount={})",
+              "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pickupAvailable={}, pendingCount={})",
               requestIdLog,
               totalAvailable,
               rackAvailable,
+              pickupAvailable,
               pendingCount);
         }
         continue;
       }
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks =
-          planFromRacksWithPositions(tile, deliverable, pendingCount);
+          planFromPickupWithPositions(pickup, deliverable, pendingCount);
+      int plannedCount = countPlanned(stacks);
+      if (plannedCount < pendingCount) {
+        stacks.addAll(
+            planFromRacksWithPositions(tile, deliverable, pendingCount - plannedCount));
+      }
       if (stacks.isEmpty()) {
         logPendingReasonChange(request.getId(), "wait:plan-empty");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pendingCount={})",
+              "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pickupAvailable={}, pendingCount={})",
               requestIdLog,
               rackAvailable,
+              pickupAvailable,
               pendingCount);
         }
         continue;
       }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} creating deliveries (stacks={}, pendingCount={}, rackAvailable={})",
+            "[CreateShop] tickPending: {} creating deliveries (stacks={}, pendingCount={}, rackAvailable={}, pickupAvailable={})",
             requestIdLog,
             stacks.size(),
             pendingCount,
-            rackAvailable);
+            rackAvailable,
+            pickupAvailable);
       }
       List<IToken<?>> created = createDeliveriesFromStacks(manager, request, stacks, pickup);
       if (created.isEmpty()) {
@@ -855,6 +881,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     Level level = manager.getColony().getWorld();
     if (level == null) {
       pendingRequestCounts.put(parentToken, Math.max(1, stack.getCount()));
+      recordPendingSource(parentToken, "delivery-cancel");
       clearDeliveriesCreated(parentToken);
       return;
     }
@@ -877,6 +904,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pickup.release(parentRequestId);
     }
     pendingRequestCounts.put(parentToken, pendingCount);
+    recordPendingSource(parentToken, "delivery-cancel-reserve");
     // Keep on cooldown so tickPending can retry once stock is available.
     markRequestOrdered(level, parentToken);
     clearDeliveriesCreated(parentToken);
@@ -921,6 +949,47 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
+    if (Config.DEBUG_LOGGING.getAsBoolean()
+        && request != null
+        && request.getRequest() instanceof Delivery delivery) {
+      try {
+        CreateShopBlockEntity pickup = null;
+        Level level = manager == null ? null : manager.getColony().getWorld();
+        BlockPos startPos = delivery.getStart().getInDimensionLocation();
+        if (level != null && WorldUtil.isBlockLoaded(level, startPos)) {
+          BlockEntity startEntity = level.getBlockEntity(startPos);
+          if (startEntity instanceof CreateShopBlockEntity shopPickup) {
+            pickup = shopPickup;
+          }
+        }
+        UUID parentRequestId = toRequestId(parentToken);
+        ItemStack stack = delivery.getStack().copy();
+        int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
+        int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
+        BlockPos pickupPosition = pickup == null ? startPos : pickup.getBlockPos();
+        logDeliveryDiagnostics(
+            "complete",
+            manager,
+            request.getId(),
+            parentRequestId,
+            pickupPosition,
+            stack,
+            delivery.getTarget(),
+            reservedForRequest,
+            -1,
+            reservedForStack);
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={}",
+            request.getId(),
+            parentToken,
+            stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
+            stack.getCount(),
+            startPos,
+            delivery.getTarget().getInDimensionLocation());
+      } catch (Exception ignored) {
+        // Ignore delivery detail logging failures.
+      }
+    }
     clearDeliveriesCreated(parentToken);
     orderedRequests.remove(parentToken);
     pendingRequestCounts.remove(parentToken);
@@ -958,6 +1027,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     orderedRequests.remove(request.getId());
     pendingRequestCounts.remove(request.getId());
+    pendingSources.remove(request.getId());
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
@@ -968,6 +1038,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     orderedRequests.remove(request.getId());
     pendingRequestCounts.remove(request.getId());
+    pendingSources.remove(request.getId());
     releaseReservation(manager, request);
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
@@ -979,6 +1050,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
     pendingRequestCounts.remove(request.getId());
+    pendingSources.remove(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
       releaseReservation(manager, request);
     }
@@ -989,6 +1061,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
     orderedRequests.remove(request.getId());
     pendingRequestCounts.remove(request.getId());
+    pendingSources.remove(request.getId());
     clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
@@ -1510,6 +1583,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         previous == null ? "<none>" : previous);
   }
 
+  private void recordPendingSource(IToken<?> token, String reason) {
+    if (!Config.DEBUG_LOGGING.getAsBoolean() || token == null || reason == null) {
+      return;
+    }
+    String previous = pendingSources.put(token, reason);
+    if (reason.equals(previous)) {
+      return;
+    }
+    TheSettlerXCreate.LOGGER.info(
+        "[CreateShop] pending source token={} reason={} prev={}",
+        token,
+        reason,
+        previous == null ? "<none>" : previous);
+  }
+
   private void scheduleParentChildRecheck(IStandardRequestManager manager, IToken<?> parentToken) {
     var level = manager.getColony().getWorld();
     parentChildrenRecheck.put(parentToken, level.getGameTime() + 20L);
@@ -1704,6 +1792,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     long until = level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong();
     orderedRequests.put(token, until);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      pendingSources.put(token, "markRequestOrdered");
+    }
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] markRequestOrdered token={} resolver={} until={}", token, getId(), until);
     }
@@ -1711,6 +1802,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private void clearRequestCooldown(IToken<?> token) {
     orderedRequests.remove(token);
+    if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
+      String source = pendingSources.remove(token);
+      if (source != null) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] pending cleared token={} source=clearCooldown prev={}", token, source);
+      }
+    }
   }
 
   private boolean hasDeliveriesCreated(IToken<?> token) {
@@ -1844,21 +1942,53 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (buildingManager == null) {
       return false;
     }
+    int warehousesChecked = 0;
+    int warehousesWithCouriers = 0;
+    int warehousesWithQueue = 0;
     for (var entry : buildingManager.getBuildings().entrySet()) {
       if (!(entry.getValue() instanceof IWareHouse warehouse)) {
         continue;
       }
+      warehousesChecked++;
       CourierAssignmentModule couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
-      if (couriers == null || couriers.getAssignedCitizen().isEmpty()) {
+      int courierCount = couriers == null ? 0 : couriers.getAssignedCitizen().size();
+      if (courierCount <= 0) {
         continue;
       }
+      warehousesWithCouriers++;
       WarehouseRequestQueueModule queue =
           warehouse.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
       if (queue == null) {
         continue;
       }
+      warehousesWithQueue++;
       queue.addRequest(token);
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        String warehouseInfo = "<unknown>";
+        try {
+          var getLocation = warehouse.getClass().getMethod("getLocation");
+          Object location = getLocation.invoke(warehouse);
+          if (location != null) {
+            warehouseInfo = location.toString();
+          }
+        } catch (Exception ignored) {
+          // Ignore reflection failures.
+        }
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery enqueue token={} warehouse={} couriers={} queued=true",
+            token,
+            warehouseInfo,
+            courierCount);
+      }
       return true;
+    }
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] delivery enqueue token={} queued=false warehousesChecked={} withCouriers={} withQueue={}",
+          token,
+          warehousesChecked,
+          warehousesWithCouriers,
+          warehousesWithQueue);
     }
     return false;
   }
