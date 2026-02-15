@@ -21,6 +21,7 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.MessageUtils;
+import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
@@ -117,6 +118,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private String lastWarehouseCompareDump;
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   private boolean warehouseRegistered;
+  private long lastRackScanTick;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -143,6 +145,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastEntityRepairDump = "";
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
+    this.lastRackScanTick = -1L;
     this.shopResolver = null;
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
@@ -312,6 +315,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = getOrCreateShopResolver();
+      if (isDebugRequests() && resolver == null) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tick: resolver missing for shop {}", getLocation().getInDimensionLocation());
+      }
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }
@@ -548,6 +555,93 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private boolean hasWarehouseModules() {
     return getModule(BuildingModules.WAREHOUSE_COURIERS) != null
         && getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
+  }
+
+  public void ensureRackContainers() {
+    if (getColony() == null) {
+      return;
+    }
+    Level level = getColony().getWorld();
+    if (level == null) {
+      return;
+    }
+    long now = level.getGameTime();
+    if (lastRackScanTick >= 0 && now - lastRackScanTick < 40L) {
+      return;
+    }
+    lastRackScanTick = now;
+    int added = 0;
+    Tuple<BlockPos, BlockPos> corners = getCorners();
+    boolean usedFallback = false;
+    if (corners != null && corners.getA() != null && corners.getB() != null) {
+      BlockPos a = corners.getA();
+      BlockPos b = corners.getB();
+      int minX = Math.min(a.getX(), b.getX());
+      int maxX = Math.max(a.getX(), b.getX());
+      int minY = Math.min(a.getY(), b.getY());
+      int maxY = Math.max(a.getY(), b.getY());
+      int minZ = Math.min(a.getZ(), b.getZ());
+      int maxZ = Math.max(a.getZ(), b.getZ());
+      long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+      if (volume <= 20000L) {
+        added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
+      } else {
+        usedFallback = true;
+      }
+    } else {
+      usedFallback = true;
+    }
+    if (usedFallback) {
+      BlockPos origin = getLocation().getInDimensionLocation();
+      int radius = 12;
+      int minX = origin.getX() - radius;
+      int maxX = origin.getX() + radius;
+      int minY = origin.getY() - 4;
+      int maxY = origin.getY() + 4;
+      int minZ = origin.getZ() - radius;
+      int maxZ = origin.getZ() + radius;
+      added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
+    }
+    if (isDebugRequests() && added > 0) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
+    }
+  }
+
+  private int scanRackBox(
+      Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+    int added = 0;
+    for (int x = minX; x <= maxX; x++) {
+      for (int y = minY; y <= maxY; y++) {
+        for (int z = minZ; z <= maxZ; z++) {
+          BlockPos pos = new BlockPos(x, y, z);
+          if (!WorldUtil.isBlockLoaded(level, pos)) {
+            continue;
+          }
+          BlockState state = level.getBlockState(pos);
+          if (!(state.getBlock() instanceof AbstractBlockMinecoloniesRack)) {
+            continue;
+          }
+          if (containerList.contains(pos)) {
+            continue;
+          }
+          addContainerPosition(pos);
+          BlockEntity entity = level.getBlockEntity(pos);
+          if (entity instanceof TileEntityRack rack) {
+            rack.setInWarehouse(Boolean.TRUE);
+            var warehouseModules = getModulesByType(WarehouseModule.class);
+            if (!warehouseModules.isEmpty()) {
+              WarehouseModule warehouseModule = warehouseModules.get(0);
+              while (rack.getUpgradeSize() < warehouseModule.getStorageUpgrade()) {
+                rack.upgradeRackSize();
+              }
+            }
+          }
+          added++;
+        }
+      }
+    }
+    return added;
   }
 
   private void ensureDeliverableAssignment() {
@@ -2511,6 +2605,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     Object delivery = tryInvoke(task, "getDeliveryLocation");
     if (delivery != null) {
       detail.append("delivery=").append(delivery).append(" ");
+    }
+    Object start = tryInvoke(task, "getStart");
+    if (start != null) {
+      detail.append("start=").append(start).append(" ");
+    }
+    Object target = tryInvoke(task, "getTarget");
+    if (target != null) {
+      detail.append("target=").append(target).append(" ");
     }
     String result = detail.toString().trim();
     return result.isEmpty() ? task.toString() : result;

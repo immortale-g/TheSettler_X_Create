@@ -122,6 +122,26 @@ public class CreateShopBlockEntity extends BlockEntity {
     return total;
   }
 
+  public int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
+    if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
+      return 0;
+    }
+    cleanExpired();
+    Reservation reservation = reservations.get(requestId);
+    if (reservation == null || !matches(reservation.stackKey, key)) {
+      return 0;
+    }
+    int taken = Math.min(amount, reservation.reservedAmount);
+    reservation.reservedAmount -= taken;
+    if (reservation.reservedAmount <= 0) {
+      reservations.remove(requestId);
+    }
+    if (taken > 0) {
+      setChanged();
+    }
+    return taken;
+  }
+
   //    public int consumeReserved(ItemStack key, int amount) {
   //        if (amount <= 0) {
   //            return 0;

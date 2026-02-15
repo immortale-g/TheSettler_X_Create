@@ -16,6 +16,7 @@ import java.util.List;
 import net.minecraft.world.item.ItemStack;
 
 public class CreateNetworkFacade implements ICreateNetworkFacade {
+  private static final int MAX_PACKAGE_COUNT = 99;
   private final TileEntityCreateShop shop;
   private long lastPerfLogTime = 0L;
   private long lastSummaryNanos = 0L;
@@ -144,14 +145,20 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (remaining <= 0) {
         break;
       }
-      int toOrder = Math.min(remaining, stack.count);
-      if (toOrder <= 0) {
+      int available = Math.min(remaining, stack.count);
+      if (available <= 0) {
         continue;
       }
-      ItemStack requestStack = stack.stack.copy();
-      requestStack.setCount(toOrder);
-      orderedStacks.add(requestStack);
-      remaining -= toOrder;
+      int maxPer =
+          Math.max(1, Math.min(MAX_PACKAGE_COUNT, stack.stack.getMaxStackSize()));
+      while (available > 0 && remaining > 0) {
+        int chunk = Math.min(available, maxPer);
+        ItemStack requestStack = stack.stack.copy();
+        requestStack.setCount(chunk);
+        orderedStacks.add(requestStack);
+        available -= chunk;
+        remaining -= chunk;
+      }
     }
 
     return orderedStacks;
