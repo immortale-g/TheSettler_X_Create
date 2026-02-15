@@ -14,15 +14,11 @@ pickup/output blocks with reservation handling, and Create-specific courier inte
 This mod is designed as a bridge/adapter layer: the Create Shop uses MineColonies standard hut windows and
 module tabs, while Create integration lives behind the adapter components.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
-
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
-
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything
-{this does not affect your code} and then start the process again.
+Provenance / Attribution
+========================
+This project is developed independently using only public APIs from MineColonies and Create. No third-party
+bridge code is included. If external references or ideas are used in the future, they will be credited in
+`docs/provenance.md` and `FEATURE_STATUS.md`.
 
 Mapping Names:
 ============

@@ -8,6 +8,9 @@ not imply shared code or shared implementation.
 No third-party bridge code is included. All integration logic is authored specifically for this
 project, and the feature set is documented in ARCHITECTURE.md and FEATURE_STATUS.md.
 
+If external references, ideas, or sample snippets are used in the future, they will be explicitly
+credited here (with source and scope), along with the corresponding implementation notes.
+
 Scope and constraints:
 - API-driven integration: request resolution and logistics flows follow MineColonies/Create contracts.
 - Compatibility first: serialization keys and IDs remain stable unless a migration is provided.
