@@ -188,6 +188,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     UUID requestId = toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
     needed = Math.max(0, needed - reservedForRequest);
     if (needed <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -199,7 +200,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = getAvailableFromRacks(tile, deliverable);
     int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForDeliverable);
+    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
     int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
@@ -207,7 +208,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] canResolve=false (available={}, reserved={}, needed={}, min={}) for {}",
             available,
-            reservedForDeliverable,
+            reservedForOthers,
             needed,
             deliverable.getMinimumCount(),
             deliverable);
@@ -222,7 +223,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           "[CreateShop] canResolve={} (available={}, reserved={}, needed={}, min={}) for {}",
           result,
           available,
-          reservedForDeliverable,
+          reservedForOthers,
           needed,
           minimum,
           deliverable);
@@ -303,6 +304,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     UUID requestId = toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
     needed = Math.max(0, needed - reservedForRequest);
     if (needed <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -324,7 +326,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = getAvailableFromRacks(tile, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForDeliverable);
+    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
     int available = Math.max(0, networkAvailable + rackUsable);
     int provide = Math.min(available, needed);
     if (provide <= 0) {
@@ -332,7 +334,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve aborted (available={}, reserved={}, needed={}) for {}",
             available,
-            reservedForDeliverable,
+            reservedForOthers,
             needed,
             deliverable);
       }
@@ -356,7 +358,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           "[CreateShop] attemptResolve provide={} (available={}, reserved={}, needed={}) -> ordered {} stack(s)",
           provide,
           available,
-          reservedForDeliverable,
+          reservedForOthers,
           needed,
           ordered.size());
     }
