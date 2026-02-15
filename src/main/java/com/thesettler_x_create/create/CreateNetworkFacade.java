@@ -149,8 +149,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (available <= 0) {
         continue;
       }
-      int maxPer =
-          Math.max(1, Math.min(MAX_PACKAGE_COUNT, stack.stack.getMaxStackSize()));
+      int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, stack.stack.getMaxStackSize()));
       while (available > 0 && remaining > 0) {
         int chunk = Math.min(available, maxPer);
         ItemStack requestStack = stack.stack.copy();

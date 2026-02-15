@@ -317,7 +317,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       CreateShopRequestResolver resolver = getOrCreateShopResolver();
       if (isDebugRequests() && resolver == null) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tick: resolver missing for shop {}", getLocation().getInDimensionLocation());
+            "[CreateShop] tick: resolver missing for shop {}",
+            getLocation().getInDimensionLocation());
       }
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
@@ -608,8 +609,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
   }
 
-  private int scanRackBox(
-      Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+  private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
     int added = 0;
     for (int x = minX; x <= maxX; x++) {
       for (int y = minY; y <= maxY; y++) {
