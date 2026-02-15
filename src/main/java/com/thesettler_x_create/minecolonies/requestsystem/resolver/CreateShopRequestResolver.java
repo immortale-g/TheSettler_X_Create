@@ -15,6 +15,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.BlockPosUtil;
+import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.MessageUtils;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
@@ -2046,6 +2047,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       total += rack.getItemCount(deliverable::matches);
     }
+    if (total > 0) {
+      return Math.max(0, total);
+    }
+    // Fallback: direct scan around the shop for unregistered racks.
+    total = scanRacksAroundShop(tile, deliverable, null);
     return Math.max(0, total);
   }
 
@@ -2107,7 +2113,87 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       planned.add(new com.minecolonies.api.util.Tuple<>(copy, tuple.getB()));
       remaining -= toTake;
     }
+    if (planned.isEmpty()) {
+      scanRacksAroundShop(tile, deliverable, planned);
+      if (!planned.isEmpty()) {
+        // Trim to requested amount.
+        int plannedCount = countPlanned(planned);
+        if (plannedCount > amount) {
+          List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> trimmed =
+              Lists.newArrayList();
+          int needed = amount;
+          for (var entry : planned) {
+            if (needed <= 0) {
+              break;
+            }
+            ItemStack stack = entry.getA();
+            if (stack.isEmpty()) {
+              continue;
+            }
+            int take = Math.min(needed, stack.getCount());
+            ItemStack copy = stack.copy();
+            copy.setCount(take);
+            trimmed.add(new com.minecolonies.api.util.Tuple<>(copy, entry.getB()));
+            needed -= take;
+          }
+          planned = trimmed;
+        }
+      }
+    }
     return planned;
+  }
+
+  private int scanRacksAroundShop(
+      TileEntityCreateShop tile,
+      IDeliverable deliverable,
+      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
+    BuildingCreateShop shop =
+        tile.getBuilding() instanceof BuildingCreateShop b ? b : null;
+    if (shop == null) {
+      return 0;
+    }
+    Level level = tile.getLevel();
+    if (level == null) {
+      return 0;
+    }
+    BlockPos origin = shop.getLocation().getInDimensionLocation();
+    int radius = 16;
+    int minX = origin.getX() - radius;
+    int maxX = origin.getX() + radius;
+    int minY = origin.getY() - 6;
+    int maxY = origin.getY() + 6;
+    int minZ = origin.getZ() - radius;
+    int maxZ = origin.getZ() + radius;
+    int total = 0;
+    for (int x = minX; x <= maxX; x++) {
+      for (int y = minY; y <= maxY; y++) {
+        for (int z = minZ; z <= maxZ; z++) {
+          BlockPos pos = new BlockPos(x, y, z);
+          if (!WorldUtil.isBlockLoaded(level, pos)) {
+            continue;
+          }
+          BlockEntity entity = level.getBlockEntity(pos);
+          if (!(entity instanceof AbstractTileEntityRack rack)) {
+            continue;
+          }
+          int count = rack.getItemCount(deliverable::matches);
+          if (count <= 0) {
+            continue;
+          }
+          total += count;
+          if (planned != null) {
+            for (ItemStack stack : InventoryUtils.filterItemHandler(rack.getInventory(), deliverable::matches)) {
+              planned.add(new com.minecolonies.api.util.Tuple<>(stack.copy(), pos));
+            }
+          }
+        }
+      }
+    }
+    if (Config.DEBUG_LOGGING.getAsBoolean() && total > 0) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] fallback rack scan found {} matching items near {}", total, origin);
+    }
+    return total;
   }
 
   private List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
