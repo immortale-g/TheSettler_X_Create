@@ -1366,6 +1366,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "[CreateShop] delivery assign failed {}: {}", token, ex.getMessage());
         }
       }
+      // Always enqueue into warehouse request queues so couriers can pick it up.
+      boolean enqueued = tryEnqueueDelivery(standardManager, token);
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery enqueue after assign token={} result={}",
+            token,
+            enqueued ? "ok" : "none");
+      }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       var created = manager.getRequestForToken(token);
@@ -1739,6 +1747,30 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] unwrap manager failed type={} err={}",
+            manager.getClass().getName(),
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+    }
+    // MineColonies wraps managers without a public accessor; unwrap via reflection.
+    try {
+      Class<?> type = manager.getClass();
+      while (type != null) {
+        try {
+          var field = type.getDeclaredField("wrappedManager");
+          field.setAccessible(true);
+          Object value = field.get(manager);
+          if (value instanceof IStandardRequestManager standard) {
+            return standard;
+          }
+        } catch (NoSuchFieldException ignored) {
+          // Try next superclass.
+        }
+        type = type.getSuperclass();
+      }
+    } catch (Exception ex) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] unwrap manager field failed type={} err={}",
             manager.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
