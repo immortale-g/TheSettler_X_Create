@@ -570,22 +570,46 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return;
     }
     lastRackScanTick = now;
+    int added = 0;
     Tuple<BlockPos, BlockPos> corners = getCorners();
-    if (corners == null || corners.getA() == null || corners.getB() == null) {
-      return;
+    boolean usedFallback = false;
+    if (corners != null && corners.getA() != null && corners.getB() != null) {
+      BlockPos a = corners.getA();
+      BlockPos b = corners.getB();
+      int minX = Math.min(a.getX(), b.getX());
+      int maxX = Math.max(a.getX(), b.getX());
+      int minY = Math.min(a.getY(), b.getY());
+      int maxY = Math.max(a.getY(), b.getY());
+      int minZ = Math.min(a.getZ(), b.getZ());
+      int maxZ = Math.max(a.getZ(), b.getZ());
+      long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+      if (volume <= 20000L) {
+        added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
+      } else {
+        usedFallback = true;
+      }
+    } else {
+      usedFallback = true;
     }
-    BlockPos a = corners.getA();
-    BlockPos b = corners.getB();
-    int minX = Math.min(a.getX(), b.getX());
-    int maxX = Math.max(a.getX(), b.getX());
-    int minY = Math.min(a.getY(), b.getY());
-    int maxY = Math.max(a.getY(), b.getY());
-    int minZ = Math.min(a.getZ(), b.getZ());
-    int maxZ = Math.max(a.getZ(), b.getZ());
-    long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
-    if (volume > 20000L) {
-      return;
+    if (usedFallback) {
+      BlockPos origin = getLocation().getInDimensionLocation();
+      int radius = 12;
+      int minX = origin.getX() - radius;
+      int maxX = origin.getX() + radius;
+      int minY = origin.getY() - 4;
+      int maxY = origin.getY() + 4;
+      int minZ = origin.getZ() - radius;
+      int maxZ = origin.getZ() + radius;
+      added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
     }
+    if (isDebugRequests() && added > 0) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
+    }
+  }
+
+  private int scanRackBox(
+      Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
     int added = 0;
     for (int x = minX; x <= maxX; x++) {
       for (int y = minY; y <= maxY; y++) {
@@ -617,10 +641,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       }
     }
-    if (isDebugRequests() && added > 0) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
-    }
+    return added;
   }
 
   private void ensureDeliverableAssignment() {
