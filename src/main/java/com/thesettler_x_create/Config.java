@@ -70,6 +70,21 @@ public class Config {
           .comment("Cooldown (ticks) for avoiding duplicate Create Shop request ordering.")
           .defineInRange("orderTtlTicks", 20L * 60L * 5L, 20L, 24000L);
 
+  public static final ModConfigSpec.LongValue INFLIGHT_TIMEOUT_TICKS =
+      BUILDER
+          .comment("Ticks before a Create Shop network request is considered overdue.")
+          .defineInRange("inflightTimeoutTicks", 20L * 60L * 5L, 20L, 24000L);
+
+  public static final ModConfigSpec.LongValue INFLIGHT_CHECK_INTERVAL_TICKS =
+      BUILDER
+          .comment("Ticks between Create Shop inflight tracking checks.")
+          .defineInRange("inflightCheckIntervalTicks", 100L, 20L, 24000L);
+
+  public static final ModConfigSpec.LongValue INFLIGHT_LOG_COOLDOWN =
+      BUILDER
+          .comment("Cooldown (ticks) between inflight overdue logs.")
+          .defineInRange("inflightLogCooldown", 200L, 0L, 24000L);
+
   public static final ModConfigSpec.LongValue PENDING_NOTICE_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) for pending delivery notices.")

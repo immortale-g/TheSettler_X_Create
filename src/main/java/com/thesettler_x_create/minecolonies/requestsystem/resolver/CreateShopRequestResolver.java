@@ -357,7 +357,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
     int remaining = Math.max(0, provide - plannedCount);
     if (remaining > 0) {
-      ordered.addAll(network.requestItems(deliverable, remaining));
+      String requesterName = resolveRequesterName(manager, request);
+      ordered.addAll(network.requestItems(deliverable, remaining, requesterName));
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
@@ -1665,6 +1666,28 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         token,
         reason,
         previous == null ? "<none>" : previous);
+  }
+
+  private String resolveRequesterName(IRequestManager manager, IRequest<?> request) {
+    if (request == null) {
+      return "unknown";
+    }
+    try {
+      com.minecolonies.api.colony.requestsystem.requester.IRequester requester =
+          request.getRequester();
+      if (requester == null) {
+        return "unknown";
+      }
+      net.minecraft.network.chat.MutableComponent component =
+          requester.getRequesterDisplayName(manager, request);
+      if (component == null) {
+        return "unknown";
+      }
+      String text = component.getString();
+      return text == null || text.isBlank() ? "unknown" : text;
+    } catch (Exception ignored) {
+      return "unknown";
+    }
   }
 
   private void scheduleParentChildRecheck(IStandardRequestManager manager, IToken<?> parentToken) {
