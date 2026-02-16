@@ -12,7 +12,6 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
-import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
@@ -28,7 +27,6 @@ import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseModule;
-import com.minecolonies.core.colony.interactionhandling.SimpleNotificationInteraction;
 import com.minecolonies.core.colony.jobs.JobBuilder;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
@@ -40,7 +38,6 @@ import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.init.ModBlocks;
-import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -58,7 +55,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -122,7 +118,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   private boolean warehouseRegistered;
   private long lastRackScanTick;
-  private long lastInflightTick;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -136,6 +131,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
   private BlockPos builderHutPos;
   private boolean beltRebuildPending;
+  private final ShopInflightTracker inflightTracker;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -150,12 +146,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
     this.lastRackScanTick = -1L;
-    this.lastInflightTick = -1L;
     this.shopResolver = null;
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
     this.builderHutPos = null;
     this.beltRebuildPending = false;
+    this.inflightTracker = new ShopInflightTracker(this);
   }
 
   @Override
@@ -328,7 +324,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }
-      tickInflightTracking(colony);
+      inflightTracker.tick(colony);
       debugCourierAssignments(colony);
     }
   }
@@ -696,87 +692,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     ItemStack copy = stack.copy();
     copy.setCount(1);
     return copy;
-  }
-
-  /** Periodically reconciles inflight stock orders and notifies on overdue entries. */
-  private void tickInflightTracking(IColony colony) {
-    if (colony == null) {
-      return;
-    }
-    Level level = colony.getWorld();
-    if (level == null) {
-      return;
-    }
-    long now = level.getGameTime();
-    if (now != 0L
-        && lastInflightTick >= 0
-        && now - lastInflightTick < Config.INFLIGHT_CHECK_INTERVAL_TICKS.getAsLong()) {
-      return;
-    }
-    lastInflightTick = now;
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (pickup == null) {
-      return;
-    }
-    List<ItemStack> inflightKeys = pickup.getInflightKeys();
-    if (inflightKeys.isEmpty()) {
-      return;
-    }
-    java.util.Map<ItemStack, Integer> currentCounts = getStockCountsForKeys(inflightKeys);
-    pickup.reconcileInflight(currentCounts);
-    List<CreateShopBlockEntity.InflightNotice> notices =
-        pickup.consumeOverdueNotices(now, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
-    if (!notices.isEmpty()) {
-      notifyShopkeeperOverdue(notices);
-    }
-  }
-
-  /** Emits a shopkeeper interaction for each overdue inflight notice. */
-  private void notifyShopkeeperOverdue(List<CreateShopBlockEntity.InflightNotice> notices) {
-    if (notices == null || notices.isEmpty()) {
-      return;
-    }
-    ICitizenData citizen = getShopkeeperCitizen();
-    if (citizen == null) {
-      return;
-    }
-    for (CreateShopBlockEntity.InflightNotice notice : notices) {
-      if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
-        continue;
-      }
-      String requester =
-          notice.requesterName == null || notice.requesterName.isBlank()
-              ? "unknown requester"
-              : notice.requesterName;
-      String address =
-          notice.address == null || notice.address.isBlank() ? "unknown address" : notice.address;
-      String itemName = notice.stackKey.getHoverName().getString();
-      String text =
-          "Delivery seems lost for "
-              + requester
-              + ". Item: "
-              + itemName
-              + " x"
-              + notice.remaining
-              + " (address: "
-              + address
-              + ").";
-      citizen.triggerInteraction(
-          new SimpleNotificationInteraction(Component.literal(text), ChatPriority.IMPORTANT));
-    }
-  }
-
-  /** Returns the assigned Create Shop worker, if any. */
-  private ICitizenData getShopkeeperCitizen() {
-    for (ICitizenData citizen : getAllAssignedCitizen()) {
-      if (citizen == null) {
-        continue;
-      }
-      if (citizen.getJob() instanceof JobCreateShop) {
-        return citizen;
-      }
-    }
-    return null;
   }
 
   private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
