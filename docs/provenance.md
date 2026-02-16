@@ -27,3 +27,6 @@ Implementation notes:
   interaction handlers and Create stock network APIs.
 - Delivery creation logic for Create Shop is authored here and intentionally restricted to physical rack
   inventory (not virtual/pickup stock) to avoid false deliveries for inflight items.
+- Ongoing refactors (resolver module splits and upcoming stock/validator/delivery extracts) are purely
+  internal reorganizations of this codebase; no external implementations or third-party bridge code are
+  incorporated or adapted.
