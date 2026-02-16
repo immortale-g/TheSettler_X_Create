@@ -62,10 +62,14 @@ final class ShopResolverAssignments {
     var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
     var assignments = store.getAssignments();
     var deliverableList =
-        assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new ArrayList<>());
+        (java.util.Collection<IToken<?>>)
+            assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new ArrayList<>());
     var requestableList =
-        assignments.computeIfAbsent(TypeConstants.REQUESTABLE, key -> new ArrayList<>());
-    var toolList = assignments.computeIfAbsent(TypeConstants.TOOL, key -> new ArrayList<>());
+        (java.util.Collection<IToken<?>>)
+            assignments.computeIfAbsent(TypeConstants.REQUESTABLE, key -> new ArrayList<>());
+    var toolList =
+        (java.util.Collection<IToken<?>>)
+            assignments.computeIfAbsent(TypeConstants.TOOL, key -> new ArrayList<>());
     ensureAssignment(deliverableList, resolver, "DELIVERABLE");
     ensureAssignment(requestableList, resolver, "REQUESTABLE");
     ensureAssignment(toolList, resolver, "TOOL");
@@ -125,7 +129,7 @@ final class ShopResolverAssignments {
   }
 
   private void ensureAssignment(
-      java.util.List<IToken<?>> list, IRequestResolver<?> resolver, String label) {
+      java.util.Collection<IToken<?>> list, IRequestResolver<?> resolver, String label) {
     if (list.contains(resolver.getId())) {
       return;
     }
