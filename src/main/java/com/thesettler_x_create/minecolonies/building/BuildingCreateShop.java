@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
@@ -9,7 +10,6 @@ import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
-import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -18,16 +18,15 @@ import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
-import com.minecolonies.core.colony.jobs.JobBuilder;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
+import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
-import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
-import com.thesettler_x_create.init.ModBlocks;
+import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -50,12 +49,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 /** Create Shop building integration with MineColonies request system and Create network. */
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public static final String SCHEMATIC_NAME = "createshop";
+
   static boolean isDebugRequests() {
     return Config.DEBUG_LOGGING.getAsBoolean();
   }
@@ -80,6 +79,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopBeltManager beltManager;
   private final ShopBeltBlueprints beltBlueprints;
   private final ShopWarehouseRegistrar warehouseRegistrar;
+  private final ShopResolverAssignments resolverAssignments;
   private final ShopCourierDiagnostics courierDiagnostics;
   private final ShopPermaRequestManager permaManager;
 
@@ -94,6 +94,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.beltManager = new ShopBeltManager(this);
     this.beltBlueprints = new ShopBeltBlueprints(this);
     this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
+    this.resolverAssignments = new ShopResolverAssignments(this);
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
     this.permaManager = new ShopPermaRequestManager(this);
   }
@@ -175,12 +176,32 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return outputPos;
   }
 
+  Set<BlockPos> getContainerList() {
+    return containerList;
+  }
+
+  boolean hasContainer(BlockPos pos) {
+    return containerList.contains(pos);
+  }
+
+  void addContainer(BlockPos pos) {
+    containerList.add(pos);
+  }
+
+  int getContainerCount() {
+    return containerList.size();
+  }
+
   BlockPos getBuilderHutPos() {
     return builderHutPos;
   }
 
   void setBuilderHutPos(BlockPos builderHutPos) {
     this.builderHutPos = builderHutPos;
+  }
+
+  void setPickupPos(BlockPos pickupPos) {
+    this.pickupPos = pickupPos;
   }
 
   public boolean isPermaWaitFullStack() {
@@ -483,130 +504,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   private void ensureDeliverableAssignment() {
-    if (getColony() == null) {
-      return;
-    }
-    if (shopResolver == null) {
-      getResolvers();
-    }
-    if (shopResolver == null) {
-      return;
-    }
-    if (!(getColony().getRequestManager()
-        instanceof
-        com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager
-        manager)) {
-      return;
-    }
-    var resolverHandler = manager.getResolverHandler();
-    boolean registered = false;
-    try {
-      resolverHandler.getResolver(shopResolver.getId());
-      registered = true;
-    } catch (IllegalArgumentException ignored) {
-      // Not registered yet.
-    }
-    if (!registered) {
-      try {
-        resolverHandler.registerResolver(shopResolver);
-        registered = true;
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] registered resolver {}", shopResolver.getId());
-        }
-      } catch (Exception ex) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] resolver registration failed: {}", ex.getMessage());
-        }
-      }
-    }
-    if (registered) {
-      var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
-      var assignments = store.getAssignments();
-      var deliverableList =
-          assignments.computeIfAbsent(
-              TypeConstants.DELIVERABLE, key -> new java.util.ArrayList<>());
-      var requestableList =
-          assignments.computeIfAbsent(
-              TypeConstants.REQUESTABLE, key -> new java.util.ArrayList<>());
-      var toolList =
-          assignments.computeIfAbsent(TypeConstants.TOOL, key -> new java.util.ArrayList<>());
-      if (!deliverableList.contains(shopResolver.getId())) {
-        deliverableList.add(shopResolver.getId());
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] added resolver {} to DELIVERABLE assignment list",
-              shopResolver.getId());
-        }
-      }
-      if (!requestableList.contains(shopResolver.getId())) {
-        requestableList.add(shopResolver.getId());
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] added resolver {} to REQUESTABLE assignment list",
-              shopResolver.getId());
-        }
-      }
-      if (!toolList.contains(shopResolver.getId())) {
-        toolList.add(shopResolver.getId());
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] added resolver {} to TOOL assignment list", shopResolver.getId());
-        }
-      }
-    }
+    resolverAssignments.ensureDeliverableAssignment();
   }
 
   public void ensurePickupLink() {
-    Level level = getColony() == null ? null : getColony().getWorld();
-    if (level == null) {
-      return;
-    }
-    if (pickupPos != null) {
-      BlockEntity existing = level.getBlockEntity(pickupPos);
-      if (existing instanceof CreateShopBlockEntity shopBlock) {
-        if (shopBlock.getShopPos() == null) {
-          shopBlock.setShopPos(getLocation().getInDimensionLocation());
-        }
-        return;
-      }
-      pickupPos = null;
-    }
-    BlockPos hutPos = getLocation().getInDimensionLocation();
-    // First, try to discover an existing pickup block nearby.
-    int radius = 2;
-    for (int dx = -radius; dx <= radius; dx++) {
-      for (int dy = 0; dy <= 2; dy++) {
-        for (int dz = -radius; dz <= radius; dz++) {
-          BlockPos candidate = hutPos.offset(dx, dy, dz);
-          BlockEntity entity = level.getBlockEntity(candidate);
-          if (entity instanceof CreateShopBlockEntity shopBlock) {
-            pickupPos = candidate;
-            if (shopBlock.getShopPos() == null) {
-              shopBlock.setShopPos(hutPos);
-            }
-            return;
-          }
-        }
-      }
-    }
-    BlockPos above = hutPos.above();
-    if (level.isEmptyBlock(above)) {
-      level.setBlockAndUpdate(above, ModBlocks.CREATE_SHOP_PICKUP.get().defaultBlockState());
-    }
-    if (level.getBlockState(above).is(ModBlocks.CREATE_SHOP_PICKUP.get())) {
-      pickupPos = above;
-    }
-    if (pickupPos == null) {
-      return;
-    }
-    BlockEntity entity = level.getBlockEntity(pickupPos);
-    if (entity instanceof CreateShopBlockEntity shopBlock) {
-      if (shopBlock.getShopPos() == null) {
-        shopBlock.setShopPos(getLocation().getInDimensionLocation());
-      }
-    }
+    resolverAssignments.ensurePickupLink();
   }
 
   public void setPermaWaitFullStack(boolean enabled) {
@@ -621,7 +523,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return beltBlueprints.trySpawnBeltBlueprint(colony);
   }
 
-  private boolean hasActiveWorkOrder(IColony colony) {
+  boolean hasActiveWorkOrder(IColony colony) {
     if (colony == null || colony.getWorkManager() == null) {
       return false;
     }
@@ -709,5 +611,4 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     return tag;
   }
-
 }
