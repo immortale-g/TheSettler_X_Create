@@ -13,14 +13,11 @@ import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
-import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
-import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.MessageUtils;
-import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
@@ -40,7 +37,6 @@ import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopReq
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,7 +77,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private static final ResourceLocation ENCASED_SHAFT_BLOCK_ID =
       ResourceLocation.fromNamespaceAndPath("create", "andesite_encased_shaft");
 
-  private static boolean isDebugRequests() {
+  static boolean isDebugRequests() {
     return Config.DEBUG_LOGGING.getAsBoolean();
   }
 
@@ -89,8 +85,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final String TAG_PICKUP_POS = "PickupPos";
   private static final String TAG_OUTPUT_POS = "OutputPos";
-  private static final String TAG_PERMA_ORES = "PermaOres";
-  private static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
+  static final String TAG_PERMA_ORES = "PermaOres";
+  static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
 
   private long lastMissingNetworkWarning;
@@ -113,17 +109,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private IToken<?> pickupResolverToken;
   private BlockPos pickupPos;
   private BlockPos outputPos;
-  private final Set<ResourceLocation> permaOres = new HashSet<>();
-  private boolean permaWaitFullStack;
-  private long lastPermaRequestTick;
-  private final Map<IToken<?>, PendingPermaRequest> permaPendingRequests =
-      new java.util.HashMap<>();
-  private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
   private BlockPos builderHutPos;
   private final ShopInflightTracker inflightTracker;
   private final ShopRackIndex rackIndex;
   private final ShopBeltManager beltManager;
   private final ShopWarehouseRegistrar warehouseRegistrar;
+  private final ShopPermaRequestManager permaManager;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -138,13 +129,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
     this.shopResolver = null;
-    this.permaWaitFullStack = false;
-    this.lastPermaRequestTick = 0L;
     this.builderHutPos = null;
     this.inflightTracker = new ShopInflightTracker(this);
     this.rackIndex = new ShopRackIndex(this);
     this.beltManager = new ShopBeltManager(this);
     this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
+    this.permaManager = new ShopPermaRequestManager(this);
   }
 
   @Override
@@ -225,11 +215,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public boolean isPermaWaitFullStack() {
-    return permaWaitFullStack;
+    return permaManager.isPermaWaitFullStack();
   }
 
   public Set<ResourceLocation> getPermaOres() {
-    return java.util.Collections.unmodifiableSet(permaOres);
+    return permaManager.getPermaOres();
   }
 
   public boolean canUsePermaRequests() {
@@ -300,7 +290,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         .ensureGlobalResolver(colony);
     ensurePickupLink();
     beltManager.tick();
-    tickPermaRequests(colony);
+    permaManager.tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = getOrCreateShopResolver();
       if (isDebugRequests() && resolver == null) {
@@ -651,159 +641,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public void setPermaWaitFullStack(boolean enabled) {
-    permaWaitFullStack = enabled;
-    setDirty();
+    permaManager.setPermaWaitFullStack(enabled);
   }
 
   public void setPermaOre(ResourceLocation itemId, boolean enabled) {
-    if (itemId == null) {
-      return;
-    }
-    if (enabled) {
-      permaOres.add(itemId);
-    } else {
-      permaOres.remove(itemId);
-    }
-    setDirty();
-  }
-
-  private void setDirty() {
-    if (getColony() != null) {
-      getColony().markDirty();
-    }
-  }
-
-  private void tickPermaRequests(IColony colony) {
-    if (colony == null || permaOres.isEmpty() || !canUsePermaRequests() || !isWorkerWorking()) {
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",
-            colony == null ? "<null>" : colony.getID(),
-            permaOres.size(),
-            canUsePermaRequests());
-      }
-      return;
-    }
-    Level level = colony.getWorld();
-    if (level == null || level.isClientSide) {
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: level={}", level);
-      }
-      return;
-    }
-    long now = level.getGameTime();
-    if (now - lastPermaRequestTick < Config.PERMA_REQUEST_INTERVAL_TICKS.getAsLong()) {
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] perma tick throttled: now={} last={} diff={}",
-            now,
-            lastPermaRequestTick,
-            now - lastPermaRequestTick);
-      }
-      return;
-    }
-    lastPermaRequestTick = now;
-
-    IRequestManager manager = colony.getRequestManager();
-    if (manager == null) {
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: request manager null");
-      }
-      return;
-    }
-    IRequester requester = getRequester();
-    if (requester == null) {
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: requester null");
-      }
-      return;
-    }
-
-    List<ResourceLocation> ordered = new ArrayList<>(permaOres);
-    ordered.sort(Comparator.comparing(ResourceLocation::toString));
-
-    for (ResourceLocation itemId : ordered) {
-      Item item = BuiltInRegistries.ITEM.get(itemId);
-      if (item == null || item == net.minecraft.world.item.Items.AIR) {
-        if (isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info("[CreateShop] perma skip: missing item {}", itemId);
-        }
-        continue;
-      }
-      ItemStack stack = new ItemStack(item, 1);
-      int available = countInWarehouses(stack);
-      int pending = permaPendingCounts.getOrDefault(itemId, 0);
-      int requestable = Math.max(0, available - pending);
-      if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] perma eval item={} available={} pending={} requestable={} waitFull={}",
-            itemId,
-            available,
-            pending,
-            requestable,
-            permaWaitFullStack);
-      }
-      if (requestable <= 0) {
-        continue;
-      }
-      int maxStack = Math.max(1, stack.getMaxStackSize());
-      int amount = permaWaitFullStack ? (requestable / maxStack) * maxStack : requestable;
-      if (amount <= 0) {
-        continue;
-      }
-      Stack deliverable = new Stack(stack, amount, 1);
-      IToken<?> token = manager.createRequest(requester, deliverable);
-      if (token != null) {
-        permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
-        permaPendingCounts.merge(itemId, amount, Integer::sum);
-        if (isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] perma request created token={} item={} amount={}",
-              token,
-              itemId,
-              amount);
-        }
-      }
-    }
-  }
-
-  private int countInWarehouses(ItemStack stack) {
-    if (stack == null || stack.isEmpty() || getColony() == null) {
-      return 0;
-    }
-    var manager = getColony().getServerBuildingManager();
-    if (manager == null) {
-      return 0;
-    }
-    List<IWareHouse> warehouses = manager.getWareHouses();
-    if (warehouses == null || warehouses.isEmpty()) {
-      return 0;
-    }
-    int total = 0;
-    for (IWareHouse warehouse : warehouses) {
-      if (warehouse == null || warehouse == this) {
-        continue;
-      }
-      if (!(warehouse.getTileEntity() instanceof AbstractTileEntityWareHouse wareHouse)) {
-        continue;
-      }
-      for (var entry :
-          wareHouse.getMatchingItemStacksInWarehouse(match -> matchesStack(match, stack))) {
-        ItemStack found = entry.getA();
-        if (found == null || found.isEmpty()) {
-          continue;
-        }
-        total += found.getCount();
-      }
-    }
-    return Math.max(0, total);
-  }
-
-  private boolean matchesStack(ItemStack candidate, ItemStack target) {
-    if (candidate == null || target == null) {
-      return false;
-    }
-    return ItemStack.isSameItemSameComponents(candidate, target);
+    permaManager.setPermaOre(itemId, enabled);
   }
 
   private boolean trySpawnBeltBlueprint(IColony colony) {
@@ -2515,17 +2357,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   private void clearPermaPending(
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
-    if (request == null || request.getId() == null) {
-      return;
-    }
-    PendingPermaRequest pending = permaPendingRequests.remove(request.getId());
-    if (pending == null) {
-      return;
-    }
-    permaPendingCounts.merge(pending.itemId, -pending.count, Integer::sum);
-    if (permaPendingCounts.getOrDefault(pending.itemId, 0) <= 0) {
-      permaPendingCounts.remove(pending.itemId);
-    }
+    permaManager.clearPermaPending(request);
   }
 
   public static List<ItemStack> getOreCandidates() {
@@ -2570,21 +2402,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (compound.contains(TAG_BUILDER_HUT_POS)) {
       builderHutPos = BlockPos.of(compound.getLong(TAG_BUILDER_HUT_POS));
     }
-    permaOres.clear();
-    if (compound.contains(TAG_PERMA_ORES)) {
-      var list = compound.getList(TAG_PERMA_ORES, net.minecraft.nbt.Tag.TAG_STRING);
-      for (int i = 0; i < list.size(); i++) {
-        String key = list.getString(i);
-        if (key == null || key.isBlank()) {
-          continue;
-        }
-        ResourceLocation id = ResourceLocation.tryParse(key);
-        if (id != null) {
-          permaOres.add(id);
-        }
-      }
-    }
-    permaWaitFullStack = compound.getBoolean(TAG_PERMA_WAIT_FULL);
+    permaManager.loadPerma(compound);
   }
 
   @Override
@@ -2596,29 +2414,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (outputPos != null) {
       tag.putLong(TAG_OUTPUT_POS, outputPos.asLong());
     }
-    if (!permaOres.isEmpty()) {
-      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
-      for (ResourceLocation id : permaOres) {
-        list.add(net.minecraft.nbt.StringTag.valueOf(id.toString()));
-      }
-      tag.put(TAG_PERMA_ORES, list);
-    }
-    if (permaWaitFullStack) {
-      tag.putBoolean(TAG_PERMA_WAIT_FULL, true);
-    }
+    permaManager.savePerma(tag);
     if (builderHutPos != null) {
       tag.putLong(TAG_BUILDER_HUT_POS, builderHutPos.asLong());
     }
     return tag;
   }
 
-  private static final class PendingPermaRequest {
-    private final ResourceLocation itemId;
-    private final int count;
-
-    private PendingPermaRequest(ResourceLocation itemId, int count) {
-      this.itemId = itemId;
-      this.count = count;
-    }
-  }
 }
