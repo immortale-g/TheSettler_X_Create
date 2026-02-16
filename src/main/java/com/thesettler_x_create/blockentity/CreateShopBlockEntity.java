@@ -180,7 +180,8 @@ public class CreateShopBlockEntity extends BlockEntity {
       int baseline = findCount(baselines, key);
       upsertBaseline(key, baseline);
       inflightEntries.add(
-          new InflightEntry(key, stack.getCount(), now, sanitize(requesterName), sanitize(address)));
+          new InflightEntry(
+              key, stack.getCount(), now, sanitize(requesterName), sanitize(address)));
       changed = true;
     }
     if (changed) {
@@ -252,11 +253,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       changed = true;
       notices.add(
           new InflightNotice(
-              entry.stackKey.copy(),
-              entry.remaining,
-              age,
-              entry.requesterName,
-              entry.address));
+              entry.stackKey.copy(), entry.remaining, age, entry.requesterName, entry.address));
     }
     if (changed) {
       setChanged();
@@ -398,8 +395,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       return;
     }
     lastInflightLogTime = now;
-    TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] inflight overdue: {}", String.join(" | ", entries));
+    TheSettlerXCreate.LOGGER.info("[CreateShop] inflight overdue: {}", String.join(" | ", entries));
   }
 
   private long getExpireTime() {
@@ -588,11 +584,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     public boolean notified;
 
     public InflightEntry(
-        ItemStack stackKey,
-        int remaining,
-        long requestedAt,
-        String requesterName,
-        String address) {
+        ItemStack stackKey, int remaining, long requestedAt, String requesterName, String address) {
       this.stackKey = stackKey;
       this.remaining = remaining;
       this.requestedAt = requestedAt;
