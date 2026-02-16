@@ -13,13 +13,13 @@ final class CreateShopResolverCooldown {
   }
 
   boolean isRequestOnCooldown(Level level, IToken<?> token) {
-    Long until = resolver.getOrderedRequests().get(token);
+    Long until = resolver.getOrderedRequests().getIfPresent(token);
     if (until == null) {
       return false;
     }
     long now = level.getGameTime();
     if (now >= until) {
-      resolver.getOrderedRequests().remove(token);
+      resolver.getOrderedRequests().invalidate(token);
       return false;
     }
     return true;
@@ -39,7 +39,7 @@ final class CreateShopResolverCooldown {
   }
 
   void clearRequestCooldown(IToken<?> token) {
-    resolver.getOrderedRequests().remove(token);
+    resolver.getOrderedRequests().invalidate(token);
     if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
       String source = CreateShopRequestResolver.getPendingSources().remove(token);
       if (source != null) {
@@ -47,5 +47,21 @@ final class CreateShopResolverCooldown {
             "[CreateShop] pending cleared token={} source=clearCooldown prev={}", token, source);
       }
     }
+  }
+
+  boolean isOrdered(IToken<?> token) {
+    return resolver.getOrderedRequests().getIfPresent(token) != null;
+  }
+
+  int getOrderedCount() {
+    return resolver.getOrderedRequests().asMap().size();
+  }
+
+  boolean hasOrderedRequests() {
+    return !resolver.getOrderedRequests().asMap().isEmpty();
+  }
+
+  java.util.Set<IToken<?>> getOrderedTokens() {
+    return resolver.getOrderedRequests().asMap().keySet();
   }
 }

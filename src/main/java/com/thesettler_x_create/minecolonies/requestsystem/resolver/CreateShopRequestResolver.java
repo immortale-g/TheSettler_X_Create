@@ -1,5 +1,7 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Lists;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
@@ -23,6 +25,7 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -41,8 +44,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
-  private static final java.util.Map<IToken<?>, Long> orderedRequests =
-      new java.util.concurrent.ConcurrentHashMap<>();
+  private static final Cache<IToken<?>, Long> orderedRequests =
+      CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
   private static final java.util.Set<IToken<?>> deliveriesCreated =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final java.util.Set<IToken<?>> cancelledRequests =
@@ -57,8 +60,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private long lastDeliveryAssignmentDebugTime = 0L;
-  private long lastTickPendingDebugTime = 0L;
+  private final Object debugLock = new Object();
+  private volatile long lastTickPendingDebugTime = 0L;
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
@@ -419,7 +422,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     // Do not complete requests that are still waiting on ordered goods.
     Level level = manager.getColony().getWorld();
-    boolean ordered = orderedRequests.containsKey(request.getId());
+    boolean ordered = cooldown.isOrdered(request.getId());
     boolean cooldown = this.cooldown.isRequestOnCooldown(level, request.getId());
     if (ordered || cooldown) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -486,14 +489,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (assigned != null) {
       pendingTokens.addAll(assigned);
     }
-    pendingTokens.addAll(orderedRequests.keySet());
+    pendingTokens.addAll(cooldown.getOrderedTokens());
     pendingTokens.addAll(pendingRequestCounts.keySet());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        if (!orderedRequests.isEmpty() || !pendingRequestCounts.isEmpty()) {
+        if (cooldown.hasOrderedRequests() || !pendingRequestCounts.isEmpty()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
-              orderedRequests.size(),
+              cooldown.getOrderedCount(),
               pendingRequestCounts.size());
         }
       }
@@ -505,7 +508,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
       int assignedCount = assigned == null ? 0 : assigned.size();
-      int orderedCount = orderedRequests.size();
+      int orderedCount = cooldown.getOrderedCount();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: assigned={}, ordered={}, total={}",
           assignedCount,
@@ -807,12 +810,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private boolean shouldLogTickPending(Level level) {
     long now = level.getGameTime();
-    if (now == 0L
-        || now - lastTickPendingDebugTime >= Config.TICK_PENDING_DEBUG_COOLDOWN.getAsLong()) {
-      lastTickPendingDebugTime = now;
+    if (now == 0L) {
       return true;
     }
-    return false;
+    synchronized (debugLock) {
+      if (now - lastTickPendingDebugTime >= Config.TICK_PENDING_DEBUG_COOLDOWN.getAsLong()) {
+        lastTickPendingDebugTime = now;
+        return true;
+      }
+      return false;
+    }
   }
 
   private void maybeLogPerf(Level level) {
@@ -1195,19 +1202,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (manager == null) {
       return null;
     }
-    try {
-      var method = manager.getClass().getMethod("getManager");
-      Object value = method.invoke(manager);
-      if (value instanceof IStandardRequestManager standard) {
-        return standard;
-      }
-    } catch (Exception ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] unwrap manager failed type={} err={}",
-            manager.getClass().getName(),
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+    java.util.Optional<Object> direct = tryInvoke(manager, "getManager");
+    if (direct.isPresent() && direct.get() instanceof IStandardRequestManager standard) {
+      return standard;
     }
     // MineColonies wraps managers without a public accessor; unwrap via reflection.
     try {
@@ -1227,7 +1224,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
     } catch (Exception ex) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
+        TheSettlerXCreate.LOGGER.warn(
             "[CreateShop] unwrap manager field failed type={} err={}",
             manager.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
@@ -1309,25 +1306,40 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (resolver == null) {
       return "<none>";
     }
-    try {
-      var getLocation = resolver.getClass().getMethod("getLocation");
-      Object location = getLocation.invoke(resolver);
-      if (location != null) {
-        return "location=" + location;
-      }
-    } catch (Exception ignored) {
-      // Fall through.
+    java.util.Optional<Object> location = tryInvoke(resolver, "getLocation");
+    if (location.isPresent()) {
+      return "location=" + location.get();
     }
-    try {
-      var getRequester = resolver.getClass().getMethod("getRequester");
-      Object requester = getRequester.invoke(resolver);
-      if (requester != null) {
-        return "requester=" + requester;
-      }
-    } catch (Exception ignored) {
-      // Fall through.
+    java.util.Optional<Object> requester = tryInvoke(resolver, "getRequester");
+    if (requester.isPresent()) {
+      return "requester=" + requester.get();
     }
     return "<unknown>";
+  }
+
+  private static java.util.Optional<Object> tryInvoke(Object target, String methodName) {
+    if (target == null || methodName == null) {
+      return java.util.Optional.empty();
+    }
+    try {
+      java.lang.reflect.Method method = target.getClass().getMethod(methodName);
+      return java.util.Optional.ofNullable(method.invoke(target));
+    } catch (NoSuchMethodException ex) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.debug(
+            "[CreateShop] method {} not available on {}",
+            methodName,
+            target.getClass().getName());
+      }
+      return java.util.Optional.empty();
+    } catch (Exception ex) {
+      TheSettlerXCreate.LOGGER.warn(
+          "[CreateShop] failed to invoke {} on {}: {}",
+          methodName,
+          target.getClass().getName(),
+          ex.getMessage() == null ? "<null>" : ex.getMessage());
+      return java.util.Optional.empty();
+    }
   }
 
   int getMaxChainSanitizeNodes() {
@@ -1358,7 +1370,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return pendingSources;
   }
 
-  java.util.Map<IToken<?>, Long> getOrderedRequests() {
+  Cache<IToken<?>, Long> getOrderedRequests() {
     return orderedRequests;
   }
 
