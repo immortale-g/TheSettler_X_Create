@@ -6,8 +6,10 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.VirtualCreateNetworkItemHandler;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -23,11 +25,16 @@ import org.jetbrains.annotations.Nullable;
 public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_SHOP_POS = "ShopPos";
   private static final String TAG_RESERVATIONS = "Reservations";
+  private static final String TAG_INFLIGHT = "Inflight";
+  private static final String TAG_INFLIGHT_BASELINES = "InflightBaselines";
   private static final long RESERVATION_TTL = 20L * 60L * 5L;
 
   private final IItemHandler itemHandler = new VirtualCreateNetworkItemHandler(this);
   private final Map<UUID, Reservation> reservations = new HashMap<>();
+  private final List<InflightEntry> inflightEntries = new ArrayList<>();
+  private final List<BaselineEntry> inflightBaselines = new ArrayList<>();
   private BlockPos shopPos;
+  private long lastInflightLogTime;
 
   public CreateShopBlockEntity(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_PICKUP.get(), pos, state);
@@ -142,6 +149,86 @@ public class CreateShopBlockEntity extends BlockEntity {
     return taken;
   }
 
+  public List<ItemStack> getInflightKeys() {
+    List<ItemStack> keys = new ArrayList<>();
+    for (InflightEntry entry : inflightEntries) {
+      if (entry.stackKey == null || entry.stackKey.isEmpty()) {
+        continue;
+      }
+      if (!containsKey(keys, entry.stackKey)) {
+        keys.add(entry.stackKey.copy());
+      }
+    }
+    return keys;
+  }
+
+  public void recordInflight(List<ItemStack> stacks, Map<ItemStack, Integer> baselines) {
+    if (stacks == null || stacks.isEmpty()) {
+      return;
+    }
+    long now = getGameTimeSafe();
+    boolean changed = false;
+    for (ItemStack stack : stacks) {
+      if (stack == null || stack.isEmpty() || stack.getCount() <= 0) {
+        continue;
+      }
+      ItemStack key = makeKey(stack);
+      int baseline = findCount(baselines, key);
+      upsertBaseline(key, baseline);
+      inflightEntries.add(new InflightEntry(key, stack.getCount(), now));
+      changed = true;
+    }
+    if (changed) {
+      setChanged();
+    }
+  }
+
+  public void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
+    if (inflightEntries.isEmpty()) {
+      return;
+    }
+    ensureBaselines(currentCounts);
+    long now = getGameTimeSafe();
+    boolean changed = false;
+    for (BaselineEntry baseline : inflightBaselines) {
+      int current = findCount(currentCounts, baseline.stackKey);
+      int delta = Math.max(0, current - baseline.count);
+      if (baseline.count != current) {
+        baseline.count = current;
+        changed = true;
+      }
+      if (delta <= 0) {
+        continue;
+      }
+      int remaining = delta;
+      Iterator<InflightEntry> iterator = inflightEntries.iterator();
+      while (iterator.hasNext() && remaining > 0) {
+        InflightEntry entry = iterator.next();
+        if (!matches(entry.stackKey, baseline.stackKey)) {
+          continue;
+        }
+        int applied = Math.min(remaining, entry.remaining);
+        entry.remaining -= applied;
+        remaining -= applied;
+        if (entry.remaining <= 0) {
+          iterator.remove();
+          changed = true;
+        } else if (applied > 0) {
+          changed = true;
+        }
+      }
+    }
+    if (pruneBaselines()) {
+      changed = true;
+    }
+    if (shouldLogOverdue(now)) {
+      logOverdue(now);
+    }
+    if (changed) {
+      setChanged();
+    }
+  }
+
   //    public int consumeReserved(ItemStack key, int amount) {
   //        if (amount <= 0) {
   //            return 0;
@@ -192,6 +279,94 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
   }
 
+  private void ensureBaselines(Map<ItemStack, Integer> currentCounts) {
+    for (InflightEntry entry : inflightEntries) {
+      if (entry.stackKey == null || entry.stackKey.isEmpty()) {
+        continue;
+      }
+      if (findBaseline(entry.stackKey) == null) {
+        int current = findCount(currentCounts, entry.stackKey);
+        inflightBaselines.add(new BaselineEntry(entry.stackKey.copy(), current));
+      }
+    }
+  }
+
+  private boolean pruneBaselines() {
+    boolean changed = false;
+    Iterator<BaselineEntry> iterator = inflightBaselines.iterator();
+    while (iterator.hasNext()) {
+      BaselineEntry baseline = iterator.next();
+      if (!hasInflightFor(baseline.stackKey)) {
+        iterator.remove();
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private boolean hasInflightFor(ItemStack key) {
+    for (InflightEntry entry : inflightEntries) {
+      if (matches(entry.stackKey, key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private BaselineEntry findBaseline(ItemStack key) {
+    for (BaselineEntry baseline : inflightBaselines) {
+      if (matches(baseline.stackKey, key)) {
+        return baseline;
+      }
+    }
+    return null;
+  }
+
+  private void upsertBaseline(ItemStack key, int count) {
+    BaselineEntry existing = findBaseline(key);
+    if (existing != null) {
+      existing.count = count;
+      return;
+    }
+    inflightBaselines.add(new BaselineEntry(key.copy(), count));
+  }
+
+  private boolean shouldLogOverdue(long now) {
+    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+      return false;
+    }
+    if (now == 0L) {
+      return false;
+    }
+    return now - lastInflightLogTime >= Config.INFLIGHT_LOG_COOLDOWN.getAsLong();
+  }
+
+  private void logOverdue(long now) {
+    long timeout = Config.INFLIGHT_TIMEOUT_TICKS.getAsLong();
+    if (timeout <= 0L) {
+      return;
+    }
+    List<String> entries = new ArrayList<>();
+    for (InflightEntry entry : inflightEntries) {
+      if (entry.remaining <= 0) {
+        continue;
+      }
+      long age = now - entry.requestedAt;
+      if (age < timeout) {
+        continue;
+      }
+      String label =
+          entry.stackKey.getHoverName().getString() + " x" + entry.remaining + " age=" + age;
+      entries.add(label);
+    }
+    if (entries.isEmpty()) {
+      return;
+    }
+    lastInflightLogTime = now;
+    TheSettlerXCreate.LOGGER.info(
+        "[CreateShop] inflight overdue: {}", String.join(" | ", entries));
+  }
+
   private long getExpireTime() {
     return getGameTimeSafe() + RESERVATION_TTL;
   }
@@ -202,6 +377,27 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   private static boolean matches(ItemStack a, ItemStack b) {
     return ItemStack.isSameItemSameComponents(a, b);
+  }
+
+  private static boolean containsKey(List<ItemStack> keys, ItemStack key) {
+    for (ItemStack existing : keys) {
+      if (matches(existing, key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static int findCount(Map<ItemStack, Integer> counts, ItemStack key) {
+    if (counts == null || counts.isEmpty() || key == null || key.isEmpty()) {
+      return 0;
+    }
+    for (Map.Entry<ItemStack, Integer> entry : counts.entrySet()) {
+      if (matches(entry.getKey(), key)) {
+        return entry.getValue();
+      }
+    }
+    return 0;
   }
 
   private static ItemStack makeKey(ItemStack stack) {
@@ -236,6 +432,33 @@ public class CreateShopBlockEntity extends BlockEntity {
         }
       }
     }
+    inflightEntries.clear();
+    if (tag.contains(TAG_INFLIGHT)) {
+      var list = tag.getList(TAG_INFLIGHT, net.minecraft.nbt.Tag.TAG_COMPOUND);
+      for (int i = 0; i < list.size(); i++) {
+        CompoundTag entry = list.getCompound(i);
+        ItemStack stack =
+            ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
+        int remaining = entry.getInt("remaining");
+        long requestedAt = entry.getLong("requestedAt");
+        if (!stack.isEmpty() && remaining > 0) {
+          inflightEntries.add(new InflightEntry(makeKey(stack), remaining, requestedAt));
+        }
+      }
+    }
+    inflightBaselines.clear();
+    if (tag.contains(TAG_INFLIGHT_BASELINES)) {
+      var list = tag.getList(TAG_INFLIGHT_BASELINES, net.minecraft.nbt.Tag.TAG_COMPOUND);
+      for (int i = 0; i < list.size(); i++) {
+        CompoundTag entry = list.getCompound(i);
+        ItemStack stack =
+            ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
+        int count = entry.getInt("count");
+        if (!stack.isEmpty()) {
+          inflightBaselines.add(new BaselineEntry(makeKey(stack), Math.max(0, count)));
+        }
+      }
+    }
   }
 
   @Override
@@ -255,6 +478,27 @@ public class CreateShopBlockEntity extends BlockEntity {
       resTag.put(entry.getKey().toString(), data);
     }
     tag.put(TAG_RESERVATIONS, resTag);
+    if (!inflightEntries.isEmpty()) {
+      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+      for (InflightEntry entry : inflightEntries) {
+        CompoundTag data = new CompoundTag();
+        data.put("stack", entry.stackKey.save(registries));
+        data.putInt("remaining", entry.remaining);
+        data.putLong("requestedAt", entry.requestedAt);
+        list.add(data);
+      }
+      tag.put(TAG_INFLIGHT, list);
+    }
+    if (!inflightBaselines.isEmpty()) {
+      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+      for (BaselineEntry entry : inflightBaselines) {
+        CompoundTag data = new CompoundTag();
+        data.put("stack", entry.stackKey.save(registries));
+        data.putInt("count", entry.count);
+        list.add(data);
+      }
+      tag.put(TAG_INFLIGHT_BASELINES, list);
+    }
   }
 
   @SuppressWarnings("unused")
@@ -274,6 +518,28 @@ public class CreateShopBlockEntity extends BlockEntity {
       this.stackKey = stackKey;
       this.reservedAmount = reservedAmount;
       this.expiresAtGameTime = expiresAtGameTime;
+    }
+  }
+
+  public static class InflightEntry {
+    public final ItemStack stackKey;
+    public int remaining;
+    public final long requestedAt;
+
+    public InflightEntry(ItemStack stackKey, int remaining, long requestedAt) {
+      this.stackKey = stackKey;
+      this.remaining = remaining;
+      this.requestedAt = requestedAt;
+    }
+  }
+
+  public static class BaselineEntry {
+    public final ItemStack stackKey;
+    public int count;
+
+    public BaselineEntry(ItemStack stackKey, int count) {
+      this.stackKey = stackKey;
+      this.count = count;
     }
   }
 }
