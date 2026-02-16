@@ -12,6 +12,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
+import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
@@ -27,6 +28,7 @@ import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseModule;
+import com.minecolonies.core.colony.interactionhandling.SimpleNotificationInteraction;
 import com.minecolonies.core.colony.jobs.JobBuilder;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
@@ -56,6 +58,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -724,6 +727,57 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     java.util.Map<ItemStack, Integer> currentCounts = getStockCountsForKeys(inflightKeys);
     pickup.reconcileInflight(currentCounts);
+    List<CreateShopBlockEntity.InflightNotice> notices =
+        pickup.consumeOverdueNotices(now, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+    if (!notices.isEmpty()) {
+      notifyShopkeeperOverdue(notices);
+    }
+  }
+
+  private void notifyShopkeeperOverdue(List<CreateShopBlockEntity.InflightNotice> notices) {
+    if (notices == null || notices.isEmpty()) {
+      return;
+    }
+    ICitizenData citizen = getShopkeeperCitizen();
+    if (citizen == null) {
+      return;
+    }
+    for (CreateShopBlockEntity.InflightNotice notice : notices) {
+      if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
+        continue;
+      }
+      String requester =
+          notice.requesterName == null || notice.requesterName.isBlank()
+              ? "unknown requester"
+              : notice.requesterName;
+      String address =
+          notice.address == null || notice.address.isBlank() ? "unknown address" : notice.address;
+      String itemName = notice.stackKey.getHoverName().getString();
+      String text =
+          "Delivery seems lost for "
+              + requester
+              + ". Item: "
+              + itemName
+              + " x"
+              + notice.remaining
+              + " (address: "
+              + address
+              + ").";
+      citizen.triggerInteraction(
+          new SimpleNotificationInteraction(Component.literal(text), ChatPriority.IMPORTANT));
+    }
+  }
+
+  private ICitizenData getShopkeeperCitizen() {
+    for (ICitizenData citizen : getAllAssignedCitizen()) {
+      if (citizen == null) {
+        continue;
+      }
+      if (citizen.getJob() instanceof JobCreateShop) {
+        return citizen;
+      }
+    }
+    return null;
   }
 
   private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
