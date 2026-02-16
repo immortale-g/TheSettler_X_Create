@@ -15,5 +15,5 @@ public interface ICreateNetworkFacade {
 
   List<ItemStack> planItems(IDeliverable deliverable, int amount);
 
-  List<ItemStack> requestItems(IDeliverable deliverable, int amount);
+  List<ItemStack> requestItems(IDeliverable deliverable, int amount, String requesterName);
 }
