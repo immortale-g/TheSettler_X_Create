@@ -119,6 +119,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   private boolean warehouseRegistered;
   private long lastRackScanTick;
+  private long lastInflightTick;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -146,6 +147,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
     this.lastRackScanTick = -1L;
+    this.lastInflightTick = -1L;
     this.shopResolver = null;
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
@@ -323,6 +325,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }
+      tickInflightTracking(colony);
       debugCourierAssignments(colony);
     }
   }
@@ -607,6 +610,120 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
     }
+  }
+
+  public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
+    java.util.Map<ItemStack, Integer> counts = new java.util.HashMap<>();
+    if (keys == null || keys.isEmpty()) {
+      return counts;
+    }
+    for (ItemStack key : keys) {
+      if (key == null || key.isEmpty()) {
+        continue;
+      }
+      ItemStack normalized = normalizeKey(key);
+      if (!containsKey(counts, normalized)) {
+        counts.put(normalized, 0);
+      }
+    }
+    if (counts.isEmpty()) {
+      return counts;
+    }
+    Level level = getColony() == null ? null : getColony().getWorld();
+    if (level == null) {
+      return counts;
+    }
+    ensureRackContainers();
+    for (BlockPos pos : containerList) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = level.getBlockEntity(pos);
+      if (!(entity instanceof TileEntityRack rack)) {
+        continue;
+      }
+      addCountsFromHandler(rack.getInventory(), counts);
+    }
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (pickup != null) {
+      addCountsFromHandler(pickup.getItemHandler(null), counts);
+    }
+    return counts;
+  }
+
+  private void addCountsFromHandler(
+      net.neoforged.neoforge.items.IItemHandler handler,
+      java.util.Map<ItemStack, Integer> counts) {
+    if (handler == null || counts == null || counts.isEmpty()) {
+      return;
+    }
+    for (int slot = 0; slot < handler.getSlots(); slot++) {
+      ItemStack stack = handler.getStackInSlot(slot);
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      ItemStack key = findMatchingKey(counts, stack);
+      if (key != null) {
+        counts.put(key, counts.get(key) + stack.getCount());
+      }
+    }
+  }
+
+  private ItemStack findMatchingKey(java.util.Map<ItemStack, Integer> counts, ItemStack stack) {
+    if (counts == null || counts.isEmpty() || stack == null || stack.isEmpty()) {
+      return null;
+    }
+    for (ItemStack key : counts.keySet()) {
+      if (ItemStack.isSameItemSameComponents(key, stack)) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  private boolean containsKey(java.util.Map<ItemStack, Integer> counts, ItemStack key) {
+    if (counts == null || counts.isEmpty() || key == null || key.isEmpty()) {
+      return false;
+    }
+    for (ItemStack existing : counts.keySet()) {
+      if (ItemStack.isSameItemSameComponents(existing, key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private ItemStack normalizeKey(ItemStack stack) {
+    ItemStack copy = stack.copy();
+    copy.setCount(1);
+    return copy;
+  }
+
+  private void tickInflightTracking(IColony colony) {
+    if (colony == null) {
+      return;
+    }
+    Level level = colony.getWorld();
+    if (level == null) {
+      return;
+    }
+    long now = level.getGameTime();
+    if (now != 0L
+        && lastInflightTick >= 0
+        && now - lastInflightTick < Config.INFLIGHT_CHECK_INTERVAL_TICKS.getAsLong()) {
+      return;
+    }
+    lastInflightTick = now;
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (pickup == null) {
+      return;
+    }
+    List<ItemStack> inflightKeys = pickup.getInflightKeys();
+    if (inflightKeys.isEmpty()) {
+      return;
+    }
+    java.util.Map<ItemStack, Integer> currentCounts = getStockCountsForKeys(inflightKeys);
+    pickup.reconcileInflight(currentCounts);
   }
 
   private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {

@@ -8,6 +8,8 @@ import com.simibubi.create.content.logistics.packager.InventorySummary;
 import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
 import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -211,6 +213,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
               shop.getStockNetworkId(),
               shop.getShopAddress());
         }
+        recordInflight(orderedStacks);
       } catch (Exception ex) {
         if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -230,6 +233,21 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
 
     return orderedStacks;
+  }
+
+  private void recordInflight(List<ItemStack> orderedStacks) {
+    if (orderedStacks == null || orderedStacks.isEmpty()) {
+      return;
+    }
+    if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
+      return;
+    }
+    CreateShopBlockEntity pickup = building.getPickupBlockEntity();
+    if (pickup == null) {
+      return;
+    }
+    var baseline = building.getStockCountsForKeys(orderedStacks);
+    pickup.recordInflight(orderedStacks, baseline);
   }
 
   private int getToolLevel(Tool tool, ItemStack stack) {
