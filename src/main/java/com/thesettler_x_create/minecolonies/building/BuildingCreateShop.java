@@ -13,7 +13,6 @@ import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
-import com.minecolonies.api.util.MessageUtils;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
@@ -64,7 +63,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
 
-  private long lastMissingNetworkWarning;
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   boolean warehouseRegistered;
   private CreateShopRequestResolver shopResolver;
@@ -82,10 +80,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopCourierDiagnostics courierDiagnostics;
   private final ShopPermaRequestManager permaManager;
   private final ShopWorkerStatus workerStatus;
+  private final ShopNetworkNotifier networkNotifier;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
-    this.lastMissingNetworkWarning = 0L;
     this.warehouseRegistered = false;
     this.shopResolver = null;
     this.builderHutPos = null;
@@ -98,6 +96,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
     this.permaManager = new ShopPermaRequestManager(this);
     this.workerStatus = new ShopWorkerStatus(this);
+    this.networkNotifier = new ShopNetworkNotifier(this);
   }
 
   @Override
@@ -453,22 +452,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public void notifyMissingNetwork() {
-    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
-      return;
-    }
-    TileEntityCreateShop shop = getCreateShopTileEntity();
-    if (shop == null || shop.getLevel() == null) {
-      return;
-    }
-    long gameTime = shop.getLevel().getGameTime();
-    if (gameTime - lastMissingNetworkWarning
-        <= Config.MISSING_NETWORK_WARNING_COOLDOWN.getAsLong()) {
-      return;
-    }
-    lastMissingNetworkWarning = gameTime;
-    MessageUtils.format("com.thesettler_x_create.message.createshop.no_network")
-        .sendTo(getColony())
-        .forAllPlayers();
+    networkNotifier.notifyMissingNetwork();
   }
 
   private void ensureWarehouseRegistration() {
