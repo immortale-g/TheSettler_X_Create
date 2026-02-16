@@ -68,12 +68,6 @@ import org.jetbrains.annotations.Nullable;
 /** Create Shop building integration with MineColonies request system and Create network. */
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public static final String SCHEMATIC_NAME = "createshop";
-  private static final ResourceLocation BELT_BLUEPRINT_L1 =
-      ResourceLocation.fromNamespaceAndPath(
-          TheSettlerXCreate.MODID, "blueprints_internal/createshop1_belt.blueprint");
-  private static final ResourceLocation BELT_BLUEPRINT_L2 =
-      ResourceLocation.fromNamespaceAndPath(
-          TheSettlerXCreate.MODID, "blueprints_internal/createshop2_belt.blueprint");
   private static final ResourceLocation BELT_ITEM_ID =
       ResourceLocation.fromNamespaceAndPath("create", "belt_connector");
   private static final Set<ResourceLocation> BELT_ANCHOR_BLOCK_IDS =
@@ -126,9 +120,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       new java.util.HashMap<>();
   private final Map<ResourceLocation, Integer> permaPendingCounts = new java.util.HashMap<>();
   private BlockPos builderHutPos;
-  private boolean beltRebuildPending;
   private final ShopInflightTracker inflightTracker;
   private final ShopRackIndex rackIndex;
+  private final ShopBeltManager beltManager;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -146,9 +140,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
     this.builderHutPos = null;
-    this.beltRebuildPending = false;
     this.inflightTracker = new ShopInflightTracker(this);
     this.rackIndex = new ShopRackIndex(this);
+    this.beltManager = new ShopBeltManager(this);
   }
 
   @Override
@@ -270,7 +264,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
     }
     super.requestRepair(pos);
-    beltRebuildPending = true;
+    beltManager.onRepair();
   }
 
   @Override
@@ -281,8 +275,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
         .ensureGlobalResolver(getColony());
     ensurePickupLink();
-    beltRebuildPending = true;
-    trySpawnBeltBlueprint(getColony());
+    beltManager.onPlacement();
   }
 
   @Override
@@ -293,8 +286,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
         .ensureGlobalResolver(getColony());
     ensurePickupLink();
-    beltRebuildPending = true;
-    trySpawnBeltBlueprint(getColony());
+    beltManager.onUpgrade();
   }
 
   @Override
@@ -305,11 +297,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
         .ensureGlobalResolver(colony);
     ensurePickupLink();
-    if (beltRebuildPending && isBuilt() && !hasActiveWorkOrder(colony)) {
-      if (trySpawnBeltBlueprint(colony)) {
-        beltRebuildPending = false;
-      }
-    }
+    beltManager.tick();
     tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = getOrCreateShopResolver();
@@ -959,7 +947,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   @Nullable
   private Blueprint loadBeltBlueprint(ServerLevel level, int beltLevel) {
     ResourceLocation primary = getBeltBlueprintPath(beltLevel);
-    ResourceLocation fallback = BELT_BLUEPRINT_L1;
+    ResourceLocation fallback = ShopBeltManager.beltBlueprintL1();
     logBelt("load blueprint: primary={} fallback={}", primary, fallback);
     Blueprint blueprint = loadBeltBlueprintFromPath(level, primary);
     if (blueprint != null) {
@@ -1046,9 +1034,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private ResourceLocation getBeltBlueprintPath(int beltLevel) {
     int level = Math.max(1, beltLevel);
     if (level >= 2) {
-      return BELT_BLUEPRINT_L2;
+      return ShopBeltManager.beltBlueprintL2();
     }
-    return BELT_BLUEPRINT_L1;
+    return ShopBeltManager.beltBlueprintL1();
   }
 
   private List<BlockPos> findAnchorShafts(Blueprint blueprint) {
