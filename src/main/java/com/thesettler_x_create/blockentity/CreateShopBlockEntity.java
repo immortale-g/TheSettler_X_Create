@@ -22,6 +22,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+/** Pickup block entity for the Create Shop. Tracks reservations and inflight stock orders. */
 public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_SHOP_POS = "ShopPos";
   private static final String TAG_RESERVATIONS = "Reservations";
@@ -62,6 +63,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     return null;
   }
 
+  /** Reserve items for a specific request to avoid duplicate ordering. */
   public void reserve(UUID requestId, ItemStack key, int amount) {
     if (amount <= 0) {
       return;
@@ -83,6 +85,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     setChanged();
   }
 
+  /** Release all reservations for a request. */
   public void release(UUID requestId) {
     cleanExpired();
     if (reservations.remove(requestId) != null) {
@@ -90,6 +93,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
   }
 
+  /** Returns total reserved count for a stack key. */
   public int getReservedFor(ItemStack key) {
     cleanExpired();
     int total = 0;
@@ -101,6 +105,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     return total;
   }
 
+  /** Returns total reserved count for a deliverable match. */
   public int getReservedForDeliverable(IDeliverable deliverable) {
     if (deliverable == null) {
       return 0;
@@ -115,6 +120,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     return total;
   }
 
+  /** Returns reserved count for a specific request. */
   public int getReservedForRequest(UUID requestId) {
     if (requestId == null) {
       return 0;
@@ -129,6 +135,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     return total;
   }
 
+  /** Consumes reserved items for a request when deliveries are created. */
   public int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
     if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
       return 0;
@@ -149,6 +156,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     return taken;
   }
 
+  /** Returns unique stack keys currently tracked as inflight. */
   public List<ItemStack> getInflightKeys() {
     List<ItemStack> keys = new ArrayList<>();
     for (InflightEntry entry : inflightEntries) {
@@ -162,6 +170,11 @@ public class CreateShopBlockEntity extends BlockEntity {
     return keys;
   }
 
+  /**
+   * Records inflight orders and their baseline stock counts.
+   *
+   * @param baselines current rack counts to detect arrivals later
+   */
   public void recordInflight(
       List<ItemStack> stacks,
       Map<ItemStack, Integer> baselines,
@@ -189,6 +202,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
   }
 
+  /** Reconciles inflight entries against current rack counts to detect arrivals. */
   public void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
     if (inflightEntries.isEmpty()) {
       return;
@@ -235,6 +249,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
   }
 
+  /** Marks overdue inflight entries as notified and returns notices to surface. */
   public List<InflightNotice> consumeOverdueNotices(long now, long timeout) {
     if (timeout <= 0L || inflightEntries.isEmpty()) {
       return java.util.Collections.emptyList();

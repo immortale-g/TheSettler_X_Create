@@ -615,6 +615,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
   }
 
+  /** Returns rack inventory counts for the given stack keys. */
   public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
     java.util.Map<ItemStack, Integer> counts = new java.util.HashMap<>();
     if (keys == null || keys.isEmpty()) {
@@ -697,6 +698,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return copy;
   }
 
+  /** Periodically reconciles inflight stock orders and notifies on overdue entries. */
   private void tickInflightTracking(IColony colony) {
     if (colony == null) {
       return;
@@ -729,6 +731,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
   }
 
+  /** Emits a shopkeeper interaction for each overdue inflight notice. */
   private void notifyShopkeeperOverdue(List<CreateShopBlockEntity.InflightNotice> notices) {
     if (notices == null || notices.isEmpty()) {
       return;
@@ -763,6 +766,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
   }
 
+  /** Returns the assigned Create Shop worker, if any. */
   private ICitizenData getShopkeeperCitizen() {
     for (ICitizenData citizen : getAllAssignedCitizen()) {
       if (citizen == null) {
