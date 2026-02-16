@@ -618,8 +618,7 @@ final class ShopCourierDiagnostics {
             + uuidLookup;
     if (!dump.equals(lastCourierEntityDump)) {
       lastCourierEntityDump = dump;
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] courier debug: citizen entity missing {}", dump);
+      TheSettlerXCreate.LOGGER.info("[CreateShop] courier debug: citizen entity missing {}", dump);
     }
     if (hasUuidEntity && entityId < 0) {
       attemptCitizenEntityRepair(citizen, level);

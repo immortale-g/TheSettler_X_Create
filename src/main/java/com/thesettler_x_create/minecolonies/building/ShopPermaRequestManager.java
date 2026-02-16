@@ -1,13 +1,13 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
-import com.minecolonies.core.colony.buildings.workerbuildings.IWareHouse;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
@@ -65,7 +65,10 @@ final class ShopPermaRequestManager {
   }
 
   void tickPermaRequests(IColony colony) {
-    if (colony == null || permaOres.isEmpty() || !shop.canUsePermaRequests() || !shop.isWorkerWorking()) {
+    if (colony == null
+        || permaOres.isEmpty()
+        || !shop.canUsePermaRequests()
+        || !shop.isWorkerWorking()) {
       if (BuildingCreateShop.isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",
@@ -175,7 +178,8 @@ final class ShopPermaRequestManager {
   void loadPerma(CompoundTag compound) {
     permaOres.clear();
     if (compound.contains(BuildingCreateShop.TAG_PERMA_ORES)) {
-      var list = compound.getList(BuildingCreateShop.TAG_PERMA_ORES, net.minecraft.nbt.Tag.TAG_STRING);
+      var list =
+          compound.getList(BuildingCreateShop.TAG_PERMA_ORES, net.minecraft.nbt.Tag.TAG_STRING);
       for (int i = 0; i < list.size(); i++) {
         String key = list.getString(i);
         if (key == null || key.isBlank()) {

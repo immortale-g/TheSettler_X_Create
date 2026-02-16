@@ -2,7 +2,6 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.buildings.modules.WarehouseModule;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
@@ -40,9 +39,9 @@ final class ShopRackIndex {
     int added = 0;
     Tuple<BlockPos, BlockPos> corners = shop.getCorners();
     boolean usedFallback = false;
-    if (corners != null && corners.getFirst() != null && corners.getSecond() != null) {
-      BlockPos start = corners.getFirst();
-      BlockPos end = corners.getSecond();
+    if (corners != null && corners.getA() != null && corners.getB() != null) {
+      BlockPos start = corners.getA();
+      BlockPos end = corners.getB();
       int minX = Math.min(start.getX(), end.getX());
       int maxX = Math.max(start.getX(), end.getX());
       int minY = Math.min(start.getY(), end.getY());
@@ -69,7 +68,7 @@ final class ShopRackIndex {
     }
     if (Config.DEBUG_LOGGING.getAsBoolean() && added > 0) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] ensureRackContainers added={} total={}", added, shop.containerList.size());
+          "[CreateShop] ensureRackContainers added={} total={}", added, shop.getContainerCount());
     }
   }
 
@@ -99,7 +98,7 @@ final class ShopRackIndex {
       return counts;
     }
     ensureRackContainers();
-    for (BlockPos pos : shop.containerList) {
+    for (BlockPos pos : shop.getContainerList()) {
       if (!WorldUtil.isBlockLoaded(level, pos)) {
         continue;
       }
@@ -117,13 +116,6 @@ final class ShopRackIndex {
       return;
     }
     rack.setInWarehouse(Boolean.TRUE);
-    var warehouseModules = shop.getModulesByType(WarehouseModule.class);
-    if (!warehouseModules.isEmpty()) {
-      WarehouseModule warehouseModule = warehouseModules.get(0);
-      while (rack.getUpgradeSize() < warehouseModule.getStorageUpgrade()) {
-        rack.upgradeRackSize();
-      }
-    }
   }
 
   private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
@@ -139,13 +131,13 @@ final class ShopRackIndex {
           if (!(entity instanceof TileEntityRack rack)) {
             continue;
           }
-          if (shop.containerList.contains(pos)) {
+          if (shop.hasContainer(pos)) {
             continue;
           }
           if (!(level.getBlockState(pos).getBlock() instanceof AbstractBlockMinecoloniesRack)) {
             continue;
           }
-          shop.containerList.add(pos);
+          shop.addContainer(pos);
           onRackRegistered(level, pos, rack);
           added++;
         }
@@ -155,8 +147,7 @@ final class ShopRackIndex {
   }
 
   private void addCountsFromHandler(
-      net.neoforged.neoforge.items.IItemHandler handler,
-      java.util.Map<ItemStack, Integer> counts) {
+      net.neoforged.neoforge.items.IItemHandler handler, java.util.Map<ItemStack, Integer> counts) {
     if (handler == null || counts == null || counts.isEmpty()) {
       return;
     }
