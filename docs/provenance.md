@@ -25,3 +25,5 @@ Implementation notes:
   address panel descriptions that clarify expected routing behavior).
 - Inflight request tracking and shopkeeper notifications are authored for this project using MineColonies
   interaction handlers and Create stock network APIs.
+- Delivery creation logic for Create Shop is authored here and intentionally restricted to physical rack
+  inventory (not virtual/pickup stock) to avoid false deliveries for inflight items.
