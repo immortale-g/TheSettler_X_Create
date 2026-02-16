@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
@@ -22,6 +23,7 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.requestsystem.requesters.SafeRequester;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -179,6 +181,9 @@ final class CreateShopResolverDeliveryOps {
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      IDeliverable deliverable = request.getRequest() instanceof IDeliverable typed ? typed : null;
+      int reservedForDeliverable =
+          deliverable == null ? 0 : pickup.getReservedForDeliverable(deliverable);
       logDeliveryDiagnostics(
           "create",
           manager,
@@ -188,7 +193,7 @@ final class CreateShopResolverDeliveryOps {
           selected.copy(),
           request.getRequester().getLocation(),
           pickup.getReservedForRequest(resolver.toRequestId(request.getId())),
-          pickup.getReservedForDeliverable(delivery),
+          reservedForDeliverable,
           pickup.getReservedFor(selected));
       IStandardRequestManager standardManager =
           CreateShopRequestResolver.unwrapStandardManager(manager);
