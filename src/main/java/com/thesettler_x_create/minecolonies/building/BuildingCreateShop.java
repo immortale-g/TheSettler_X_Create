@@ -1,24 +1,18 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
-import com.minecolonies.api.colony.requestsystem.factory.IFactoryController;
-import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
-import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
-import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
-import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.block.CreateShopBlock;
@@ -81,6 +75,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopPermaRequestManager permaManager;
   private final ShopWorkerStatus workerStatus;
   private final ShopNetworkNotifier networkNotifier;
+  private final ShopResolverFactory resolverFactory;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -97,6 +92,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.permaManager = new ShopPermaRequestManager(this);
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
+    this.resolverFactory = new ShopResolverFactory(this);
   }
 
   @Override
@@ -377,45 +373,18 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   @Override
   public ImmutableCollection<IRequestResolver<?>> createResolvers() {
-    ImmutableList.Builder<IRequestResolver<?>> builder = ImmutableList.builder();
-    for (IRequestResolver<?> resolver : super.createResolvers()) {
-      if (resolver
-          instanceof
-          com.minecolonies.core.colony.requestsystem.resolvers.core
-              .AbstractWarehouseRequestResolver) {
-        // CreateShop is not a BuildingWareHouse; avoid MineColonies' warehouse resolver cast crash.
-        continue;
-      }
-      builder.add(resolver);
-    }
-
-    ILocation location = getRequester().getLocation();
-    IFactoryController factory = getColony().getRequestManager().getFactoryController();
-    IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
-
-    shopResolver = new CreateShopRequestResolver(location, token);
-    builder.add(shopResolver);
-    deliveryResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
-    pickupResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
-    builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
-    builder.add(new PickupRequestResolver(location, pickupResolverToken));
-
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] createResolvers at {} -> {}",
-          getLocation().getInDimensionLocation(),
-          builder.build().size());
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery resolver token={} pickup resolver token={}",
-          deliveryResolverToken,
-          pickupResolverToken);
-    }
-
-    return builder.build();
+    return resolverFactory.createResolvers(super.createResolvers());
   }
 
   public CreateShopRequestResolver getShopResolver() {
     return shopResolver;
+  }
+
+  void setResolverState(
+      CreateShopRequestResolver resolver, IToken<?> deliveryToken, IToken<?> pickupToken) {
+    this.shopResolver = resolver;
+    this.deliveryResolverToken = deliveryToken;
+    this.pickupResolverToken = pickupToken;
   }
 
   @Override
