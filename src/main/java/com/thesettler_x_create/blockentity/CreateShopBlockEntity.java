@@ -65,6 +65,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Reserve items for a specific request to avoid duplicate ordering. */
   public void reserve(UUID requestId, ItemStack key, int amount) {
+    if (!ensureServerThread("reserve")) {
+      return;
+    }
     if (amount <= 0) {
       return;
     }
@@ -87,6 +90,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Release all reservations for a request. */
   public void release(UUID requestId) {
+    if (!ensureServerThread("release")) {
+      return;
+    }
     cleanExpired();
     if (reservations.remove(requestId) != null) {
       setChanged();
@@ -137,6 +143,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Consumes reserved items for a request when deliveries are created. */
   public int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
+    if (!ensureServerThread("consumeReservedForRequest")) {
+      return 0;
+    }
     if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
       return 0;
     }
@@ -180,6 +189,9 @@ public class CreateShopBlockEntity extends BlockEntity {
       Map<ItemStack, Integer> baselines,
       String requesterName,
       String address) {
+    if (!ensureServerThread("recordInflight")) {
+      return;
+    }
     if (stacks == null || stacks.isEmpty()) {
       return;
     }
@@ -204,6 +216,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Reconciles inflight entries against current rack counts to detect arrivals. */
   public void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
+    if (!ensureServerThread("reconcileInflight")) {
+      return;
+    }
     if (inflightEntries.isEmpty()) {
       return;
     }
@@ -251,6 +266,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Marks overdue inflight entries as notified and returns notices to surface. */
   public List<InflightNotice> consumeOverdueNotices(long now, long timeout) {
+    if (!ensureServerThread("consumeOverdueNotices")) {
+      return java.util.Collections.emptyList();
+    }
     if (timeout <= 0L || inflightEntries.isEmpty()) {
       return java.util.Collections.emptyList();
     }
@@ -316,6 +334,9 @@ public class CreateShopBlockEntity extends BlockEntity {
   }
 
   private void cleanExpired() {
+    if (!ensureServerThread("cleanExpired")) {
+      return;
+    }
     long now = getGameTimeSafe();
     Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
     while (iterator.hasNext()) {
@@ -419,6 +440,21 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   private long getGameTimeSafe() {
     return level == null ? 0L : level.getGameTime();
+  }
+
+  private boolean ensureServerThread(String action) {
+    if (level == null || level.isClientSide) {
+      return false;
+    }
+    var server = level.getServer();
+    if (server != null && !server.isSameThread()) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] inflight '{}' ignored off-server-thread", action);
+      }
+      return false;
+    }
+    return true;
   }
 
   private static boolean matches(ItemStack a, ItemStack b) {
