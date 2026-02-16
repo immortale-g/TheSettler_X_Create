@@ -107,7 +107,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private String lastEntityRepairDump;
   private String lastWarehouseCompareDump;
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
-  private boolean warehouseRegistered;
+  boolean warehouseRegistered;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -123,6 +123,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopInflightTracker inflightTracker;
   private final ShopRackIndex rackIndex;
   private final ShopBeltManager beltManager;
+  private final ShopWarehouseRegistrar warehouseRegistrar;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -143,6 +144,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.inflightTracker = new ShopInflightTracker(this);
     this.rackIndex = new ShopRackIndex(this);
     this.beltManager = new ShopBeltManager(this);
+    this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
   }
 
   @Override
@@ -509,31 +511,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   private void ensureWarehouseRegistration() {
-    if (warehouseRegistered || getColony() == null) {
-      return;
-    }
-    var manager = getColony().getServerBuildingManager();
-    if (manager == null) {
-      return;
-    }
-    var warehouses = manager.getWareHouses();
-    if (warehouses == null) {
-      return;
-    }
-    if (!hasWarehouseModules()) {
-      warehouses.remove(this);
-      warehouseRegistered = false;
-      return;
-    }
-    if (!warehouses.contains(this)) {
-      warehouses.add(this);
-    }
-    warehouseRegistered = true;
-  }
-
-  private boolean hasWarehouseModules() {
-    return getModule(BuildingModules.WAREHOUSE_COURIERS) != null
-        && getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
+    warehouseRegistrar.ensureWarehouseRegistration();
   }
 
   public void ensureRackContainers() {
