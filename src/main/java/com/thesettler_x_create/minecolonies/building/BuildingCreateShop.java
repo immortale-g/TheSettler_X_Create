@@ -6,7 +6,6 @@ import com.ldtteam.structurize.api.RotationMirror;
 import com.ldtteam.structurize.blueprints.v1.Blueprint;
 import com.ldtteam.structurize.blueprints.v1.BlueprintUtil;
 import com.ldtteam.structurize.util.BlockInfo;
-import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
@@ -26,11 +25,9 @@ import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
-import com.minecolonies.core.colony.buildings.modules.WarehouseModule;
 import com.minecolonies.core.colony.jobs.JobBuilder;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
-import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.CreateShopBlock;
@@ -117,7 +114,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private String lastWarehouseCompareDump;
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   private boolean warehouseRegistered;
-  private long lastRackScanTick;
   private CreateShopRequestResolver shopResolver;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
@@ -132,6 +128,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private BlockPos builderHutPos;
   private boolean beltRebuildPending;
   private final ShopInflightTracker inflightTracker;
+  private final ShopRackIndex rackIndex;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -145,13 +142,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.lastEntityRepairDump = "";
     this.lastWarehouseCompareDump = "";
     this.warehouseRegistered = false;
-    this.lastRackScanTick = -1L;
     this.shopResolver = null;
     this.permaWaitFullStack = false;
     this.lastPermaRequestTick = 0L;
     this.builderHutPos = null;
     this.beltRebuildPending = false;
     this.inflightTracker = new ShopInflightTracker(this);
+    this.rackIndex = new ShopRackIndex(this);
   }
 
   @Override
@@ -398,16 +395,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     if (block instanceof AbstractBlockMinecoloniesRack) {
       BlockEntity entity = world.getBlockEntity(pos);
-      if (entity instanceof TileEntityRack rack) {
-        rack.setInWarehouse(Boolean.TRUE);
-        var warehouseModules = getModulesByType(WarehouseModule.class);
-        if (!warehouseModules.isEmpty()) {
-          WarehouseModule warehouseModule = warehouseModules.get(0);
-          while (rack.getUpgradeSize() < warehouseModule.getStorageUpgrade()) {
-            rack.upgradeRackSize();
-          }
-        }
-      }
+      rackIndex.onRackRegistered(world, pos, entity);
     }
     super.registerBlockPosition(block, pos, world);
   }
@@ -561,172 +549,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public void ensureRackContainers() {
-    if (getColony() == null) {
-      return;
-    }
-    Level level = getColony().getWorld();
-    if (level == null) {
-      return;
-    }
-    long now = level.getGameTime();
-    if (lastRackScanTick >= 0 && now - lastRackScanTick < 40L) {
-      return;
-    }
-    lastRackScanTick = now;
-    int added = 0;
-    Tuple<BlockPos, BlockPos> corners = getCorners();
-    boolean usedFallback = false;
-    if (corners != null && corners.getA() != null && corners.getB() != null) {
-      BlockPos a = corners.getA();
-      BlockPos b = corners.getB();
-      int minX = Math.min(a.getX(), b.getX());
-      int maxX = Math.max(a.getX(), b.getX());
-      int minY = Math.min(a.getY(), b.getY());
-      int maxY = Math.max(a.getY(), b.getY());
-      int minZ = Math.min(a.getZ(), b.getZ());
-      int maxZ = Math.max(a.getZ(), b.getZ());
-      long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
-      if (volume <= 20000L) {
-        added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
-      } else {
-        usedFallback = true;
-      }
-    } else {
-      usedFallback = true;
-    }
-    if (usedFallback) {
-      BlockPos origin = getLocation().getInDimensionLocation();
-      int radius = 12;
-      int minX = origin.getX() - radius;
-      int maxX = origin.getX() + radius;
-      int minY = origin.getY() - 4;
-      int maxY = origin.getY() + 4;
-      int minZ = origin.getZ() - radius;
-      int maxZ = origin.getZ() + radius;
-      added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
-    }
-    if (isDebugRequests() && added > 0) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] ensureRackContainers added={} total={}", added, containerList.size());
-    }
+    rackIndex.ensureRackContainers();
   }
 
   /** Returns rack inventory counts for the given stack keys. */
   public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
-    java.util.Map<ItemStack, Integer> counts = new java.util.HashMap<>();
-    if (keys == null || keys.isEmpty()) {
-      return counts;
-    }
-    for (ItemStack key : keys) {
-      if (key == null || key.isEmpty()) {
-        continue;
-      }
-      ItemStack normalized = normalizeKey(key);
-      if (!containsKey(counts, normalized)) {
-        counts.put(normalized, 0);
-      }
-    }
-    if (counts.isEmpty()) {
-      return counts;
-    }
-    Level level = getColony() == null ? null : getColony().getWorld();
-    if (level == null) {
-      return counts;
-    }
-    ensureRackContainers();
-    for (BlockPos pos : containerList) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = level.getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
-        continue;
-      }
-      addCountsFromHandler(rack.getInventory(), counts);
-    }
-    return counts;
-  }
-
-  private void addCountsFromHandler(
-      net.neoforged.neoforge.items.IItemHandler handler, java.util.Map<ItemStack, Integer> counts) {
-    if (handler == null || counts == null || counts.isEmpty()) {
-      return;
-    }
-    for (int slot = 0; slot < handler.getSlots(); slot++) {
-      ItemStack stack = handler.getStackInSlot(slot);
-      if (stack == null || stack.isEmpty()) {
-        continue;
-      }
-      ItemStack key = findMatchingKey(counts, stack);
-      if (key != null) {
-        counts.put(key, counts.get(key) + stack.getCount());
-      }
-    }
-  }
-
-  private ItemStack findMatchingKey(java.util.Map<ItemStack, Integer> counts, ItemStack stack) {
-    if (counts == null || counts.isEmpty() || stack == null || stack.isEmpty()) {
-      return null;
-    }
-    for (ItemStack key : counts.keySet()) {
-      if (ItemStack.isSameItemSameComponents(key, stack)) {
-        return key;
-      }
-    }
-    return null;
-  }
-
-  private boolean containsKey(java.util.Map<ItemStack, Integer> counts, ItemStack key) {
-    if (counts == null || counts.isEmpty() || key == null || key.isEmpty()) {
-      return false;
-    }
-    for (ItemStack existing : counts.keySet()) {
-      if (ItemStack.isSameItemSameComponents(existing, key)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private ItemStack normalizeKey(ItemStack stack) {
-    ItemStack copy = stack.copy();
-    copy.setCount(1);
-    return copy;
-  }
-
-  private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
-    int added = 0;
-    for (int x = minX; x <= maxX; x++) {
-      for (int y = minY; y <= maxY; y++) {
-        for (int z = minZ; z <= maxZ; z++) {
-          BlockPos pos = new BlockPos(x, y, z);
-          if (!WorldUtil.isBlockLoaded(level, pos)) {
-            continue;
-          }
-          BlockState state = level.getBlockState(pos);
-          if (!(state.getBlock() instanceof AbstractBlockMinecoloniesRack)) {
-            continue;
-          }
-          if (containerList.contains(pos)) {
-            continue;
-          }
-          addContainerPosition(pos);
-          BlockEntity entity = level.getBlockEntity(pos);
-          if (entity instanceof TileEntityRack rack) {
-            rack.setInWarehouse(Boolean.TRUE);
-            var warehouseModules = getModulesByType(WarehouseModule.class);
-            if (!warehouseModules.isEmpty()) {
-              WarehouseModule warehouseModule = warehouseModules.get(0);
-              while (rack.getUpgradeSize() < warehouseModule.getStorageUpgrade()) {
-                rack.upgradeRackSize();
-              }
-            }
-          }
-          added++;
-        }
-      }
-    }
-    return added;
+    return rackIndex.getStockCountsForKeys(keys);
   }
 
   private void ensureDeliverableAssignment() {
