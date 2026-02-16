@@ -1327,9 +1327,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     } catch (NoSuchMethodException ex) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.debug(
-            "[CreateShop] method {} not available on {}",
-            methodName,
-            target.getClass().getName());
+            "[CreateShop] method {} not available on {}", methodName, target.getClass().getName());
       }
       return java.util.Optional.empty();
     } catch (Exception ex) {
