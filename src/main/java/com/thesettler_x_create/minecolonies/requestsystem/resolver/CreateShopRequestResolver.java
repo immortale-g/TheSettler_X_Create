@@ -722,8 +722,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       int rackAvailable = getAvailableFromRacks(tile, deliverable);
-      int pickupAvailable = getAvailableFromPickup(pickup, deliverable);
-      int totalAvailable = rackAvailable + pickupAvailable;
+      int totalAvailable = rackAvailable;
       if (totalAvailable <= 0) {
         logPendingReasonChange(
             request.getId(),
@@ -731,8 +730,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 + totalAvailable
                 + " rack="
                 + rackAvailable
-                + " pickup="
-                + pickupAvailable
                 + " pending="
                 + pendingCount);
         if (shouldNotifyPending(level, request.getId())) {
@@ -743,43 +740,36 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pickupAvailable={}, pendingCount={})",
+              "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pendingCount={})",
               requestIdLog,
               totalAvailable,
               rackAvailable,
-              pickupAvailable,
               pendingCount);
         }
         continue;
       }
       int deliverCount = Math.min(totalAvailable, pendingCount);
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks =
-          planFromPickupWithPositions(pickup, deliverable, deliverCount);
-      int plannedCount = countPlanned(stacks);
-      if (plannedCount < deliverCount) {
-        stacks.addAll(planFromRacksWithPositions(tile, deliverable, deliverCount - plannedCount));
-      }
+          planFromRacksWithPositions(tile, deliverable, deliverCount);
       if (stacks.isEmpty()) {
         logPendingReasonChange(request.getId(), "wait:plan-empty");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pickupAvailable={}, pendingCount={})",
+              "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pendingCount={})",
               requestIdLog,
               rackAvailable,
-              pickupAvailable,
               pendingCount);
         }
         continue;
       }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} creating deliveries (stacks={}, deliverCount={}, pendingCount={}, rackAvailable={}, pickupAvailable={})",
+            "[CreateShop] tickPending: {} creating deliveries (stacks={}, deliverCount={}, pendingCount={}, rackAvailable={})",
             requestIdLog,
             stacks.size(),
             deliverCount,
             pendingCount,
-            rackAvailable,
-            pickupAvailable);
+            rackAvailable);
       }
       List<IToken<?>> created = createDeliveriesFromStacks(manager, request, stacks, pickup);
       if (created.isEmpty()) {
