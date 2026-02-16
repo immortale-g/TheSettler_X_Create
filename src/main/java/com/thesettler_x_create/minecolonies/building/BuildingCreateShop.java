@@ -647,16 +647,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       addCountsFromHandler(rack.getInventory(), counts);
     }
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (pickup != null) {
-      addCountsFromHandler(pickup.getItemHandler(null), counts);
-    }
     return counts;
   }
 
   private void addCountsFromHandler(
-      net.neoforged.neoforge.items.IItemHandler handler,
-      java.util.Map<ItemStack, Integer> counts) {
+      net.neoforged.neoforge.items.IItemHandler handler, java.util.Map<ItemStack, Integer> counts) {
     if (handler == null || counts == null || counts.isEmpty()) {
       return;
     }
