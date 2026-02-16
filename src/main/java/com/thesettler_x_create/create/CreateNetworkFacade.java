@@ -166,7 +166,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   @Override
-  public List<ItemStack> requestItems(IDeliverable deliverable, int amount) {
+  public List<ItemStack> requestItems(IDeliverable deliverable, int amount, String requesterName) {
     if (!hasNetwork() || amount <= 0) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -213,7 +213,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
               shop.getStockNetworkId(),
               shop.getShopAddress());
         }
-        recordInflight(orderedStacks);
+        recordInflight(orderedStacks, requesterName);
       } catch (Exception ex) {
         if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -235,7 +235,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     return orderedStacks;
   }
 
-  private void recordInflight(List<ItemStack> orderedStacks) {
+  private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {
     if (orderedStacks == null || orderedStacks.isEmpty()) {
       return;
     }
@@ -247,7 +247,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       return;
     }
     var baseline = building.getStockCountsForKeys(orderedStacks);
-    pickup.recordInflight(orderedStacks, baseline);
+    pickup.recordInflight(orderedStacks, baseline, requesterName, shop.getShopAddress());
   }
 
   private int getToolLevel(Tool tool, ItemStack stack) {

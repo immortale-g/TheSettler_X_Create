@@ -162,7 +162,11 @@ public class CreateShopBlockEntity extends BlockEntity {
     return keys;
   }
 
-  public void recordInflight(List<ItemStack> stacks, Map<ItemStack, Integer> baselines) {
+  public void recordInflight(
+      List<ItemStack> stacks,
+      Map<ItemStack, Integer> baselines,
+      String requesterName,
+      String address) {
     if (stacks == null || stacks.isEmpty()) {
       return;
     }
@@ -175,7 +179,8 @@ public class CreateShopBlockEntity extends BlockEntity {
       ItemStack key = makeKey(stack);
       int baseline = findCount(baselines, key);
       upsertBaseline(key, baseline);
-      inflightEntries.add(new InflightEntry(key, stack.getCount(), now));
+      inflightEntries.add(
+          new InflightEntry(key, stack.getCount(), now, sanitize(requesterName), sanitize(address)));
       changed = true;
     }
     if (changed) {
@@ -227,6 +232,36 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (changed) {
       setChanged();
     }
+  }
+
+  public List<InflightNotice> consumeOverdueNotices(long now, long timeout) {
+    if (timeout <= 0L || inflightEntries.isEmpty()) {
+      return java.util.Collections.emptyList();
+    }
+    List<InflightNotice> notices = new ArrayList<>();
+    boolean changed = false;
+    for (InflightEntry entry : inflightEntries) {
+      if (entry.remaining <= 0 || entry.notified) {
+        continue;
+      }
+      long age = now - entry.requestedAt;
+      if (age < timeout) {
+        continue;
+      }
+      entry.notified = true;
+      changed = true;
+      notices.add(
+          new InflightNotice(
+              entry.stackKey.copy(),
+              entry.remaining,
+              age,
+              entry.requesterName,
+              entry.address));
+    }
+    if (changed) {
+      setChanged();
+    }
+    return notices;
   }
 
   //    public int consumeReserved(ItemStack key, int amount) {
@@ -406,6 +441,14 @@ public class CreateShopBlockEntity extends BlockEntity {
     return copy;
   }
 
+  private static String sanitize(String value) {
+    if (value == null) {
+      return "";
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? "" : trimmed;
+  }
+
   @Override
   public void loadAdditional(
       @NotNull CompoundTag tag, @NotNull net.minecraft.core.HolderLookup.Provider registries) {
@@ -441,8 +484,14 @@ public class CreateShopBlockEntity extends BlockEntity {
             ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
         int remaining = entry.getInt("remaining");
         long requestedAt = entry.getLong("requestedAt");
+        boolean notified = entry.getBoolean("notified");
+        String requester = entry.getString("requester");
+        String address = entry.getString("address");
         if (!stack.isEmpty() && remaining > 0) {
-          inflightEntries.add(new InflightEntry(makeKey(stack), remaining, requestedAt));
+          InflightEntry inflight =
+              new InflightEntry(makeKey(stack), remaining, requestedAt, requester, address);
+          inflight.notified = notified;
+          inflightEntries.add(inflight);
         }
       }
     }
@@ -485,6 +534,15 @@ public class CreateShopBlockEntity extends BlockEntity {
         data.put("stack", entry.stackKey.save(registries));
         data.putInt("remaining", entry.remaining);
         data.putLong("requestedAt", entry.requestedAt);
+        if (entry.notified) {
+          data.putBoolean("notified", true);
+        }
+        if (entry.requesterName != null && !entry.requesterName.isEmpty()) {
+          data.putString("requester", entry.requesterName);
+        }
+        if (entry.address != null && !entry.address.isEmpty()) {
+          data.putString("address", entry.address);
+        }
         list.add(data);
       }
       tag.put(TAG_INFLIGHT, list);
@@ -525,11 +583,39 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final ItemStack stackKey;
     public int remaining;
     public final long requestedAt;
+    public final String requesterName;
+    public final String address;
+    public boolean notified;
 
-    public InflightEntry(ItemStack stackKey, int remaining, long requestedAt) {
+    public InflightEntry(
+        ItemStack stackKey,
+        int remaining,
+        long requestedAt,
+        String requesterName,
+        String address) {
       this.stackKey = stackKey;
       this.remaining = remaining;
       this.requestedAt = requestedAt;
+      this.requesterName = requesterName == null ? "" : requesterName;
+      this.address = address == null ? "" : address;
+      this.notified = false;
+    }
+  }
+
+  public static class InflightNotice {
+    public final ItemStack stackKey;
+    public final int remaining;
+    public final long age;
+    public final String requesterName;
+    public final String address;
+
+    public InflightNotice(
+        ItemStack stackKey, int remaining, long age, String requesterName, String address) {
+      this.stackKey = stackKey;
+      this.remaining = remaining;
+      this.age = age;
+      this.requesterName = requesterName == null ? "" : requesterName;
+      this.address = address == null ? "" : address;
     }
   }
 
