@@ -26,7 +26,6 @@ import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
-import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -82,6 +81,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopResolverAssignments resolverAssignments;
   private final ShopCourierDiagnostics courierDiagnostics;
   private final ShopPermaRequestManager permaManager;
+  private final ShopWorkerStatus workerStatus;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -97,6 +97,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.resolverAssignments = new ShopResolverAssignments(this);
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
     this.permaManager = new ShopPermaRequestManager(this);
+    this.workerStatus = new ShopWorkerStatus(this);
   }
 
   @Override
@@ -444,31 +445,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public boolean hasActiveWorker() {
-    return getAllAssignedCitizen().stream()
-        .anyMatch(citizen -> citizen.getJob() instanceof JobCreateShop);
+    return workerStatus.hasActiveWorker();
   }
 
   public boolean isWorkerWorking() {
-    for (var citizen : getAllAssignedCitizen()) {
-      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
-        continue;
-      }
-      if (citizen.getJobStatus() == com.minecolonies.api.entity.ai.JobStatus.WORKING) {
-        return true;
-      }
-      try {
-        var entity = citizen.getEntity();
-        if (entity != null && entity.isPresent()) {
-          String meta = entity.get().getRenderMetadata();
-          if ("working".equals(meta)) {
-            return true;
-          }
-        }
-      } catch (Exception ignored) {
-        // Ignore entity lookup issues.
-      }
-    }
-    return false;
+    return workerStatus.isWorkerWorking();
   }
 
   public void notifyMissingNetwork() {
