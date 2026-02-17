@@ -77,7 +77,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final java.util.Set<String> chainCycleLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
-  private final CreateShopResolverDeliveryOps deliveryOps = new CreateShopResolverDeliveryOps(this);
+  private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
   private final CreateShopResolverChain chain = new CreateShopResolverChain(this);
   private final CreateShopResolverRecheck recheck =
@@ -250,7 +250,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       // If we can satisfy from racks, create deliveries immediately.
       if (rackUsable > 0) {
         List<IToken<?>> created =
-            deliveryOps.createDeliveriesFromStacks(manager, request, planned, pickup);
+            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
         markDeliveriesCreated(request.getId());
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
@@ -516,7 +516,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                       com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
                 var childAssigned = assignmentStore.getAssignmentForValue(childToken);
                 if (childAssigned == null) {
-                  boolean enqueued = deliveryOps.tryEnqueueDelivery(standardManager, childToken);
+                  boolean enqueued =
+                      deliveryManager.tryEnqueueDelivery(standardManager, childToken);
                   if (Config.DEBUG_LOGGING.getAsBoolean()) {
                     TheSettlerXCreate.LOGGER.info(
                         "[CreateShop] tickPending: {} child {} unassigned delivery -> enqueue={}",
@@ -652,7 +653,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             rackAvailable);
       }
       List<IToken<?>> created =
-          deliveryOps.createDeliveriesFromStacks(manager, request, stacks, pickup);
+          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
       if (created.isEmpty()) {
         diagnostics.logPendingReasonChange(request.getId(), "create:failed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -823,7 +824,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
       BlockPos pickupPosition =
           pickup == null ? delivery.getStart().getInDimensionLocation() : pickup.getBlockPos();
-      deliveryOps.logDeliveryDiagnostics(
+      deliveryManager.logDeliveryDiagnostics(
           "cancel",
           manager,
           request.getId(),
@@ -878,7 +879,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
         int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
         BlockPos pickupPosition = pickup == null ? startPos : pickup.getBlockPos();
-        deliveryOps.logDeliveryDiagnostics(
+        deliveryManager.logDeliveryDiagnostics(
             "complete",
             manager,
             request.getId(),
