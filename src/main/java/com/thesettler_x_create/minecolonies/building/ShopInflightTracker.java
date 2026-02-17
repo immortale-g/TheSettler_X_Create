@@ -2,13 +2,10 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.interactionhandling.ChatPriority;
-import com.minecolonies.core.colony.interactionhandling.SimpleNotificationInteraction;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import java.util.List;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -65,25 +62,9 @@ final class ShopInflightTracker {
       if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
         continue;
       }
-      String requester =
-          notice.requesterName == null || notice.requesterName.isBlank()
-              ? "unknown requester"
-              : notice.requesterName;
-      String address =
-          notice.address == null || notice.address.isBlank() ? "unknown address" : notice.address;
-      String itemName = notice.stackKey.getHoverName().getString();
-      String text =
-          "Delivery seems lost for "
-              + requester
-              + ". Item: "
-              + itemName
-              + " x"
-              + notice.remaining
-              + " (address: "
-              + address
-              + ").";
       citizen.triggerInteraction(
-          new SimpleNotificationInteraction(Component.literal(text), ChatPriority.IMPORTANT));
+          new ShopLostPackageInteraction(
+              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address));
     }
   }
 

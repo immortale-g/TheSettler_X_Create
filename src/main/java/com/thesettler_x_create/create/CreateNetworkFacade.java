@@ -187,13 +187,31 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
 
     List<ItemStack> orderedStacks = planItems(deliverable, amount);
-    List<BigItemStack> order = new ArrayList<>();
+    return requestStacks(orderedStacks, requesterName);
+  }
 
-    for (ItemStack requestStack : orderedStacks) {
+  @Override
+  public List<ItemStack> requestStacks(List<ItemStack> requestedStacks, String requesterName) {
+    if (!hasNetwork() || requestedStacks == null || requestedStacks.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<BigItemStack> order = new ArrayList<>();
+    List<ItemStack> normalized = new ArrayList<>();
+
+    for (ItemStack requestStack : requestedStacks) {
       if (requestStack.isEmpty()) {
         continue;
       }
-      order.add(new BigItemStack(requestStack.copy(), requestStack.getCount()));
+      int available = requestStack.getCount();
+      int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, requestStack.getMaxStackSize()));
+      while (available > 0) {
+        int chunk = Math.min(available, maxPer);
+        ItemStack chunkStack = requestStack.copy();
+        chunkStack.setCount(chunk);
+        order.add(new BigItemStack(chunkStack.copy(), chunk));
+        normalized.add(chunkStack);
+        available -= chunk;
+      }
     }
 
     if (!order.isEmpty()) {
@@ -213,7 +231,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
               shop.getStockNetworkId(),
               shop.getShopAddress());
         }
-        recordInflight(orderedStacks, requesterName);
+        recordInflight(normalized, requesterName);
       } catch (Exception ex) {
         if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -229,10 +247,10 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     } else if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] requestItems computed empty order for {}", deliverable);
+          "[CreateShop] requestStacks computed empty order");
     }
 
-    return orderedStacks;
+    return normalized;
   }
 
   private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {
