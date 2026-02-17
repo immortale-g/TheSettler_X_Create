@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -193,6 +194,82 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       IItemHandler handler = rack.getItemHandlerCap();
       InventoryUtils.transferItemStackIntoNextBestSlotInItemHandler(inventory, slot, handler);
     }
+  }
+
+  /**
+   * Tries to insert stacks into shop racks and returns leftovers that did not fit.
+   *
+   * <p>Used for manual package handover recovery.
+   */
+  public List<ItemStack> insertIntoRacks(List<ItemStack> stacks) {
+    List<ItemStack> leftovers = new ArrayList<>();
+    if (stacks == null || stacks.isEmpty()) {
+      return leftovers;
+    }
+    for (ItemStack original : stacks) {
+      if (ItemStackUtils.isEmpty(original)) {
+        continue;
+      }
+      ItemStack remaining = original.copy();
+      int containerCount =
+          getBuilding() == null ? 1 : Math.max(1, getBuilding().getContainers().size());
+      int guard = containerCount + 2;
+      while (!remaining.isEmpty() && guard-- > 0) {
+        AbstractTileEntityRack rack = getRackForStack(remaining);
+        if (rack == null) {
+          break;
+        }
+        ItemStack before = remaining.copy();
+        remaining =
+            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+                remaining, rack.getItemHandlerCap());
+        if (remaining.getCount() == before.getCount()) {
+          break;
+        }
+      }
+      if (!remaining.isEmpty()) {
+        IItemHandler hut = getItemHandlerCap((Direction) null);
+        if (hut != null) {
+          remaining =
+              InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+                  remaining, hut);
+        }
+      }
+      if (!remaining.isEmpty()) {
+        leftovers.add(remaining);
+      }
+    }
+    return leftovers;
+  }
+
+  /**
+   * True if at least one item of the given stack can currently be accepted by rack or hut buffer.
+   */
+  public boolean canAcceptInbound(ItemStack stack) {
+    if (stack == null || stack.isEmpty()) {
+      return false;
+    }
+    ItemStack probe = stack.copy();
+    probe.setCount(1);
+    AbstractTileEntityRack rack = getRackForStack(probe);
+    if (rack != null && canInsertAtLeastOne(rack.getItemHandlerCap(), probe)) {
+      return true;
+    }
+    IItemHandler hut = getItemHandlerCap((Direction) null);
+    return canInsertAtLeastOne(hut, probe);
+  }
+
+  private static boolean canInsertAtLeastOne(IItemHandler handler, ItemStack stack) {
+    if (handler == null || stack == null || stack.isEmpty()) {
+      return false;
+    }
+    for (int slot = 0; slot < handler.getSlots(); slot++) {
+      ItemStack remaining = handler.insertItem(slot, stack, true);
+      if (remaining.isEmpty() || remaining.getCount() < stack.getCount()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void maybeNotifyFull() {

@@ -27,4 +27,7 @@ public interface ICreateNetworkFacade {
    * @param requesterName display name used for inflight tracking/notifications
    */
   List<ItemStack> requestItems(IDeliverable deliverable, int amount, String requesterName);
+
+  /** Broadcasts explicit stack orders and returns the normalized ordered stacks. */
+  List<ItemStack> requestStacks(List<ItemStack> requestedStacks, String requesterName);
 }

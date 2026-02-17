@@ -10,6 +10,7 @@ import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
+import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
@@ -19,6 +20,7 @@ import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
+import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -36,6 +38,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Tuple;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -468,6 +471,97 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     networkNotifier.notifyMissingNetwork();
   }
 
+  public boolean restartLostPackage(
+      ItemStack stackKey, int remaining, String requesterName, String address) {
+    if (stackKey == null || stackKey.isEmpty() || remaining <= 0) {
+      return false;
+    }
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (tile == null || pickup == null || tile.getStockNetworkId() == null) {
+      return false;
+    }
+    ItemStack requested = stackKey.copy();
+    requested.setCount(remaining);
+    var reordered = new CreateNetworkFacade(tile).requestStacks(List.of(requested), requesterName);
+    if (reordered.isEmpty()) {
+      return false;
+    }
+    int requestedCount = 0;
+    for (ItemStack stack : reordered) {
+      if (stack != null && !stack.isEmpty()) {
+        requestedCount += stack.getCount();
+      }
+    }
+    int consumed = pickup.consumeInflight(stackKey, requestedCount, requesterName, address);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={}",
+          requesterName,
+          stackKey.getHoverName().getString(),
+          requestedCount,
+          consumed);
+    }
+    return consumed >= remaining;
+  }
+
+  public boolean acceptLostPackageFromPlayer(
+      Player player, ItemStack stackKey, int remaining, String requesterName, String address) {
+    if (player == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (tile == null || pickup == null) {
+      return false;
+    }
+    var inventory = player.getInventory();
+    for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+      ItemStack candidate = inventory.getItem(slot);
+      if (!ShopLostPackageInteraction.packageContains(candidate, stackKey, 1)) {
+        continue;
+      }
+      List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      if (unpacked.isEmpty()) {
+        continue;
+      }
+      ItemStack removed = inventory.removeItem(slot, 1);
+      if (removed.isEmpty()) {
+        continue;
+      }
+      List<ItemStack> leftovers = tile.insertIntoRacks(unpacked);
+      for (ItemStack leftover : leftovers) {
+        if (!leftover.isEmpty()) {
+          Level level = getColony() == null ? null : getColony().getWorld();
+          BlockPos dropPos = getLocation().getInDimensionLocation();
+          if (level != null) {
+            InventoryUtils.spawnItemStack(
+                level,
+                dropPos.getX() + 0.5D,
+                dropPos.getY() + 1.0D,
+                dropPos.getZ() + 0.5D,
+                leftover);
+          }
+        }
+      }
+      int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
+      int targetAmount = Math.max(1, remaining);
+      int consumed =
+          pickup.consumeInflight(
+              stackKey, Math.min(targetAmount, insertedMatching), requesterName, address);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={}",
+            requesterName,
+            stackKey.getHoverName().getString(),
+            insertedMatching,
+            consumed);
+      }
+      return consumed >= targetAmount;
+    }
+    return false;
+  }
+
   private void ensureWarehouseRegistration() {
     warehouseRegistrar.ensureWarehouseRegistration();
   }
@@ -527,6 +621,22 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private void clearPermaPending(
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     permaManager.clearPermaPending(request);
+  }
+
+  private static int countMatching(List<ItemStack> stacks, ItemStack key) {
+    if (stacks == null || stacks.isEmpty() || key == null || key.isEmpty()) {
+      return 0;
+    }
+    int count = 0;
+    for (ItemStack stack : stacks) {
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      if (ItemStack.isSameItemSameComponents(stack, key)) {
+        count += stack.getCount();
+      }
+    }
+    return count;
   }
 
   public static List<ItemStack> getOreCandidates() {
