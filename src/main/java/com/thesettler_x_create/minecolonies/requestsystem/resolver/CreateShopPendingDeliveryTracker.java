@@ -93,13 +93,29 @@ final class CreateShopPendingDeliveryTracker {
   }
 
   void setReason(IToken<?> token, String reason) {
-    CreateShopPendingDeliveryState state = getOrCreate(token);
+    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
+    if (state == null) {
+      if (reason == null) {
+        return;
+      }
+      state = getOrCreate(token);
+    }
     state.setReason(reason);
   }
 
   String getReason(IToken<?> token) {
     CreateShopPendingDeliveryState state = pending.getIfPresent(token);
     return state == null ? null : state.getReason();
+  }
+
+  boolean isActive(IToken<?> token) {
+    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
+    if (state == null) {
+      return false;
+    }
+    return state.getPendingCount() > 0
+        || state.isDeliveryCreated()
+        || state.getCooldownUntil() > 0L;
   }
 
   boolean hasEntries() {
