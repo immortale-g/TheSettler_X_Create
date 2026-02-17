@@ -398,6 +398,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   @Nullable
+  public IToken<?> getDeliveryResolverTokenPublic() {
+    return deliveryResolverToken;
+  }
+
+  @Nullable
   IToken<?> getPickupResolverToken() {
     return pickupResolverToken;
   }

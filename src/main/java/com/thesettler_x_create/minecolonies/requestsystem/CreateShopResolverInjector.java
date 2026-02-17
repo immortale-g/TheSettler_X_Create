@@ -30,6 +30,9 @@ public final class CreateShopResolverInjector {
       REQUEST_STATE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
   private static long lastPerfLogTime = 0L;
   private static long lastEnsureNanos = 0L;
+  private static final java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
+      DISABLED_DELIVERY_RESOLVERS =
+          java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
   private CreateShopResolverInjector() {}
 
@@ -106,6 +109,8 @@ public final class CreateShopResolverInjector {
     int pruned = 0;
     java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>> allowedShopResolvers =
         new java.util.HashSet<>();
+    java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
+        disabledDeliveryResolvers = new java.util.HashSet<>();
     for (var entry : colony.getServerBuildingManager().getBuildings().entrySet()) {
       if (!(entry.getValue() instanceof BuildingCreateShop shop)) {
         continue;
@@ -146,6 +151,33 @@ public final class CreateShopResolverInjector {
       if (registered && !toolList.contains(shopResolver.getId())) {
         toolList.add(shopResolver.getId());
         injected++;
+      }
+
+      // Disable shop delivery resolver if no deliveryman is assigned to the shop.
+      var deliveryResolverToken = shop.getDeliveryResolverTokenPublic();
+      if (deliveryResolverToken != null) {
+        if (shopHasDeliveryman(shop)) {
+          if (!requestableList.contains(deliveryResolverToken)) {
+            requestableList.add(deliveryResolverToken);
+            injected++;
+          }
+        } else {
+          disabledDeliveryResolvers.add(deliveryResolverToken);
+        }
+      }
+    }
+
+    // Remove delivery resolvers that belong to shops without deliverymen.
+    DISABLED_DELIVERY_RESOLVERS.clear();
+    if (!disabledDeliveryResolvers.isEmpty()) {
+      DISABLED_DELIVERY_RESOLVERS.addAll(disabledDeliveryResolvers);
+      var removeDelivery = requestableList.iterator();
+      while (removeDelivery.hasNext()) {
+        var token = removeDelivery.next();
+        if (disabledDeliveryResolvers.contains(token)) {
+          removeDelivery.remove();
+          pruned++;
+        }
       }
     }
 
@@ -254,6 +286,53 @@ public final class CreateShopResolverInjector {
     }
     lastEnsureNanos = System.nanoTime() - perfStart;
     maybeLogPerf(colony);
+    if (allowDebugLog && shops > 0) {
+      try {
+        var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
+        var resolverAssignments = assignmentStore == null ? null : assignmentStore.getAssignments();
+        int assignedTotal = 0;
+        if (resolverAssignments != null) {
+          for (var token : allowedShopResolvers) {
+            var list = resolverAssignments.get(token);
+            assignedTotal += list == null ? 0 : list.size();
+          }
+        }
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver assignments shops={} assignedTotal={} resolverIds={}",
+            shops,
+            assignedTotal,
+            allowedShopResolvers);
+      } catch (Exception ex) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver assignment log failed {}", ex.getMessage());
+      }
+    }
+  }
+
+  private static boolean shopHasDeliveryman(BuildingCreateShop shop) {
+    if (shop == null) {
+      return false;
+    }
+    var modules =
+        shop.getModulesByType(
+            com.thesettler_x_create.minecolonies.module.CreateShopCourierModule.class);
+    if (modules == null || modules.isEmpty()) {
+      return false;
+    }
+    var module = modules.get(0);
+    var citizens = module.getAssignedCitizen();
+    if (citizens == null || citizens.isEmpty()) {
+      return false;
+    }
+    for (var citizen : citizens) {
+      if (citizen == null) {
+        continue;
+      }
+      if (citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void maybeLogPerf(IColony colony) {
@@ -540,7 +619,9 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.api.colony.requestsystem.requestable.deliveryman
                     .IDeliverymanRequestable;
-    if (isDeliveryRequest) {
+    if (isDeliveryRequest
+        && assignedToken != null
+        && !DISABLED_DELIVERY_RESOLVERS.contains(assignedToken)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (delivery request)", token);
       }
