@@ -340,16 +340,31 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public void tickPendingDeliveries(IRequestManager manager) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending entry manager={} resolverId={}",
+          manager == null ? "<null>" : manager.getClass().getName(),
+          getId());
+    }
     IStandardRequestManager standardManager = unwrapStandardManager(manager);
     if (standardManager == null) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no standard manager)");
+      }
       return;
     }
     long perfStart = System.nanoTime();
     Level level = standardManager.getColony().getWorld();
     if (level == null) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no level)");
+      }
       return;
     }
     if (level.isClientSide) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (client side)");
+      }
       return;
     }
     recheck.processParentChildRechecks(standardManager, level);
@@ -357,6 +372,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
     var assigned = assignments.get(getId());
+    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned == null) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
+          getId(),
+          assignments.keySet());
+    }
     java.util.Set<IToken<?>> pendingTokens = new java.util.HashSet<>();
     if (assigned != null) {
       pendingTokens.addAll(assigned);
