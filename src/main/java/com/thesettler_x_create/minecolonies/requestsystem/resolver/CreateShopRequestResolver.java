@@ -1,7 +1,5 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Lists;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
@@ -23,7 +21,6 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -42,19 +39,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
-  private static final Cache<IToken<?>, Long> orderedRequests =
-      CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
-  private static final java.util.Set<IToken<?>> deliveriesCreated =
-      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final java.util.Map<IToken<?>, IToken<?>> deliveryParents =
       new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, IToken<?>> deliveryResolvers =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private static final java.util.Map<IToken<?>, Integer> pendingRequestCounts =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private static final java.util.Map<IToken<?>, String> pendingSources =
       new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -86,6 +75,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
   private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
+  private final CreateShopPendingDeliveryTracker pendingTracker =
+      new CreateShopPendingDeliveryTracker();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -200,7 +191,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             "[CreateShop] attemptResolve deferred (worker not working) request=" + request.getId());
       }
       cooldown.markRequestOrdered(level, request.getId());
-      pendingRequestCounts.put(request.getId(), needed);
+      pendingTracker.setPendingCount(request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:worker-not-working");
       return Lists.newArrayList();
     }
@@ -222,7 +213,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       // Track pending requests so we can detect items arriving in racks.
       cooldown.markRequestOrdered(level, request.getId());
-      pendingRequestCounts.put(request.getId(), needed);
+      pendingTracker.setPendingCount(request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:insufficient");
       return Lists.newArrayList();
     }
@@ -256,7 +247,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (remaining > 0) {
           cooldown.markRequestOrdered(level, request.getId());
-          pendingRequestCounts.put(request.getId(), Math.max(1, needed - plannedCount));
+          pendingTracker.setPendingCount(request.getId(), Math.max(1, needed - plannedCount));
           diagnostics.recordPendingSource(request.getId(), "attemptResolve:partial");
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -270,7 +261,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       // Otherwise, order from network and wait for arrival.
       cooldown.markRequestOrdered(level, request.getId());
-      pendingRequestCounts.put(request.getId(), needed);
+      pendingTracker.setPendingCount(request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:network-ordered");
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
@@ -369,15 +360,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (assigned != null) {
       pendingTokens.addAll(assigned);
     }
-    pendingTokens.addAll(cooldown.getOrderedTokens());
-    pendingTokens.addAll(pendingRequestCounts.keySet());
+    pendingTokens.addAll(pendingTracker.getTokens());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        if (cooldown.hasOrderedRequests() || !pendingRequestCounts.isEmpty()) {
+        if (pendingTracker.hasEntries()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
               cooldown.getOrderedCount(),
-              pendingRequestCounts.size());
+              pendingTracker.size());
         }
       }
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
@@ -417,9 +407,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     if (!shop.isWorkerWorking()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (worker not working)");
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
       }
-      return;
     }
     TileEntityCreateShop tile = shop.getCreateShopTileEntity();
     if (tile == null) {
@@ -436,8 +425,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         request = requestHandler.getRequest(token);
       } catch (IllegalArgumentException ex) {
         cooldown.clearRequestCooldown(token);
-        pendingRequestCounts.remove(token);
-        pendingSources.remove(token);
+        pendingTracker.remove(token);
         continue;
       }
       if (cancelledRequests.contains(request.getId())) {
@@ -446,8 +434,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           cancelledRequests.remove(request.getId());
         } else {
           cooldown.clearRequestCooldown(request.getId());
-          pendingRequestCounts.remove(request.getId());
-          pendingSources.remove(request.getId());
+          pendingTracker.remove(request.getId());
           cooldown.clearRequestCooldown(request.getId());
           clearDeliveriesCreated(request.getId());
           diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
@@ -475,19 +462,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       UUID requestId = toRequestId(request.getId());
       int reservedForRequest = pickup.getReservedForRequest(requestId);
       boolean onCooldown = cooldown.isRequestOnCooldown(level, request.getId());
-      if (!onCooldown && reservedForRequest <= 0) {
-        diagnostics.logPendingReasonChange(
-            request.getId(),
-            "skip:no-cooldown reserved="
-                + reservedForRequest
-                + " pending="
-                + pendingRequestCounts.getOrDefault(request.getId(), 0));
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (not on cooldown)", requestIdLog);
-        }
-        continue;
-      }
       if (hasDeliveriesCreated(request.getId())) {
         diagnostics.logPendingReasonChange(request.getId(), "skip:deliveries-created");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -586,7 +560,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       int pendingCount = reservedForRequest;
       if (pendingCount <= 0) {
-        pendingCount = pendingRequestCounts.getOrDefault(request.getId(), 0);
+        pendingCount = pendingTracker.getPendingCount(request.getId());
+      }
+      if (pendingCount <= 0 && !onCooldown) {
+        diagnostics.logPendingReasonChange(
+            request.getId(),
+            "skip:no-pending reserved="
+                + reservedForRequest
+                + " pending="
+                + pendingTracker.getPendingCount(request.getId()));
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
+        }
+        continue;
       }
       if (pendingCount <= 0) {
         diagnostics.logPendingReasonChange(
@@ -673,11 +660,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       int remainingCount = Math.max(0, pendingCount - deliveredCount);
       if (remainingCount > 0) {
-        pendingRequestCounts.put(request.getId(), remainingCount);
+        pendingTracker.setPendingCount(request.getId(), remainingCount);
         cooldown.markRequestOrdered(level, request.getId());
         diagnostics.recordPendingSource(request.getId(), "tickPending:partial");
       } else {
-        pendingRequestCounts.remove(request.getId());
+        pendingTracker.remove(request.getId());
         cooldown.clearRequestCooldown(request.getId());
       }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -790,7 +777,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
     Level level = manager.getColony().getWorld();
     if (level == null) {
-      pendingRequestCounts.put(parentToken, Math.max(1, stack.getCount()));
+      pendingTracker.setPendingCount(parentToken, Math.max(1, stack.getCount()));
       diagnostics.recordPendingSource(parentToken, "delivery-cancel");
       clearDeliveriesCreated(parentToken);
       return;
@@ -813,7 +800,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (pickup != null) {
       pickup.release(parentRequestId);
     }
-    pendingRequestCounts.put(parentToken, pendingCount);
+    pendingTracker.setPendingCount(parentToken, pendingCount);
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
     // Keep on cooldown so tickPending can retry once stock is available.
     cooldown.markRequestOrdered(level, parentToken);
@@ -902,15 +889,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
     }
     clearDeliveriesCreated(parentToken);
-    Integer pending = pendingRequestCounts.get(parentToken);
-    if (pending != null && pending > 0) {
+    int pending = pendingTracker.getPendingCount(parentToken);
+    if (pending > 0) {
       // Keep cooldown so tickPending continues creating partial deliveries.
       if (manager != null && manager.getColony() != null) {
         cooldown.markRequestOrdered(manager.getColony().getWorld(), parentToken);
       }
     } else {
       cooldown.clearRequestCooldown(parentToken);
-      pendingRequestCounts.remove(parentToken);
+      pendingTracker.remove(parentToken);
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IStandardRequestManager standard = unwrapStandardManager(manager);
@@ -942,8 +929,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    pendingRequestCounts.remove(request.getId());
-    pendingSources.remove(request.getId());
+    pendingTracker.remove(request.getId());
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
@@ -952,8 +938,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    pendingRequestCounts.remove(request.getId());
-    pendingSources.remove(request.getId());
+    pendingTracker.remove(request.getId());
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
@@ -964,8 +949,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
-    pendingRequestCounts.remove(request.getId());
-    pendingSources.remove(request.getId());
+    pendingTracker.remove(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
       releaseReservation(manager, request);
     }
@@ -974,8 +958,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    pendingRequestCounts.remove(request.getId());
-    pendingSources.remove(request.getId());
+    pendingTracker.remove(request.getId());
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
     if (request.getRequest() instanceof IDeliverable) {
@@ -1171,15 +1154,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   boolean hasDeliveriesCreated(IToken<?> token) {
-    return deliveriesCreated.contains(token);
+    return pendingTracker.isDeliveryCreated(token);
   }
 
   void markDeliveriesCreated(IToken<?> token) {
-    deliveriesCreated.add(token);
+    pendingTracker.markDeliveryCreated(token);
   }
 
   void clearDeliveriesCreated(IToken<?> token) {
-    deliveriesCreated.remove(token);
+    pendingTracker.clearDeliveryCreated(token);
   }
 
   String tryDescribeResolver(Object resolver) {
@@ -1244,14 +1227,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return pendingReasonSnapshots;
   }
 
-  static java.util.Map<IToken<?>, String> getPendingSources() {
-    return pendingSources;
-  }
-
-  Cache<IToken<?>, Long> getOrderedRequests() {
-    return orderedRequests;
-  }
-
   java.util.Map<IToken<?>, Long> getPendingNotices() {
     return pendingNotices;
   }
@@ -1270,6 +1245,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopResolverCooldown getCooldown() {
     return cooldown;
+  }
+
+  CreateShopPendingDeliveryTracker getPendingTracker() {
+    return pendingTracker;
   }
 
   CreateShopStockResolver getStockResolver() {

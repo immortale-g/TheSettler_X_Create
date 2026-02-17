@@ -23,6 +23,8 @@ Core concepts
 - Perma requests: the shop can auto-request all items from ore tags, gated to building level 2.
 - Inflight tracking: Create stock network orders are tracked until items arrive in shop racks; overdue orders
   trigger a shopkeeper notification.
+- Pending delivery tracking: a single source of truth tracks pending counts, cooldowns, and delivery-created
+  state per request; reconciliation ticks resume delivery creation even if the shopkeeper was idle.
 - Belts: internal belt blueprints are spawned around the shop during placement/upgrade/repair.
 - Deliveries: generated only from rack positions (not pickup block) to match MineColonies deliveryman rules.
 - Inflight orders that never arrive no longer trigger deliveries; only rack inventory is eligible.
@@ -77,7 +79,7 @@ Gameplay constraints
 - Courier max = 1 at all levels (custom courier module).
 - Hut inventory button uses the standard MineColonies hut inventory menu; Create Shop addresses are configured
   via the module tab in the hut GUI (not via the inventory button).
-- Delivery creation is gated to a working shopkeeper.
+- Delivery creation is gated to a working shopkeeper, but reconciliation continues for pending deliveries.
 - Delivery pickup targets racks; pickup block is used for reservations and Create network integration only.
 
 Known gaps / follow-ups

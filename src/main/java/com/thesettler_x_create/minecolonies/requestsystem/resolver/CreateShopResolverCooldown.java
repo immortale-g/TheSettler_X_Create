@@ -13,35 +13,30 @@ final class CreateShopResolverCooldown {
   }
 
   boolean isRequestOnCooldown(Level level, IToken<?> token) {
-    Long until = resolver.getOrderedRequests().getIfPresent(token);
-    if (until == null) {
-      return false;
-    }
-    long now = level.getGameTime();
-    if (now >= until) {
-      resolver.getOrderedRequests().invalidate(token);
-      return false;
-    }
-    return true;
+    return resolver.getPendingTracker().isOnCooldown(level, token);
   }
 
   void markRequestOrdered(Level level, IToken<?> token) {
-    long until = level.getGameTime() + Config.ORDER_TTL_TICKS.getAsLong();
-    resolver.getOrderedRequests().put(token, until);
+    resolver.getPendingTracker().setCooldown(level, token, Config.ORDER_TTL_TICKS.getAsLong());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      CreateShopRequestResolver.getPendingSources().put(token, "markRequestOrdered");
+      resolver.getPendingTracker().setReason(token, "markRequestOrdered");
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] markRequestOrdered token={} resolver={} until={}",
           token,
           resolver.getResolverToken(),
-          until);
+          resolver.getPendingTracker().get(token) == null
+              ? "<unknown>"
+              : resolver.getPendingTracker().get(token).getCooldownUntil());
     }
   }
 
   void clearRequestCooldown(IToken<?> token) {
-    resolver.getOrderedRequests().invalidate(token);
+    resolver.getPendingTracker().clearCooldown(token);
     if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
-      String source = CreateShopRequestResolver.getPendingSources().remove(token);
+      String source = resolver.getPendingTracker().getReason(token);
+      if (source != null) {
+        resolver.getPendingTracker().setReason(token, null);
+      }
       if (source != null) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] pending cleared token={} source=clearCooldown prev={}", token, source);
@@ -50,18 +45,18 @@ final class CreateShopResolverCooldown {
   }
 
   boolean isOrdered(IToken<?> token) {
-    return resolver.getOrderedRequests().getIfPresent(token) != null;
+    return resolver.getPendingTracker().isActive(token);
   }
 
   int getOrderedCount() {
-    return resolver.getOrderedRequests().asMap().size();
+    return resolver.getPendingTracker().size();
   }
 
   boolean hasOrderedRequests() {
-    return !resolver.getOrderedRequests().asMap().isEmpty();
+    return resolver.getPendingTracker().hasEntries();
   }
 
   java.util.Set<IToken<?>> getOrderedTokens() {
-    return resolver.getOrderedRequests().asMap().keySet();
+    return resolver.getPendingTracker().getTokens();
   }
 }
