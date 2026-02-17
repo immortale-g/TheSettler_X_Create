@@ -240,7 +240,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       // If we can satisfy from racks, create deliveries immediately.
       if (rackUsable > 0) {
         List<IToken<?>> created =
-            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
+            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup, shop);
         markDeliveriesCreated(request.getId());
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
@@ -639,7 +639,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             rackAvailable);
       }
       List<IToken<?>> created =
-          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
+          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup, shop);
       if (created.isEmpty()) {
         diagnostics.logPendingReasonChange(request.getId(), "create:failed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
