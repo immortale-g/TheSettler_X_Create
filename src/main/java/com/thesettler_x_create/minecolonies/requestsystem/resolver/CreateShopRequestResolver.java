@@ -240,7 +240,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       // If we can satisfy from racks, create deliveries immediately.
       if (rackUsable > 0) {
         List<IToken<?>> created =
-            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
+            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup, shop);
         markDeliveriesCreated(request.getId());
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
@@ -340,15 +340,31 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public void tickPendingDeliveries(IRequestManager manager) {
-    if (!(manager instanceof IStandardRequestManager standardManager)) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending entry manager={} resolverId={}",
+          manager == null ? "<null>" : manager.getClass().getName(),
+          getId());
+    }
+    IStandardRequestManager standardManager = unwrapStandardManager(manager);
+    if (standardManager == null) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no standard manager)");
+      }
       return;
     }
     long perfStart = System.nanoTime();
-    Level level = manager.getColony().getWorld();
+    Level level = standardManager.getColony().getWorld();
     if (level == null) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no level)");
+      }
       return;
     }
     if (level.isClientSide) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (client side)");
+      }
       return;
     }
     recheck.processParentChildRechecks(standardManager, level);
@@ -356,6 +372,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
     var assigned = assignments.get(getId());
+    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned == null) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
+          getId(),
+          assignments.keySet());
+    }
     java.util.Set<IToken<?>> pendingTokens = new java.util.HashSet<>();
     if (assigned != null) {
       pendingTokens.addAll(assigned);
@@ -401,7 +423,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    BuildingCreateShop shop = getShop(manager);
+    BuildingCreateShop shop = getShop(standardManager);
     if (shop == null) {
       return;
     }
@@ -639,7 +661,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             rackAvailable);
       }
       List<IToken<?>> created =
-          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
+          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup, shop);
       if (created.isEmpty()) {
         diagnostics.logPendingReasonChange(request.getId(), "create:failed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {

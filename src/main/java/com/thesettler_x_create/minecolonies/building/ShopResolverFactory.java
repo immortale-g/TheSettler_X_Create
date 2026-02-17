@@ -36,12 +36,23 @@ final class ShopResolverFactory {
 
     ILocation location = shop.getRequester().getLocation();
     IFactoryController factory = shop.getColony().getRequestManager().getFactoryController();
-    IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
 
-    CreateShopRequestResolver shopResolver = new CreateShopRequestResolver(location, token);
+    CreateShopRequestResolver shopResolver = shop.getExistingShopResolver();
+    IToken<?> deliveryResolverToken = shop.getDeliveryResolverToken();
+    IToken<?> pickupResolverToken = shop.getPickupResolverToken();
+
+    if (shopResolver == null) {
+      IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
+      shopResolver = new CreateShopRequestResolver(location, token);
+    }
     builder.add(shopResolver);
-    IToken<?> deliveryResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
-    IToken<?> pickupResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
+
+    if (deliveryResolverToken == null) {
+      deliveryResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
+    }
+    if (pickupResolverToken == null) {
+      pickupResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
+    }
     builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
     builder.add(new PickupRequestResolver(location, pickupResolverToken));
 
