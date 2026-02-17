@@ -195,6 +195,44 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
   }
 
+  /**
+   * Tries to insert stacks into shop racks and returns leftovers that did not fit.
+   *
+   * <p>Used for manual package handover recovery.
+   */
+  public List<ItemStack> insertIntoRacks(List<ItemStack> stacks) {
+    List<ItemStack> leftovers = new ArrayList<>();
+    if (stacks == null || stacks.isEmpty()) {
+      return leftovers;
+    }
+    for (ItemStack original : stacks) {
+      if (ItemStackUtils.isEmpty(original)) {
+        continue;
+      }
+      ItemStack remaining = original.copy();
+      int containerCount =
+          getBuilding() == null ? 1 : Math.max(1, getBuilding().getContainers().size());
+      int guard = containerCount + 2;
+      while (!remaining.isEmpty() && guard-- > 0) {
+        AbstractTileEntityRack rack = getRackForStack(remaining);
+        if (rack == null) {
+          break;
+        }
+        ItemStack before = remaining.copy();
+        remaining =
+            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+                remaining, rack.getItemHandlerCap());
+        if (remaining.getCount() == before.getCount()) {
+          break;
+        }
+      }
+      if (!remaining.isEmpty()) {
+        leftovers.add(remaining);
+      }
+    }
+    return leftovers;
+  }
+
   private void maybeNotifyFull() {
     Level world = getLevel();
     if (world == null) {
