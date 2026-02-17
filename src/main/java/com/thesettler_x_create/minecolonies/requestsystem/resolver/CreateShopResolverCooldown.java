@@ -34,7 +34,9 @@ final class CreateShopResolverCooldown {
     resolver.getPendingTracker().clearCooldown(token);
     if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
       String source = resolver.getPendingTracker().getReason(token);
-      resolver.getPendingTracker().setReason(token, null);
+      if (source != null) {
+        resolver.getPendingTracker().setReason(token, null);
+      }
       if (source != null) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] pending cleared token={} source=clearCooldown prev={}", token, source);
@@ -43,7 +45,7 @@ final class CreateShopResolverCooldown {
   }
 
   boolean isOrdered(IToken<?> token) {
-    return resolver.getPendingTracker().get(token) != null;
+    return resolver.getPendingTracker().isActive(token);
   }
 
   int getOrderedCount() {
