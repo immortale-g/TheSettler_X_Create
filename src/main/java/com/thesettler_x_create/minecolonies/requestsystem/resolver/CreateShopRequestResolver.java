@@ -340,11 +340,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public void tickPendingDeliveries(IRequestManager manager) {
-    if (!(manager instanceof IStandardRequestManager standardManager)) {
+    IStandardRequestManager standardManager = unwrapStandardManager(manager);
+    if (standardManager == null) {
       return;
     }
     long perfStart = System.nanoTime();
-    Level level = manager.getColony().getWorld();
+    Level level = standardManager.getColony().getWorld();
     if (level == null) {
       return;
     }
@@ -401,7 +402,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    BuildingCreateShop shop = getShop(manager);
+    BuildingCreateShop shop = getShop(standardManager);
     if (shop == null) {
       return;
     }
