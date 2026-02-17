@@ -7,8 +7,6 @@ import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliv
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
-import com.thesettler_x_create.create.CreateNetworkFacade;
-import com.thesettler_x_create.create.ICreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.UUID;
@@ -107,12 +105,11 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
-    int networkAvailable = network.getAvailable(deliverable);
-    int rackAvailable = resolver.getPlanning().getAvailableFromRacks(tile, deliverable);
-    int pickupAvailable = resolver.getPlanning().getAvailableFromPickup(pickup, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
-    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
+    CreateShopStockSnapshot snapshot =
+        resolver
+            .getStockResolver()
+            .getAvailability(tile, pickup, deliverable, reservedForOthers, resolver.getPlanning());
+    int available = snapshot.getAvailable();
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {

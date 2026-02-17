@@ -18,8 +18,6 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
-import com.thesettler_x_create.create.CreateNetworkFacade;
-import com.thesettler_x_create.create.ICreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
@@ -87,6 +85,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopResolverPendingState(this);
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
   private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
+  private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -206,11 +205,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
 
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
-    int networkAvailable = network.getAvailable(deliverable);
-    int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
-    int available = Math.max(0, networkAvailable + rackUsable);
+    CreateShopStockSnapshot snapshot =
+        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
+    int rackAvailable = snapshot.getRackAvailable();
+    int rackUsable = snapshot.getRackUsable();
+    int available = Math.max(0, snapshot.getNetworkAvailable() + rackUsable);
     int provide = Math.min(available, needed);
     if (provide <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -235,7 +234,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     int remaining = Math.max(0, provide - plannedCount);
     if (remaining > 0) {
       String requesterName = messaging.resolveRequesterName(manager, request);
-      ordered.addAll(network.requestItems(deliverable, remaining, requesterName));
+      ordered.addAll(stockResolver.requestFromNetwork(tile, deliverable, remaining, requesterName));
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
@@ -1018,8 +1017,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (pickup == null) {
       return 0;
     }
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
-    int available = network.getAvailable(deliverable);
+    int available = stockResolver.getNetworkAvailable(tile, deliverable);
     int reserved = pickup.getReservedForDeliverable(deliverable);
     return Math.max(0, available - reserved);
   }
@@ -1272,6 +1270,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopResolverCooldown getCooldown() {
     return cooldown;
+  }
+
+  CreateShopStockResolver getStockResolver() {
+    return stockResolver;
   }
 
   BuildingCreateShop getShopForValidator(IRequestManager manager) {
