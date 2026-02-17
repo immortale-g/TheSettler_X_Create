@@ -202,6 +202,15 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (requestStack.isEmpty()) {
         continue;
       }
+      if (!shop.canAcceptInbound(requestStack)) {
+        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
+              requestStack.getHoverName().getString(),
+              requestStack.getCount());
+        }
+        continue;
+      }
       int available = requestStack.getCount();
       int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, requestStack.getMaxStackSize()));
       while (available > 0) {

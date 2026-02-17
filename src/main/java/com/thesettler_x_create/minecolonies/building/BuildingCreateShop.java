@@ -10,6 +10,7 @@ import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
+import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
@@ -501,7 +502,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           requestedCount,
           consumed);
     }
-    return requestedCount > 0;
+    return consumed >= remaining;
   }
 
   public boolean acceptLostPackageFromPlayer(
@@ -531,7 +532,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       List<ItemStack> leftovers = tile.insertIntoRacks(unpacked);
       for (ItemStack leftover : leftovers) {
         if (!leftover.isEmpty()) {
-          player.addItem(leftover);
+          Level level = getColony() == null ? null : getColony().getWorld();
+          BlockPos dropPos = getLocation().getInDimensionLocation();
+          if (level != null) {
+            InventoryUtils.spawnItemStack(
+                level,
+                dropPos.getX() + 0.5D,
+                dropPos.getY() + 1.0D,
+                dropPos.getZ() + 0.5D,
+                leftover);
+          }
         }
       }
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
@@ -547,7 +557,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             insertedMatching,
             consumed);
       }
-      return insertedMatching > 0;
+      return consumed >= targetAmount;
     }
     return false;
   }
