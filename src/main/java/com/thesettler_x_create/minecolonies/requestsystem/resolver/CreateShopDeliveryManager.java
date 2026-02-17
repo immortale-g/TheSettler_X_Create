@@ -32,10 +32,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 
 /** Delivery creation and courier enqueue helpers for Create Shop resolver. */
-final class CreateShopResolverDeliveryOps {
+final class CreateShopDeliveryManager {
   private final CreateShopRequestResolver resolver;
 
-  CreateShopResolverDeliveryOps(CreateShopRequestResolver resolver) {
+  CreateShopDeliveryManager(CreateShopRequestResolver resolver) {
     this.resolver = resolver;
   }
 
