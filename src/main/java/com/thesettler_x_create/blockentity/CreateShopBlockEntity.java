@@ -294,6 +294,48 @@ public class CreateShopBlockEntity extends BlockEntity {
     return notices;
   }
 
+  /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
+  public int consumeInflight(
+      ItemStack stackKey, int amount, @Nullable String requesterName, @Nullable String address) {
+    if (!ensureServerThread("consumeInflight")) {
+      return 0;
+    }
+    if (stackKey == null || stackKey.isEmpty() || amount <= 0 || inflightEntries.isEmpty()) {
+      return 0;
+    }
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    int remaining = amount;
+    int consumed = 0;
+    boolean changed = false;
+    Iterator<InflightEntry> iterator = inflightEntries.iterator();
+    while (iterator.hasNext() && remaining > 0) {
+      InflightEntry entry = iterator.next();
+      if (!matches(entry.stackKey, stackKey)) {
+        continue;
+      }
+      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
+        continue;
+      }
+      if (!destination.isEmpty() && !destination.equals(entry.address)) {
+        continue;
+      }
+      int used = Math.min(remaining, entry.remaining);
+      entry.remaining -= used;
+      remaining -= used;
+      consumed += used;
+      changed = true;
+      if (entry.remaining <= 0) {
+        iterator.remove();
+      }
+    }
+    if (changed) {
+      pruneBaselines();
+      setChanged();
+    }
+    return consumed;
+  }
+
   //    public int consumeReserved(ItemStack key, int amount) {
   //        if (amount <= 0) {
   //            return 0;
