@@ -30,3 +30,5 @@ Implementation notes:
 - Ongoing refactors (resolver module splits and upcoming stock/validator/delivery extracts) are purely
   internal reorganizations of this codebase; no external implementations or third-party bridge code are
   incorporated or adapted.
+- The pending delivery tracker and reconciliation tick are authored for this project to improve
+  consistency when multiple Create deliveries arrive close together or when the shopkeeper is idle.
