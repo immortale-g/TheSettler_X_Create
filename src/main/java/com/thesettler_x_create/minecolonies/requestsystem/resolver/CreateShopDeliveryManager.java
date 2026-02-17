@@ -22,6 +22,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.requesters.SafeRequester;
 import java.util.List;
 import java.util.UUID;
@@ -43,7 +44,8 @@ final class CreateShopDeliveryManager {
       IRequestManager manager,
       IRequest<?> request,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks,
-      CreateShopBlockEntity pickup) {
+      CreateShopBlockEntity pickup,
+      BuildingCreateShop shop) {
     if (manager == null || pickup == null || stacks == null) {
       return Lists.newArrayList();
     }
@@ -201,7 +203,14 @@ final class CreateShopDeliveryManager {
         resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
       }
     }
-    notifyDeliverymen(manager, token);
+    int notified = notifyDeliverymen(manager, token, shop);
+    if (notified == 0) {
+      IStandardRequestManager standardManager =
+          CreateShopRequestResolver.unwrapStandardManager(manager);
+      if (standardManager != null) {
+        tryEnqueueDelivery(standardManager, token);
+      }
+    }
     return Lists.newArrayList(token);
   }
 
@@ -337,20 +346,37 @@ final class CreateShopDeliveryManager {
     return false;
   }
 
-  private void notifyDeliverymen(IRequestManager manager, IToken<?> token) {
+  private int notifyDeliverymen(IRequestManager manager, IToken<?> token, BuildingCreateShop shop) {
     if (manager == null || token == null) {
-      return;
-    }
-    var colony = manager.getColony();
-    if (colony == null) {
-      return;
-    }
-    var buildingManager = colony.getServerBuildingManager();
-    if (buildingManager == null) {
-      return;
+      return 0;
     }
     int notified = 0;
     int checked = 0;
+    if (shop != null) {
+      CourierAssignmentModule module = shop.getModule(BuildingModules.WAREHOUSE_COURIERS);
+      if (module != null) {
+        checked += notifyCourierModule(module, token);
+        notified += notifyCourierJobs(module, token);
+      }
+      if (notified > 0) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] delivery notify shop couriers token={} checked={} notified={}",
+              token,
+              checked,
+              notified);
+        }
+        return notified;
+      }
+    }
+    var colony = manager.getColony();
+    if (colony == null) {
+      return notified;
+    }
+    var buildingManager = colony.getServerBuildingManager();
+    if (buildingManager == null) {
+      return notified;
+    }
     for (var entry : buildingManager.getBuildings().entrySet()) {
       var building = entry.getValue();
       if (building == null) {
@@ -376,6 +402,7 @@ final class CreateShopDeliveryManager {
           checked,
           notified);
     }
+    return notified;
   }
 
   private int notifyCourierModule(AbstractAssignedCitizenModule module, IToken<?> token) {

@@ -387,6 +387,21 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.pickupResolverToken = pickupToken;
   }
 
+  @Nullable
+  CreateShopRequestResolver getExistingShopResolver() {
+    return shopResolver;
+  }
+
+  @Nullable
+  IToken<?> getDeliveryResolverToken() {
+    return deliveryResolverToken;
+  }
+
+  @Nullable
+  IToken<?> getPickupResolverToken() {
+    return pickupResolverToken;
+  }
+
   @Override
   @SuppressWarnings("unchecked")
   public <M extends IBuildingModule, V extends IBuildingModuleView> M getModule(
