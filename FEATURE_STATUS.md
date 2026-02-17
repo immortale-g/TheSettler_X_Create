@@ -2,7 +2,7 @@ Project Summary: TheSettler_x_Create (MineColonies + Create integration)
 
 Note: Keep this file updated whenever related functionality changes.
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-17
 
 Provenance / Attribution
 - This project is developed independently using only public MineColonies and Create APIs.
@@ -23,11 +23,15 @@ Core concepts
 - Perma requests: the shop can auto-request all items from ore tags, gated to building level 2.
 - Inflight tracking: Create stock network orders are tracked until items arrive in shop racks; overdue orders
   trigger a shopkeeper notification.
+- Lost-package recovery interaction: overdue inflight notifications now offer chat actions to restart
+  orders or hand over a package manually.
 - Pending delivery tracking: a single source of truth tracks pending counts, cooldowns, and delivery-created
   state per request; reconciliation ticks resume delivery creation even if the shopkeeper was idle.
 - Belts: internal belt blueprints are spawned around the shop during placement/upgrade/repair.
 - Deliveries: generated only from rack positions (not pickup block) to match MineColonies deliveryman rules.
 - Inflight orders that never arrive no longer trigger deliveries; only rack inventory is eligible.
+- Manual package handover writes into shop racks first, then hut inventory as overflow buffer.
+- Create stock requests are gated by inbound capacity (rack/hut) to avoid ordering items with no landing space.
 
 How it works (high level)
 1. Create Shop is placed (level 1) and later upgraded to level 2.
@@ -72,6 +76,13 @@ Key code locations
 - Debug logging (courier delivery lifecycle and enqueue diagnostics):
   - `src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java`
   - `src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java`
+- Lost-package recovery interaction and inflight reconciliation:
+  - `src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageInteraction.java`
+  - `src/main/java/com/thesettler_x_create/minecolonies/building/ShopInflightTracker.java`
+  - `src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java`
+- Capacity-aware stock ordering:
+  - `src/main/java/com/thesettler_x_create/create/CreateNetworkFacade.java`
+  - `src/main/java/com/thesettler_x_create/minecolonies/tileentity/TileEntityCreateShop.java`
 
 Gameplay constraints
 - Perma requests are only active at building level 2.
@@ -81,6 +92,7 @@ Gameplay constraints
   via the module tab in the hut GUI (not via the inventory button).
 - Delivery creation is gated to a working shopkeeper, but reconciliation continues for pending deliveries.
 - Delivery pickup targets racks; pickup block is used for reservations and Create network integration only.
+- Lost-package chat interactions remain active until the requested overdue amount is fully satisfied.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

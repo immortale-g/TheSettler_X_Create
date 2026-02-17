@@ -32,3 +32,6 @@ Implementation notes:
   incorporated or adapted.
 - The pending delivery tracker and reconciliation tick are authored for this project to improve
   consistency when multiple Create deliveries arrive close together or when the shopkeeper is idle.
+- Lost-package recovery interactions (shopkeeper chat actions, manual package handover, restart order
+  flow), inflight consumption semantics, and storage-capacity request gating are authored specifically
+  for this project using MineColonies interaction handlers and Create logistics APIs.
