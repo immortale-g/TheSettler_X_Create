@@ -890,7 +890,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     clearDeliveriesCreated(parentToken);
     int pending = pendingTracker.getPendingCount(parentToken);
-    if (pending != null && pending > 0) {
+    if (pending > 0) {
       // Keep cooldown so tickPending continues creating partial deliveries.
       if (manager != null && manager.getColony() != null) {
         cooldown.markRequestOrdered(manager.getColony().getWorld(), parentToken);
