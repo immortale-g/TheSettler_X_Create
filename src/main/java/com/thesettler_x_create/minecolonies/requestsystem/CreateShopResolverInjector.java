@@ -627,10 +627,15 @@ public final class CreateShopResolverInjector {
       }
       return 0;
     }
+    boolean allowDeliveryReassign =
+        isDeliveryRequest
+            && assignedToken != null
+            && DISABLED_DELIVERY_RESOLVERS.contains(assignedToken);
     if (state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS
             && assignedToken != null
             && !assignedToRetrying
             && !assignedToPlayer
+            && !allowDeliveryReassign
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.RESOLVED
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.COMPLETED
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED
