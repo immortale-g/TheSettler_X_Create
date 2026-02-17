@@ -109,10 +109,34 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public boolean canAccessWareHouse(ICitizenData citizen) {
     CourierAssignmentModule module = getFirstModuleOccurance(CourierAssignmentModule.class);
     boolean result = module != null && module.hasAssignedCitizen(citizen);
+    if (!result && module != null && !hasDeliveryman(module)) {
+      // Allow warehouse deliverymen to access the shop if no shop courier is assigned.
+      if (citizen != null
+          && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
+        result = true;
+      }
+    }
     if (isDebugRequests()) {
       courierDiagnostics.logAccessCheck(citizen, result);
     }
     return result;
+  }
+
+  private boolean hasDeliveryman(CourierAssignmentModule module) {
+    if (module == null) {
+      return false;
+    }
+    var citizens = module.getAssignedCitizen();
+    if (citizens == null || citizens.isEmpty()) {
+      return false;
+    }
+    for (var assigned : citizens) {
+      if (assigned != null
+          && assigned.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
@@ -385,6 +409,26 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.shopResolver = resolver;
     this.deliveryResolverToken = deliveryToken;
     this.pickupResolverToken = pickupToken;
+  }
+
+  @Nullable
+  CreateShopRequestResolver getExistingShopResolver() {
+    return shopResolver;
+  }
+
+  @Nullable
+  IToken<?> getDeliveryResolverToken() {
+    return deliveryResolverToken;
+  }
+
+  @Nullable
+  public IToken<?> getDeliveryResolverTokenPublic() {
+    return deliveryResolverToken;
+  }
+
+  @Nullable
+  IToken<?> getPickupResolverToken() {
+    return pickupResolverToken;
   }
 
   @Override
