@@ -92,7 +92,8 @@ final class CreateShopResolverDiagnostics {
     if (!Config.DEBUG_LOGGING.getAsBoolean() || token == null || reason == null) {
       return;
     }
-    String previous = resolver.getPendingSources().put(token, reason);
+    String previous = resolver.getPendingTracker().getReason(token);
+    resolver.getPendingTracker().setReason(token, reason);
     if (reason.equals(previous)) {
       return;
     }
