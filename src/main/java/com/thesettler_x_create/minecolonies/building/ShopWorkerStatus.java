@@ -1,9 +1,22 @@
 package com.thesettler_x_create.minecolonies.building;
 
+import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
+import java.util.Set;
 
 /** Tracks whether Create Shop workers are assigned and active. */
 final class ShopWorkerStatus {
+  private static final Set<VisibleCitizenStatus> UNAVAILABLE_STATUSES =
+      Set.of(
+          VisibleCitizenStatus.SICK,
+          VisibleCitizenStatus.SLEEP,
+          VisibleCitizenStatus.EAT,
+          VisibleCitizenStatus.MOURNING,
+          VisibleCitizenStatus.RAIDED,
+          VisibleCitizenStatus.BAD_WEATHER,
+          VisibleCitizenStatus.HOUSE);
+
   private final BuildingCreateShop shop;
 
   ShopWorkerStatus(BuildingCreateShop shop) {
@@ -16,9 +29,15 @@ final class ShopWorkerStatus {
   }
 
   boolean isWorkerWorking() {
-    for (var citizen : shop.getAllAssignedCitizen()) {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
       if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
         continue;
+      }
+      if (isCitizenUnavailable(citizen)) {
+        continue;
+      }
+      if (citizen.isWorking()) {
+        return true;
       }
       if (citizen.getJobStatus() == com.minecolonies.api.entity.ai.JobStatus.WORKING) {
         return true;
@@ -36,5 +55,13 @@ final class ShopWorkerStatus {
       }
     }
     return false;
+  }
+
+  private boolean isCitizenUnavailable(ICitizenData citizen) {
+    if (citizen.isAsleep()) {
+      return true;
+    }
+    VisibleCitizenStatus status = citizen.getStatus();
+    return status != null && UNAVAILABLE_STATUSES.contains(status);
   }
 }
