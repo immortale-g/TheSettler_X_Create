@@ -86,6 +86,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopResolverPendingState pendingState =
       new CreateShopResolverPendingState(this);
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
+  private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -110,127 +111,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public boolean canResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    if (request.getState()
-        == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      cancelledRequests.add(request.getId());
-    } else if (cancelledRequests.remove(request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] cleared cancelled flag (state={}) {}",
-            request.getState(),
-            request.getId());
-      }
-    }
-    if (cancelledRequests.contains(request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] canResolve=false (request cancelled) " + request.getId());
-      }
-      return false;
-    }
-    Level level = manager.getColony().getWorld();
-    if (level.isClientSide) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (no level or client)");
-      }
-      return false;
-    }
-    if (cooldown.isRequestOnCooldown(level, request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request already ordered)");
-      }
-      return false;
-    }
-    if (hasDeliveriesCreated(request.getId())) {
-      return false;
-    }
-    if (request.getRequester().getLocation().equals(getLocation())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (self-loop)");
-      }
-      return false;
-    }
-    IDeliverable deliverable = request.getRequest();
-
-    BuildingCreateShop shop = getShop(manager);
-    if (shop == null || !shop.isBuilt()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (shop missing or not built)");
-      }
-      return false;
-    }
-    chain.sanitizeRequestChain(manager, request);
-    if (!chain.safeIsRequestChainValid(manager, request)) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request chain invalid)");
-      }
-      return false;
-    }
-
-    TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-    if (tile == null || tile.getStockNetworkId() == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (missing stock network id)");
-      }
-      return false;
-    }
-    shop.ensurePickupLink();
-    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
-    if (pickup == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (pickup block missing)");
-      }
-      return false;
-    }
-
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
-    UUID requestId = toRequestId(request.getId());
-    int reservedForRequest = pickup.getReservedForRequest(requestId);
-    int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    needed = Math.max(0, needed - reservedForRequest);
-    if (needed <= 0) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (needed<=0)");
-      }
-      return false;
-    }
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
-    int networkAvailable = network.getAvailable(deliverable);
-    int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
-    int pickupAvailable = planning.getAvailableFromPickup(pickup, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
-    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
-    // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
-    if (available <= 0) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] canResolve=false (available={}, reserved={}, needed={}, min={}) for {}",
-            available,
-            reservedForOthers,
-            needed,
-            deliverable.getMinimumCount(),
-            deliverable);
-      }
-      return false;
-    }
-
-    int minimum = deliverable.getMinimumCount();
-    boolean result = available >= minimum || available >= needed;
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] canResolve={} (available={}, reserved={}, needed={}, min={}) for {}",
-          result,
-          available,
-          reservedForOthers,
-          needed,
-          minimum,
-          deliverable);
-    }
-    return result;
+    return validator.canResolveRequest(this, manager, request);
   }
 
   @Override
@@ -1374,6 +1255,26 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getPendingNotices() {
     return pendingNotices;
+  }
+
+  java.util.Set<IToken<?>> getCancelledRequests() {
+    return cancelledRequests;
+  }
+
+  CreateShopResolverPlanning getPlanning() {
+    return planning;
+  }
+
+  CreateShopResolverChain getChain() {
+    return chain;
+  }
+
+  CreateShopResolverCooldown getCooldown() {
+    return cooldown;
+  }
+
+  BuildingCreateShop getShopForValidator(IRequestManager manager) {
+    return getShop(manager);
   }
 
   java.util.Map<IToken<?>, IToken<?>> getDeliveryParents() {
