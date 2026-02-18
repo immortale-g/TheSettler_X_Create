@@ -62,6 +62,8 @@ final class ShopResolverFactory {
     if (shopResolver == null) {
       IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
       shopResolver = new CreateShopRequestResolver(location, token);
+    }
+    if (existingShopResolver == null) {
       builder.add(shopResolver);
     }
 
