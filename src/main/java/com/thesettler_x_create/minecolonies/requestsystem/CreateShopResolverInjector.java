@@ -120,7 +120,9 @@ public final class CreateShopResolverInjector {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] Found shop at {}", shop.getLocation().getInDimensionLocation());
       }
-      CreateShopRequestResolver shopResolver = shop.getOrCreateShopResolver();
+      // Never force resolver creation here. During building placement MineColonies registers
+      // provider resolvers itself; creating/registering early can duplicate resolver tokens.
+      CreateShopRequestResolver shopResolver = shop.getShopResolver();
       if (shopResolver == null) {
         continue;
       }
@@ -133,16 +135,7 @@ public final class CreateShopResolverInjector {
         resolverHandler.getResolver(shopResolver.getId());
         registered = true;
       } catch (IllegalArgumentException ignored) {
-        // Not registered yet.
-      }
-      if (!registered) {
-        try {
-          resolverHandler.registerResolver(shopResolver);
-          registered = true;
-        } catch (Exception ex) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] Global resolver registration failed: {}", ex.getMessage());
-        }
+        // Not registered yet. Skip until MineColonies provider registration finishes.
       }
       if (registered && !deliverableList.contains(shopResolver.getId())) {
         deliverableList.add(shopResolver.getId());
