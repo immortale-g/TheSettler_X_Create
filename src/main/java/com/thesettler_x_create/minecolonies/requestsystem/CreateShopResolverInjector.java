@@ -150,9 +150,19 @@ public final class CreateShopResolverInjector {
       var deliveryResolverToken = shop.getDeliveryResolverTokenPublic();
       if (deliveryResolverToken != null) {
         if (shopHasDeliveryman(shop)) {
-          if (!requestableList.contains(deliveryResolverToken)) {
+          boolean deliveryResolverRegistered = true;
+          try {
+            resolverHandler.getResolver(deliveryResolverToken);
+          } catch (IllegalArgumentException ignored) {
+            deliveryResolverRegistered = false;
+          }
+          if (deliveryResolverRegistered && !requestableList.contains(deliveryResolverToken)) {
             requestableList.add(deliveryResolverToken);
             injected++;
+          } else if (!deliveryResolverRegistered && allowDebugLog) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] skip REQUESTABLE add for unregistered delivery resolver {}",
+                deliveryResolverToken);
           }
         } else {
           disabledDeliveryResolvers.add(deliveryResolverToken);
