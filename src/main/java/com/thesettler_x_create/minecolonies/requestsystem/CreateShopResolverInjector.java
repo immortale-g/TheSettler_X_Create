@@ -33,6 +33,9 @@ public final class CreateShopResolverInjector {
   private static final java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
       DISABLED_DELIVERY_RESOLVERS =
           java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private static final java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
+      ACTIVE_SHOP_RESOLVERS =
+          java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
   private CreateShopResolverInjector() {}
 
@@ -183,6 +186,8 @@ public final class CreateShopResolverInjector {
         }
       }
     }
+    ACTIVE_SHOP_RESOLVERS.clear();
+    ACTIVE_SHOP_RESOLVERS.addAll(allowedShopResolvers);
 
     // Prune duplicate CreateShop resolvers from DELIVERABLE list.
     var prune = deliverableList.iterator();
@@ -590,6 +595,7 @@ public final class CreateShopResolverInjector {
     var state = request.getState();
     boolean assignedToRetrying = false;
     boolean assignedToPlayer = false;
+    boolean assignedToStaleShopResolver = false;
     com.minecolonies.api.colony.requestsystem.token.IToken<?> assignedToken = null;
     if (assignmentStore != null) {
       assignedToken = assignmentStore.getAssignmentForValue(token);
@@ -606,6 +612,16 @@ public final class CreateShopResolverInjector {
                   instanceof
                   com.minecolonies.core.colony.requestsystem.resolvers
                       .StandardPlayerRequestResolver;
+          assignedToStaleShopResolver =
+              assignedResolver instanceof CreateShopRequestResolver
+                  && !ACTIVE_SHOP_RESOLVERS.contains(assignedToken);
+          if (assignedToStaleShopResolver && Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] stale shop resolver assignment detected token={} active={} request={}",
+                assignedToken,
+                ACTIVE_SHOP_RESOLVERS,
+                token);
+          }
         } catch (IllegalArgumentException ignored) {
           // Missing resolver; treat as unassigned.
         }
@@ -638,6 +654,7 @@ public final class CreateShopResolverInjector {
             && assignedToken != null
             && !assignedToRetrying
             && !assignedToPlayer
+            && !assignedToStaleShopResolver
             && !allowDeliveryReassign
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.RESOLVED
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.COMPLETED
@@ -663,7 +680,9 @@ public final class CreateShopResolverInjector {
     boolean assigned = true;
     try {
       var assignedResolver = resolverHandler.getResolverForRequest(request);
-      if (assignedResolver instanceof CreateShopRequestResolver) {
+      if (assignedResolver instanceof CreateShopRequestResolver
+          && assignedToken != null
+          && ACTIVE_SHOP_RESOLVERS.contains(assignedToken)) {
         return 0;
       }
     } catch (IllegalArgumentException ignored) {
