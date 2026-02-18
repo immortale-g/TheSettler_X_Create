@@ -35,3 +35,7 @@ Implementation notes:
 - Lost-package recovery interactions (shopkeeper chat actions, manual package handover, restart order
   flow), inflight consumption semantics, and storage-capacity request gating are authored specifically
   for this project using MineColonies interaction handlers and Create logistics APIs.
+- Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
+  duplicate resolver registration prevention, registered-token-only assignment injection, and stale
+  Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
+  churn in existing saves.

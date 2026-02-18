@@ -2,7 +2,7 @@ Project Summary: TheSettler_x_Create (MineColonies + Create integration)
 
 Note: Keep this file updated whenever related functionality changes.
 
-Last reviewed: 2026-02-17
+Last reviewed: 2026-02-18
 
 Provenance / Attribution
 - This project is developed independently using only public MineColonies and Create APIs.
@@ -93,6 +93,12 @@ Gameplay constraints
 - Delivery creation is gated to a working shopkeeper, but reconciliation continues for pending deliveries.
 - Delivery pickup targets racks; pickup block is used for reservations and Create network integration only.
 - Lost-package chat interactions remain active until the requested overdue amount is fully satisfied.
+
+Recent fixes (v0.0.11)
+- Fixed duplicate resolver token registration during Create Shop placement/build flow (crash fix).
+- Fixed unknown resolver token assignment injection by adding only registered resolver tokens to request lists.
+- Fixed stale Create Shop resolver assignments that kept requests IN_PROGRESS without creating follow-up deliveries.
+- Added stale-assignment reassignment path so existing stuck requests in active worlds can recover and complete.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.
