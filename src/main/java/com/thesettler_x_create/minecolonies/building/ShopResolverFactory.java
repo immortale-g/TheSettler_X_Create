@@ -23,6 +23,10 @@ final class ShopResolverFactory {
   ImmutableCollection<IRequestResolver<?>> createResolvers(
       ImmutableCollection<IRequestResolver<?>> baseResolvers) {
     ImmutableList.Builder<IRequestResolver<?>> builder = ImmutableList.builder();
+    CreateShopRequestResolver existingShopResolver = null;
+    DeliveryRequestResolver existingDeliveryResolver = null;
+    PickupRequestResolver existingPickupResolver = null;
+
     for (IRequestResolver<?> resolver : baseResolvers) {
       if (resolver
           instanceof
@@ -31,30 +35,50 @@ final class ShopResolverFactory {
         // CreateShop is not a BuildingWareHouse; avoid MineColonies' warehouse resolver cast crash.
         continue;
       }
+      if (resolver instanceof CreateShopRequestResolver csr) {
+        existingShopResolver = csr;
+      } else if (resolver instanceof DeliveryRequestResolver dr) {
+        existingDeliveryResolver = dr;
+      } else if (resolver instanceof PickupRequestResolver pr) {
+        existingPickupResolver = pr;
+      }
       builder.add(resolver);
     }
 
     ILocation location = shop.getRequester().getLocation();
     IFactoryController factory = shop.getColony().getRequestManager().getFactoryController();
 
-    CreateShopRequestResolver shopResolver = shop.getExistingShopResolver();
-    IToken<?> deliveryResolverToken = shop.getDeliveryResolverToken();
-    IToken<?> pickupResolverToken = shop.getPickupResolverToken();
+    CreateShopRequestResolver shopResolver =
+        existingShopResolver != null ? existingShopResolver : shop.getExistingShopResolver();
+    IToken<?> deliveryResolverToken =
+        existingDeliveryResolver != null
+            ? existingDeliveryResolver.getId()
+            : shop.getDeliveryResolverToken();
+    IToken<?> pickupResolverToken =
+        existingPickupResolver != null
+            ? existingPickupResolver.getId()
+            : shop.getPickupResolverToken();
 
     if (shopResolver == null) {
       IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
       shopResolver = new CreateShopRequestResolver(location, token);
     }
-    builder.add(shopResolver);
+    if (existingShopResolver == null) {
+      builder.add(shopResolver);
+    }
 
-    if (deliveryResolverToken == null) {
+    if (existingDeliveryResolver == null && deliveryResolverToken == null) {
       deliveryResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
     }
-    if (pickupResolverToken == null) {
+    if (existingPickupResolver == null && pickupResolverToken == null) {
       pickupResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
     }
-    builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
-    builder.add(new PickupRequestResolver(location, pickupResolverToken));
+    if (existingDeliveryResolver == null) {
+      builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
+    }
+    if (existingPickupResolver == null) {
+      builder.add(new PickupRequestResolver(location, pickupResolverToken));
+    }
 
     shop.setResolverState(shopResolver, deliveryResolverToken, pickupResolverToken);
 
