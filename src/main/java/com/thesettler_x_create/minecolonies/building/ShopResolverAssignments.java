@@ -35,28 +35,10 @@ final class ShopResolverAssignments {
       return;
     }
     var resolverHandler = manager.getResolverHandler();
-    boolean registered = false;
     try {
       resolverHandler.getResolver(resolver.getId());
-      registered = true;
     } catch (IllegalArgumentException ignored) {
-      // Not registered yet.
-    }
-    if (!registered) {
-      try {
-        resolverHandler.registerResolver(resolver);
-        registered = true;
-        if (BuildingCreateShop.isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info("[CreateShop] registered resolver {}", resolver.getId());
-        }
-      } catch (Exception ex) {
-        if (BuildingCreateShop.isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] resolver registration failed: {}", ex.getMessage());
-        }
-      }
-    }
-    if (!registered) {
+      // Resolver is not registered yet. MineColonies will register provider resolvers.
       return;
     }
     var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
