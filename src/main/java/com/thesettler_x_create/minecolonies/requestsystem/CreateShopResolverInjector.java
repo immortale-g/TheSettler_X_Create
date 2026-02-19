@@ -534,6 +534,7 @@ public final class CreateShopResolverInjector {
       com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
       com.minecolonies.api.colony.requestsystem.data.IRequestResolverRequestAssignmentDataStore
           assignmentStore) {
+    final boolean debugLogging = isDebugLoggingEnabled();
     if (request == null) {
       return 0;
     }
@@ -544,7 +545,7 @@ public final class CreateShopResolverInjector {
     REASSIGN_ATTEMPTS.put(token, gameTime);
     if (request.hasChildren()) {
       int reassigned = 0;
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (debugLogging) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] request {} has {} child(ren)", token, request.getChildren().size());
       }
@@ -555,7 +556,7 @@ public final class CreateShopResolverInjector {
         } catch (IllegalArgumentException ex) {
           child = null;
         }
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (debugLogging) {
           String childType = child == null ? "<null>" : child.getRequest().getClass().getName();
           String childState = child == null ? "<null>" : String.valueOf(child.getState());
           TheSettlerXCreate.LOGGER.info(
@@ -569,12 +570,12 @@ public final class CreateShopResolverInjector {
             tryReassignRequest(
                 childToken, child, gameTime, resolverHandler, requestHandler, assignmentStore);
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean() && reassigned == 0) {
+      if (debugLogging && reassigned == 0) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (has children)", token);
       }
       return reassigned;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (debugLogging) {
       String type = request.getRequest().getClass().getName();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] inspect request {} type={} state={}", token, type, request.getState());
@@ -600,7 +601,7 @@ public final class CreateShopResolverInjector {
         assignedToStaleShopResolver =
             assignedResolver instanceof CreateShopRequestResolver
                 && !ACTIVE_SHOP_RESOLVERS.contains(assignedToken);
-        if (assignedToStaleShopResolver && Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (assignedToStaleShopResolver && debugLogging) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] stale shop resolver assignment detected token={} active={} request={}",
               assignedToken,
@@ -625,7 +626,7 @@ public final class CreateShopResolverInjector {
     if (isDeliveryRequest
         && assignedToken != null
         && !DISABLED_DELIVERY_RESOLVERS.contains(assignedToken)) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (debugLogging) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (delivery request)", token);
       }
       return 0;
@@ -649,7 +650,7 @@ public final class CreateShopResolverInjector {
         || state
             == com.minecolonies.api.colony.requestsystem.request.RequestState
                 .FOLLOWUP_IN_PROGRESS) {
-      if (Config.DEBUG_LOGGING.getAsBoolean() && isDeliveryRequest) {
+      if (debugLogging && isDeliveryRequest) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] skip reassign {} (delivery state={} assigned={})",
             token,
@@ -678,7 +679,7 @@ public final class CreateShopResolverInjector {
       } else {
         requestHandler.assignRequest(request);
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (debugLogging) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] reassigned request {} (assigned={})", token, assigned);
         if (isDeliveryRequest) {
@@ -705,11 +706,19 @@ public final class CreateShopResolverInjector {
       }
       return 1;
     } catch (IllegalArgumentException ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (debugLogging) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] reassign failed {}: {}", token, ex.getMessage());
       }
       return 0;
+    }
+  }
+
+  private static boolean isDebugLoggingEnabled() {
+    try {
+      return Config.DEBUG_LOGGING.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
     }
   }
 
