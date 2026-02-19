@@ -39,3 +39,5 @@ Implementation notes:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
   churn in existing saves.
+- Ongoing static-inspection cleanup (warning reduction and readability refactors) is authored in this
+  codebase and limited to behavior-preserving changes in existing Create Shop request-system logic.
