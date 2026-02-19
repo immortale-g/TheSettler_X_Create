@@ -41,3 +41,7 @@ Implementation notes:
   churn in existing saves.
 - Ongoing static-inspection cleanup (warning reduction and readability refactors) is authored in this
   codebase and limited to behavior-preserving changes in existing Create Shop request-system logic.
+- Headless regression coverage for resolver reassignment edge cases (stale vs. active Create Shop
+  resolver assignments) is authored in this project as local JUnit/Mockito tests.
+- Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
+  loaded yet) is authored in this codebase and does not depend on external bridge implementations.
