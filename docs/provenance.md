@@ -43,5 +43,8 @@ Implementation notes:
   codebase and limited to behavior-preserving changes in existing Create Shop request-system logic.
 - Headless regression coverage for resolver reassignment edge cases (stale vs. active Create Shop
   resolver assignments) is authored in this project as local JUnit/Mockito tests.
+- Additional headless regression coverage for delivery-resolver disable/enable behavior, reassignment
+  cooldown gating, child-chain reassignment, and burst-arrival request handling is authored in this
+  project as local JUnit/Mockito tests for the Create Shop resolver injector flow.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
