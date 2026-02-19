@@ -26,6 +26,7 @@ tmp_blueprint_dump
 tmp_minecolonies_xml
 tmp_requesthandler_javap.txt
 tmp_resolverhandler_javap.txt
+logs/
 blueprint_backups/
 
 repo
@@ -33,3 +34,4 @@ Backups/
 Backups/*.zip
 libs/
 FEATURE_STATUS.md
+PROJECT_TODO_LOCAL.md
