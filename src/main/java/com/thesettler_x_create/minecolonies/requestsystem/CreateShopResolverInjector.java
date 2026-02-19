@@ -57,7 +57,7 @@ public final class CreateShopResolverInjector {
 
     var resolverHandler = manager.getResolverHandler();
     var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
-    if (resolverHandler == null || store == null) {
+    if (resolverHandler == null) {
       if (allowDebugLog) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] Global resolver skipped (resolver handler/store missing)");
@@ -65,12 +65,6 @@ public final class CreateShopResolverInjector {
       return;
     }
     var assignments = store.getAssignments();
-    if (assignments == null) {
-      if (allowDebugLog) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] Global resolver skipped (assignments missing)");
-      }
-      return;
-    }
     var deliverableList =
         assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new java.util.ArrayList<>());
     var requestableList =
@@ -297,13 +291,11 @@ public final class CreateShopResolverInjector {
     if (allowDebugLog && shops > 0) {
       try {
         var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
-        var resolverAssignments = assignmentStore == null ? null : assignmentStore.getAssignments();
+        var resolverAssignments = assignmentStore.getAssignments();
         int assignedTotal = 0;
-        if (resolverAssignments != null) {
-          for (var token : allowedShopResolvers) {
-            var list = resolverAssignments.get(token);
-            assignedTotal += list == null ? 0 : list.size();
-          }
+        for (var token : allowedShopResolvers) {
+          var list = resolverAssignments.get(token);
+          assignedTotal += list == null ? 0 : list.size();
         }
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver assignments shops={} assignedTotal={} resolverIds={}",
@@ -318,16 +310,12 @@ public final class CreateShopResolverInjector {
   }
 
   private static boolean shopHasDeliveryman(BuildingCreateShop shop) {
-    if (shop == null) {
-      return false;
-    }
-    var modules =
-        shop.getModulesByType(
+    var module =
+        shop.getFirstModuleOccurance(
             com.thesettler_x_create.minecolonies.module.CreateShopCourierModule.class);
-    if (modules == null || modules.isEmpty()) {
+    if (module == null) {
       return false;
     }
-    var module = modules.get(0);
     var citizens = module.getAssignedCitizen();
     if (citizens == null || citizens.isEmpty()) {
       return false;
@@ -347,9 +335,6 @@ public final class CreateShopResolverInjector {
     if (!Config.DEBUG_LOGGING.getAsBoolean()) {
       return;
     }
-    if (colony == null || colony.getWorld() == null) {
-      return;
-    }
     long now = colony.getWorld().getGameTime();
     if (now != 0L && now - lastPerfLogTime < Config.PERF_LOG_COOLDOWN.getAsLong()) {
       return;
@@ -361,7 +346,7 @@ public final class CreateShopResolverInjector {
 
   private static void tryReassignOpenDeliverables(IStandardRequestManager manager) {
     var colony = manager.getColony();
-    var level = colony == null ? null : colony.getWorld();
+    var level = colony.getWorld();
     long gameTime = level == null ? 0L : level.getGameTime();
     var resolverHandler = manager.getResolverHandler();
     var requestHandler = manager.getRequestHandler();
@@ -371,8 +356,7 @@ public final class CreateShopResolverInjector {
     }
     var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
     var typeAssignmentsStore = manager.getRequestableTypeRequestResolverAssignmentDataStore();
-    var typeAssignments =
-        typeAssignmentsStore == null ? null : typeAssignmentsStore.getAssignments();
+    var typeAssignments = typeAssignmentsStore.getAssignments();
     sanitizeAllRequestChains(manager, requestHandler, gameTime);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       boolean logIdentity =
@@ -401,60 +385,46 @@ public final class CreateShopResolverInjector {
         if (request == null) {
           TheSettlerXCreate.LOGGER.info("[CreateShop] request {} -> <null>", token);
         } else {
-          String type =
-              request.getRequest() == null ? "<null>" : request.getRequest().getClass().getName();
+          String type = request.getRequest().getClass().getName();
           String state = String.valueOf(request.getState());
-          if (assignmentStore != null) {
-            var assignedToken = assignmentStore.getAssignmentForValue(token);
-            String assignedInfo = "<none>";
-            if (assignedToken != null) {
-              try {
-                var assignedResolver = resolverHandler.getResolver(assignedToken);
-                assignedInfo =
-                    assignedToken
-                        + " -> "
-                        + assignedResolver.getClass().getName()
-                        + " (priority="
-                        + assignedResolver.getPriority()
-                        + ")";
-              } catch (IllegalArgumentException ex) {
-                assignedInfo = assignedToken + " -> <missing>";
-              }
+          var assignedToken = assignmentStore.getAssignmentForValue(token);
+          String assignedInfo = "<none>";
+          if (assignedToken != null) {
+            try {
+              var assignedResolver = resolverHandler.getResolver(assignedToken);
+              assignedInfo =
+                  assignedToken
+                      + " -> "
+                      + assignedResolver.getClass().getName()
+                      + " (priority="
+                      + assignedResolver.getPriority()
+                      + ")";
+            } catch (IllegalArgumentException ex) {
+              assignedInfo = assignedToken + " -> <missing>";
             }
-            String snapshot = type + "|" + state + "|" + assignedInfo;
-            String last = REQUEST_STATE_CACHE.put(token, snapshot);
-            if (!snapshot.equals(last)) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] request {} type={} state={}", token, type, state);
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] request {} assigned resolver {}", token, assignedInfo);
-            }
-          } else {
-            String snapshot = type + "|" + state + "|<no-assignment>";
-            String last = REQUEST_STATE_CACHE.put(token, snapshot);
-            if (!snapshot.equals(last)) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] request {} type={} state={}", token, type, state);
-            }
+          }
+          String snapshot = type + "|" + state + "|" + assignedInfo;
+          String last = REQUEST_STATE_CACHE.put(token, snapshot);
+          if (!snapshot.equals(last)) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] request {} type={} state={}", token, type, state);
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] request {} assigned resolver {}", token, assignedInfo);
           }
         }
       }
       if (request != null
           && request.getRequest()
               instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
-          && assignmentStore != null
           && assignmentStore.getAssignmentForValue(token) == null) {
         unassignedDeliveries++;
       }
       if (Config.DEBUG_LOGGING.getAsBoolean() && request != null) {
         Object payload = request.getRequest();
         if (payload
-                instanceof
-                com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
-            || payload
-                instanceof
-                com.minecolonies.api.colony.requestsystem.requestable.deliveryman
-                    .IDeliverymanRequestable) {
+            instanceof
+            com.minecolonies.api.colony.requestsystem.requestable.deliveryman
+                .IDeliverymanRequestable) {
           String dump = buildDeliveryDebugDump(token, request, assignmentStore);
           String last = DELIVERY_DUMP_CACHE.put(token, dump);
           if (!dump.equals(last)) {
@@ -477,8 +447,7 @@ public final class CreateShopResolverInjector {
                 >= Config.RESOLVER_DELIVERY_DEBUG_COOLDOWN.getAsLong())) {
       lastDeliveryDebugTime = gameTime;
       java.util.Collection<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
-          requestableList =
-              typeAssignments == null ? null : typeAssignments.get(TypeConstants.REQUESTABLE);
+          requestableList = typeAssignments.get(TypeConstants.REQUESTABLE);
       int requestableCount = requestableList == null ? 0 : requestableList.size();
       int matchingResolvers = 0;
       java.util.List<String> matchingResolverNames = new java.util.ArrayList<>();
@@ -510,9 +479,8 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver) {
               var resolverAssignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
-              var assignments =
-                  resolverAssignmentStore == null ? null : resolverAssignmentStore.getAssignments();
-              var assignedRequests = assignments == null ? null : assignments.get(resolverToken);
+              var assignments = resolverAssignmentStore.getAssignments();
+              var assignedRequests = assignments.get(resolverToken);
               int assignedCount = assignedRequests == null ? 0 : assignedRequests.size();
               deliveryResolverAssignments.add(resolver.getClass().getName() + "=" + assignedCount);
             }
@@ -565,10 +533,7 @@ public final class CreateShopResolverInjector {
           child = null;
         }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          String childType =
-              child == null || child.getRequest() == null
-                  ? "<null>"
-                  : child.getRequest().getClass().getName();
+          String childType = child == null ? "<null>" : child.getRequest().getClass().getName();
           String childState = child == null ? "<null>" : String.valueOf(child.getState());
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] child {} type={} state={}", childToken, childType, childState);
@@ -587,8 +552,7 @@ public final class CreateShopResolverInjector {
       return reassigned;
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      String type =
-          request.getRequest() == null ? "<null>" : request.getRequest().getClass().getName();
+      String type = request.getRequest().getClass().getName();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] inspect request {} type={} state={}", token, type, request.getState());
     }
@@ -597,34 +561,31 @@ public final class CreateShopResolverInjector {
     boolean assignedToPlayer = false;
     boolean assignedToStaleShopResolver = false;
     com.minecolonies.api.colony.requestsystem.token.IToken<?> assignedToken = null;
-    if (assignmentStore != null) {
-      assignedToken = assignmentStore.getAssignmentForValue(token);
-      if (assignedToken != null) {
-        try {
-          var assignedResolver = resolverHandler.getResolver(assignedToken);
-          assignedToRetrying =
-              assignedResolver
-                  instanceof
-                  com.minecolonies.core.colony.requestsystem.resolvers
-                      .StandardRetryingRequestResolver;
-          assignedToPlayer =
-              assignedResolver
-                  instanceof
-                  com.minecolonies.core.colony.requestsystem.resolvers
-                      .StandardPlayerRequestResolver;
-          assignedToStaleShopResolver =
-              assignedResolver instanceof CreateShopRequestResolver
-                  && !ACTIVE_SHOP_RESOLVERS.contains(assignedToken);
-          if (assignedToStaleShopResolver && Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] stale shop resolver assignment detected token={} active={} request={}",
-                assignedToken,
-                ACTIVE_SHOP_RESOLVERS,
-                token);
-          }
-        } catch (IllegalArgumentException ignored) {
-          // Missing resolver; treat as unassigned.
+    assignedToken = assignmentStore.getAssignmentForValue(token);
+    if (assignedToken != null) {
+      try {
+        var assignedResolver = resolverHandler.getResolver(assignedToken);
+        assignedToRetrying =
+            assignedResolver
+                instanceof
+                com.minecolonies.core.colony.requestsystem.resolvers
+                    .StandardRetryingRequestResolver;
+        assignedToPlayer =
+            assignedResolver
+                instanceof
+                com.minecolonies.core.colony.requestsystem.resolvers.StandardPlayerRequestResolver;
+        assignedToStaleShopResolver =
+            assignedResolver instanceof CreateShopRequestResolver
+                && !ACTIVE_SHOP_RESOLVERS.contains(assignedToken);
+        if (assignedToStaleShopResolver && Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] stale shop resolver assignment detected token={} active={} request={}",
+              assignedToken,
+              ACTIVE_SHOP_RESOLVERS,
+              token);
         }
+      } catch (IllegalArgumentException ignored) {
+        // Missing resolver; treat as unassigned.
       }
     }
     Object payload = request.getRequest();
@@ -697,7 +658,7 @@ public final class CreateShopResolverInjector {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] reassigned request {} (assigned={})", token, assigned);
-        if (isDeliveryRequest && assignmentStore != null) {
+        if (isDeliveryRequest) {
           var postAssignToken = assignmentStore.getAssignmentForValue(token);
           if (postAssignToken != null) {
             try {
@@ -737,7 +698,7 @@ public final class CreateShopResolverInjector {
       return;
     }
     var children = request.getChildren();
-    if (children == null || children.isEmpty()) {
+    if (children.isEmpty()) {
       return;
     }
     if (children.contains(token)) {
@@ -770,10 +731,11 @@ public final class CreateShopResolverInjector {
         }
         continue;
       }
-      if (child == null || child.getChildren() == null || child.getChildren().isEmpty()) {
+      var childChildren = child.getChildren();
+      if (childChildren.isEmpty()) {
         continue;
       }
-      if (child.getChildren().contains(token)) {
+      if (childChildren.contains(token)) {
         child.removeChild(token);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           String key = "pair:" + token + ":" + childToken;
@@ -790,9 +752,6 @@ public final class CreateShopResolverInjector {
       IStandardRequestManager manager,
       com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
       long gameTime) {
-    if (manager == null || requestHandler == null) {
-      return;
-    }
     if (gameTime != 0L
         && gameTime - lastChainSanitizeTime < Config.RESOLVER_CHAIN_SANITIZE_COOLDOWN.getAsLong()) {
       return;
@@ -837,10 +796,8 @@ public final class CreateShopResolverInjector {
         itStack = new java.util.ArrayDeque<>();
     stack.push(root);
     itStack.push(
-        root.getChildren() == null
-            ? java.util.Collections
-                .<com.minecolonies.api.colony.requestsystem.token.IToken<?>>emptyList()
-                .iterator()
+        root.getChildren().isEmpty()
+            ? java.util.Collections.emptyIterator()
             : root.getChildren().iterator());
     visiting.add(root.getId());
     int removed = 0;
@@ -851,9 +808,7 @@ public final class CreateShopResolverInjector {
       if (it == null || !it.hasNext()) {
         var done = stack.pop();
         itStack.pop();
-        if (done != null && done.getId() != null) {
-          visiting.remove(done.getId());
-        }
+        visiting.remove(done.getId());
         continue;
       }
       var childToken = it.next();
@@ -902,10 +857,8 @@ public final class CreateShopResolverInjector {
       visiting.add(childToken);
       stack.push(child);
       itStack.push(
-          child.getChildren() == null
-              ? java.util.Collections
-                  .<com.minecolonies.api.colony.requestsystem.token.IToken<?>>emptyList()
-                  .iterator()
+          child.getChildren().isEmpty()
+              ? java.util.Collections.emptyIterator()
               : child.getChildren().iterator());
     }
     return removed;
@@ -918,11 +871,9 @@ public final class CreateShopResolverInjector {
           assignmentStore) {
     String state = request == null ? "<null>" : String.valueOf(request.getState());
     String assigned = "<none>";
-    if (assignmentStore != null) {
-      var assignedToken = assignmentStore.getAssignmentForValue(token);
-      if (assignedToken != null) {
-        assigned = assignedToken.toString();
-      }
+    var assignedToken = assignmentStore.getAssignmentForValue(token);
+    if (assignedToken != null) {
+      assigned = assignedToken.toString();
     }
     Object payload = request == null ? null : request.getRequest();
     String requester = "<n/a>";
