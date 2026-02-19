@@ -46,5 +46,7 @@ Implementation notes:
 - Additional headless regression coverage for delivery-resolver disable/enable behavior, reassignment
   cooldown gating, child-chain reassignment, and burst-arrival request handling is authored in this
   project as local JUnit/Mockito tests for the Create Shop resolver injector flow.
+- Delivery self-loop prevention (guarding against pickup==target routing such as Postbox->Postbox) and
+  accompanying headless unit tests are authored in this project within Create Shop delivery management.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.

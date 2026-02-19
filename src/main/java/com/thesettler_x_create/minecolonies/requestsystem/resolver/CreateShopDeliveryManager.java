@@ -73,12 +73,26 @@ final class CreateShopDeliveryManager {
     if (pickupLevel == null) {
       return Lists.newArrayList();
     }
+    var requester = request.getRequester();
+    ILocation targetLocation = requester == null ? null : requester.getLocation();
+    if (targetLocation == null) {
+      return Lists.newArrayList();
+    }
+    if (isSelfLoopDeliveryTarget(pickupLevel, startPos, targetLocation)) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] skip delivery create self-loop start={} target={} request={}",
+            startPos,
+            targetLocation.getInDimensionLocation(),
+            request.getId());
+      }
+      return Lists.newArrayList();
+    }
     ILocation pickupLocation =
         factory.getNewInstance(TypeConstants.ILOCATION, startPos, pickupLevel.dimension());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       try {
-        var targetLoc = request.getRequester().getLocation();
-        var targetPos = targetLoc.getInDimensionLocation();
+        var targetPos = targetLocation.getInDimensionLocation();
         var pickupBlock = pickupLevel.getBlockState(startPos).getBlock();
         var targetBlock = pickupLevel.getBlockState(targetPos).getBlock();
         TheSettlerXCreate.LOGGER.info(
@@ -99,10 +113,9 @@ final class CreateShopDeliveryManager {
     Delivery delivery =
         new Delivery(
             pickupLocation,
-            request.getRequester().getLocation(),
+            targetLocation,
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
-    var requester = request.getRequester();
     if (!(requester instanceof SafeRequester)) {
       requester = new SafeRequester(requester);
     }
@@ -212,6 +225,15 @@ final class CreateShopDeliveryManager {
       }
     }
     return Lists.newArrayList(token);
+  }
+
+  static boolean isSelfLoopDeliveryTarget(
+      Level pickupLevel, BlockPos startPos, ILocation targetLocation) {
+    if (pickupLevel == null || startPos == null || targetLocation == null) {
+      return false;
+    }
+    return pickupLevel.dimension().equals(targetLocation.getDimension())
+        && startPos.equals(targetLocation.getInDimensionLocation());
   }
 
   void logDeliveryDiagnostics(
