@@ -57,7 +57,7 @@ public final class CreateShopResolverInjector {
 
     var resolverHandler = manager.getResolverHandler();
     var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
-    if (resolverHandler == null) {
+    if (resolverHandler == null || store == null) {
       if (allowDebugLog) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] Global resolver skipped (resolver handler/store missing)");
@@ -65,6 +65,12 @@ public final class CreateShopResolverInjector {
       return;
     }
     var assignments = store.getAssignments();
+    if (assignments == null) {
+      if (allowDebugLog) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] Global resolver skipped (assignments missing)");
+      }
+      return;
+    }
     var deliverableList =
         assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new java.util.ArrayList<>());
     var requestableList =
@@ -346,6 +352,9 @@ public final class CreateShopResolverInjector {
 
   private static void tryReassignOpenDeliverables(IStandardRequestManager manager) {
     var colony = manager.getColony();
+    if (colony == null) {
+      return;
+    }
     var level = colony.getWorld();
     long gameTime = level == null ? 0L : level.getGameTime();
     var resolverHandler = manager.getResolverHandler();
@@ -356,7 +365,13 @@ public final class CreateShopResolverInjector {
     }
     var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
     var typeAssignmentsStore = manager.getRequestableTypeRequestResolverAssignmentDataStore();
+    if (assignmentStore == null || typeAssignmentsStore == null) {
+      return;
+    }
     var typeAssignments = typeAssignmentsStore.getAssignments();
+    if (typeAssignments == null) {
+      return;
+    }
     sanitizeAllRequestChains(manager, requestHandler, gameTime);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       boolean logIdentity =
@@ -415,7 +430,9 @@ public final class CreateShopResolverInjector {
       }
       if (request != null
           && request.getRequest()
-              instanceof com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
+              instanceof
+              com.minecolonies.api.colony.requestsystem.requestable.deliveryman
+                  .IDeliverymanRequestable
           && assignmentStore.getAssignmentForValue(token) == null) {
         unassignedDeliveries++;
       }
@@ -479,7 +496,13 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver) {
               var resolverAssignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
+              if (resolverAssignmentStore == null) {
+                continue;
+              }
               var assignments = resolverAssignmentStore.getAssignments();
+              if (assignments == null) {
+                continue;
+              }
               var assignedRequests = assignments.get(resolverToken);
               int assignedCount = assignedRequests == null ? 0 : assignedRequests.size();
               deliveryResolverAssignments.add(resolver.getClass().getName() + "=" + assignedCount);
@@ -560,7 +583,7 @@ public final class CreateShopResolverInjector {
     boolean assignedToRetrying = false;
     boolean assignedToPlayer = false;
     boolean assignedToStaleShopResolver = false;
-    com.minecolonies.api.colony.requestsystem.token.IToken<?> assignedToken = null;
+    com.minecolonies.api.colony.requestsystem.token.IToken<?> assignedToken;
     assignedToken = assignmentStore.getAssignmentForValue(token);
     if (assignedToken != null) {
       try {
