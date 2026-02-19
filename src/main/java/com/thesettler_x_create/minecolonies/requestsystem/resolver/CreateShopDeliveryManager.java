@@ -108,8 +108,6 @@ final class CreateShopDeliveryManager {
     if (resolver.hasDeliveriesCreated(request.getId())) {
       return Lists.newArrayList();
     }
-    resolver.markDeliveriesCreated(request.getId());
-    request.addDelivery(selected.copy());
     Delivery delivery =
         new Delivery(
             pickupLocation,
@@ -131,6 +129,8 @@ final class CreateShopDeliveryManager {
       }
       return Lists.newArrayList();
     }
+    request.addDelivery(selected.copy());
+    resolver.markDeliveriesCreated(request.getId());
     resolver.getDeliveryParents().put(token, request.getId());
     resolver.getDeliveryResolvers().put(token, resolver.getResolverToken());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {

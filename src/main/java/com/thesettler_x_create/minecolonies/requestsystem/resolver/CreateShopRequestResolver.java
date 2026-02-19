@@ -241,7 +241,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (rackUsable > 0) {
         List<IToken<?>> created =
             deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup, shop);
-        markDeliveriesCreated(request.getId());
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
         }
