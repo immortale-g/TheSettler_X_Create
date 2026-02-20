@@ -77,6 +77,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
+  private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
+      new CreateShopWorkerAvailabilityGate();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -181,7 +183,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       return Lists.newArrayList();
     }
-    if (!shop.isWorkerWorking()) {
+    boolean workerWorking = shop.isWorkerWorking();
+    if (workerAvailabilityGate.shouldDeferNetworkOrder(workerWorking, needed)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve deferred (worker not working) request=" + request.getId());
@@ -422,7 +425,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (shop == null) {
       return;
     }
-    if (!shop.isWorkerWorking()) {
+    boolean workerWorking = shop.isWorkerWorking();
+    if (!workerWorking) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
       }
@@ -647,6 +651,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
               requestIdLog,
               reservedForRequest,
+              pendingCount);
+        }
+        continue;
+      }
+      if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
+        if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
+          cooldown.markRequestOrdered(level, request.getId());
+          pendingTracker.setPendingCount(request.getId(), pendingCount);
+          diagnostics.recordPendingSource(request.getId(), "tickPending:worker-unavailable");
+        }
+        diagnostics.logPendingReasonChange(request.getId(), "wait:worker-not-working");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",
+              requestIdLog,
               pendingCount);
         }
         continue;
@@ -882,7 +901,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     cooldown.markRequestOrdered(level, parentToken);
     clearDeliveriesCreated(parentToken);
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (isDebugLoggingEnabled()) {
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
       BlockPos pickupPosition =
           pickup == null ? delivery.getStart().getInDimensionLocation() : pickup.getBlockPos();
@@ -923,7 +942,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()
+    if (isDebugLoggingEnabled()
         && request != null
         && request.getRequest() instanceof Delivery delivery) {
       try {
@@ -975,7 +994,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       cooldown.clearRequestCooldown(parentToken);
       pendingTracker.remove(parentToken);
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (isDebugLoggingEnabled()) {
       IStandardRequestManager standard = unwrapStandardManager(manager);
       if (standard != null) {
         try {
@@ -1276,6 +1295,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           target.getClass().getName(),
           ex.getMessage() == null ? "<null>" : ex.getMessage());
       return java.util.Optional.empty();
+    }
+  }
+
+  private static boolean isDebugLoggingEnabled() {
+    try {
+      return Config.DEBUG_LOGGING.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
     }
   }
 
