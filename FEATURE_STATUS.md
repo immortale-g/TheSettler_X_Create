@@ -2,7 +2,7 @@ Project Summary: TheSettler_x_Create (MineColonies + Create integration)
 
 Note: Keep this file updated whenever related functionality changes.
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-20
 
 Provenance / Attribution
 - This project is developed independently using only public MineColonies and Create APIs.
@@ -99,6 +99,12 @@ Recent fixes (v0.0.11)
 - Fixed unknown resolver token assignment injection by adding only registered resolver tokens to request lists.
 - Fixed stale Create Shop resolver assignments that kept requests IN_PROGRESS without creating follow-up deliveries.
 - Added stale-assignment reassignment path so existing stuck requests in active worlds can recover and complete.
+
+Current fixes in progress (post-v0.0.11)
+- Pending parent requests now drop terminal/missing child delivery links during reconciliation so
+  requests do not remain blocked behind completed/cancelled child tokens.
+- Create network request stack normalization now consolidates equal stacks before broadcast and
+  chunks by the Create package order limit (99) to reduce request fragmentation.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,

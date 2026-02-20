@@ -48,5 +48,8 @@ Implementation notes:
   project as local JUnit/Mockito tests for the Create Shop resolver injector flow.
 - Delivery self-loop prevention (guarding against pickup==target routing such as Postbox->Postbox) and
   accompanying headless unit tests are authored in this project within Create Shop delivery management.
+- Parent-request reconciliation now removes terminal/missing child delivery links before continuing
+  pending processing, and Create network request stacks are consolidated/chunked to the package limit;
+  both behaviors are authored in this project for Create Shop request-flow stability.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
