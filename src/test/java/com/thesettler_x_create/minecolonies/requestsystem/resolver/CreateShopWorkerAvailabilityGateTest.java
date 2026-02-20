@@ -42,4 +42,19 @@ class CreateShopWorkerAvailabilityGateTest {
     assertFalse(gate.shouldKeepPendingState(true, 10));
     assertFalse(gate.shouldKeepPendingState(false, 0));
   }
+
+  @Test
+  void transitionUnavailableToAvailableKeepsThenResumesPending() {
+    int pending = 4;
+
+    // While unavailable, keep pending stable and do not resume.
+    assertTrue(gate.shouldKeepPendingState(false, pending));
+    assertFalse(gate.shouldResumePending(false, pending));
+    assertTrue(gate.shouldDeferNetworkOrder(false, pending));
+
+    // Once available again, stop holding and resume processing.
+    assertFalse(gate.shouldKeepPendingState(true, pending));
+    assertTrue(gate.shouldResumePending(true, pending));
+    assertFalse(gate.shouldDeferNetworkOrder(true, pending));
+  }
 }
