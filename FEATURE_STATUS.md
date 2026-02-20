@@ -113,6 +113,8 @@ Current fixes in progress (post-v0.0.11)
 - Create stock network requests are now queued and grouped per server tick by
   `network + address + requester`, then flushed as consolidated broadcasts to reduce
   multi-request package fragmentation.
+- Grouped Create network request flush now re-queues failed broadcasts instead of dropping
+  queued stacks, so transient Create/network errors do not lose pending grouped requests.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,

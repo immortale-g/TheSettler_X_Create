@@ -255,7 +255,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
         continue;
       }
-      bucket.facade.broadcastQueuedRequest(key, bucket.stacks);
+      if (!bucket.facade.broadcastQueuedRequest(key, bucket.stacks)) {
+        requeueFailedBucket(key, bucket);
+      }
     }
   }
 
@@ -390,17 +392,31 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
   }
 
-  private void broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
+  private static void requeueFailedBucket(QueuedRequestKey key, QueuedRequestBucket failed) {
+    if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
+      return;
+    }
+    QueuedRequestBucket target =
+        QUEUED_REQUESTS.computeIfAbsent(key, ignored -> new QueuedRequestBucket(failed.facade));
+    if (target.facade == null) {
+      target.facade = failed.facade;
+    }
+    for (ItemStack stack : failed.stacks) {
+      mergeInto(target.stacks, stack);
+    }
+  }
+
+  private boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
     if (key == null
         || stacks == null
         || stacks.isEmpty()
         || shop == null
         || key.networkId == null) {
-      return;
+      return true;
     }
     List<ItemStack> consolidated = consolidateRequestedStacks(stacks);
     if (consolidated.isEmpty()) {
-      return;
+      return true;
     }
     List<BigItemStack> order = new ArrayList<>();
     for (ItemStack requestStack : consolidated) {
@@ -414,7 +430,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     if (order.isEmpty()) {
-      return;
+      return true;
     }
     PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
     long start = System.nanoTime();
@@ -435,6 +451,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.requesterName);
       }
       recordInflight(consolidated, key.requesterName);
+      return true;
     } catch (Exception ex) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -442,6 +459,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.networkId,
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
+      return false;
     } finally {
       lastBroadcastNanos = System.nanoTime() - start;
       lastBroadcastCount = order.size();
