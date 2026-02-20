@@ -610,6 +610,7 @@ public final class CreateShopResolverInjector {
         }
       } catch (IllegalArgumentException ignored) {
         // Missing resolver; treat as unassigned.
+        assignedToken = null;
       }
     }
     Object payload = request.getRequest();
