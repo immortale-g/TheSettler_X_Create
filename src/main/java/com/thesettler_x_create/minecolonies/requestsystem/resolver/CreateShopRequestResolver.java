@@ -170,15 +170,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
 
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
     UUID requestId = toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
+    int needed = computeOutstandingNeeded(request, deliverable, reservedForRequest);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    needed = Math.max(0, needed - reservedForRequest);
     if (needed <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (needed<=0)");
@@ -611,6 +607,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (pendingCount <= 0) {
         pendingCount = pendingTracker.getPendingCount(request.getId());
       }
+      if (pendingCount <= 0) {
+        int derivedPending = computeOutstandingNeeded(request, deliverable, reservedForRequest);
+        if (derivedPending > 0) {
+          pendingTracker.setPendingCount(request.getId(), derivedPending);
+          pendingCount = derivedPending;
+          diagnostics.recordPendingSource(request.getId(), "tickPending:derived-needed");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} derived pending from request={} (reservedForRequest={})",
+                requestIdLog,
+                derivedPending,
+                reservedForRequest);
+          }
+        }
+      }
       if (pendingCount <= 0 && !onCooldown) {
         diagnostics.logPendingReasonChange(
             request.getId(),
@@ -753,6 +764,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lastPerfLogTime = now;
     TheSettlerXCreate.LOGGER.info(
         "[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
+  }
+
+  private int computeOutstandingNeeded(
+      IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
+    if (request == null || deliverable == null) {
+      return 0;
+    }
+    int needed = deliverable.getCount();
+    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
+      needed -= nonExhaustive.getLeftOver();
+    }
+    needed = Math.max(0, needed - Math.max(0, reservedForRequest));
+    return needed;
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
