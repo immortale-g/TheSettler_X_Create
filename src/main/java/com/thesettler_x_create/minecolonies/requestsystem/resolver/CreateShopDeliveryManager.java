@@ -23,7 +23,6 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
-import com.thesettler_x_create.minecolonies.requestsystem.requesters.SafeRequester;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -114,9 +113,6 @@ final class CreateShopDeliveryManager {
             targetLocation,
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
-    if (!(requester instanceof SafeRequester)) {
-      requester = new SafeRequester(requester);
-    }
     IToken<?> token;
     try {
       token = manager.createRequest(requester, delivery);

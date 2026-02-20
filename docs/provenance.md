@@ -63,3 +63,6 @@ Implementation notes:
   grouped bucket for the next tick; this reliability behavior is authored in this project.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
+- Delivery child-request creation now preserves MineColonies parent linkage by using the original
+  requester instance (without SafeRequester wrapping) in Create Shop delivery creation; this fix is
+  authored in this project for resolver-chain stability in live worlds.
