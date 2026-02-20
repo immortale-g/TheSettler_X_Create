@@ -194,36 +194,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
   @Override
   public List<ItemStack> requestStacks(List<ItemStack> requestedStacks, String requesterName) {
-    if (!hasNetwork() || requestedStacks == null || requestedStacks.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<ItemStack> consolidated = consolidateRequestedStacks(requestedStacks);
-    List<ItemStack> normalized = new ArrayList<>();
-
-    for (ItemStack requestStack : consolidated) {
-      if (requestStack.isEmpty()) {
-        continue;
-      }
-      if (!shop.canAcceptInbound(requestStack)) {
-        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
-              requestStack.getHoverName().getString(),
-              requestStack.getCount());
-        }
-        continue;
-      }
-      int available = requestStack.getCount();
-      int maxPer = MAX_PACKAGE_COUNT;
-      while (available > 0) {
-        int chunk = Math.min(available, maxPer);
-        ItemStack chunkStack = requestStack.copy();
-        chunkStack.setCount(chunk);
-        normalized.add(chunkStack);
-        available -= chunk;
-      }
-    }
-
+    List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
     if (normalized.isEmpty()) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -241,6 +212,20 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
 
     return normalized;
+  }
+
+  public List<ItemStack> requestStacksImmediate(
+      List<ItemStack> requestedStacks, String requesterName) {
+    List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
+    if (normalized.isEmpty() || !hasNetwork() || shop == null) {
+      return Collections.emptyList();
+    }
+    QueuedRequestKey key =
+        new QueuedRequestKey(
+            shop.getStockNetworkId(),
+            shop.getShopAddress(),
+            requesterName == null ? "" : requesterName);
+    return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
   }
 
   public static void flushQueuedRequests() {
@@ -284,6 +269,37 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     return consolidated;
+  }
+
+  private List<ItemStack> normalizeRequestedStacks(List<ItemStack> requestedStacks) {
+    if (!hasNetwork() || requestedStacks == null || requestedStacks.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<ItemStack> consolidated = consolidateRequestedStacks(requestedStacks);
+    List<ItemStack> normalized = new ArrayList<>();
+    for (ItemStack requestStack : consolidated) {
+      if (requestStack.isEmpty()) {
+        continue;
+      }
+      if (!shop.canAcceptInbound(requestStack)) {
+        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
+              requestStack.getHoverName().getString(),
+              requestStack.getCount());
+        }
+        continue;
+      }
+      int available = requestStack.getCount();
+      while (available > 0) {
+        int chunk = Math.min(available, MAX_PACKAGE_COUNT);
+        ItemStack chunkStack = requestStack.copy();
+        chunkStack.setCount(chunk);
+        normalized.add(chunkStack);
+        available -= chunk;
+      }
+    }
+    return normalized;
   }
 
   private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {
