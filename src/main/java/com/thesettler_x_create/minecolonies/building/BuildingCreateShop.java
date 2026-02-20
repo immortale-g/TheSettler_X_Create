@@ -483,7 +483,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(remaining);
-    var reordered = new CreateNetworkFacade(tile).requestStacks(List.of(requested), requesterName);
+    var reordered =
+        new CreateNetworkFacade(tile).requestStacksImmediate(List.of(requested), requesterName);
     if (reordered.isEmpty()) {
       return false;
     }

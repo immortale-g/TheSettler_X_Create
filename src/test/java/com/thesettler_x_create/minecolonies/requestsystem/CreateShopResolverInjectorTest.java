@@ -101,6 +101,37 @@ class CreateShopResolverInjectorTest {
   }
 
   @Test
+  void missingAssignedResolverTokenTriggersReroute() throws Exception {
+    IToken<Object> requestToken = mock(IToken.class);
+    IToken<Object> assignedToken = mock(IToken.class);
+    IRequest<?> request = mock(IRequest.class);
+    IRequestHandler requestHandler = mock(IRequestHandler.class);
+    IResolverHandler resolverHandler = mock(IResolverHandler.class);
+    IRequestResolverRequestAssignmentDataStore assignmentStore =
+        mock(IRequestResolverRequestAssignmentDataStore.class);
+    IDeliverable deliverable = mock(IDeliverable.class);
+
+    when(request.hasChildren()).thenReturn(false);
+    when(request.getRequest()).thenReturn(deliverable);
+    when(request.getState()).thenReturn(RequestState.IN_PROGRESS);
+    doReturn(assignedToken).when(assignmentStore).getAssignmentForValue(requestToken);
+    doThrow(new IllegalArgumentException("missing assigned resolver"))
+        .when(resolverHandler)
+        .getResolver(assignedToken);
+    doThrow(new IllegalArgumentException("missing resolver for request"))
+        .when(resolverHandler)
+        .getResolverForRequest(request);
+
+    int result =
+        invokeTryReassignRequest(
+            requestToken, request, 1000L, resolverHandler, requestHandler, assignmentStore);
+
+    assertEquals(1, result);
+    verify(requestHandler, times(1)).assignRequest(request);
+    verify(requestHandler, never()).reassignRequest(request, Collections.emptyList());
+  }
+
+  @Test
   void deliveryRequestAssignedToDisabledResolverIsReassigned() throws Exception {
     IToken<Object> requestToken = mock(IToken.class);
     IToken<Object> assignedToken = mock(IToken.class);

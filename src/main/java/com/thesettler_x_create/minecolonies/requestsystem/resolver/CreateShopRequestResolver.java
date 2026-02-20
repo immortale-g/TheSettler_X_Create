@@ -170,15 +170,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
 
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
     UUID requestId = toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
+    int needed = computeOutstandingNeeded(request, deliverable, reservedForRequest);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    needed = Math.max(0, needed - reservedForRequest);
     if (needed <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (needed<=0)");
@@ -496,6 +492,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         java.util.Collection<IToken<?>> children =
             java.util.Objects.requireNonNull(request.getChildren(), "children");
         int missing = 0;
+        boolean hasActiveChildren = false;
         if (!children.isEmpty()) {
           for (IToken<?> childToken : java.util.List.copyOf(children)) {
             try {
@@ -503,6 +500,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               if (child == null) {
                 missing++;
                 request.removeChild(childToken);
+                deliveryParents.remove(childToken);
+                deliveryResolvers.remove(childToken);
               }
               if (child != null
                   && child.getRequest()
@@ -519,6 +518,29 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                         childToken,
                         enqueued ? "ok" : "none");
                   }
+                }
+                var childState = child.getState();
+                boolean terminalChild =
+                    childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .COMPLETED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .CANCELLED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState.FAILED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RESOLVED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RECEIVED;
+                if (terminalChild) {
+                  request.removeChild(childToken);
+                  deliveryParents.remove(childToken);
+                  deliveryResolvers.remove(childToken);
+                } else {
+                  hasActiveChildren = true;
                 }
               }
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -570,7 +592,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         if (missing > 0) {
           continue;
         }
-        continue;
+        if (hasActiveChildren || request.hasChildren()) {
+          continue;
+        }
       }
 
       if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -582,6 +606,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       int pendingCount = reservedForRequest;
       if (pendingCount <= 0) {
         pendingCount = pendingTracker.getPendingCount(request.getId());
+      }
+      if (pendingCount <= 0) {
+        int derivedPending = computeOutstandingNeeded(request, deliverable, reservedForRequest);
+        if (derivedPending > 0) {
+          pendingTracker.setPendingCount(request.getId(), derivedPending);
+          pendingCount = derivedPending;
+          diagnostics.recordPendingSource(request.getId(), "tickPending:derived-needed");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} derived pending from request={} (reservedForRequest={})",
+                requestIdLog,
+                derivedPending,
+                reservedForRequest);
+          }
+        }
       }
       if (pendingCount <= 0 && !onCooldown) {
         diagnostics.logPendingReasonChange(
@@ -725,6 +764,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lastPerfLogTime = now;
     TheSettlerXCreate.LOGGER.info(
         "[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
+  }
+
+  private int computeOutstandingNeeded(
+      IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
+    if (request == null || deliverable == null) {
+      return 0;
+    }
+    int needed = deliverable.getCount();
+    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
+      needed -= nonExhaustive.getLeftOver();
+    }
+    needed = Math.max(0, needed - Math.max(0, reservedForRequest));
+    return needed;
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {

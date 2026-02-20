@@ -8,6 +8,7 @@ import com.minecolonies.api.sounds.ModSoundEvents;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.mojang.logging.LogUtils;
+import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.event.StockLinkLinkerEvents;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModBlocks;
@@ -126,6 +127,7 @@ public class TheSettlerXCreate {
   }
 
   private void onServerTick(ServerTickEvent.Post event) {
+    CreateNetworkFacade.flushQueuedRequests();
     IColonyManager manager = IColonyManager.getInstance();
     var colonies = manager.getAllColonies();
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
