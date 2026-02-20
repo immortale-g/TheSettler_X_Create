@@ -14,6 +14,9 @@ public final class CreateShopResolverInjector {
           com.minecolonies.api.colony.requestsystem.token.IToken<?>, Long>
       REASSIGN_ATTEMPTS = new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<
+          com.minecolonies.api.colony.requestsystem.token.IToken<?>, Long>
+      DELIVERY_IN_PROGRESS_SINCE = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.Map<
           com.minecolonies.api.colony.requestsystem.token.IToken<?>, String>
       DELIVERY_DUMP_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
   private static long lastDebugLogTime = 0L;
@@ -36,6 +39,9 @@ public final class CreateShopResolverInjector {
   private static final java.util.Set<com.minecolonies.api.colony.requestsystem.token.IToken<?>>
       ACTIVE_SHOP_RESOLVERS =
           java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private static final long DELIVERY_STALE_REASSIGN_TICKS = 40L;
+  private static final long DELIVERY_REASSIGN_ATTEMPT_COOLDOWN_TICKS = 20L;
+  private static final long DEFAULT_REASSIGN_ATTEMPT_COOLDOWN_TICKS = 200L;
 
   private CreateShopResolverInjector() {}
 
@@ -538,8 +544,21 @@ public final class CreateShopResolverInjector {
     if (request == null) {
       return 0;
     }
+    Object payloadPreview = request.getRequest();
+    boolean isDeliveryRequestPreview =
+        payloadPreview
+                instanceof
+                com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
+            || payloadPreview
+                instanceof
+                com.minecolonies.api.colony.requestsystem.requestable.deliveryman
+                    .IDeliverymanRequestable;
+    long attemptCooldown =
+        isDeliveryRequestPreview
+            ? DELIVERY_REASSIGN_ATTEMPT_COOLDOWN_TICKS
+            : DEFAULT_REASSIGN_ATTEMPT_COOLDOWN_TICKS;
     Long lastAttempt = REASSIGN_ATTEMPTS.get(token);
-    if (lastAttempt != null && gameTime > 0L && (gameTime - lastAttempt) < 200L) {
+    if (lastAttempt != null && gameTime > 0L && (gameTime - lastAttempt) < attemptCooldown) {
       return 0;
     }
     REASSIGN_ATTEMPTS.put(token, gameTime);
@@ -613,7 +632,7 @@ public final class CreateShopResolverInjector {
         assignedToken = null;
       }
     }
-    Object payload = request.getRequest();
+    Object payload = payloadPreview;
     boolean isDeliverable =
         payload instanceof com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
     boolean isDeliveryRequest =
@@ -624,9 +643,29 @@ public final class CreateShopResolverInjector {
                 instanceof
                 com.minecolonies.api.colony.requestsystem.requestable.deliveryman
                     .IDeliverymanRequestable;
+    boolean staleDeliveryRequest = false;
+    if (isDeliveryRequest
+        && state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS
+        && assignedToken != null) {
+      long firstSeen = DELIVERY_IN_PROGRESS_SINCE.computeIfAbsent(token, ignored -> gameTime);
+      staleDeliveryRequest =
+          gameTime > 0L
+              && firstSeen > 0L
+              && (gameTime - firstSeen) >= DELIVERY_STALE_REASSIGN_TICKS;
+      if (staleDeliveryRequest && debugLogging) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] stale delivery detected token={} age={} assigned={}",
+            token,
+            gameTime - firstSeen,
+            assignedToken);
+      }
+    } else {
+      DELIVERY_IN_PROGRESS_SINCE.remove(token);
+    }
     if (isDeliveryRequest
         && assignedToken != null
-        && !DISABLED_DELIVERY_RESOLVERS.contains(assignedToken)) {
+        && !DISABLED_DELIVERY_RESOLVERS.contains(assignedToken)
+        && !staleDeliveryRequest) {
       if (debugLogging) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] skip reassign {} (delivery request)", token);
       }
@@ -642,6 +681,7 @@ public final class CreateShopResolverInjector {
             && !assignedToPlayer
             && !assignedToStaleShopResolver
             && !allowDeliveryReassign
+            && !staleDeliveryRequest
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.RESOLVED
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.COMPLETED
         || state == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED
@@ -680,6 +720,7 @@ public final class CreateShopResolverInjector {
       } else {
         requestHandler.assignRequest(request);
       }
+      DELIVERY_IN_PROGRESS_SINCE.remove(token);
       if (debugLogging) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] reassigned request {} (assigned={})", token, assigned);
