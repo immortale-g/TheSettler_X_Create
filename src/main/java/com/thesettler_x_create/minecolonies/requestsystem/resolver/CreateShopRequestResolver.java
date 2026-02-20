@@ -425,7 +425,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (shop == null) {
       return;
     }
-    if (!shop.isWorkerWorking()) {
+    boolean workerWorking = shop.isWorkerWorking();
+    if (!workerWorking) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
       }
@@ -650,6 +651,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
               requestIdLog,
               reservedForRequest,
+              pendingCount);
+        }
+        continue;
+      }
+      if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
+        diagnostics.logPendingReasonChange(request.getId(), "wait:worker-not-working");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",
+              requestIdLog,
               pendingCount);
         }
         continue;
