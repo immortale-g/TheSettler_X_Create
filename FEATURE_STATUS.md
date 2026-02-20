@@ -2,7 +2,7 @@ Project Summary: TheSettler_x_Create (MineColonies + Create integration)
 
 Note: Keep this file updated whenever related functionality changes.
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-20
 
 Provenance / Attribution
 - This project is developed independently using only public MineColonies and Create APIs.
@@ -99,6 +99,22 @@ Recent fixes (v0.0.11)
 - Fixed unknown resolver token assignment injection by adding only registered resolver tokens to request lists.
 - Fixed stale Create Shop resolver assignments that kept requests IN_PROGRESS without creating follow-up deliveries.
 - Added stale-assignment reassignment path so existing stuck requests in active worlds can recover and complete.
+
+Current fixes in progress (post-v0.0.11)
+- Pending parent requests now drop terminal/missing child delivery links during reconciliation so
+  requests do not remain blocked behind completed/cancelled child tokens.
+- Create network request stack normalization now consolidates equal stacks before broadcast and
+  chunks by the Create package order limit (99) to reduce request fragmentation.
+- Pending reconciliation now derives missing pending counts from the live request payload
+  (`deliverable count - leftovers - reserved`) so late stock arrivals can resume delivery flow
+  without requiring manual request resets.
+- Resolver reassignment now treats unresolved assigned resolver tokens as unassigned and reroutes
+  those requests instead of leaving them in a formally assigned but dead state.
+- Create stock network requests are now queued and grouped per server tick by
+  `network + address + requester`, then flushed as consolidated broadcasts to reduce
+  multi-request package fragmentation.
+- Grouped Create network request flush now re-queues failed broadcasts instead of dropping
+  queued stacks, so transient Create/network errors do not lose pending grouped requests.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,

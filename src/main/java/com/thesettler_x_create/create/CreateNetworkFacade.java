@@ -19,6 +19,8 @@ import net.minecraft.world.item.ItemStack;
 
 public class CreateNetworkFacade implements ICreateNetworkFacade {
   private static final int MAX_PACKAGE_COUNT = 99;
+  private static final java.util.Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final TileEntityCreateShop shop;
   private long lastPerfLogTime = 0L;
   private long lastSummaryNanos = 0L;
@@ -192,13 +194,90 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
   @Override
   public List<ItemStack> requestStacks(List<ItemStack> requestedStacks, String requesterName) {
+    List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
+    if (normalized.isEmpty()) {
+      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] requestStacks computed empty order");
+      }
+      return Collections.emptyList();
+    }
+    queueRequestStacks(normalized, requesterName);
+    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] queued {} stack(s) for grouped network broadcast {} -> '{}'",
+          normalized.size(),
+          shop.getStockNetworkId(),
+          shop.getShopAddress());
+    }
+
+    return normalized;
+  }
+
+  public List<ItemStack> requestStacksImmediate(
+      List<ItemStack> requestedStacks, String requesterName) {
+    List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
+    if (normalized.isEmpty() || !hasNetwork() || shop == null) {
+      return Collections.emptyList();
+    }
+    QueuedRequestKey key =
+        new QueuedRequestKey(
+            shop.getStockNetworkId(),
+            shop.getShopAddress(),
+            requesterName == null ? "" : requesterName);
+    return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
+  }
+
+  public static void flushQueuedRequests() {
+    if (QUEUED_REQUESTS.isEmpty()) {
+      return;
+    }
+    var snapshot = new java.util.ArrayList<>(QUEUED_REQUESTS.entrySet());
+    QUEUED_REQUESTS.clear();
+    for (var entry : snapshot) {
+      QueuedRequestKey key = entry.getKey();
+      QueuedRequestBucket bucket = entry.getValue();
+      if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
+        continue;
+      }
+      if (!bucket.facade.broadcastQueuedRequest(key, bucket.stacks)) {
+        requeueFailedBucket(key, bucket);
+      }
+    }
+  }
+
+  private List<ItemStack> consolidateRequestedStacks(List<ItemStack> requestedStacks) {
+    if (requestedStacks == null || requestedStacks.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<ItemStack> consolidated = new ArrayList<>();
+    for (ItemStack requestStack : requestedStacks) {
+      if (requestStack == null || requestStack.isEmpty()) {
+        continue;
+      }
+      ItemStack existing = null;
+      for (ItemStack candidate : consolidated) {
+        if (ItemStack.isSameItemSameComponents(candidate, requestStack)) {
+          existing = candidate;
+          break;
+        }
+      }
+      if (existing == null) {
+        consolidated.add(requestStack.copy());
+      } else {
+        existing.setCount(existing.getCount() + requestStack.getCount());
+      }
+    }
+    return consolidated;
+  }
+
+  private List<ItemStack> normalizeRequestedStacks(List<ItemStack> requestedStacks) {
     if (!hasNetwork() || requestedStacks == null || requestedStacks.isEmpty()) {
       return Collections.emptyList();
     }
-    List<BigItemStack> order = new ArrayList<>();
+    List<ItemStack> consolidated = consolidateRequestedStacks(requestedStacks);
     List<ItemStack> normalized = new ArrayList<>();
-
-    for (ItemStack requestStack : requestedStacks) {
+    for (ItemStack requestStack : consolidated) {
       if (requestStack.isEmpty()) {
         continue;
       }
@@ -212,53 +291,14 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         continue;
       }
       int available = requestStack.getCount();
-      int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, requestStack.getMaxStackSize()));
       while (available > 0) {
-        int chunk = Math.min(available, maxPer);
+        int chunk = Math.min(available, MAX_PACKAGE_COUNT);
         ItemStack chunkStack = requestStack.copy();
         chunkStack.setCount(chunk);
-        order.add(new BigItemStack(chunkStack.copy(), chunk));
         normalized.add(chunkStack);
         available -= chunk;
       }
     }
-
-    if (!order.isEmpty()) {
-      PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
-      long start = System.nanoTime();
-      try {
-        LogisticsManager.broadcastPackageRequest(
-            shop.getStockNetworkId(),
-            LogisticallyLinkedBehaviour.RequestType.PLAYER,
-            request,
-            null,
-            shop.getShopAddress());
-        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] Requested {} stack(s) from network {} to address '{}'",
-              order.size(),
-              shop.getStockNetworkId(),
-              shop.getShopAddress());
-        }
-        recordInflight(normalized, requesterName);
-      } catch (Exception ex) {
-        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] requestItems broadcast failed for {}: {}",
-              shop.getStockNetworkId(),
-              ex.getMessage() == null ? "<null>" : ex.getMessage());
-        }
-        return Collections.emptyList();
-      } finally {
-        lastBroadcastNanos = System.nanoTime() - start;
-        lastBroadcastCount = order.size();
-        maybeLogPerf();
-      }
-    } else if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] requestStacks computed empty order");
-    }
-
     return normalized;
   }
 
@@ -349,5 +389,149 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         lastSummaryNanos / 1000L,
         lastBroadcastNanos / 1000L,
         lastBroadcastCount);
+  }
+
+  private void queueRequestStacks(List<ItemStack> stacks, String requesterName) {
+    if (stacks == null || stacks.isEmpty() || shop == null || shop.getStockNetworkId() == null) {
+      return;
+    }
+    QueuedRequestKey key =
+        new QueuedRequestKey(
+            shop.getStockNetworkId(),
+            shop.getShopAddress(),
+            requesterName == null ? "" : requesterName);
+    QueuedRequestBucket bucket =
+        QUEUED_REQUESTS.computeIfAbsent(key, k -> new QueuedRequestBucket(this));
+    bucket.facade = this;
+    for (ItemStack stack : stacks) {
+      mergeInto(bucket.stacks, stack);
+    }
+  }
+
+  private static void requeueFailedBucket(QueuedRequestKey key, QueuedRequestBucket failed) {
+    if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
+      return;
+    }
+    QueuedRequestBucket target =
+        QUEUED_REQUESTS.computeIfAbsent(key, ignored -> new QueuedRequestBucket(failed.facade));
+    if (target.facade == null) {
+      target.facade = failed.facade;
+    }
+    for (ItemStack stack : failed.stacks) {
+      mergeInto(target.stacks, stack);
+    }
+  }
+
+  private boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
+    if (key == null
+        || stacks == null
+        || stacks.isEmpty()
+        || shop == null
+        || key.networkId == null) {
+      return true;
+    }
+    List<ItemStack> consolidated = consolidateRequestedStacks(stacks);
+    if (consolidated.isEmpty()) {
+      return true;
+    }
+    List<BigItemStack> order = new ArrayList<>();
+    for (ItemStack requestStack : consolidated) {
+      int available = requestStack.getCount();
+      while (available > 0) {
+        int chunk = Math.min(available, MAX_PACKAGE_COUNT);
+        ItemStack chunkStack = requestStack.copy();
+        chunkStack.setCount(chunk);
+        order.add(new BigItemStack(chunkStack.copy(), chunk));
+        available -= chunk;
+      }
+    }
+    if (order.isEmpty()) {
+      return true;
+    }
+    PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
+    long start = System.nanoTime();
+    try {
+      LogisticsManager.broadcastPackageRequest(
+          key.networkId,
+          LogisticallyLinkedBehaviour.RequestType.PLAYER,
+          request,
+          null,
+          key.address == null ? "" : key.address);
+      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] broadcast grouped request stacks={} chunks={} network={} address='{}' requester='{}'",
+            consolidated.size(),
+            order.size(),
+            key.networkId,
+            key.address,
+            key.requesterName);
+      }
+      recordInflight(consolidated, key.requesterName);
+      return true;
+    } catch (Exception ex) {
+      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] grouped request broadcast failed for {}: {}",
+            key.networkId,
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return false;
+    } finally {
+      lastBroadcastNanos = System.nanoTime() - start;
+      lastBroadcastCount = order.size();
+      maybeLogPerf();
+    }
+  }
+
+  private static void mergeInto(List<ItemStack> target, ItemStack stack) {
+    if (target == null || stack == null || stack.isEmpty()) {
+      return;
+    }
+    for (ItemStack existing : target) {
+      if (ItemStack.isSameItemSameComponents(existing, stack)) {
+        existing.setCount(existing.getCount() + stack.getCount());
+        return;
+      }
+    }
+    target.add(stack.copy());
+  }
+
+  private static final class QueuedRequestBucket {
+    private CreateNetworkFacade facade;
+    private final List<ItemStack> stacks = new ArrayList<>();
+
+    private QueuedRequestBucket(CreateNetworkFacade facade) {
+      this.facade = facade;
+    }
+  }
+
+  private static final class QueuedRequestKey {
+    private final java.util.UUID networkId;
+    private final String address;
+    private final String requesterName;
+
+    private QueuedRequestKey(java.util.UUID networkId, String address, String requesterName) {
+      this.networkId = networkId;
+      this.address = address == null ? "" : address;
+      this.requesterName = requesterName == null ? "" : requesterName;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (!(obj instanceof QueuedRequestKey other)) {
+        return false;
+      }
+      return java.util.Objects.equals(networkId, other.networkId)
+          && java.util.Objects.equals(address, other.address)
+          && java.util.Objects.equals(requesterName, other.requesterName);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(networkId, address, requesterName);
+    }
   }
 }

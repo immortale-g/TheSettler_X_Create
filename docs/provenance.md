@@ -48,5 +48,18 @@ Implementation notes:
   project as local JUnit/Mockito tests for the Create Shop resolver injector flow.
 - Delivery self-loop prevention (guarding against pickup==target routing such as Postbox->Postbox) and
   accompanying headless unit tests are authored in this project within Create Shop delivery management.
+- Parent-request reconciliation now removes terminal/missing child delivery links before continuing
+  pending processing, and Create network request stacks are consolidated/chunked to the package limit;
+  both behaviors are authored in this project for Create Shop request-flow stability.
+- Pending reconciliation now derives missing pending counts from active request payload state
+  (including non-exhaustive leftovers and existing reservations) to recover late-arrival routing
+  without external resets; this behavior is authored in this project.
+- Resolver reassignment now explicitly handles stale assignment tokens whose resolver can no longer
+  be resolved, rerouting those requests instead of preserving dead formal assignments.
+- Create stock ordering now includes per-tick grouped broadcast batching (keyed by network/address/
+  requester) to reduce fragmented package emission under concurrent request bursts; this behavior is
+  authored in this project.
+- Grouped broadcast flushing now retries failed Create-network broadcasts by re-queuing the failed
+  grouped bucket for the next tick; this reliability behavior is authored in this project.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
