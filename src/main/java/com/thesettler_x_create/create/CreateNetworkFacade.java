@@ -195,10 +195,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     if (!hasNetwork() || requestedStacks == null || requestedStacks.isEmpty()) {
       return Collections.emptyList();
     }
+    List<ItemStack> consolidated = consolidateRequestedStacks(requestedStacks);
     List<BigItemStack> order = new ArrayList<>();
     List<ItemStack> normalized = new ArrayList<>();
 
-    for (ItemStack requestStack : requestedStacks) {
+    for (ItemStack requestStack : consolidated) {
       if (requestStack.isEmpty()) {
         continue;
       }
@@ -212,7 +213,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         continue;
       }
       int available = requestStack.getCount();
-      int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, requestStack.getMaxStackSize()));
+      int maxPer = MAX_PACKAGE_COUNT;
       while (available > 0) {
         int chunk = Math.min(available, maxPer);
         ItemStack chunkStack = requestStack.copy();
@@ -260,6 +261,31 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
 
     return normalized;
+  }
+
+  private List<ItemStack> consolidateRequestedStacks(List<ItemStack> requestedStacks) {
+    if (requestedStacks == null || requestedStacks.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<ItemStack> consolidated = new ArrayList<>();
+    for (ItemStack requestStack : requestedStacks) {
+      if (requestStack == null || requestStack.isEmpty()) {
+        continue;
+      }
+      ItemStack existing = null;
+      for (ItemStack candidate : consolidated) {
+        if (ItemStack.isSameItemSameComponents(candidate, requestStack)) {
+          existing = candidate;
+          break;
+        }
+      }
+      if (existing == null) {
+        consolidated.add(requestStack.copy());
+      } else {
+        existing.setCount(existing.getCount() + requestStack.getCount());
+      }
+    }
+    return consolidated;
   }
 
   private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {
