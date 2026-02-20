@@ -28,4 +28,10 @@ class CreateShopWorkerAvailabilityGateTest {
     assertFalse(gate.shouldResumePending(false, 10));
     assertFalse(gate.shouldResumePending(true, 0));
   }
+
+  @Test
+  void resumeDecisionFlipsWhenWorkerBecomesAvailable() {
+    assertFalse(gate.shouldResumePending(false, 3));
+    assertTrue(gate.shouldResumePending(true, 3));
+  }
 }
