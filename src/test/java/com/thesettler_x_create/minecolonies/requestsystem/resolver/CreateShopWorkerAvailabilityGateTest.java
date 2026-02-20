@@ -34,4 +34,12 @@ class CreateShopWorkerAvailabilityGateTest {
     assertFalse(gate.shouldResumePending(false, 3));
     assertTrue(gate.shouldResumePending(true, 3));
   }
+
+  @Test
+  void keepPendingStateOnlyWhenUnavailableAndPendingPositive() {
+    assertTrue(gate.shouldKeepPendingState(false, 1));
+    assertTrue(gate.shouldKeepPendingState(false, 10));
+    assertFalse(gate.shouldKeepPendingState(true, 10));
+    assertFalse(gate.shouldKeepPendingState(false, 0));
+  }
 }

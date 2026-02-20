@@ -656,6 +656,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
+        if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
+          cooldown.markRequestOrdered(level, request.getId());
+          pendingTracker.setPendingCount(request.getId(), pendingCount);
+          diagnostics.recordPendingSource(request.getId(), "tickPending:worker-unavailable");
+        }
         diagnostics.logPendingReasonChange(request.getId(), "wait:worker-not-working");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
