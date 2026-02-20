@@ -479,14 +479,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       UUID requestId = toRequestId(request.getId());
       int reservedForRequest = pickup.getReservedForRequest(requestId);
       boolean onCooldown = cooldown.isRequestOnCooldown(level, request.getId());
-      if (hasDeliveriesCreated(request.getId())) {
-        diagnostics.logPendingReasonChange(request.getId(), "skip:deliveries-created");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (deliveries already created)", requestIdLog);
-        }
-        continue;
-      }
       if (request.hasChildren()) {
         diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
         java.util.Collection<IToken<?>> children =
@@ -594,6 +586,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (hasActiveChildren || request.hasChildren()) {
           continue;
+        }
+      }
+      if (hasDeliveriesCreated(request.getId())) {
+        // If no active children remain, this parent is stale-blocked by a leftover delivery-created
+        // marker (for example when MineColonies consumed the child without callbacking resolver
+        // hooks).
+        clearDeliveriesCreated(request.getId());
+        diagnostics.logPendingReasonChange(request.getId(), "recover:clear-deliveries-created");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} cleared stale deliveries-created marker", requestIdLog);
         }
       }
 
