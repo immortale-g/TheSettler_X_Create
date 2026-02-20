@@ -66,3 +66,7 @@ Implementation notes:
 - Delivery child-request creation now preserves MineColonies parent linkage by using the original
   requester instance (without SafeRequester wrapping) in Create Shop delivery creation; this fix is
   authored in this project for resolver-chain stability in live worlds.
+- Delivery reassignment and pending reconciliation hardening in v0.0.12 is authored in this project:
+  stale `IN_PROGRESS` delivery requests are retried on a shorter cadence, and stale
+  `deliveries-created` parent markers are cleared when no active child remains to prevent
+  long-lived blocked parent requests in existing saves.
