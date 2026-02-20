@@ -51,5 +51,8 @@ Implementation notes:
 - Parent-request reconciliation now removes terminal/missing child delivery links before continuing
   pending processing, and Create network request stacks are consolidated/chunked to the package limit;
   both behaviors are authored in this project for Create Shop request-flow stability.
+- Pending reconciliation now derives missing pending counts from active request payload state
+  (including non-exhaustive leftovers and existing reservations) to recover late-arrival routing
+  without external resets; this behavior is authored in this project.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
