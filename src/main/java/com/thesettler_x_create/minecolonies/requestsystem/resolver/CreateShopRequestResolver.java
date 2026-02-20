@@ -496,6 +496,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         java.util.Collection<IToken<?>> children =
             java.util.Objects.requireNonNull(request.getChildren(), "children");
         int missing = 0;
+        boolean hasActiveChildren = false;
         if (!children.isEmpty()) {
           for (IToken<?> childToken : java.util.List.copyOf(children)) {
             try {
@@ -503,6 +504,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               if (child == null) {
                 missing++;
                 request.removeChild(childToken);
+                deliveryParents.remove(childToken);
+                deliveryResolvers.remove(childToken);
               }
               if (child != null
                   && child.getRequest()
@@ -519,6 +522,29 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                         childToken,
                         enqueued ? "ok" : "none");
                   }
+                }
+                var childState = child.getState();
+                boolean terminalChild =
+                    childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .COMPLETED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .CANCELLED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState.FAILED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RESOLVED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RECEIVED;
+                if (terminalChild) {
+                  request.removeChild(childToken);
+                  deliveryParents.remove(childToken);
+                  deliveryResolvers.remove(childToken);
+                } else {
+                  hasActiveChildren = true;
                 }
               }
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -570,7 +596,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         if (missing > 0) {
           continue;
         }
-        continue;
+        if (hasActiveChildren || request.hasChildren()) {
+          continue;
+        }
       }
 
       if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
