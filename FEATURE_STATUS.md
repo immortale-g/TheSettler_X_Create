@@ -105,6 +105,9 @@ Current fixes in progress (post-v0.0.11)
   requests do not remain blocked behind completed/cancelled child tokens.
 - Create network request stack normalization now consolidates equal stacks before broadcast and
   chunks by the Create package order limit (99) to reduce request fragmentation.
+- Pending reconciliation now derives missing pending counts from the live request payload
+  (`deliverable count - leftovers - reserved`) so late stock arrivals can resume delivery flow
+  without requiring manual request resets.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
