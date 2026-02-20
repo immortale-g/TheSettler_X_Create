@@ -59,5 +59,7 @@ Implementation notes:
 - Create stock ordering now includes per-tick grouped broadcast batching (keyed by network/address/
   requester) to reduce fragmented package emission under concurrent request bursts; this behavior is
   authored in this project.
+- Grouped broadcast flushing now retries failed Create-network broadcasts by re-queuing the failed
+  grouped bucket for the next tick; this reliability behavior is authored in this project.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
