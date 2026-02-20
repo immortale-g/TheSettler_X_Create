@@ -115,6 +115,9 @@ Current fixes in progress (post-v0.0.11)
   multi-request package fragmentation.
 - Grouped Create network request flush now re-queues failed broadcasts instead of dropping
   queued stacks, so transient Create/network errors do not lose pending grouped requests.
+- Delivery child creation now uses the original MineColonies requester instance (no SafeRequester
+  wrapping) so parent-child linkage remains intact and courier deliveries cannot get stuck
+  `IN_PROGRESS` due to missing parent links.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
