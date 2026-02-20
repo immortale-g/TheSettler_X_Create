@@ -118,6 +118,12 @@ Current fixes in progress (post-v0.0.11)
 - Delivery child creation now uses the original MineColonies requester instance (no SafeRequester
   wrapping) so parent-child linkage remains intact and courier deliveries cannot get stuck
   `IN_PROGRESS` due to missing parent links.
+- Delivery reassignment fallback now treats long-running `IN_PROGRESS` delivery requests as stale
+  with a faster retry cadence, so stuck warehouse delivery assignments are retried instead of
+  staying blocked indefinitely.
+- Pending reconciliation now clears stale `deliveries-created` markers when no active delivery
+  child remains, preventing parent requests from being permanently skipped after child loss or
+  terminal child-state cleanup.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
