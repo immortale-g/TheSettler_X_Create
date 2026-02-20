@@ -54,5 +54,7 @@ Implementation notes:
 - Pending reconciliation now derives missing pending counts from active request payload state
   (including non-exhaustive leftovers and existing reservations) to recover late-arrival routing
   without external resets; this behavior is authored in this project.
+- Resolver reassignment now explicitly handles stale assignment tokens whose resolver can no longer
+  be resolved, rerouting those requests instead of preserving dead formal assignments.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.

@@ -108,6 +108,8 @@ Current fixes in progress (post-v0.0.11)
 - Pending reconciliation now derives missing pending counts from the live request payload
   (`deliverable count - leftovers - reserved`) so late stock arrivals can resume delivery flow
   without requiring manual request resets.
+- Resolver reassignment now treats unresolved assigned resolver tokens as unassigned and reroutes
+  those requests instead of leaving them in a formally assigned but dead state.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
