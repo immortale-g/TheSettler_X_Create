@@ -110,6 +110,9 @@ Current fixes in progress (post-v0.0.11)
   without requiring manual request resets.
 - Resolver reassignment now treats unresolved assigned resolver tokens as unassigned and reroutes
   those requests instead of leaving them in a formally assigned but dead state.
+- Create stock network requests are now queued and grouped per server tick by
+  `network + address + requester`, then flushed as consolidated broadcasts to reduce
+  multi-request package fragmentation.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
