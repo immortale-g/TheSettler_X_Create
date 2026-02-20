@@ -901,7 +901,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     cooldown.markRequestOrdered(level, parentToken);
     clearDeliveriesCreated(parentToken);
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (isDebugLoggingEnabled()) {
       int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
       BlockPos pickupPosition =
           pickup == null ? delivery.getStart().getInDimensionLocation() : pickup.getBlockPos();
@@ -942,7 +942,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()
+    if (isDebugLoggingEnabled()
         && request != null
         && request.getRequest() instanceof Delivery delivery) {
       try {
@@ -994,7 +994,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       cooldown.clearRequestCooldown(parentToken);
       pendingTracker.remove(parentToken);
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (isDebugLoggingEnabled()) {
       IStandardRequestManager standard = unwrapStandardManager(manager);
       if (standard != null) {
         try {
@@ -1295,6 +1295,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           target.getClass().getName(),
           ex.getMessage() == null ? "<null>" : ex.getMessage());
       return java.util.Optional.empty();
+    }
+  }
+
+  private static boolean isDebugLoggingEnabled() {
+    try {
+      return Config.DEBUG_LOGGING.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
     }
   }
 
