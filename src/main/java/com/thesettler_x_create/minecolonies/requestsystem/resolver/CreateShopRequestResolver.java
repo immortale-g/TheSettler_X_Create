@@ -77,6 +77,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
+  private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
+      new CreateShopWorkerAvailabilityGate();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -181,7 +183,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       return Lists.newArrayList();
     }
-    if (!shop.isWorkerWorking()) {
+    boolean workerWorking = shop.isWorkerWorking();
+    if (workerAvailabilityGate.shouldDeferNetworkOrder(workerWorking, needed)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve deferred (worker not working) request=" + request.getId());
