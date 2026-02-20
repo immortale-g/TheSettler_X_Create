@@ -18,7 +18,7 @@ final class CreateShopResolverCooldown {
 
   void markRequestOrdered(Level level, IToken<?> token) {
     resolver.getPendingTracker().setCooldown(level, token, Config.ORDER_TTL_TICKS.getAsLong());
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (isDebugLoggingEnabled()) {
       resolver.getPendingTracker().setReason(token, "markRequestOrdered");
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] markRequestOrdered token={} resolver={} until={}",
@@ -32,7 +32,7 @@ final class CreateShopResolverCooldown {
 
   void clearRequestCooldown(IToken<?> token) {
     resolver.getPendingTracker().clearCooldown(token);
-    if (Config.DEBUG_LOGGING.getAsBoolean() && token != null) {
+    if (isDebugLoggingEnabled() && token != null) {
       String source = resolver.getPendingTracker().getReason(token);
       if (source != null) {
         resolver.getPendingTracker().setReason(token, null);
@@ -58,5 +58,13 @@ final class CreateShopResolverCooldown {
 
   java.util.Set<IToken<?>> getOrderedTokens() {
     return resolver.getPendingTracker().getTokens();
+  }
+
+  private static boolean isDebugLoggingEnabled() {
+    try {
+      return Config.DEBUG_LOGGING.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
+    }
   }
 }

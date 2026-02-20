@@ -63,6 +63,9 @@ Implementation notes:
   grouped bucket for the next tick; this reliability behavior is authored in this project.
 - Debug-log gating hardening for headless/test execution (safe fallback when NeoForge config is not
   loaded yet) is authored in this codebase and does not depend on external bridge implementations.
+- Additional headless-safe debug-log gating in Create Shop resolver callback/cooldown paths is
+  authored in this project so callback regression tests can run without requiring NeoForge config
+  bootstrap in the unit-test JVM.
 - Delivery child-request creation now preserves MineColonies parent linkage by using the original
   requester instance (without SafeRequester wrapping) in Create Shop delivery creation; this fix is
   authored in this project for resolver-chain stability in live worlds.
@@ -70,3 +73,6 @@ Implementation notes:
   stale `IN_PROGRESS` delivery requests are retried on a shorter cadence, and stale
   `deliveries-created` parent markers are cleared when no active child remains to prevent
   long-lived blocked parent requests in existing saves.
+- Worker-availability guard validation tests and resolver callback cleanup regression tests are
+  authored in this project to reduce repeat regressions around pending-delivery stalls and
+  cancellation/cleanup state handling.

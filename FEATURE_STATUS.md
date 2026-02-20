@@ -124,6 +124,12 @@ Current fixes in progress (post-v0.0.11)
 - Pending reconciliation now clears stale `deliveries-created` markers when no active delivery
   child remains, preventing parent requests from being permanently skipped after child loss or
   terminal child-state cleanup.
+- Worker-availability validation now has dedicated regression coverage (defer/resume/keep-pending
+  behavior) to prevent network ordering while the shopkeeper is unavailable.
+- Resolver callback regression tests now cover delivery-link cleanup and cancel-state cleanup for
+  pending/delivery-created markers.
+- Resolver cooldown and delivery callback debug logging now use safe guards in headless test
+  contexts so unit tests do not fail when NeoForge config is not loaded.
 
 Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
