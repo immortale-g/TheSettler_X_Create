@@ -655,6 +655,22 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
     if (selected == null) {
       selected = findResolverFromAssignments(manager);
+    } else {
+      // Prefer assignment-backed resolver when provider-prioritized resolver has no work.
+      if (!hasAssignedRequestsForResolver(manager, selected.getId())) {
+        CreateShopRequestResolver assignmentSelected = findResolverFromAssignments(manager);
+        if (assignmentSelected != null
+            && !assignmentSelected.getId().equals(selected.getId())
+            && hasAssignedRequestsForResolver(manager, assignmentSelected.getId())) {
+          if (isDebugRequests()) {
+            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] resolver assignment drift detected: switching {} -> {}",
+                selected.getId(),
+                assignmentSelected.getId());
+          }
+          selected = assignmentSelected;
+        }
+      }
     }
     if (selected == null) {
       return current;
@@ -688,6 +704,19 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
     }
     return null;
+  }
+
+  private boolean hasAssignedRequestsForResolver(
+      IStandardRequestManager manager, IToken<?> resolverToken) {
+    if (manager == null || resolverToken == null) {
+      return false;
+    }
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return false;
+    }
+    var resolverAssignments = assignments.get(resolverToken);
+    return resolverAssignments != null && !resolverAssignments.isEmpty();
   }
 
   private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {

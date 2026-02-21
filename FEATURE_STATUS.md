@@ -14,6 +14,8 @@ Branch: `refactor/strict-bridge-state-machine`
   (`ClassCastException` in `tickPendingDeliveries` hotfix).
 - Duplicate child-token guard is active: parent child lists are deduplicated during pending tick,
   and delivery link creation normalizes duplicate same-token links.
+- Resolver selection now falls back to assignment-backed Create Shop resolver tokens when the
+  current provider-selected resolver has zero assignments.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
