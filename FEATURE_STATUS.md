@@ -22,6 +22,8 @@ Branch: `refactor/strict-bridge-state-machine`
   fallback when `IStandardRequestManager` unwrapping is unavailable).
 - `attemptResolve` now defers rack-delivery child creation for wrapped managers and hands off
   creation to standard-manager `tickPending`.
+- Courier dispatch now uses warehouse request queue only (no direct `JobDeliveryman.addRequest`
+  injection) with queue-token dedupe.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
