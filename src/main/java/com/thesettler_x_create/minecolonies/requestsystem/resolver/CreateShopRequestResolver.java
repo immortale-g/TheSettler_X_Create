@@ -1796,8 +1796,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (assignments == null || assignments.isEmpty()) {
       return;
     }
+    // Snapshot to avoid ConcurrentModificationException when reassignRequest mutates assignment
+    // store.
+    java.util.List<Map.Entry<IToken<?>, java.util.Collection<IToken<?>>>> assignmentSnapshot =
+        new java.util.ArrayList<>(assignments.entrySet());
     long now = level.getGameTime();
-    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignments.entrySet()) {
+    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignmentSnapshot) {
       IToken<?> ownerToken = entry.getKey();
       java.util.Collection<IToken<?>> tokens = entry.getValue();
       if (ownerToken == null || tokens == null || tokens.isEmpty()) {
@@ -1813,7 +1817,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           || !"StandardRetryingRequestResolver".equals(ownerResolver.getClass().getSimpleName())) {
         continue;
       }
-      for (IToken<?> requestToken : tokens) {
+      java.util.List<IToken<?>> tokenSnapshot = new java.util.ArrayList<>(tokens);
+      for (IToken<?> requestToken : tokenSnapshot) {
         if (requestToken == null) {
           continue;
         }
@@ -1849,6 +1854,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 ownerToken,
                 newResolver);
           }
+          // Keep one reassignment per tick to reduce assignment churn and avoid drift races.
+          return;
         } catch (Exception ex) {
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             TheSettlerXCreate.LOGGER.info(

@@ -30,6 +30,8 @@ Current behavior:
   provider bindings and cancel active Create Shop-owned requests before removing the mod jar.
 - Tool/Deliverable requests currently owned by MineColonies `StandardRetryingRequestResolver`
   are now opportunistically reassigned to the Create Shop resolver once `canResolve` becomes true.
+- Retrying-owner reassignment now iterates assignment snapshots and performs at most one reassignment
+  per tick, preventing `ConcurrentModificationException` and reducing assignment churn/drift.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
