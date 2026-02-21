@@ -123,3 +123,6 @@ Implementation notes:
   tick resolver selection now prefers an assignment-backed Create Shop resolver when the
   provider-prioritized resolver has no assigned requests, reducing no-assignment stalls after
   request-system token churn.
+- Delivery link idempotency hardening on the strict branch is authored in this project: Create
+  Shop delivery child linking now skips `addChild` when MineColonies flow already linked the token
+  on the parent, preventing repeated same-token child duplication in wrapped resolver flows.
