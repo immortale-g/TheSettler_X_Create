@@ -13,6 +13,7 @@ import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.init.ModCreativeTabs;
 import com.thesettler_x_create.init.ModItems;
 import com.thesettler_x_create.init.ModMenus;
+import com.thesettler_x_create.minecolonies.command.CreateShopMaintenanceCommands;
 import com.thesettler_x_create.minecolonies.debug.NativeRequestFlowDiagnostics;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesBuildings;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesJobs;
@@ -32,6 +33,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
@@ -60,6 +62,7 @@ public class TheSettlerXCreate {
     NeoForge.EVENT_BUS.register(this);
     NeoForge.EVENT_BUS.addListener(StockLinkLinkerEvents::onRightClickBlock);
     NeoForge.EVENT_BUS.addListener(this::onServerTick);
+    NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
 
     modEventBus.addListener(this::addCreative);
 
@@ -133,6 +136,10 @@ public class TheSettlerXCreate {
         nativeRequestFlowDiagnostics.tick(colony, tick);
       }
     }
+  }
+
+  private void onRegisterCommands(RegisterCommandsEvent event) {
+    CreateShopMaintenanceCommands.register(event.getDispatcher());
   }
 
   private void addCreative(BuildCreativeModeTabContentsEvent event) {
