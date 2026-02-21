@@ -162,6 +162,9 @@ Current refactor branch updates
   so MineColonies `onRequestCompleted` can propagate completion back to the parent request.
 - Create Shop no longer provides a custom courier-assignment module; courier handling now uses the
   native MineColonies `WAREHOUSE_COURIERS` module path only.
+- Resolver factory now avoids reusing a stale cached shop-resolver instance when MineColonies
+  rebuilds resolver providers (for example after request-system restart), and tick resolver
+  selection now includes assignment-backed Create Shop resolvers as a fallback.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

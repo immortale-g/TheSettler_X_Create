@@ -654,6 +654,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     if (selected == null) {
+      selected = findResolverFromAssignments(manager);
+    }
+    if (selected == null) {
       return current;
     }
     if (current == null || !current.getId().equals(selected.getId())) {
@@ -666,6 +669,36 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
     }
     return selected;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver findResolverFromAssignments(IStandardRequestManager manager) {
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return null;
+    }
+    for (IToken<?> resolverToken : assignments.keySet()) {
+      try {
+        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(resolverToken);
+        if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+          return shop;
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Ignore stale tokens; health-check and reassignment paths handle cleanup.
+      }
+    }
+    return null;
+  }
+
+  private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
+    if (resolver == null || resolver.getLocation() == null || getLocation() == null) {
+      return false;
+    }
+    return resolver.getLocation().getDimension().equals(getLocation().getDimension())
+        && resolver
+            .getLocation()
+            .getInDimensionLocation()
+            .equals(getLocation().getInDimensionLocation());
   }
 
   public void ensureRackContainers() {

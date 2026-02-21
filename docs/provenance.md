@@ -104,3 +104,6 @@ Implementation notes:
 - Custom Create Shop courier-module removal on the strict branch is authored in this project:
   Create Shop now uses MineColonies native warehouse courier module wiring instead of a mod-specific
   courier-assignment implementation.
+- Resolver drift repair hardening on the strict branch is authored in this project: the resolver
+  factory no longer reuses stale cached shop-resolver instances across request-system rebuilds, and
+  tick resolver selection can recover via assignment-backed Create Shop resolver discovery.
