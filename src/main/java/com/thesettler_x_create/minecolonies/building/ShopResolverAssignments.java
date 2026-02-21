@@ -1,13 +1,7 @@
 package com.thesettler_x_create.minecolonies.building;
 
-import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
-import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.minecolonies.api.util.constant.TypeConstants;
-import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlocks;
-import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
-import java.util.ArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -18,43 +12,6 @@ final class ShopResolverAssignments {
 
   ShopResolverAssignments(BuildingCreateShop shop) {
     this.shop = shop;
-  }
-
-  void ensureDeliverableAssignment() {
-    if (shop.getColony() == null) {
-      return;
-    }
-    CreateShopRequestResolver resolver = shop.getOrCreateShopResolver();
-    if (resolver == null) {
-      return;
-    }
-    if (!(shop.getColony().getRequestManager()
-        instanceof
-        com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager
-        manager)) {
-      return;
-    }
-    var resolverHandler = manager.getResolverHandler();
-    try {
-      resolverHandler.getResolver(resolver.getId());
-    } catch (IllegalArgumentException ignored) {
-      // Resolver is not registered yet. MineColonies will register provider resolvers.
-      return;
-    }
-    var store = manager.getRequestableTypeRequestResolverAssignmentDataStore();
-    var assignments = store.getAssignments();
-    var deliverableList =
-        (java.util.Collection<IToken<?>>)
-            assignments.computeIfAbsent(TypeConstants.DELIVERABLE, key -> new ArrayList<>());
-    var requestableList =
-        (java.util.Collection<IToken<?>>)
-            assignments.computeIfAbsent(TypeConstants.REQUESTABLE, key -> new ArrayList<>());
-    var toolList =
-        (java.util.Collection<IToken<?>>)
-            assignments.computeIfAbsent(TypeConstants.TOOL, key -> new ArrayList<>());
-    ensureAssignment(deliverableList, resolver, "DELIVERABLE");
-    ensureAssignment(requestableList, resolver, "REQUESTABLE");
-    ensureAssignment(toolList, resolver, "TOOL");
   }
 
   void ensurePickupLink() {
@@ -107,18 +64,6 @@ final class ShopResolverAssignments {
       if (shopBlock.getShopPos() == null) {
         shopBlock.setShopPos(shop.getLocation().getInDimensionLocation());
       }
-    }
-  }
-
-  private void ensureAssignment(
-      java.util.Collection<IToken<?>> list, IRequestResolver<?> resolver, String label) {
-    if (list.contains(resolver.getId())) {
-      return;
-    }
-    list.add(resolver.getId());
-    if (BuildingCreateShop.isDebugRequests()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] added resolver {} to {} assignment list", resolver.getId(), label);
     }
   }
 }
