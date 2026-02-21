@@ -184,3 +184,7 @@ Implementation notes:
 - Uninstall-preparation maintenance command on the strict branch is authored in this project:
   `/thesettlerxcreate prepare_uninstall` performs best-effort Create Shop provider unregistration
   and cancellation of active Create Shop-owned requests via MineColonies APIs before jar removal.
+- Retrying-owner handoff for late stock availability on the strict branch is authored in this
+  project: when a request is owned by MineColonies `StandardRetryingRequestResolver` and Create
+  Shop `canResolve` flips to true (e.g. stock added later), the request is re-assigned via
+  `reassignRequest` to avoid waiting indefinitely on native retry cadence.
