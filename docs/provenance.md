@@ -141,3 +141,7 @@ Implementation notes:
 - Resolver followup behavior alignment on the strict branch is authored in this project:
   Create Shop resolver followup completion now returns `null` (no explicit followups), matching
   MineColonies delivery-resolver semantics while avoiding unsafe warehouse-tile casts.
+- Tick-pending assignment drift recovery on the strict branch is authored in this project:
+  when the active Create Shop resolver token has no direct assignment entry, pending processing now
+  recovers assignments from local Create Shop resolver tokens in the manager assignment map, so
+  partial-delivery continuations do not stall on resolver-id drift.

@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.api.util.WorldUtil;
@@ -433,6 +434,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
     var assigned = assignments.get(getId());
+    if (assigned == null || assigned.isEmpty()) {
+      java.util.Set<IToken<?>> recovered =
+          collectAssignedTokensFromLocalResolvers(standardManager, assignments);
+      if (!recovered.isEmpty()) {
+        assigned = recovered;
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending assignment drift recovered: resolverId={} recoveredAssignments={}",
+              getId(),
+              recovered.size());
+        }
+      }
+    }
     if (Config.DEBUG_LOGGING.getAsBoolean() && assigned == null) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
@@ -927,6 +941,44 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     needed = Math.max(0, needed - Math.max(0, reservedForRequest));
     return needed;
+  }
+
+  private java.util.Set<IToken<?>> collectAssignedTokensFromLocalResolvers(
+      IStandardRequestManager manager,
+      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
+    java.util.Set<IToken<?>> recovered = new java.util.LinkedHashSet<>();
+    if (manager == null || assignments == null || assignments.isEmpty()) {
+      return recovered;
+    }
+    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignments.entrySet()) {
+      java.util.Collection<IToken<?>> values = entry.getValue();
+      if (values == null || values.isEmpty()) {
+        continue;
+      }
+      IToken<?> resolverToken = entry.getKey();
+      IRequestResolver<?> resolver;
+      try {
+        resolver = manager.getResolverHandler().getResolver(resolverToken);
+      } catch (Exception ignored) {
+        continue;
+      }
+      if (resolver instanceof CreateShopRequestResolver shopResolver
+          && isLocalShopResolver(shopResolver)) {
+        recovered.addAll(values);
+      }
+    }
+    return recovered;
+  }
+
+  private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
+    if (resolver == null || resolver.getLocation() == null || getLocation() == null) {
+      return false;
+    }
+    return resolver.getLocation().getDimension().equals(getLocation().getDimension())
+        && resolver
+            .getLocation()
+            .getInDimensionLocation()
+            .equals(getLocation().getInDimensionLocation());
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
