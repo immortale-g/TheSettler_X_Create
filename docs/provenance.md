@@ -167,3 +167,7 @@ Implementation notes:
   resolver selection now includes ownership-based fallback (`getResolverForRequest`) when
   assignment-key/token maps are out-of-sync, allowing pending local requests to continue without
   cancel/recreate churn.
+- Dynamic request-owner pending processing on the strict branch is authored in this project:
+  `tickPending` now prioritizes per-request owner resolution (`getResolverForRequest`) over
+  resolver-token assignment keys, reducing repeated stalls when resolver IDs drift while requests
+  remain valid in MineColonies.

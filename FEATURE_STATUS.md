@@ -18,6 +18,8 @@ Current behavior:
   keeps daytime work active while resolver work exists.
 - Resolver selection now includes ownership-based drift recovery, so active local Create Shop
   requests can re-bind to the resolver that MineColonies currently considers owner.
+- Pending processing is now request-owner dynamic: assignment ownership (`getResolverForRequest`)
+  is used as primary source each tick, with resolver-token key maps only as fallback hints.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

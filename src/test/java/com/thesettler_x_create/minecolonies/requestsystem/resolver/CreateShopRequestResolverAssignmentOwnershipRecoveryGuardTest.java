@@ -15,7 +15,7 @@ class CreateShopRequestResolverAssignmentOwnershipRecoveryGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
 
     assertTrue(source.contains("collectAssignedTokensByRequestResolver"));
-    assertTrue(source.contains("assignment drift recovered by request ownership"));
+    assertTrue(source.contains("tickPending owner-sync"));
     assertTrue(source.contains("getResolverForRequest(request)"));
   }
 }
