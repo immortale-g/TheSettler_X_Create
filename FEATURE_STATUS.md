@@ -160,6 +160,8 @@ Current refactor branch updates
   preserving ongoing resolver-flow diagnostics.
 - Delivery child linkage now sets both sides (`parent.addChild(child)` and `child.setParent(parent)`)
   so MineColonies `onRequestCompleted` can propagate completion back to the parent request.
+- Create Shop no longer provides a custom courier-assignment module; courier handling now uses the
+  native MineColonies `WAREHOUSE_COURIERS` module path only.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

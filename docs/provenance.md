@@ -101,3 +101,6 @@ Implementation notes:
 - Parent/child delivery-chain completion fix on the strict branch is authored in this project:
   created delivery requests now set both parent-child edges (`addChild` + `setParent`) so
   MineColonies parent completion callbacks can fire normally after child completion.
+- Custom Create Shop courier-module removal on the strict branch is authored in this project:
+  Create Shop now uses MineColonies native warehouse courier module wiring instead of a mod-specific
+  courier-assignment implementation.
