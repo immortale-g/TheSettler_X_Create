@@ -125,6 +125,24 @@ final class CreateShopDeliveryManager {
       }
       return Lists.newArrayList();
     }
+    try {
+      request.addChild(token);
+    } catch (Exception ex) {
+      try {
+        manager.updateRequestState(
+            token, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED);
+      } catch (Exception ignored) {
+        // Best-effort rollback only.
+      }
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link failed parent={} child={} error={}",
+            request.getId(),
+            token,
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return Lists.newArrayList();
+    }
     request.addDelivery(selected.copy());
     resolver.markDeliveriesCreated(request.getId());
     resolver.getDeliveryParents().put(token, request.getId());
