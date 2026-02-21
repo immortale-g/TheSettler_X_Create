@@ -48,8 +48,7 @@ final class ShopResolverFactory {
     ILocation location = shop.getRequester().getLocation();
     IFactoryController factory = shop.getColony().getRequestManager().getFactoryController();
 
-    CreateShopRequestResolver shopResolver =
-        existingShopResolver != null ? existingShopResolver : shop.getExistingShopResolver();
+    CreateShopRequestResolver shopResolver = existingShopResolver;
     IToken<?> deliveryResolverToken =
         existingDeliveryResolver != null
             ? existingDeliveryResolver.getId()
