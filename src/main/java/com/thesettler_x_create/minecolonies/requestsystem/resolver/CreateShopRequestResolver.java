@@ -384,7 +384,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   public java.util.List<IRequest<?>> getFollowupRequestForCompletion(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     // Avoid AbstractWarehouseRequestResolver followup logic (casts to TileEntityWareHouse).
-    java.util.List<IRequest<?>> followups = java.util.Collections.emptyList();
+    // Keep MineColonies delivery-resolver behavior: no explicit followup requests here.
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       int size = 0;
       TheSettlerXCreate.LOGGER.info(
@@ -397,7 +397,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (manager instanceof IStandardRequestManager standardManager) {
       diagnostics.logRequestStateChange(standardManager, request.getId(), "followup");
     }
-    return followups;
+    return null;
   }
 
   public void tickPendingDeliveries(IRequestManager manager) {

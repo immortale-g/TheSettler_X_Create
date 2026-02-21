@@ -24,6 +24,8 @@ Branch: `refactor/strict-bridge-state-machine`
   creation to standard-manager `tickPending`.
 - Courier dispatch now uses warehouse request queue only (no direct `JobDeliveryman.addRequest`
   injection) with queue-token dedupe.
+- Create Shop resolver completion followup now returns `null` (instead of an empty list) to align
+  with MineColonies delivery-resolver semantics and avoid unsafe warehouse-followup casts.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
