@@ -423,13 +423,32 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
-    var assigned = assignments.get(getId());
-    if (assigned == null || assigned.isEmpty()) {
+    java.util.Set<IToken<?>> assigned = new java.util.LinkedHashSet<>();
+    java.util.Collection<IToken<?>> directAssigned = assignments.get(getId());
+    if (directAssigned != null && !directAssigned.isEmpty()) {
+      assigned.addAll(directAssigned);
+    }
+    java.util.Set<IToken<?>> assignedByOwner =
+        collectAssignedTokensByRequestResolver(standardManager, assignments);
+    if (!assignedByOwner.isEmpty()) {
+      int before = assigned.size();
+      assigned.addAll(assignedByOwner);
+      if (Config.DEBUG_LOGGING.getAsBoolean()
+          && shouldLogTickPending(level)
+          && (before == 0 || assignedByOwner.size() > before)) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending owner-sync: resolverId={} directAssignments={} ownerAssignments={} effective={}",
+            getId(),
+            directAssigned == null ? 0 : directAssigned.size(),
+            assignedByOwner.size(),
+            assigned.size());
+      }
+    } else {
       java.util.Set<IToken<?>> recovered =
           collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
-        assigned = recovered;
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        assigned.addAll(recovered);
+        if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending assignment drift recovered: resolverId={} recoveredAssignments={}",
               getId(),
@@ -437,29 +456,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
-    if (assigned == null || assigned.isEmpty()) {
-      java.util.Set<IToken<?>> recoveredByRequest =
-          collectAssignedTokensByRequestResolver(standardManager, assignments);
-      if (!recoveredByRequest.isEmpty()) {
-        assigned = recoveredByRequest;
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending assignment drift recovered by request ownership: resolverId={} recoveredAssignments={}",
-              getId(),
-              recoveredByRequest.size());
-        }
-      }
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned == null) {
+    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned.isEmpty()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
           getId(),
           assignments.keySet());
     }
     java.util.Set<IToken<?>> pendingTokens = new java.util.HashSet<>();
-    if (assigned != null) {
-      pendingTokens.addAll(assigned);
-    }
+    pendingTokens.addAll(assigned);
     pendingTokens.addAll(pendingTracker.getTokens());
     if (pendingTokens.isEmpty()) {
       if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
@@ -477,7 +481,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-      int assignedCount = assigned == null ? 0 : assigned.size();
+      int assignedCount = assigned.size();
       int orderedCount = cooldown.getOrderedCount();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: assigned={}, ordered={}, total={}",
