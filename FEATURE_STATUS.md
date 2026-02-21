@@ -14,6 +14,8 @@ Current behavior:
 - Delivery creation from already-present rack items can continue during temporary worker idle.
 - Pending partials can top up from Create network when worker is working and stock becomes available.
 - Parent/child link dedupe and drift recovery are active in pending reconciliation.
+- Shopkeeper AI now marks MineColonies-native worker signals (`JobStatus`/`VisibleStatus`) and
+  keeps daytime work active while resolver work exists.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
