@@ -134,3 +134,7 @@ Implementation notes:
   `attemptResolve` now defers rack-based delivery-child creation when running under wrapped request
   managers and leaves child creation to `tickPending` under the standard manager, avoiding
   unregistered-child tokens and subsequent cancel/reorder loops.
+- Queue-only courier dispatch hardening on the strict branch is authored in this project: Create
+  Shop delivery dispatch no longer injects requests directly into deliveryman jobs and now relies
+  on MineColonies warehouse queue dispatch only, with queue deduplication to avoid repeated
+  token insertion.

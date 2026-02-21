@@ -17,7 +17,6 @@ import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.DeliverymanAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
-import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -408,6 +407,15 @@ final class CreateShopDeliveryManager {
         continue;
       }
       warehousesWithQueue++;
+      if (queue.getMutableRequestList().contains(token)) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] delivery enqueue token={} warehouse=<known> couriers={} queued=already",
+              token,
+              courierCount);
+        }
+        return true;
+      }
       queue.addRequest(token);
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         String warehouseInfo = "<unknown>";
@@ -449,7 +457,6 @@ final class CreateShopDeliveryManager {
       CourierAssignmentModule module = shop.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (module != null) {
         checked += notifyCourierModule(module, token);
-        notified += notifyCourierJobs(module, token);
       }
       if (notified > 0) {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -479,13 +486,11 @@ final class CreateShopDeliveryManager {
           building.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (warehouseCouriers != null) {
         checked += notifyCourierModule(warehouseCouriers, token);
-        notified += notifyCourierJobs(warehouseCouriers, token);
       }
       DeliverymanAssignmentModule deliverymanModule =
           building.getModule(BuildingModules.COURIER_WORK);
       if (deliverymanModule != null) {
         checked += notifyCourierModule(deliverymanModule, token);
-        notified += notifyCourierJobs(deliverymanModule, token);
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -504,32 +509,5 @@ final class CreateShopDeliveryManager {
     }
     var citizens = module.getAssignedCitizen();
     return citizens == null ? 0 : citizens.size();
-  }
-
-  private int notifyCourierJobs(AbstractAssignedCitizenModule module, IToken<?> token) {
-    if (module == null) {
-      return 0;
-    }
-    var citizens = module.getAssignedCitizen();
-    if (citizens == null || citizens.isEmpty()) {
-      return 0;
-    }
-    int notified = 0;
-    for (var citizen : citizens) {
-      if (citizen == null) {
-        continue;
-      }
-      var job = citizen.getJob();
-      if (job instanceof JobDeliveryman deliveryman) {
-        try {
-          deliveryman.addRequest(
-              token, AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
-          notified++;
-        } catch (Exception ignored) {
-          // Ignore enqueue errors.
-        }
-      }
-    }
-    return notified;
   }
 }
