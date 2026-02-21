@@ -44,6 +44,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.Map<IToken<?>, Long> retryingReassignAttempts =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final Object debugLock = new Object();
   private volatile long lastTickPendingDebugTime = 0L;
   private final java.util.Set<String> deliveryLinkLogged =
@@ -415,6 +417,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       return;
     }
+    reassignResolvableRetryingRequests(standardManager, level);
     recheck.processParentChildRechecks(standardManager, level);
     var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
     var requestHandler = standardManager.getRequestHandler();
@@ -1778,6 +1781,85 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       total += stack.getCount();
     }
     return total;
+  }
+
+  private void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {
+    if (manager == null || level == null) {
+      return;
+    }
+    var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
+    var requestHandler = manager.getRequestHandler();
+    if (assignmentStore == null || requestHandler == null) {
+      return;
+    }
+    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return;
+    }
+    long now = level.getGameTime();
+    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignments.entrySet()) {
+      IToken<?> ownerToken = entry.getKey();
+      java.util.Collection<IToken<?>> tokens = entry.getValue();
+      if (ownerToken == null || tokens == null || tokens.isEmpty()) {
+        continue;
+      }
+      IRequestResolver<?> ownerResolver;
+      try {
+        ownerResolver = manager.getResolverHandler().getResolver(ownerToken);
+      } catch (Exception ignored) {
+        continue;
+      }
+      if (ownerResolver == null
+          || !"StandardRetryingRequestResolver".equals(ownerResolver.getClass().getSimpleName())) {
+        continue;
+      }
+      for (IToken<?> requestToken : tokens) {
+        if (requestToken == null) {
+          continue;
+        }
+        Long last = retryingReassignAttempts.get(requestToken);
+        if (last != null && now - last < 40L) {
+          continue;
+        }
+        IRequest<?> request;
+        try {
+          request = requestHandler.getRequest(requestToken);
+        } catch (Exception ignored) {
+          continue;
+        }
+        if (request == null
+            || !(request.getRequest() instanceof IDeliverable deliverable)
+            || request.getState()
+                == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+          continue;
+        }
+        @SuppressWarnings("unchecked")
+        IRequest<? extends IDeliverable> casted = (IRequest<? extends IDeliverable>) request;
+        if (!canResolveRequest(manager, casted)) {
+          continue;
+        }
+        retryingReassignAttempts.put(requestToken, now);
+        try {
+          IToken<?> newResolver =
+              manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] retrying reassign token={} from={} to={}",
+                requestToken,
+                ownerToken,
+                newResolver);
+          }
+        } catch (Exception ex) {
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] retrying reassign failed token={} from={} error={}",
+                requestToken,
+                ownerToken,
+                ex.getMessage() == null ? "<null>" : ex.getMessage());
+          }
+        }
+      }
+    }
   }
 
   private String describeStack(ItemStack stack) {

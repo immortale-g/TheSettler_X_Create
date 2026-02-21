@@ -28,6 +28,8 @@ Current behavior:
   assignments), and pending processing drops requests no longer owned by the local resolver.
 - Added admin maintenance command `/thesettlerxcreate prepare_uninstall` to scrub Create Shop
   provider bindings and cancel active Create Shop-owned requests before removing the mod jar.
+- Tool/Deliverable requests currently owned by MineColonies `StandardRetryingRequestResolver`
+  are now opportunistically reassigned to the Create Shop resolver once `canResolve` becomes true.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
