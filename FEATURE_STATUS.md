@@ -18,6 +18,8 @@ Branch: `refactor/strict-bridge-state-machine`
   current provider-selected resolver has zero assignments.
 - Delivery child linking is idempotent for wrapped resolve paths (`addChild` skipped when already
   linked by manager flow).
+- Delivery fallback now supports wrapped request managers (assignment attempt + queue enqueue
+  fallback when `IStandardRequestManager` unwrapping is unavailable).
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
