@@ -192,3 +192,7 @@ Implementation notes:
   reassignment scanning now snapshots assignment entries/tokens before mutation and limits to one
   successful reassignment per tick, preventing `ConcurrentModificationException` during colony tick
   and reducing assignment churn after late stock updates.
+- PR-scope boundary note on the strict branch is authored in this project: Create network
+  extraction implementation in `CreateNetworkFacade.extract(...)` remains intentionally out of
+  scope for this PR and is tracked as a local follow-up TODO, while current resolver flow continues
+  to use existing network-order pathways.
