@@ -1644,6 +1644,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return getId();
   }
 
+  public boolean hasActiveWork() {
+    if (pendingTracker.hasEntries()) {
+      return true;
+    }
+    if (cooldown.getOrderedCount() > 0) {
+      return true;
+    }
+    if (!deliveryParents.isEmpty() || !deliveryResolvers.isEmpty()) {
+      return true;
+    }
+    return !flowStateMachine.snapshot().isEmpty();
+  }
+
   void logDeliveryLinkStateForOps(
       String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
     logDeliveryLinkState(stage, manager, parentToken, childToken);

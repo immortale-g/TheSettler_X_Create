@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import java.util.Set;
@@ -38,10 +39,10 @@ final class ShopWorkerStatus {
       if (isCitizenUnavailable(citizen)) {
         continue;
       }
-      if (citizen.isWorking()) {
+      if (citizen.getJobStatus() == JobStatus.WORKING) {
         return true;
       }
-      if (citizen.getJobStatus() == com.minecolonies.api.entity.ai.JobStatus.WORKING) {
+      if (citizen.isWorking()) {
         return true;
       }
       try {

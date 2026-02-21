@@ -442,6 +442,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return workerStatus.isWorkerWorking();
   }
 
+  public boolean hasResolverWork() {
+    CreateShopRequestResolver resolver = getOrCreateShopResolver();
+    return resolver != null && resolver.hasActiveWork();
+  }
+
   public void notifyMissingNetwork() {
     networkNotifier.notifyMissingNetwork();
   }

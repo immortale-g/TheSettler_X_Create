@@ -158,3 +158,8 @@ Implementation notes:
   can continue during temporary worker idle to avoid blocking already-arrived items; daytime
   worker-status fallback was added to reduce false idle gating caused by transient AI metadata
   drift.
+- MineColonies-style shopkeeper worker-state alignment on the strict branch is authored in this
+  project: Create Shop AI now updates `JobStatus`/`VisibleStatus` during working vs idle states,
+  worker gating prefers `JobStatus.WORKING` over deliveryman-specific `isWorking()` flags, and
+  resolver-active workload signaling is exposed so daytime shop work does not idle while resolver
+  tasks are pending.
