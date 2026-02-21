@@ -674,6 +674,17 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
                 assignmentSelected.getId());
           }
           selected = assignmentSelected;
+        } else {
+          CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
+          if (ownershipSelected != null && !ownershipSelected.getId().equals(selected.getId())) {
+            if (isDebugRequests()) {
+              com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] resolver ownership drift detected: switching {} -> {}",
+                  selected.getId(),
+                  ownershipSelected.getId());
+            }
+            selected = ownershipSelected;
+          }
         }
       }
     }
@@ -706,6 +717,38 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       } catch (IllegalArgumentException ignored) {
         // Ignore stale tokens; health-check and reassignment paths handle cleanup.
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver findResolverFromRequestOwnership(
+      IStandardRequestManager manager) {
+    if (manager == null || manager.getRequestHandler() == null) {
+      return null;
+    }
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return null;
+    }
+    for (java.util.Collection<IToken<?>> requestTokens : assignments.values()) {
+      if (requestTokens == null || requestTokens.isEmpty()) {
+        continue;
+      }
+      for (IToken<?> requestToken : requestTokens) {
+        try {
+          var request = manager.getRequestHandler().getRequest(requestToken);
+          if (request == null) {
+            continue;
+          }
+          IRequestResolver<?> owner = manager.getResolverHandler().getResolverForRequest(request);
+          if (owner instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+            return shop;
+          }
+        } catch (Exception ignored) {
+          // Ignore stale request/resolver links.
+        }
       }
     }
     return null;
