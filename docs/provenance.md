@@ -145,3 +145,7 @@ Implementation notes:
   when the active Create Shop resolver token has no direct assignment entry, pending processing now
   recovers assignments from local Create Shop resolver tokens in the manager assignment map, so
   partial-delivery continuations do not stall on resolver-id drift.
+- Partial-delivery network top-up on the strict branch is authored in this project: pending
+  processing now issues an idempotent Create-network top-up request for outstanding deficits
+  (`pendingCount - reservedForRequest`) as soon as stock becomes available, and reserves pulled
+  items to prevent duplicate reordering while delivery children are still in flight.
