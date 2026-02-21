@@ -138,3 +138,6 @@ Implementation notes:
   Shop delivery dispatch no longer injects requests directly into deliveryman jobs and now relies
   on MineColonies warehouse queue dispatch only, with queue deduplication to avoid repeated
   token insertion.
+- Resolver followup behavior alignment on the strict branch is authored in this project:
+  Create Shop resolver followup completion now returns `null` (no explicit followups), matching
+  MineColonies delivery-resolver semantics while avoiding unsafe warehouse-tile casts.
