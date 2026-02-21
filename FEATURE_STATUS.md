@@ -16,6 +16,8 @@ Branch: `refactor/strict-bridge-state-machine`
   and delivery link creation normalizes duplicate same-token links.
 - Resolver selection now falls back to assignment-backed Create Shop resolver tokens when the
   current provider-selected resolver has zero assignments.
+- Delivery child linking is idempotent for wrapped resolve paths (`addChild` skipped when already
+  linked by manager flow).
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)

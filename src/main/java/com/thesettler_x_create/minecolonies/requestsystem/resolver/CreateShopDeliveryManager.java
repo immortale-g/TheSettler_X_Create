@@ -127,7 +127,10 @@ final class CreateShopDeliveryManager {
       return Lists.newArrayList();
     }
     try {
-      request.addChild(token);
+      boolean alreadyLinked = request.getChildren().contains(token);
+      if (!alreadyLinked) {
+        request.addChild(token);
+      }
       int duplicateLinksRemoved = 0;
       boolean seenNewChild = false;
       for (IToken<?> childToken : java.util.List.copyOf(request.getChildren())) {
@@ -155,6 +158,12 @@ final class CreateShopDeliveryManager {
             request.getId(),
             token,
             duplicateLinksRemoved);
+      }
+      if (alreadyLinked && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link exists parent={} child={} skipAddChild=true",
+            request.getId(),
+            token);
       }
     } catch (Exception ex) {
       try {
