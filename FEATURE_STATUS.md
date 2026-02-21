@@ -10,6 +10,8 @@ Branch: `refactor/strict-bridge-state-machine`
 - Resolver drift recovery is active for stale assignment-token scenarios.
 - Delivery child requester binding now uses Create Shop resolver (native MineColonies pattern).
 - Headless guard test added for requester binding in delivery child creation.
+- Cancelled-request tick handling no longer crashes on logger overload mismatch
+  (`ClassCastException` in `tickPendingDeliveries` hotfix).
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
