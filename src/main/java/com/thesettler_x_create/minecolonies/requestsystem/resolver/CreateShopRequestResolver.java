@@ -447,6 +447,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
     }
+    if (assigned == null || assigned.isEmpty()) {
+      java.util.Set<IToken<?>> recoveredByRequest =
+          collectAssignedTokensByRequestResolver(standardManager, assignments);
+      if (!recoveredByRequest.isEmpty()) {
+        assigned = recoveredByRequest;
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending assignment drift recovered by request ownership: resolverId={} recoveredAssignments={}",
+              getId(),
+              recoveredByRequest.size());
+        }
+      }
+    }
     if (Config.DEBUG_LOGGING.getAsBoolean() && assigned == null) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
@@ -998,6 +1011,46 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (resolver instanceof CreateShopRequestResolver shopResolver
           && isLocalShopResolver(shopResolver)) {
         recovered.addAll(values);
+      }
+    }
+    return recovered;
+  }
+
+  private java.util.Set<IToken<?>> collectAssignedTokensByRequestResolver(
+      IStandardRequestManager manager,
+      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
+    java.util.Set<IToken<?>> recovered = new java.util.LinkedHashSet<>();
+    if (manager == null || assignments == null || assignments.isEmpty()) {
+      return recovered;
+    }
+    var requestHandler = manager.getRequestHandler();
+    if (requestHandler == null) {
+      return recovered;
+    }
+    for (java.util.Collection<IToken<?>> values : assignments.values()) {
+      if (values == null || values.isEmpty()) {
+        continue;
+      }
+      for (IToken<?> token : values) {
+        IRequest<?> request;
+        try {
+          request = requestHandler.getRequest(token);
+        } catch (Exception ignored) {
+          continue;
+        }
+        if (request == null) {
+          continue;
+        }
+        IRequestResolver<?> ownerResolver;
+        try {
+          ownerResolver = manager.getResolverHandler().getResolverForRequest(request);
+        } catch (Exception ignored) {
+          continue;
+        }
+        if (ownerResolver instanceof CreateShopRequestResolver shopResolver
+            && isLocalShopResolver(shopResolver)) {
+          recovered.add(token);
+        }
       }
     }
     return recovered;

@@ -32,6 +32,10 @@ Branch: `refactor/strict-bridge-state-machine`
 - Partial-delivery continuation now performs idempotent network top-up in `tickPending`: if a
   request has outstanding `pendingCount` beyond current reservation, missing items are requested
   from the Create stock network immediately when available and reserved to avoid duplicate pulls.
+- Assignment recovery in `tickPending` now includes request-ownership fallback: when resolver-key
+  based recovery still returns empty, assignment tokens are filtered via
+  `resolverHandler.getResolverForRequest(request)` and local Create Shop ownership, reducing
+  stalls when assignment maps reference drifted resolver ids.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
