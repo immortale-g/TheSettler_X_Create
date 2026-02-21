@@ -276,9 +276,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onPlacement() {
     super.onPlacement();
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(getColony());
     ensurePickupLink();
     beltManager.onPlacement();
   }
@@ -287,9 +284,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onUpgradeComplete(int newLevel) {
     super.onUpgradeComplete(newLevel);
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(getColony());
     ensurePickupLink();
     beltManager.onUpgrade();
   }
@@ -298,9 +292,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onColonyTick(IColony colony) {
     super.onColonyTick(colony);
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(colony);
     ensurePickupLink();
     beltManager.tick();
     permaManager.tickPermaRequests(colony);
@@ -574,10 +565,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   /** Returns rack inventory counts for the given stack keys. */
   public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
     return rackIndex.getStockCountsForKeys(keys);
-  }
-
-  private void ensureDeliverableAssignment() {
-    resolverAssignments.ensureDeliverableAssignment();
   }
 
   public void ensurePickupLink() {
