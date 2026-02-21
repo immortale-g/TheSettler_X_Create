@@ -94,3 +94,7 @@ Implementation notes:
   requests are now explicitly linked via `request.addChild(token)` and rolled back via
   `updateRequestState(..., CANCELLED)` if link creation fails, reducing orphan-child risk in
   parent completion flow.
+- Resolver assignment-drift hardening on the strict branch is authored in this project: the shop
+  now synchronizes to the active MineColonies-registered resolver token for its provider before
+  pending tick processing, and triggers provider repair only when registration/type membership is
+  inconsistent.
