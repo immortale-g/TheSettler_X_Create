@@ -26,6 +26,9 @@ Branch: `refactor/strict-bridge-state-machine`
   injection) with queue-token dedupe.
 - Create Shop resolver completion followup now returns `null` (instead of an empty list) to align
   with MineColonies delivery-resolver semantics and avoid unsafe warehouse-followup casts.
+- `tickPending` now recovers assignment tokens from local Create Shop resolvers when the current
+  resolver token drifts and has no direct assignment entry (`assignmentsKeys` fallback), preventing
+  no-assignment stalls after partial/cancel churn.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
