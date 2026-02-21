@@ -29,10 +29,12 @@ final class ShopWorkerStatus {
   }
 
   boolean isWorkerWorking() {
+    boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
       if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
         continue;
       }
+      hasShopWorker = true;
       if (isCitizenUnavailable(citizen)) {
         continue;
       }
@@ -53,6 +55,13 @@ final class ShopWorkerStatus {
       } catch (Exception ignored) {
         // Ignore entity lookup issues.
       }
+    }
+    if (hasShopWorker
+        && shop.getColony() != null
+        && shop.getColony().getWorld() != null
+        && shop.getColony().getWorld().isDay()) {
+      // Daytime fallback: avoid hard false-negatives from transient AI metadata/status drift.
+      return true;
     }
     return false;
   }

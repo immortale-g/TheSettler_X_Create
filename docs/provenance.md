@@ -153,3 +153,8 @@ Implementation notes:
   processing now performs a second recovery pass that inspects assignment tokens by request
   ownership (`getResolverForRequest`) and only keeps tokens owned by a local Create Shop resolver,
   so request handling can continue when resolver-id keyed assignment maps drift.
+- Worker-gated ordering split on the strict branch is authored in this project: Create-network
+  ordering/top-up remains gated by `isWorkerWorking()`, while rack-only delivery-child creation
+  can continue during temporary worker idle to avoid blocking already-arrived items; daytime
+  worker-status fallback was added to reduce false idle gating caused by transient AI metadata
+  drift.
