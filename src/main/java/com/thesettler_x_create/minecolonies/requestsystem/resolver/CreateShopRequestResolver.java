@@ -535,7 +535,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             "com.thesettler_x_create.message.createshop.flow_cancelled");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
+              "[CreateShop] tickPending: " + request.getId() + " skip (state cancelled)");
         }
         continue;
       }

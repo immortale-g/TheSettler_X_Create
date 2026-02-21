@@ -111,3 +111,7 @@ Implementation notes:
   delivery children are now created with the Create Shop resolver as requester (aligned to
   MineColonies warehouse-resolver pattern) instead of the parent requester, reducing resolver-chain
   drift and stuck `IN_PROGRESS` child risk.
+- Tick-pending cancellation logging hotfix on the strict branch is authored in this project: a
+  logger call in Create Shop pending processing was corrected to avoid a runtime
+  `ClassCastException` (`StandardToken` being routed to a throwable overload), preventing colony
+  tick interruption during cancelled-request handling.
