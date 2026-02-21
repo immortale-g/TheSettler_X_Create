@@ -5,15 +5,14 @@ import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry.ModuleProducer;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.apiimp.CommonMinecoloniesAPIImpl;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.WorkerBuildingModule;
-import com.minecolonies.core.colony.buildings.moduleviews.CourierAssignmentModuleView;
 import com.minecolonies.core.colony.buildings.moduleviews.WorkerBuildingModuleView;
 import com.minecolonies.core.colony.buildings.views.EmptyView;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopAddressModule;
-import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopOutputModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopPermaModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopStockModule;
@@ -54,14 +53,8 @@ public final class ModMinecoloniesBuildings {
                                   true,
                                   building -> 1),
                           () -> WorkerBuildingModuleView::new))
-                  .addBuildingModuleProducer(
-                      new ModuleProducer<>(
-                          "createshop_couriers",
-                          CreateShopCourierModule::new,
-                          () -> CourierAssignmentModuleView::new))
-                  .addBuildingModuleProducer(
-                      com.minecolonies.core.colony.buildings.modules.BuildingModules
-                          .WAREHOUSE_REQUEST_QUEUE)
+                  .addBuildingModuleProducer(BuildingModules.WAREHOUSE_COURIERS)
+                  .addBuildingModuleProducer(BuildingModules.WAREHOUSE_REQUEST_QUEUE)
                   .addBuildingModuleProducer(
                       new ModuleProducer<>(
                           "createshop_address",
