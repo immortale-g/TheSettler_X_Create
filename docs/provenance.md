@@ -98,3 +98,6 @@ Implementation notes:
   now synchronizes to the active MineColonies-registered resolver token for its provider before
   pending tick processing, and triggers provider repair only when registration/type membership is
   inconsistent.
+- Parent/child delivery-chain completion fix on the strict branch is authored in this project:
+  created delivery requests now set both parent-child edges (`addChild` + `setParent`) so
+  MineColonies parent completion callbacks can fire normally after child completion.

@@ -158,6 +158,8 @@ Current refactor branch updates
   the shop used a stale local resolver id and saw "no assignments" forever.
 - Global debug tick logging is now throttled to a fixed interval to keep logs readable while
   preserving ongoing resolver-flow diagnostics.
+- Delivery child linkage now sets both sides (`parent.addChild(child)` and `child.setParent(parent)`)
+  so MineColonies `onRequestCompleted` can propagate completion back to the parent request.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

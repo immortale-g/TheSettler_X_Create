@@ -15,6 +15,7 @@ class CreateShopDeliveryManagerLinkGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryManager.java"));
 
     assertTrue(source.contains("request.addChild(token)"));
+    assertTrue(source.contains("child.setParent(request.getId())"));
     assertTrue(source.contains("updateRequestState("));
     assertTrue(source.contains("RequestState.CANCELLED"));
   }

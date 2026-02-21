@@ -127,6 +127,14 @@ final class CreateShopDeliveryManager {
     }
     try {
       request.addChild(token);
+      IStandardRequestManager standardManager =
+          CreateShopRequestResolver.unwrapStandardManager(manager);
+      if (standardManager != null && standardManager.getRequestHandler() != null) {
+        IRequest<?> child = standardManager.getRequestHandler().getRequest(token);
+        if (child != null) {
+          child.setParent(request.getId());
+        }
+      }
     } catch (Exception ex) {
       try {
         manager.updateRequestState(
