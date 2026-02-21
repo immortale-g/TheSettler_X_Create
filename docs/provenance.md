@@ -130,3 +130,7 @@ Implementation notes:
   Create Shop delivery fallback now handles `WrappedBlacklistAssignmentRequestManager` paths by
   using generic request-manager assignment checks and queue enqueue fallback, preventing
   `notified=0` delivery stalls when standard-manager unwrapping is unavailable.
+- Wrapped-manager delivery creation deferral on the strict branch is authored in this project:
+  `attemptResolve` now defers rack-based delivery-child creation when running under wrapped request
+  managers and leaves child creation to `tickPending` under the standard manager, avoiding
+  unregistered-child tokens and subsequent cancel/reorder loops.

@@ -20,6 +20,8 @@ Branch: `refactor/strict-bridge-state-machine`
   linked by manager flow).
 - Delivery fallback now supports wrapped request managers (assignment attempt + queue enqueue
   fallback when `IStandardRequestManager` unwrapping is unavailable).
+- `attemptResolve` now defers rack-delivery child creation for wrapped managers and hands off
+  creation to standard-manager `tickPending`.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)

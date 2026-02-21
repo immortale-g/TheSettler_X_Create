@@ -261,6 +261,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           "com.thesettler_x_create.message.createshop.flow_ordered");
       // If we can satisfy from racks, create deliveries immediately.
       if (rackUsable > 0) {
+        if (unwrapStandardManager(manager) == null) {
+          cooldown.markRequestOrdered(level, request.getId());
+          pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
+          diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-wrapped-manager");
+          flowStateMachine.touch(request.getId(), now, "attemptResolve:defer-wrapped-manager");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] attemptResolve defer delivery creation (wrapped manager) request={} needed={} rackUsable={}",
+                request.getId(),
+                needed,
+                rackUsable);
+          }
+          return Lists.newArrayList();
+        }
         transitionFlow(
             manager,
             request,
