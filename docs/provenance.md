@@ -90,3 +90,7 @@ Implementation notes:
   favor of MineColonies-native resolver registration assignment behavior.
 - Headless tests introduced on the strict branch (state-machine monotonic/timeout behavior and
   no-private-reflection guard for resolver manager unwrapping) are authored in this project.
+- Parent-child link hardening on the strict branch is authored in this project: delivery child
+  requests are now explicitly linked via `request.addChild(token)` and rolled back via
+  `updateRequestState(..., CANCELLED)` if link creation fails, reducing orphan-child risk in
+  parent completion flow.

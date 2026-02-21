@@ -150,6 +150,9 @@ Current refactor branch updates
   type assignment now follows native MineColonies resolver registration behavior.
 - Added new tests for the state-machine monotonic/timeout behavior and a headless guard that
   enforces no private-field reflection in `CreateShopRequestResolver` manager unwrapping.
+- Delivery child creation now hard-links child tokens to their parent request (`parent.addChild`)
+  with rollback cancellation if linking fails, preventing orphan delivery children that cannot
+  terminate the parent flow.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.
