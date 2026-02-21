@@ -29,6 +29,9 @@ Branch: `refactor/strict-bridge-state-machine`
 - `tickPending` now recovers assignment tokens from local Create Shop resolvers when the current
   resolver token drifts and has no direct assignment entry (`assignmentsKeys` fallback), preventing
   no-assignment stalls after partial/cancel churn.
+- Partial-delivery continuation now performs idempotent network top-up in `tickPending`: if a
+  request has outstanding `pendingCount` beyond current reservation, missing items are requested
+  from the Create stock network immediately when available and reserved to avoid duplicate pulls.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
