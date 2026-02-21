@@ -6,6 +6,7 @@ import com.minecolonies.api.util.MessageUtils;
 import com.thesettler_x_create.Config;
 import java.util.List;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 final class CreateShopResolverMessaging {
   CreateShopResolverMessaging(CreateShopRequestResolver resolver) {}
@@ -25,6 +26,21 @@ final class CreateShopResolverMessaging {
           .sendTo(manager.getColony())
           .forAllPlayers();
     }
+  }
+
+  void sendFlowStep(
+      IRequestManager manager,
+      String key,
+      IRequest<?> request,
+      @Nullable String stackLabel,
+      int amount) {
+    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean() || manager == null || request == null) {
+      return;
+    }
+    String token = String.valueOf(request.getId());
+    String item = stackLabel == null || stackLabel.isBlank() ? "-" : stackLabel;
+    int count = Math.max(0, amount);
+    MessageUtils.format(key, token, item, count).sendTo(manager.getColony()).forAllPlayers();
   }
 
   String resolveRequesterName(IRequestManager manager, IRequest<?> request) {

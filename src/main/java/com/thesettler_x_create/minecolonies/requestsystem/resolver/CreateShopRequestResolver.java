@@ -79,6 +79,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPendingDeliveryTracker();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
+  private final CreateShopRequestStateMachine flowStateMachine =
+      new CreateShopRequestStateMachine();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -109,6 +111,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public List<IToken<?>> attemptResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    long now = resolveNowTick(manager);
+    transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.ELIGIBILITY_CHECK,
+        "attemptResolve:start",
+        "",
+        0,
+        null);
     if (request.getState()
         == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
       cancelledRequests.add(request.getId());
@@ -137,6 +148,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return Lists.newArrayList();
     }
     if (hasDeliveriesCreated(request.getId())) {
+      flowStateMachine.touch(request.getId(), now, "attemptResolve:deliveries-created");
       return Lists.newArrayList();
     }
     IDeliverable deliverable = request.getRequest();
@@ -178,6 +190,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
     if (needed <= 0) {
+      flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (needed<=0)");
       }
@@ -185,6 +198,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     boolean workerWorking = shop.isWorkerWorking();
     if (workerAvailabilityGate.shouldDeferNetworkOrder(workerWorking, needed)) {
+      flowStateMachine.touch(request.getId(), now, "attemptResolve:worker-unavailable");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve deferred (worker not working) request=" + request.getId());
@@ -202,6 +216,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     int available = Math.max(0, snapshot.getNetworkAvailable() + rackUsable);
     int provide = Math.min(available, needed);
     if (provide <= 0) {
+      flowStateMachine.touch(request.getId(), now, "attemptResolve:insufficient");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve aborted (available={}, reserved={}, needed={}) for {}",
@@ -236,12 +251,36 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           ordered.size());
     }
     if (!ordered.isEmpty()) {
+      transitionFlow(
+          manager,
+          request,
+          CreateShopFlowState.ORDERED_FROM_NETWORK,
+          "attemptResolve:order-created",
+          describeStack(ordered.get(0)),
+          countStackList(ordered),
+          "com.thesettler_x_create.message.createshop.flow_ordered");
       // If we can satisfy from racks, create deliveries immediately.
       if (rackUsable > 0) {
+        transitionFlow(
+            manager,
+            request,
+            CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
+            "attemptResolve:rack-usable",
+            describeStack(ordered.get(0)),
+            countStackList(ordered),
+            "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
             deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup, shop);
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
+          transitionFlow(
+              manager,
+              request,
+              CreateShopFlowState.RESERVED_FOR_DELIVERY,
+              "attemptResolve:reserved-consumed",
+              describeStack(ordered.get(0)),
+              plannedCount,
+              "com.thesettler_x_create.message.createshop.flow_reserved");
         }
         if (remaining > 0) {
           cooldown.markRequestOrdered(level, request.getId());
@@ -254,6 +293,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               request.getId(),
               manager.getClass().getName(),
               created);
+        }
+        if (!created.isEmpty()) {
+          transitionFlow(
+              manager,
+              request,
+              CreateShopFlowState.DELIVERY_CREATED,
+              "attemptResolve:delivery-created",
+              describeStack(ordered.get(0)),
+              plannedCount,
+              "com.thesettler_x_create.message.createshop.flow_delivery_created");
         }
         return created;
       }
@@ -459,6 +508,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           cooldown.clearRequestCooldown(request.getId());
           clearDeliveriesCreated(request.getId());
           diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
+          transitionFlow(
+              manager,
+              request,
+              CreateShopFlowState.CANCELLED,
+              "tickPending:cancelled",
+              "",
+              0,
+              "com.thesettler_x_create.message.createshop.flow_cancelled");
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] tickPending: " + request.getId() + " skip (cancelled)");
@@ -468,6 +525,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       if (request.getState()
           == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
+        transitionFlow(
+            manager,
+            request,
+            CreateShopFlowState.CANCELLED,
+            "tickPending:state-cancelled",
+            "",
+            0,
+            "com.thesettler_x_create.message.createshop.flow_cancelled");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
@@ -656,6 +721,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
+        flowStateMachine.touch(
+            request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
         if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
           cooldown.markRequestOrdered(level, request.getId());
           pendingTracker.setPendingCount(request.getId(), pendingCount);
@@ -673,6 +740,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
       int totalAvailable = rackAvailable;
       if (totalAvailable <= 0) {
+        flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:waiting-arrival");
         diagnostics.logPendingReasonChange(
             request.getId(),
             "wait:available="
@@ -701,6 +769,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks =
           planning.planFromRacksWithPositions(tile, deliverable, deliverCount);
       if (stacks.isEmpty()) {
+        flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:plan-empty");
         diagnostics.logPendingReasonChange(request.getId(), "wait:plan-empty");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
@@ -723,6 +792,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       List<IToken<?>> created =
           deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup, shop);
       if (created.isEmpty()) {
+        flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:create-failed");
         diagnostics.logPendingReasonChange(request.getId(), "create:failed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
@@ -731,14 +801,38 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       List<ItemStack> ordered = planning.extractStacks(stacks);
+      transitionFlow(
+          manager,
+          request,
+          CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
+          "tickPending:rack-arrived",
+          describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
+          countStackList(ordered),
+          "com.thesettler_x_create.message.createshop.flow_arrived");
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.goods_arrived", ordered);
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
+      transitionFlow(
+          manager,
+          request,
+          CreateShopFlowState.DELIVERY_CREATED,
+          "tickPending:delivery-created",
+          describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
+          countStackList(ordered),
+          "com.thesettler_x_create.message.createshop.flow_delivery_created");
       diagnostics.logPendingReasonChange(request.getId(), "create:delivery");
       int deliveredCount = planning.countPlanned(stacks);
       if (reservedForRequest > 0 && deliveredCount > 0) {
         consumeReservedForRequest(pickup, requestId, stacks);
+        transitionFlow(
+            manager,
+            request,
+            CreateShopFlowState.RESERVED_FOR_DELIVERY,
+            "tickPending:reserved-consumed",
+            describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
+            deliveredCount,
+            "com.thesettler_x_create.message.createshop.flow_reserved");
       }
       int remainingCount = Math.max(0, pendingCount - deliveredCount);
       if (remainingCount > 0) {
@@ -754,6 +848,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             "[CreateShop] tickPending: {} skip assignRequest (delivery created)", requestIdLog);
       }
     }
+    processTimedOutFlows(standardManager, level);
     lastTickPendingNanos = System.nanoTime() - perfStart;
     maybeLogPerf(level);
   }
@@ -942,6 +1037,26 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
+    IRequest<?> parentRequest = null;
+    IStandardRequestManager standard = unwrapStandardManager(manager);
+    if (standard != null) {
+      try {
+        parentRequest = standard.getRequestHandler().getRequest(parentToken);
+      } catch (Exception ignored) {
+        // Ignore lookup failures; callbacks remain best-effort.
+      }
+    }
+    if (parentRequest != null) {
+      transitionFlow(
+          manager,
+          parentRequest,
+          CreateShopFlowState.DELIVERY_COMPLETED,
+          "delivery-complete",
+          describeStack(
+              request.getRequest() instanceof Delivery d ? d.getStack() : ItemStack.EMPTY),
+          request.getRequest() instanceof Delivery d ? d.getStack().getCount() : 0,
+          "com.thesettler_x_create.message.createshop.flow_delivery_completed");
+    }
     if (isDebugLoggingEnabled()
         && request != null
         && request.getRequest() instanceof Delivery delivery) {
@@ -995,10 +1110,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTracker.remove(parentToken);
     }
     if (isDebugLoggingEnabled()) {
-      IStandardRequestManager standard = unwrapStandardManager(manager);
-      if (standard != null) {
+      IStandardRequestManager debugManager = unwrapStandardManager(manager);
+      if (debugManager != null) {
         try {
-          var handler = standard.getRequestHandler();
+          var handler = debugManager.getRequestHandler();
           IRequest<?> parent = handler.getRequest(parentToken);
           if (parent == null) {
             TheSettlerXCreate.LOGGER.info(
@@ -1012,8 +1127,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               parentToken,
               parentState,
               hasChildren);
-          diagnostics.logParentChildrenState(standard, parentToken, "delivery-complete");
-          recheck.scheduleParentChildRecheck(standard, parentToken);
+          diagnostics.logParentChildrenState(debugManager, parentToken, "delivery-complete");
+          recheck.scheduleParentChildRecheck(debugManager, parentToken);
         } catch (Exception ignored) {
           // Ignore lookup errors.
         }
@@ -1024,6 +1139,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.CANCELLED,
+        "assigned-cancelled",
+        "",
+        0,
+        "com.thesettler_x_create.message.createshop.flow_cancelled");
     pendingTracker.remove(request.getId());
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
@@ -1033,6 +1156,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
+    transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.CANCELLED,
+        "assigned-cancelled-post",
+        "",
+        0,
+        "com.thesettler_x_create.message.createshop.flow_cancelled");
     pendingTracker.remove(request.getId());
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
@@ -1042,6 +1173,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onRequestedRequestComplete(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
+    transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.REQUEST_COMPLETED,
+        "request-completed",
+        "",
+        0,
+        "com.thesettler_x_create.message.createshop.flow_request_completed");
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
     pendingTracker.remove(request.getId());
@@ -1053,6 +1192,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
+    transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.CANCELLED,
+        "request-cancelled",
+        "",
+        0,
+        "com.thesettler_x_create.message.createshop.flow_cancelled");
     pendingTracker.remove(request.getId());
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
@@ -1154,41 +1301,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   static IStandardRequestManager unwrapStandardManager(IRequestManager manager) {
-    if (manager instanceof IStandardRequestManager standard) {
-      return standard;
-    }
-    if (manager == null) {
-      return null;
-    }
-    java.util.Optional<Object> direct = tryInvoke(manager, "getManager");
-    if (direct.isPresent() && direct.get() instanceof IStandardRequestManager standard) {
-      return standard;
-    }
-    // MineColonies wraps managers without a public accessor; unwrap via reflection.
-    try {
-      Class<?> type = manager.getClass();
-      while (type != null) {
-        try {
-          var field = type.getDeclaredField("wrappedManager");
-          field.setAccessible(true);
-          Object value = field.get(manager);
-          if (value instanceof IStandardRequestManager standard) {
-            return standard;
-          }
-        } catch (NoSuchFieldException ignored) {
-          // Try next superclass.
-        }
-        type = type.getSuperclass();
-      }
-    } catch (Exception ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.warn(
-            "[CreateShop] unwrap manager field failed type={} err={}",
-            manager.getClass().getName(),
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
-    }
-    return null;
+    return manager instanceof IStandardRequestManager standard ? standard : null;
   }
 
   private static CreateShopRequestResolver findResolverByDeliveryToken(
@@ -1261,41 +1374,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   String tryDescribeResolver(Object resolver) {
-    if (resolver == null) {
-      return "<none>";
-    }
-    java.util.Optional<Object> location = tryInvoke(resolver, "getLocation");
-    if (location.isPresent()) {
-      return "location=" + location.get();
-    }
-    java.util.Optional<Object> requester = tryInvoke(resolver, "getRequester");
-    if (requester.isPresent()) {
-      return "requester=" + requester.get();
-    }
-    return "<unknown>";
-  }
-
-  private static java.util.Optional<Object> tryInvoke(Object target, String methodName) {
-    if (target == null || methodName == null) {
-      return java.util.Optional.empty();
-    }
-    try {
-      java.lang.reflect.Method method = target.getClass().getMethod(methodName);
-      return java.util.Optional.ofNullable(method.invoke(target));
-    } catch (NoSuchMethodException ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.debug(
-            "[CreateShop] method {} not available on {}", methodName, target.getClass().getName());
-      }
-      return java.util.Optional.empty();
-    } catch (Exception ex) {
-      TheSettlerXCreate.LOGGER.warn(
-          "[CreateShop] failed to invoke {} on {}: {}",
-          methodName,
-          target.getClass().getName(),
-          ex.getMessage() == null ? "<null>" : ex.getMessage());
-      return java.util.Optional.empty();
-    }
+    return resolver == null ? "<none>" : resolver.getClass().getSimpleName();
   }
 
   private static boolean isDebugLoggingEnabled() {
@@ -1385,5 +1464,84 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   void logDeliveryLinkStateForOps(
       String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
     logDeliveryLinkState(stage, manager, parentToken, childToken);
+  }
+
+  private long resolveNowTick(IRequestManager manager) {
+    if (manager == null || manager.getColony() == null || manager.getColony().getWorld() == null) {
+      return 0L;
+    }
+    return manager.getColony().getWorld().getGameTime();
+  }
+
+  private void transitionFlow(
+      IRequestManager manager,
+      IRequest<?> request,
+      CreateShopFlowState state,
+      String detail,
+      String stackLabel,
+      int amount,
+      String messageKey) {
+    if (manager == null || request == null) {
+      return;
+    }
+    long now = resolveNowTick(manager);
+    boolean changed =
+        flowStateMachine.transition(
+            request.getId(), state, now, detail, stackLabel, Math.max(0, amount));
+    if (changed && messageKey != null) {
+      messaging.sendFlowStep(manager, messageKey, request, stackLabel, amount);
+    }
+  }
+
+  private void processTimedOutFlows(IStandardRequestManager manager, Level level) {
+    long timeout = Math.max(20L * 30L, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+    for (CreateShopFlowRecord record :
+        flowStateMachine.collectTimedOut(level.getGameTime(), timeout)) {
+      IToken<?> token = record.getRequestToken();
+      IRequest<?> request = null;
+      try {
+        request = manager.getRequestHandler().getRequest(token);
+      } catch (Exception ignored) {
+        // Missing requests are cleaned up below.
+      }
+      if (request != null) {
+        transitionFlow(
+            manager,
+            request,
+            CreateShopFlowState.FAILED,
+            "timeout-cleanup",
+            record.getStackLabel(),
+            record.getAmount(),
+            "com.thesettler_x_create.message.createshop.flow_timeout");
+        if (request.getRequest() instanceof IDeliverable) {
+          releaseReservation(manager, request);
+        }
+      }
+      pendingTracker.remove(token);
+      cooldown.clearRequestCooldown(token);
+      clearDeliveriesCreated(token);
+      flowStateMachine.remove(token);
+    }
+  }
+
+  private int countStackList(List<ItemStack> stacks) {
+    if (stacks == null || stacks.isEmpty()) {
+      return 0;
+    }
+    int total = 0;
+    for (ItemStack stack : stacks) {
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      total += stack.getCount();
+    }
+    return total;
+  }
+
+  private String describeStack(ItemStack stack) {
+    if (stack == null || stack.isEmpty()) {
+      return "";
+    }
+    return stack.getHoverName().getString();
   }
 }
