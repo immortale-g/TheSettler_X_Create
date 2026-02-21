@@ -144,13 +144,9 @@ final class CreateShopDeliveryManager {
         request.removeChild(childToken);
         duplicateLinksRemoved++;
       }
-      IStandardRequestManager standardManager =
-          CreateShopRequestResolver.unwrapStandardManager(manager);
-      if (standardManager != null && standardManager.getRequestHandler() != null) {
-        IRequest<?> child = standardManager.getRequestHandler().getRequest(token);
-        if (child != null) {
-          child.setParent(request.getId());
-        }
+      IRequest<?> child = manager.getRequestForToken(token);
+      if (child != null) {
+        child.setParent(request.getId());
       }
       if (duplicateLinksRemoved > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
@@ -197,14 +193,19 @@ final class CreateShopDeliveryManager {
         IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
         if (standard != null && standard.getRequestHandler() != null) {
           try {
-            IRequest<?> created = standard.getRequestHandler().getRequest(token);
-            String createdRequester = created.getRequester().getClass().getName();
-            IToken<?> childParent = created.getParent();
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery create handler token={} createdRequester={} childParent={}",
-                token,
-                createdRequester,
-                childParent == null ? "<none>" : childParent);
+            IRequest<?> created = manager.getRequestForToken(token);
+            if (created != null) {
+              String createdRequester = created.getRequester().getClass().getName();
+              IToken<?> childParent = created.getParent();
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery create handler token={} createdRequester={} childParent={}",
+                  token,
+                  createdRequester,
+                  childParent == null ? "<none>" : childParent);
+            } else {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery create handler token={} created=<null>", token);
+            }
           } catch (Exception ex) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] delivery create handler token={} error={}",
@@ -238,13 +239,34 @@ final class CreateShopDeliveryManager {
         // If still unassigned, enqueue into a warehouse request queue with couriers.
         var assignedAfter = assignmentStore.getAssignmentForValue(token);
         if (assignedAfter == null) {
-          boolean enqueued = tryEnqueueDelivery(standard, token);
+          boolean enqueued = tryEnqueueDelivery(manager, token);
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] delivery fallback enqueue token={} result={}",
                 token,
                 enqueued ? "ok" : "none");
           }
+        }
+      }
+    } else {
+      try {
+        manager.assignRequest(token);
+      } catch (Exception ignored) {
+        // Wrapped manager may reject direct assignment; enqueue fallback below handles it.
+      }
+      boolean hasResolver = false;
+      try {
+        hasResolver = manager.getResolverForRequest(token) != null;
+      } catch (Exception ignored) {
+        // If lookup fails, treat as unresolved.
+      }
+      if (!hasResolver) {
+        boolean enqueued = tryEnqueueDelivery(manager, token);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] delivery fallback enqueue(wrapped) token={} result={}",
+              token,
+              enqueued ? "ok" : "none");
         }
       }
     }
@@ -271,11 +293,7 @@ final class CreateShopDeliveryManager {
     }
     int notified = notifyDeliverymen(manager, token, shop);
     if (notified == 0) {
-      IStandardRequestManager standardManager =
-          CreateShopRequestResolver.unwrapStandardManager(manager);
-      if (standardManager != null) {
-        tryEnqueueDelivery(standardManager, token);
-      }
+      tryEnqueueDelivery(manager, token);
     }
     return Lists.newArrayList(token);
   }
@@ -362,7 +380,7 @@ final class CreateShopDeliveryManager {
         targetBlock);
   }
 
-  boolean tryEnqueueDelivery(IStandardRequestManager manager, IToken<?> token) {
+  boolean tryEnqueueDelivery(IRequestManager manager, IToken<?> token) {
     if (manager == null || token == null) {
       return false;
     }

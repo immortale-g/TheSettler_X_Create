@@ -126,3 +126,7 @@ Implementation notes:
 - Delivery link idempotency hardening on the strict branch is authored in this project: Create
   Shop delivery child linking now skips `addChild` when MineColonies flow already linked the token
   on the parent, preventing repeated same-token child duplication in wrapped resolver flows.
+- Wrapped-manager delivery fallback support on the strict branch is authored in this project:
+  Create Shop delivery fallback now handles `WrappedBlacklistAssignmentRequestManager` paths by
+  using generic request-manager assignment checks and queue enqueue fallback, preventing
+  `notified=0` delivery stalls when standard-manager unwrapping is unavailable.
