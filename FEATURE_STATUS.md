@@ -135,6 +135,21 @@ Current refactor branch updates
 - Started static-inspection cleanup in `CreateShopResolverInjector` to remove redundant null checks,
   simplify duplicated conditions, and keep request reassignment logic behavior-equivalent while reducing
   warning noise for future reviews.
+- Branch `refactor/strict-bridge-state-machine` introduces an explicit Create Shop request
+  state-machine (`CreateShopFlowState`, `CreateShopFlowRecord`, `CreateShopRequestStateMachine`)
+  and wires transitions to resolver lifecycle hooks (`attemptResolve`, pending tick, delivery
+  callbacks, request complete/cancel callbacks).
+- State-machine transitions now emit chat-visible flow steps with request-token context:
+  ordered, arrived at shop, reserved for pickup, delivery created, delivery completed,
+  request completed, cancelled, and timeout reset.
+- Timeout cleanup now resets stale resolver-local state (`pending`, cooldown, delivery-created
+  markers, reservations) for long-idle flows to prevent blocked/zombie resolver progress.
+- Removed legacy global resolver-injector runtime path and SafeRequester factory registration from
+  startup/server-tick wiring to keep resolver ownership on normal building provider registration.
+- Removed legacy deliverable-assignment mutation hook (`ensureDeliverableAssignment`); resolver
+  type assignment now follows native MineColonies resolver registration behavior.
+- Added new tests for the state-machine monotonic/timeout behavior and a headless guard that
+  enforces no private-field reflection in `CreateShopRequestResolver` manager unwrapping.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

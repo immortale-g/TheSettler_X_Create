@@ -76,3 +76,17 @@ Implementation notes:
 - Worker-availability guard validation tests and resolver callback cleanup regression tests are
   authored in this project to reduce repeat regressions around pending-delivery stalls and
   cancellation/cleanup state handling.
+- Strict branch state-machine refactor (branch `refactor/strict-bridge-state-machine`, 2026-02-21)
+  is authored in this project: Create Shop request-flow tracking is now explicit and monotonic via
+  `CreateShopFlowState` + `CreateShopFlowRecord` + `CreateShopRequestStateMachine`, with lifecycle
+  transitions wired to resolver attempt/tick/callback paths and timeout-based stale-flow cleanup.
+- Flow-step chat prompts (ordered, arrived, reserved, delivery-created, delivery-completed,
+  request-completed, cancelled, timeout reset) are authored in this project to make resolver flow
+  observable in live testing without external tooling.
+- Legacy global resolver injection (`CreateShopResolverInjector`) and SafeRequester factory runtime
+  registration were removed on the strict branch; resolver/provider ownership now relies on
+  standard MineColonies building-provider registration paths in this codebase.
+- Legacy manual requestable-type assignment mutation (`ensureDeliverableAssignment`) was removed in
+  favor of MineColonies-native resolver registration assignment behavior.
+- Headless tests introduced on the strict branch (state-machine monotonic/timeout behavior and
+  no-private-reflection guard for resolver manager unwrapping) are authored in this project.
