@@ -188,3 +188,7 @@ Implementation notes:
   project: when a request is owned by MineColonies `StandardRetryingRequestResolver` and Create
   Shop `canResolve` flips to true (e.g. stock added later), the request is re-assigned via
   `reassignRequest` to avoid waiting indefinitely on native retry cadence.
+- Retrying-owner handoff iteration hardening on the strict branch is authored in this project:
+  reassignment scanning now snapshots assignment entries/tokens before mutation and limits to one
+  successful reassignment per tick, preventing `ConcurrentModificationException` during colony tick
+  and reducing assignment churn after late stock updates.
