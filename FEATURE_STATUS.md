@@ -16,6 +16,8 @@ Current behavior:
 - Parent/child link dedupe and drift recovery are active in pending reconciliation.
 - Shopkeeper AI now marks MineColonies-native worker signals (`JobStatus`/`VisibleStatus`) and
   keeps daytime work active while resolver work exists.
+- Resolver selection now includes ownership-based drift recovery, so active local Create Shop
+  requests can re-bind to the resolver that MineColonies currently considers owner.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

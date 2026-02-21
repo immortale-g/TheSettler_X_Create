@@ -163,3 +163,7 @@ Implementation notes:
   worker gating prefers `JobStatus.WORKING` over deliveryman-specific `isWorking()` flags, and
   resolver-active workload signaling is exposed so daytime shop work does not idle while resolver
   tasks are pending.
+- Resolver-token drift recovery on the strict branch is authored in this project: Create Shop
+  resolver selection now includes ownership-based fallback (`getResolverForRequest`) when
+  assignment-key/token maps are out-of-sync, allowing pending local requests to continue without
+  cancel/recreate churn.
