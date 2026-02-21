@@ -149,3 +149,7 @@ Implementation notes:
   processing now issues an idempotent Create-network top-up request for outstanding deficits
   (`pendingCount - reservedForRequest`) as soon as stock becomes available, and reserves pulled
   items to prevent duplicate reordering while delivery children are still in flight.
+- Assignment ownership fallback on the strict branch is authored in this project: pending
+  processing now performs a second recovery pass that inspects assignment tokens by request
+  ownership (`getResolverForRequest`) and only keeps tokens owned by a local Create Shop resolver,
+  so request handling can continue when resolver-id keyed assignment maps drift.
