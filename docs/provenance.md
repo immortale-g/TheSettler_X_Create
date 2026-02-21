@@ -181,3 +181,6 @@ Implementation notes:
   delivery callback parent lookup now uses live request linkage (`request.getParent`) with dynamic
   parent discovery from current assignments as fallback, and pending tick drops tokens no longer
   owned by the local Create Shop resolver.
+- Uninstall-preparation maintenance command on the strict branch is authored in this project:
+  `/thesettlerxcreate prepare_uninstall` performs best-effort Create Shop provider unregistration
+  and cancellation of active Create Shop-owned requests via MineColonies APIs before jar removal.
