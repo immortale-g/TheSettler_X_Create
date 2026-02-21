@@ -2,7 +2,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -25,20 +24,18 @@ class CreateShopRequestResolverCallbacksTest {
     when(resolverLocation.getInDimensionLocation()).thenReturn(BlockPos.ZERO);
     IToken<?> resolverToken = mock(IToken.class);
     resolver = new CreateShopRequestResolver(resolverLocation, resolverToken);
-    resolver.getDeliveryParents().clear();
   }
 
   @Test
-  void deliveryCompleteRemovesLinkMapsAndClearsParentDeliveryFlag() throws Exception {
+  void deliveryCompleteClearsParentDeliveryFlag() throws Exception {
     IToken<?> deliveryToken = mock(IToken.class);
     IToken<?> parentToken = mock(IToken.class);
 
-    resolver.getDeliveryParents().put(deliveryToken, parentToken);
     resolver.markDeliveriesCreated(parentToken);
 
     IRequest<?> deliveryRequest = mock(IRequest.class);
     when(deliveryRequest.getId()).thenReturn(deliveryToken);
-    when(deliveryRequest.getParent()).thenReturn(null);
+    when(deliveryRequest.getParent()).thenReturn(parentToken);
     when(deliveryRequest.getRequest()).thenReturn(mock(IDeliverable.class));
 
     invokePrivate(
@@ -46,7 +43,6 @@ class CreateShopRequestResolverCallbacksTest {
         new Class<?>[] {IRequestManager.class, IRequest.class},
         new Object[] {null, deliveryRequest});
 
-    assertNull(resolver.getDeliveryParents().get(deliveryToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
   }
 
