@@ -153,6 +153,11 @@ Current refactor branch updates
 - Delivery child creation now hard-links child tokens to their parent request (`parent.addChild`)
   with rollback cancellation if linking fails, preventing orphan delivery children that cannot
   terminate the parent flow.
+- Resolver tick-path now syncs to the currently registered provider resolver token (prioritizing
+  DELIVERABLE assignments) before processing pending deliveries, preventing assignment drift where
+  the shop used a stale local resolver id and saw "no assignments" forever.
+- Global debug tick logging is now throttled to a fixed interval to keep logs readable while
+  preserving ongoing resolver-flow diagnostics.
 
 Known gaps / follow-ups
 - Server-side strict gating for `setPermaOre` / `setPermaWaitFullStack` is not enforced; selection can be stored before level 2, though perma requests only tick at level 2.

@@ -11,9 +11,11 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
+import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.block.CreateShopBlock;
@@ -26,6 +28,7 @@ import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopReq
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,6 +82,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopWorkerStatus workerStatus;
   private final ShopNetworkNotifier networkNotifier;
   private final ShopResolverFactory resolverFactory;
+  private long lastResolverHealthcheckTick = -1L;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -293,10 +297,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     super.onColonyTick(colony);
     ensureWarehouseRegistration();
     ensurePickupLink();
+    ensureResolverRegistrationHealthy(colony);
     beltManager.tick();
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
-      CreateShopRequestResolver resolver = getOrCreateShopResolver();
+      CreateShopRequestResolver resolver = resolveTickResolver(colony);
       if (isDebugRequests() && resolver == null) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tick: resolver missing for shop {}",
@@ -556,6 +561,132 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   private void ensureWarehouseRegistration() {
     warehouseRegistrar.ensureWarehouseRegistration();
+  }
+
+  private void ensureResolverRegistrationHealthy(IColony colony) {
+    if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
+      return;
+    }
+    long now = colony.getWorld().getGameTime();
+    if (lastResolverHealthcheckTick >= 0L && now - lastResolverHealthcheckTick < 100L) {
+      return;
+    }
+    lastResolverHealthcheckTick = now;
+
+    CreateShopRequestResolver resolver = getOrCreateShopResolver();
+    if (resolver == null) {
+      return;
+    }
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
+      return;
+    }
+    IToken<?> resolverId = resolver.getId();
+    boolean resolverKnown = false;
+    try {
+      manager.getResolverHandler().getResolver(resolverId);
+      resolverKnown = true;
+    } catch (IllegalArgumentException ignored) {
+      // Health-check handles this.
+    }
+
+    boolean providerContains =
+        manager.getProviderHandler().getRegisteredResolvers(this).contains(resolverId);
+    var deliverableAssignments =
+        manager
+            .getRequestableTypeRequestResolverAssignmentDataStore()
+            .getAssignments()
+            .get(TypeConstants.DELIVERABLE);
+    boolean typeContains =
+        deliverableAssignments != null && deliverableAssignments.contains(resolverId);
+
+    if (resolverKnown && providerContains && typeContains) {
+      return;
+    }
+
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolver health mismatch: resolverKnown={} providerContains={} typeContains={} resolver={}",
+          resolverKnown,
+          providerContains,
+          typeContains,
+          resolverId);
+    }
+    try {
+      colony.getRequestManager().onProviderRemovedFromColony(this);
+    } catch (Exception ignored) {
+      // Best effort cleanup before re-register.
+    }
+    try {
+      colony.getRequestManager().onProviderAddedToColony(this);
+    } catch (Exception ex) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver provider repair failed: {}",
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return;
+    }
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolver provider repair triggered for {}", resolverId);
+    }
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveTickResolver(IColony colony) {
+    if (colony == null || colony.getRequestManager() == null) {
+      return getOrCreateShopResolver();
+    }
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
+      return getOrCreateShopResolver();
+    }
+    CreateShopRequestResolver current = getOrCreateShopResolver();
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers == null || providerResolvers.isEmpty()) {
+      return current;
+    }
+
+    var deliverableAssignments =
+        manager
+            .getRequestableTypeRequestResolverAssignmentDataStore()
+            .getAssignments()
+            .get(TypeConstants.DELIVERABLE);
+    Set<IToken<?>> prioritized = new LinkedHashSet<>();
+    if (deliverableAssignments != null) {
+      for (IToken<?> token : deliverableAssignments) {
+        if (providerResolvers.contains(token)) {
+          prioritized.add(token);
+        }
+      }
+    }
+    prioritized.addAll(providerResolvers);
+
+    CreateShopRequestResolver selected = null;
+    for (IToken<?> token : prioritized) {
+      try {
+        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
+        if (resolver instanceof CreateShopRequestResolver csr) {
+          selected = csr;
+          break;
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Ignore stale ids; health-check will repair registration.
+      }
+    }
+
+    if (selected == null) {
+      return current;
+    }
+    if (current == null || !current.getId().equals(selected.getId())) {
+      setResolverState(selected, deliveryResolverToken, pickupResolverToken);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver synced to registered token {} (previous={})",
+            selected.getId(),
+            current == null ? "<null>" : current.getId());
+      }
+    }
+    return selected;
   }
 
   public void ensureRackContainers() {

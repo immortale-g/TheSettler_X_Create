@@ -39,6 +39,7 @@ import org.slf4j.Logger;
 public class TheSettlerXCreate {
   public static final String MODID = "thesettler_x_create";
   public static final Logger LOGGER = LogUtils.getLogger();
+  private long lastGlobalTickLog = -1L;
 
   public TheSettlerXCreate(IEventBus modEventBus, ModContainer modContainer) {
     modEventBus.addListener(this::commonSetup);
@@ -116,7 +117,11 @@ public class TheSettlerXCreate {
     CreateNetworkFacade.flushQueuedRequests();
     IColonyManager manager = IColonyManager.getInstance();
     var colonies = manager.getAllColonies();
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()
+        && event.getServer() != null
+        && (lastGlobalTickLog < 0L
+            || event.getServer().getTickCount() - lastGlobalTickLog >= 200L)) {
+      lastGlobalTickLog = event.getServer().getTickCount();
       LOGGER.info("[CreateShop] Global shop tick, colonies={}", colonies.size());
     }
   }
