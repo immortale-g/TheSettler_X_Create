@@ -35,3 +35,7 @@ Current behavior:
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
+
+Out of scope for this PR:
+- `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked
+  as a follow-up TODO for dedicated Create API extraction wiring.
