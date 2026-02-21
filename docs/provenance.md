@@ -177,3 +177,7 @@ Implementation notes:
 - Live resolver-health synchronization on the strict branch is authored in this project:
   `BuildingCreateShop` now resolves local Create Shop resolvers from manager provider/assignment/
   ownership data before health-repair decisions, reducing stale cached resolver-token influence.
+- Remaining delivery-parent token cache removal on the strict branch is authored in this project:
+  delivery callback parent lookup now uses live request linkage (`request.getParent`) with dynamic
+  parent discovery from current assignments as fallback, and pending tick drops tokens no longer
+  owned by the local Create Shop resolver.

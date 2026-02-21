@@ -24,6 +24,8 @@ Current behavior:
   removing resolver-token map coupling from delivery callback routing.
 - Building resolver health/sync now resolves local Create Shop resolver instances live from
   provider/assignment/owner data before considering provider repair, reducing cached-token bias.
+- Delivery parent resolution is now live-only (request parent or dynamic parent scan via current
+  assignments), and pending processing drops requests no longer owned by the local resolver.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
