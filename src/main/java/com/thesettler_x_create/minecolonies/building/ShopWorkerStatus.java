@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
+import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import java.util.Set;
@@ -29,17 +30,19 @@ final class ShopWorkerStatus {
   }
 
   boolean isWorkerWorking() {
+    boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
       if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
         continue;
       }
+      hasShopWorker = true;
       if (isCitizenUnavailable(citizen)) {
         continue;
       }
-      if (citizen.isWorking()) {
+      if (citizen.getJobStatus() == JobStatus.WORKING) {
         return true;
       }
-      if (citizen.getJobStatus() == com.minecolonies.api.entity.ai.JobStatus.WORKING) {
+      if (citizen.isWorking()) {
         return true;
       }
       try {
@@ -53,6 +56,13 @@ final class ShopWorkerStatus {
       } catch (Exception ignored) {
         // Ignore entity lookup issues.
       }
+    }
+    if (hasShopWorker
+        && shop.getColony() != null
+        && shop.getColony().getWorld() != null
+        && shop.getColony().getWorld().isDay()) {
+      // Daytime fallback: avoid hard false-negatives from transient AI metadata/status drift.
+      return true;
     }
     return false;
   }

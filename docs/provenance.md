@@ -76,3 +76,123 @@ Implementation notes:
 - Worker-availability guard validation tests and resolver callback cleanup regression tests are
   authored in this project to reduce repeat regressions around pending-delivery stalls and
   cancellation/cleanup state handling.
+- Strict branch state-machine refactor (branch `refactor/strict-bridge-state-machine`, 2026-02-21)
+  is authored in this project: Create Shop request-flow tracking is now explicit and monotonic via
+  `CreateShopFlowState` + `CreateShopFlowRecord` + `CreateShopRequestStateMachine`, with lifecycle
+  transitions wired to resolver attempt/tick/callback paths and timeout-based stale-flow cleanup.
+- Flow-step chat prompts (ordered, arrived, reserved, delivery-created, delivery-completed,
+  request-completed, cancelled, timeout reset) are authored in this project to make resolver flow
+  observable in live testing without external tooling.
+- Legacy global resolver injection (`CreateShopResolverInjector`) and SafeRequester factory runtime
+  registration were removed on the strict branch; resolver/provider ownership now relies on
+  standard MineColonies building-provider registration paths in this codebase.
+- Legacy manual requestable-type assignment mutation (`ensureDeliverableAssignment`) was removed in
+  favor of MineColonies-native resolver registration assignment behavior.
+- Headless tests introduced on the strict branch (state-machine monotonic/timeout behavior and
+  no-private-reflection guard for resolver manager unwrapping) are authored in this project.
+- Parent-child link hardening on the strict branch is authored in this project: delivery child
+  requests are now explicitly linked via `request.addChild(token)` and rolled back via
+  `updateRequestState(..., CANCELLED)` if link creation fails, reducing orphan-child risk in
+  parent completion flow.
+- Resolver assignment-drift hardening on the strict branch is authored in this project: the shop
+  now synchronizes to the active MineColonies-registered resolver token for its provider before
+  pending tick processing, and triggers provider repair only when registration/type membership is
+  inconsistent.
+- Parent/child delivery-chain completion fix on the strict branch is authored in this project:
+  created delivery requests now set both parent-child edges (`addChild` + `setParent`) so
+  MineColonies parent completion callbacks can fire normally after child completion.
+- Custom Create Shop courier-module removal on the strict branch is authored in this project:
+  Create Shop now uses MineColonies native warehouse courier module wiring instead of a mod-specific
+  courier-assignment implementation.
+- Resolver drift repair hardening on the strict branch is authored in this project: the resolver
+  factory no longer reuses stale cached shop-resolver instances across request-system rebuilds, and
+  tick resolver selection can recover via assignment-backed Create Shop resolver discovery.
+- Delivery child requester binding on the strict branch is authored in this project: Create Shop
+  delivery children are now created with the Create Shop resolver as requester (aligned to
+  MineColonies warehouse-resolver pattern) instead of the parent requester, reducing resolver-chain
+  drift and stuck `IN_PROGRESS` child risk.
+- Tick-pending cancellation logging hotfix on the strict branch is authored in this project: a
+  logger call in Create Shop pending processing was corrected to avoid a runtime
+  `ClassCastException` (`StandardToken` being routed to a throwable overload), preventing colony
+  tick interruption during cancelled-request handling.
+- Parent-child duplication guard on the strict branch is authored in this project: Create Shop
+  pending processing now removes duplicate child-token entries from parent requests, and delivery
+  child-link creation deduplicates repeated same-token parent links to avoid multi-processing of a
+  single delivery child.
+- Resolver assignment-drift fallback improvement on the strict branch is authored in this project:
+  tick resolver selection now prefers an assignment-backed Create Shop resolver when the
+  provider-prioritized resolver has no assigned requests, reducing no-assignment stalls after
+  request-system token churn.
+- Delivery link idempotency hardening on the strict branch is authored in this project: Create
+  Shop delivery child linking now skips `addChild` when MineColonies flow already linked the token
+  on the parent, preventing repeated same-token child duplication in wrapped resolver flows.
+- Wrapped-manager delivery fallback support on the strict branch is authored in this project:
+  Create Shop delivery fallback now handles `WrappedBlacklistAssignmentRequestManager` paths by
+  using generic request-manager assignment checks and queue enqueue fallback, preventing
+  `notified=0` delivery stalls when standard-manager unwrapping is unavailable.
+- Wrapped-manager delivery creation deferral on the strict branch is authored in this project:
+  `attemptResolve` now defers rack-based delivery-child creation when running under wrapped request
+  managers and leaves child creation to `tickPending` under the standard manager, avoiding
+  unregistered-child tokens and subsequent cancel/reorder loops.
+- Queue-only courier dispatch hardening on the strict branch is authored in this project: Create
+  Shop delivery dispatch no longer injects requests directly into deliveryman jobs and now relies
+  on MineColonies warehouse queue dispatch only, with queue deduplication to avoid repeated
+  token insertion.
+- Resolver followup behavior alignment on the strict branch is authored in this project:
+  Create Shop resolver followup completion now returns `null` (no explicit followups), matching
+  MineColonies delivery-resolver semantics while avoiding unsafe warehouse-tile casts.
+- Tick-pending assignment drift recovery on the strict branch is authored in this project:
+  when the active Create Shop resolver token has no direct assignment entry, pending processing now
+  recovers assignments from local Create Shop resolver tokens in the manager assignment map, so
+  partial-delivery continuations do not stall on resolver-id drift.
+- Partial-delivery network top-up on the strict branch is authored in this project: pending
+  processing now issues an idempotent Create-network top-up request for outstanding deficits
+  (`pendingCount - reservedForRequest`) as soon as stock becomes available, and reserves pulled
+  items to prevent duplicate reordering while delivery children are still in flight.
+- Assignment ownership fallback on the strict branch is authored in this project: pending
+  processing now performs a second recovery pass that inspects assignment tokens by request
+  ownership (`getResolverForRequest`) and only keeps tokens owned by a local Create Shop resolver,
+  so request handling can continue when resolver-id keyed assignment maps drift.
+- Worker-gated ordering split on the strict branch is authored in this project: Create-network
+  ordering/top-up remains gated by `isWorkerWorking()`, while rack-only delivery-child creation
+  can continue during temporary worker idle to avoid blocking already-arrived items; daytime
+  worker-status fallback was added to reduce false idle gating caused by transient AI metadata
+  drift.
+- MineColonies-style shopkeeper worker-state alignment on the strict branch is authored in this
+  project: Create Shop AI now updates `JobStatus`/`VisibleStatus` during working vs idle states,
+  worker gating prefers `JobStatus.WORKING` over deliveryman-specific `isWorking()` flags, and
+  resolver-active workload signaling is exposed so daytime shop work does not idle while resolver
+  tasks are pending.
+- Resolver-token drift recovery on the strict branch is authored in this project: Create Shop
+  resolver selection now includes ownership-based fallback (`getResolverForRequest`) when
+  assignment-key/token maps are out-of-sync, allowing pending local requests to continue without
+  cancel/recreate churn.
+- Dynamic request-owner pending processing on the strict branch is authored in this project:
+  `tickPending` now prioritizes per-request owner resolution (`getResolverForRequest`) over
+  resolver-token assignment keys, reducing repeated stalls when resolver IDs drift while requests
+  remain valid in MineColonies.
+- Delivery callback routing on the strict branch is authored in this project: child-delivery
+  callback resolution no longer depends on stored resolver tokens and instead resolves through
+  child->parent linkage plus MineColonies owner lookup for the parent request.
+- Live resolver-health synchronization on the strict branch is authored in this project:
+  `BuildingCreateShop` now resolves local Create Shop resolvers from manager provider/assignment/
+  ownership data before health-repair decisions, reducing stale cached resolver-token influence.
+- Remaining delivery-parent token cache removal on the strict branch is authored in this project:
+  delivery callback parent lookup now uses live request linkage (`request.getParent`) with dynamic
+  parent discovery from current assignments as fallback, and pending tick drops tokens no longer
+  owned by the local Create Shop resolver.
+- Uninstall-preparation maintenance command on the strict branch is authored in this project:
+  `/thesettlerxcreate prepare_uninstall` performs best-effort Create Shop provider unregistration
+  and cancellation of active Create Shop-owned requests via MineColonies APIs before jar removal.
+- Retrying-owner handoff for late stock availability on the strict branch is authored in this
+  project: when a request is owned by MineColonies `StandardRetryingRequestResolver` and Create
+  Shop `canResolve` flips to true (e.g. stock added later), the request is re-assigned via
+  `reassignRequest` to avoid waiting indefinitely on native retry cadence.
+- Retrying-owner handoff iteration hardening on the strict branch is authored in this project:
+  reassignment scanning now snapshots assignment entries/tokens before mutation and limits to one
+  successful reassignment per tick, preventing `ConcurrentModificationException` during colony tick
+  and reducing assignment churn after late stock updates.
+- PR-scope boundary note on the strict branch is authored in this project: Create network
+  extraction implementation in `CreateNetworkFacade.extract(...)` remains intentionally out of
+  scope for this PR and is tracked as a local follow-up TODO, while current resolver flow continues
+  to use existing network-order pathways.
