@@ -553,9 +553,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         java.util.Collection<IToken<?>> children =
             java.util.Objects.requireNonNull(request.getChildren(), "children");
         int missing = 0;
+        int duplicateChildrenRemoved = 0;
         boolean hasActiveChildren = false;
         if (!children.isEmpty()) {
+          java.util.Set<IToken<?>> seenChildren = new java.util.HashSet<>();
           for (IToken<?> childToken : java.util.List.copyOf(children)) {
+            if (!seenChildren.add(childToken)) {
+              request.removeChild(childToken);
+              duplicateChildrenRemoved++;
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} child {} duplicate -> removed",
+                    requestIdLog,
+                    childToken);
+              }
+              continue;
+            }
             try {
               IRequest<?> child = requestHandler.getRequest(childToken);
               if (child == null) {
@@ -647,6 +660,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 "[CreateShop] tickPending: {} missing children={} total={}",
                 requestIdLog,
                 missing,
+                children.size());
+          } else if (duplicateChildrenRemoved > 0) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} duplicate children removed={} total={}",
+                requestIdLog,
+                duplicateChildrenRemoved,
                 children.size());
           }
         }

@@ -12,6 +12,8 @@ Branch: `refactor/strict-bridge-state-machine`
 - Headless guard test added for requester binding in delivery child creation.
 - Cancelled-request tick handling no longer crashes on logger overload mismatch
   (`ClassCastException` in `tickPendingDeliveries` hotfix).
+- Duplicate child-token guard is active: parent child lists are deduplicated during pending tick,
+  and delivery link creation normalizes duplicate same-token links.
 
 ## In Progress
 - End-to-end child completion closure reliability (parent closes after child delivery completion)
