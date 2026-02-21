@@ -107,3 +107,7 @@ Implementation notes:
 - Resolver drift repair hardening on the strict branch is authored in this project: the resolver
   factory no longer reuses stale cached shop-resolver instances across request-system rebuilds, and
   tick resolver selection can recover via assignment-backed Create Shop resolver discovery.
+- Delivery child requester binding on the strict branch is authored in this project: Create Shop
+  delivery children are now created with the Create Shop resolver as requester (aligned to
+  MineColonies warehouse-resolver pattern) instead of the parent requester, reducing resolver-chain
+  drift and stuck `IN_PROGRESS` child risk.

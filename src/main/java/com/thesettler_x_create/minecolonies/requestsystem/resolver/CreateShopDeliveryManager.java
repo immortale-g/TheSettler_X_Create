@@ -115,12 +115,13 @@ final class CreateShopDeliveryManager {
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
     IToken<?> token;
     try {
-      token = manager.createRequest(requester, delivery);
+      token = manager.createRequest(resolver, delivery);
     } catch (Exception ex) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery create failed requester={} error={}",
-            requester.getClass().getName(),
+            "[CreateShop] delivery create failed requester={} parentRequester={} error={}",
+            resolver.getClass().getName(),
+            requester == null ? "<null>" : requester.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
       return Lists.newArrayList();
@@ -159,9 +160,10 @@ final class CreateShopDeliveryManager {
       String key = token.toString();
       if (resolver.getDeliveryCreateLogged().add(key)) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery create token={} requesterClass={} managerClass={}",
+            "[CreateShop] delivery create token={} requesterClass={} parentRequesterClass={} managerClass={}",
             token,
-            requester.getClass().getName(),
+            resolver.getClass().getName(),
+            requester == null ? "<null>" : requester.getClass().getName(),
             manager.getClass().getName());
         IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
         if (standard != null && standard.getRequestHandler() != null) {
