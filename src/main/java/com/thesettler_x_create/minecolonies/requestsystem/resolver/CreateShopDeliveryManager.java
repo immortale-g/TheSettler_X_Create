@@ -128,6 +128,19 @@ final class CreateShopDeliveryManager {
     }
     try {
       request.addChild(token);
+      int duplicateLinksRemoved = 0;
+      boolean seenNewChild = false;
+      for (IToken<?> childToken : java.util.List.copyOf(request.getChildren())) {
+        if (!token.equals(childToken)) {
+          continue;
+        }
+        if (!seenNewChild) {
+          seenNewChild = true;
+          continue;
+        }
+        request.removeChild(childToken);
+        duplicateLinksRemoved++;
+      }
       IStandardRequestManager standardManager =
           CreateShopRequestResolver.unwrapStandardManager(manager);
       if (standardManager != null && standardManager.getRequestHandler() != null) {
@@ -135,6 +148,13 @@ final class CreateShopDeliveryManager {
         if (child != null) {
           child.setParent(request.getId());
         }
+      }
+      if (duplicateLinksRemoved > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link dedupe parent={} child={} removedDuplicates={}",
+            request.getId(),
+            token,
+            duplicateLinksRemoved);
       }
     } catch (Exception ex) {
       try {

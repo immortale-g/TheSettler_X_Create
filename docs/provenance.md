@@ -115,3 +115,7 @@ Implementation notes:
   logger call in Create Shop pending processing was corrected to avoid a runtime
   `ClassCastException` (`StandardToken` being routed to a throwable overload), preventing colony
   tick interruption during cancelled-request handling.
+- Parent-child duplication guard on the strict branch is authored in this project: Create Shop
+  pending processing now removes duplicate child-token entries from parent requests, and delivery
+  child-link creation deduplicates repeated same-token parent links to avoid multi-processing of a
+  single delivery child.
