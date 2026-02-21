@@ -624,6 +624,24 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                       com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
                 var childAssigned = assignmentStore.getAssignmentForValue(childToken);
                 if (childAssigned == null) {
+                  if (child.getState()
+                      == com.minecolonies.api.colony.requestsystem.request.RequestState.CREATED) {
+                    try {
+                      standardManager.assignRequest(childToken);
+                    } catch (Exception ignored) {
+                      // Best-effort kick so native delivery resolver can pick up CREATED children.
+                    }
+                    childAssigned = assignmentStore.getAssignmentForValue(childToken);
+                    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                      TheSettlerXCreate.LOGGER.info(
+                          "[CreateShop] tickPending: {} child {} CREATED assignKick={}",
+                          requestIdLog,
+                          childToken,
+                          childAssigned == null ? "none" : "ok");
+                    }
+                  }
+                }
+                if (childAssigned == null) {
                   boolean enqueued =
                       deliveryManager.tryEnqueueDelivery(standardManager, childToken);
                   if (Config.DEBUG_LOGGING.getAsBoolean()) {

@@ -14,8 +14,9 @@ class CreateShopDeliveryManagerWrappedFallbackGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryManager.java"));
 
-    assertTrue(source.contains("delivery fallback enqueue(wrapped)"));
-    assertTrue(source.contains("manager.assignRequest(token)"));
+    assertTrue(source.contains("delivery native dispatch token={} viaWarehouseQueue={}"));
+    assertTrue(source.contains("resolveDeliveryRequester(manager, request)"));
+    assertTrue(source.contains("manager.createRequest(deliveryRequester, delivery)"));
     assertTrue(source.contains("tryEnqueueDelivery(manager, token)"));
   }
 }

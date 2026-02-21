@@ -13,6 +13,7 @@ import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.init.ModCreativeTabs;
 import com.thesettler_x_create.init.ModItems;
 import com.thesettler_x_create.init.ModMenus;
+import com.thesettler_x_create.minecolonies.debug.NativeRequestFlowDiagnostics;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesBuildings;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesJobs;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolverFactory;
@@ -40,6 +41,8 @@ public class TheSettlerXCreate {
   public static final String MODID = "thesettler_x_create";
   public static final Logger LOGGER = LogUtils.getLogger();
   private long lastGlobalTickLog = -1L;
+  private final NativeRequestFlowDiagnostics nativeRequestFlowDiagnostics =
+      new NativeRequestFlowDiagnostics();
 
   public TheSettlerXCreate(IEventBus modEventBus, ModContainer modContainer) {
     modEventBus.addListener(this::commonSetup);
@@ -123,6 +126,12 @@ public class TheSettlerXCreate {
             || event.getServer().getTickCount() - lastGlobalTickLog >= 200L)) {
       lastGlobalTickLog = event.getServer().getTickCount();
       LOGGER.info("[CreateShop] Global shop tick, colonies={}", colonies.size());
+    }
+    if (event.getServer() != null) {
+      long tick = event.getServer().getTickCount();
+      for (var colony : colonies) {
+        nativeRequestFlowDiagnostics.tick(colony, tick);
+      }
     }
   }
 

@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
@@ -112,14 +113,15 @@ final class CreateShopDeliveryManager {
             targetLocation,
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
+    IRequester deliveryRequester = resolveDeliveryRequester(manager, request);
     IToken<?> token;
     try {
-      token = manager.createRequest(resolver, delivery);
+      token = manager.createRequest(deliveryRequester, delivery);
     } catch (Exception ex) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create failed requester={} parentRequester={} error={}",
-            resolver.getClass().getName(),
+            deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
             requester == null ? "<null>" : requester.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
@@ -186,7 +188,7 @@ final class CreateShopDeliveryManager {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create token={} requesterClass={} parentRequesterClass={} managerClass={}",
             token,
-            resolver.getClass().getName(),
+            deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
             requester == null ? "<null>" : requester.getClass().getName(),
             manager.getClass().getName());
         IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
@@ -219,55 +221,12 @@ final class CreateShopDeliveryManager {
         }
       }
     }
-    IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
-    if (standard != null) {
-      var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
-      var assigned = assignmentStore.getAssignmentForValue(token);
-      if (assigned == null) {
-        try {
-          IRequest<?> created = standard.getRequestHandler().getRequest(token);
-          standard.getRequestHandler().assignRequest(created);
-        } catch (Exception ex) {
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery fallback assign failed token={} error={}",
-                token,
-                ex.getMessage() == null ? "<null>" : ex.getMessage());
-          }
-        }
-        // If still unassigned, enqueue into a warehouse request queue with couriers.
-        var assignedAfter = assignmentStore.getAssignmentForValue(token);
-        if (assignedAfter == null) {
-          boolean enqueued = tryEnqueueDelivery(manager, token);
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery fallback enqueue token={} result={}",
-                token,
-                enqueued ? "ok" : "none");
-          }
-        }
-      }
-    } else {
-      try {
-        manager.assignRequest(token);
-      } catch (Exception ignored) {
-        // Wrapped manager may reject direct assignment; enqueue fallback below handles it.
-      }
-      boolean hasResolver = false;
-      try {
-        hasResolver = manager.getResolverForRequest(token) != null;
-      } catch (Exception ignored) {
-        // If lookup fails, treat as unresolved.
-      }
-      if (!hasResolver) {
-        boolean enqueued = tryEnqueueDelivery(manager, token);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery fallback enqueue(wrapped) token={} result={}",
-              token,
-              enqueued ? "ok" : "none");
-        }
-      }
+    boolean enqueued = tryEnqueueDelivery(manager, token);
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] delivery native dispatch token={} viaWarehouseQueue={}",
+          token,
+          enqueued ? "ok" : "none");
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IDeliverable deliverable = request.getRequest() instanceof IDeliverable typed ? typed : null;
@@ -290,11 +249,47 @@ final class CreateShopDeliveryManager {
         resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
       }
     }
-    int notified = notifyDeliverymen(manager, token, shop);
-    if (notified == 0) {
-      tryEnqueueDelivery(manager, token);
-    }
+    notifyDeliverymen(manager, token, shop);
     return Lists.newArrayList(token);
+  }
+
+  private IRequester resolveDeliveryRequester(IRequestManager manager, IRequest<?> parentRequest) {
+    if (manager instanceof IStandardRequestManager standard) {
+      try {
+        var owner = standard.getResolverHandler().getResolverForRequest(parentRequest);
+        if (owner instanceof IRequester requester
+            && owner.getClass().getSimpleName().contains("WarehouseConcreteRequestResolver")) {
+          return requester;
+        }
+      } catch (Exception ignored) {
+        // Best effort.
+      }
+      try {
+        var typeStore = standard.getRequestableTypeRequestResolverAssignmentDataStore();
+        var assignments = typeStore == null ? null : typeStore.getAssignments();
+        var requestableResolvers =
+            assignments == null ? null : assignments.get(TypeConstants.REQUESTABLE);
+        if (requestableResolvers != null) {
+          for (IToken<?> resolverToken : requestableResolvers) {
+            try {
+              var candidate = standard.getResolverHandler().getResolver(resolverToken);
+              if (candidate instanceof IRequester requester
+                  && candidate
+                      .getClass()
+                      .getSimpleName()
+                      .contains("WarehouseConcreteRequestResolver")) {
+                return requester;
+              }
+            } catch (Exception ignored) {
+              // Ignore stale resolver ids.
+            }
+          }
+        }
+      } catch (Exception ignored) {
+        // Best effort.
+      }
+    }
+    return resolver;
   }
 
   static boolean isSelfLoopDeliveryTarget(
