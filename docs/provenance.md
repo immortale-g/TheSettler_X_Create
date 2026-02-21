@@ -174,3 +174,6 @@ Implementation notes:
 - Delivery callback routing on the strict branch is authored in this project: child-delivery
   callback resolution no longer depends on stored resolver tokens and instead resolves through
   child->parent linkage plus MineColonies owner lookup for the parent request.
+- Live resolver-health synchronization on the strict branch is authored in this project:
+  `BuildingCreateShop` now resolves local Create Shop resolvers from manager provider/assignment/
+  ownership data before health-repair decisions, reducing stale cached resolver-token influence.

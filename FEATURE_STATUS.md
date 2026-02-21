@@ -22,6 +22,8 @@ Current behavior:
   is used as primary source each tick, with resolver-token key maps only as fallback hints.
 - Delivery callback resolution is now parent-request based (child -> parent -> owner lookup),
   removing resolver-token map coupling from delivery callback routing.
+- Building resolver health/sync now resolves local Create Shop resolver instances live from
+  provider/assignment/owner data before considering provider repair, reducing cached-token bias.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

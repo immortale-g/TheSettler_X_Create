@@ -557,12 +557,18 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     lastResolverHealthcheckTick = now;
 
-    CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    if (resolver == null) {
-      return;
-    }
     if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
       return;
+    }
+    CreateShopRequestResolver resolver = resolveLiveShopResolver(manager);
+    if (resolver == null) {
+      resolver = getOrCreateShopResolver();
+      if (resolver == null) {
+        return;
+      }
+    }
+    if (shopResolver == null || !shopResolver.getId().equals(resolver.getId())) {
+      setResolverState(resolver, deliveryResolverToken, pickupResolverToken);
     }
     IToken<?> resolverId = resolver.getId();
     boolean resolverKnown = false;
@@ -583,7 +589,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     boolean typeContains =
         deliverableAssignments != null && deliverableAssignments.contains(resolverId);
 
-    if (resolverKnown && providerContains && typeContains) {
+    boolean hasAnyLocalProviderResolver = hasAnyLocalProviderResolver(manager);
+    boolean hasAnyLocalDeliverableResolver =
+        hasAnyLocalDeliverableResolver(manager, deliverableAssignments);
+
+    if (resolverKnown
+        && (providerContains || hasAnyLocalProviderResolver)
+        && (typeContains || hasAnyLocalDeliverableResolver)) {
       return;
     }
 
@@ -627,6 +639,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     CreateShopRequestResolver current = getOrCreateShopResolver();
     var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
     if (providerResolvers == null || providerResolvers.isEmpty()) {
+      CreateShopRequestResolver fallback = resolveLiveShopResolver(manager);
+      if (fallback != null) {
+        if (current == null || !current.getId().equals(fallback.getId())) {
+          setResolverState(fallback, deliveryResolverToken, pickupResolverToken);
+        }
+        return fallback;
+      }
       return current;
     }
 
@@ -659,7 +678,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
 
     if (selected == null) {
-      selected = findResolverFromAssignments(manager);
+      selected = resolveLiveShopResolver(manager);
     } else {
       // Prefer assignment-backed resolver when provider-prioritized resolver has no work.
       if (!hasAssignedRequestsForResolver(manager, selected.getId())) {
@@ -750,6 +769,73 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           // Ignore stale request/resolver links.
         }
       }
+    }
+    return null;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveLiveShopResolver(IStandardRequestManager manager) {
+    if (manager == null) {
+      return null;
+    }
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers != null && !providerResolvers.isEmpty()) {
+      for (IToken<?> token : providerResolvers) {
+        CreateShopRequestResolver local = resolveLocalShopResolver(manager, token);
+        if (local != null) {
+          return local;
+        }
+      }
+    }
+    CreateShopRequestResolver byAssignments = findResolverFromAssignments(manager);
+    if (byAssignments != null) {
+      return byAssignments;
+    }
+    return findResolverFromRequestOwnership(manager);
+  }
+
+  private boolean hasAnyLocalProviderResolver(IStandardRequestManager manager) {
+    if (manager == null) {
+      return false;
+    }
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers == null || providerResolvers.isEmpty()) {
+      return false;
+    }
+    for (IToken<?> token : providerResolvers) {
+      if (resolveLocalShopResolver(manager, token) != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasAnyLocalDeliverableResolver(
+      IStandardRequestManager manager, java.util.Collection<IToken<?>> deliverableAssignments) {
+    if (manager == null || deliverableAssignments == null || deliverableAssignments.isEmpty()) {
+      return false;
+    }
+    for (IToken<?> token : deliverableAssignments) {
+      if (resolveLocalShopResolver(manager, token) != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveLocalShopResolver(
+      IStandardRequestManager manager, IToken<?> token) {
+    if (manager == null || token == null) {
+      return null;
+    }
+    try {
+      IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
+      if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+        return shop;
+      }
+    } catch (Exception ignored) {
+      // Ignore stale token links.
     }
     return null;
   }
