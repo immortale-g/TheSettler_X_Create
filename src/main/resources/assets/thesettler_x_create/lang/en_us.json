@@ -43,6 +43,14 @@
   "com.thesettler_x_create.message.createshop.request_sent": "Create Shop ordered from network: %s x%d",
   "com.thesettler_x_create.message.createshop.delivery_waiting": "Create Shop waiting for goods: %s",
   "com.thesettler_x_create.message.createshop.goods_arrived": "Create Shop goods arrived: %s x%d",
-  "com.thesettler_x_create.message.createshop.delivery_created": "Create Shop started delivery: %s x%d"
+  "com.thesettler_x_create.message.createshop.delivery_created": "Create Shop started delivery: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_ordered": "[Create Shop Flow] %s ordered %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_arrived": "[Create Shop Flow] %s package arrived at shop: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_reserved": "[Create Shop Flow] %s reserved for pickup: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_delivery_created": "[Create Shop Flow] %s delivery started: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_delivery_completed": "[Create Shop Flow] %s delivery completed: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_request_completed": "[Create Shop Flow] %s request completed: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_cancelled": "[Create Shop Flow] %s request cancelled: %s x%d",
+  "com.thesettler_x_create.message.createshop.flow_timeout": "[Create Shop Flow] %s request timed out and was reset: %s x%d"
 }
 

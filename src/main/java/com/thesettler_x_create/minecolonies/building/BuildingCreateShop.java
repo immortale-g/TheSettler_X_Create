@@ -4,16 +4,15 @@ import com.google.common.collect.ImmutableCollection;
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
-import com.minecolonies.api.colony.buildings.modules.IBuildingModuleView;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
+import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
-import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.block.CreateShopBlock;
@@ -21,11 +20,11 @@ import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
-import com.thesettler_x_create.minecolonies.module.CreateShopCourierModule;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,6 +78,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private final ShopWorkerStatus workerStatus;
   private final ShopNetworkNotifier networkNotifier;
   private final ShopResolverFactory resolverFactory;
+  private long lastResolverHealthcheckTick = -1L;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -276,9 +276,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onPlacement() {
     super.onPlacement();
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(getColony());
     ensurePickupLink();
     beltManager.onPlacement();
   }
@@ -287,9 +284,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onUpgradeComplete(int newLevel) {
     super.onUpgradeComplete(newLevel);
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(getColony());
     ensurePickupLink();
     beltManager.onUpgrade();
   }
@@ -298,14 +292,12 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public void onColonyTick(IColony colony) {
     super.onColonyTick(colony);
     ensureWarehouseRegistration();
-    ensureDeliverableAssignment();
-    com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector
-        .ensureGlobalResolver(colony);
     ensurePickupLink();
+    ensureResolverRegistrationHealthy(colony);
     beltManager.tick();
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
-      CreateShopRequestResolver resolver = getOrCreateShopResolver();
+      CreateShopRequestResolver resolver = resolveTickResolver(colony);
       if (isDebugRequests() && resolver == null) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tick: resolver missing for shop {}",
@@ -434,23 +426,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return pickupResolverToken;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public <M extends IBuildingModule, V extends IBuildingModuleView> M getModule(
-      com.minecolonies.api.colony.buildings.registry.BuildingEntry.ModuleProducer<M, V> producer) {
-    M module = super.getModule(producer);
-    if (module != null) {
-      return module;
-    }
-    if (producer == BuildingModules.WAREHOUSE_COURIERS) {
-      var modules = getModulesByType(CreateShopCourierModule.class);
-      if (!modules.isEmpty()) {
-        return (M) modules.get(0);
-      }
-    }
-    return null;
-  }
-
   @Nullable
   public CreateShopRequestResolver getOrCreateShopResolver() {
     if (shopResolver == null) {
@@ -465,6 +440,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public boolean isWorkerWorking() {
     return workerStatus.isWorkerWorking();
+  }
+
+  public boolean hasResolverWork() {
+    CreateShopRequestResolver resolver = getOrCreateShopResolver();
+    return resolver != null && resolver.hasActiveWork();
   }
 
   public void notifyMissingNetwork() {
@@ -567,6 +547,323 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     warehouseRegistrar.ensureWarehouseRegistration();
   }
 
+  private void ensureResolverRegistrationHealthy(IColony colony) {
+    if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
+      return;
+    }
+    long now = colony.getWorld().getGameTime();
+    if (lastResolverHealthcheckTick >= 0L && now - lastResolverHealthcheckTick < 100L) {
+      return;
+    }
+    lastResolverHealthcheckTick = now;
+
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
+      return;
+    }
+    CreateShopRequestResolver resolver = resolveLiveShopResolver(manager);
+    if (resolver == null) {
+      resolver = getOrCreateShopResolver();
+      if (resolver == null) {
+        return;
+      }
+    }
+    if (shopResolver == null || !shopResolver.getId().equals(resolver.getId())) {
+      setResolverState(resolver, deliveryResolverToken, pickupResolverToken);
+    }
+    IToken<?> resolverId = resolver.getId();
+    boolean resolverKnown = false;
+    try {
+      manager.getResolverHandler().getResolver(resolverId);
+      resolverKnown = true;
+    } catch (IllegalArgumentException ignored) {
+      // Health-check handles this.
+    }
+
+    boolean providerContains =
+        manager.getProviderHandler().getRegisteredResolvers(this).contains(resolverId);
+    var deliverableAssignments =
+        manager
+            .getRequestableTypeRequestResolverAssignmentDataStore()
+            .getAssignments()
+            .get(TypeConstants.DELIVERABLE);
+    boolean typeContains =
+        deliverableAssignments != null && deliverableAssignments.contains(resolverId);
+
+    boolean hasAnyLocalProviderResolver = hasAnyLocalProviderResolver(manager);
+    boolean hasAnyLocalDeliverableResolver =
+        hasAnyLocalDeliverableResolver(manager, deliverableAssignments);
+
+    if (resolverKnown
+        && (providerContains || hasAnyLocalProviderResolver)
+        && (typeContains || hasAnyLocalDeliverableResolver)) {
+      return;
+    }
+
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolver health mismatch: resolverKnown={} providerContains={} typeContains={} resolver={}",
+          resolverKnown,
+          providerContains,
+          typeContains,
+          resolverId);
+    }
+    try {
+      colony.getRequestManager().onProviderRemovedFromColony(this);
+    } catch (Exception ignored) {
+      // Best effort cleanup before re-register.
+    }
+    try {
+      colony.getRequestManager().onProviderAddedToColony(this);
+    } catch (Exception ex) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver provider repair failed: {}",
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return;
+    }
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolver provider repair triggered for {}", resolverId);
+    }
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveTickResolver(IColony colony) {
+    if (colony == null || colony.getRequestManager() == null) {
+      return getOrCreateShopResolver();
+    }
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
+      return getOrCreateShopResolver();
+    }
+    CreateShopRequestResolver current = getOrCreateShopResolver();
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers == null || providerResolvers.isEmpty()) {
+      CreateShopRequestResolver fallback = resolveLiveShopResolver(manager);
+      if (fallback != null) {
+        if (current == null || !current.getId().equals(fallback.getId())) {
+          setResolverState(fallback, deliveryResolverToken, pickupResolverToken);
+        }
+        return fallback;
+      }
+      return current;
+    }
+
+    var deliverableAssignments =
+        manager
+            .getRequestableTypeRequestResolverAssignmentDataStore()
+            .getAssignments()
+            .get(TypeConstants.DELIVERABLE);
+    Set<IToken<?>> prioritized = new LinkedHashSet<>();
+    if (deliverableAssignments != null) {
+      for (IToken<?> token : deliverableAssignments) {
+        if (providerResolvers.contains(token)) {
+          prioritized.add(token);
+        }
+      }
+    }
+    prioritized.addAll(providerResolvers);
+
+    CreateShopRequestResolver selected = null;
+    for (IToken<?> token : prioritized) {
+      try {
+        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
+        if (resolver instanceof CreateShopRequestResolver csr) {
+          selected = csr;
+          break;
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Ignore stale ids; health-check will repair registration.
+      }
+    }
+
+    if (selected == null) {
+      selected = resolveLiveShopResolver(manager);
+    } else {
+      // Prefer assignment-backed resolver when provider-prioritized resolver has no work.
+      if (!hasAssignedRequestsForResolver(manager, selected.getId())) {
+        CreateShopRequestResolver assignmentSelected = findResolverFromAssignments(manager);
+        if (assignmentSelected != null
+            && !assignmentSelected.getId().equals(selected.getId())
+            && hasAssignedRequestsForResolver(manager, assignmentSelected.getId())) {
+          if (isDebugRequests()) {
+            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] resolver assignment drift detected: switching {} -> {}",
+                selected.getId(),
+                assignmentSelected.getId());
+          }
+          selected = assignmentSelected;
+        } else {
+          CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
+          if (ownershipSelected != null && !ownershipSelected.getId().equals(selected.getId())) {
+            if (isDebugRequests()) {
+              com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] resolver ownership drift detected: switching {} -> {}",
+                  selected.getId(),
+                  ownershipSelected.getId());
+            }
+            selected = ownershipSelected;
+          }
+        }
+      }
+    }
+    if (selected == null) {
+      return current;
+    }
+    if (current == null || !current.getId().equals(selected.getId())) {
+      setResolverState(selected, deliveryResolverToken, pickupResolverToken);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver synced to registered token {} (previous={})",
+            selected.getId(),
+            current == null ? "<null>" : current.getId());
+      }
+    }
+    return selected;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver findResolverFromAssignments(IStandardRequestManager manager) {
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return null;
+    }
+    for (IToken<?> resolverToken : assignments.keySet()) {
+      try {
+        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(resolverToken);
+        if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+          return shop;
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Ignore stale tokens; health-check and reassignment paths handle cleanup.
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver findResolverFromRequestOwnership(
+      IStandardRequestManager manager) {
+    if (manager == null || manager.getRequestHandler() == null) {
+      return null;
+    }
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return null;
+    }
+    for (java.util.Collection<IToken<?>> requestTokens : assignments.values()) {
+      if (requestTokens == null || requestTokens.isEmpty()) {
+        continue;
+      }
+      for (IToken<?> requestToken : requestTokens) {
+        try {
+          var request = manager.getRequestHandler().getRequest(requestToken);
+          if (request == null) {
+            continue;
+          }
+          IRequestResolver<?> owner = manager.getResolverHandler().getResolverForRequest(request);
+          if (owner instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+            return shop;
+          }
+        } catch (Exception ignored) {
+          // Ignore stale request/resolver links.
+        }
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveLiveShopResolver(IStandardRequestManager manager) {
+    if (manager == null) {
+      return null;
+    }
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers != null && !providerResolvers.isEmpty()) {
+      for (IToken<?> token : providerResolvers) {
+        CreateShopRequestResolver local = resolveLocalShopResolver(manager, token);
+        if (local != null) {
+          return local;
+        }
+      }
+    }
+    CreateShopRequestResolver byAssignments = findResolverFromAssignments(manager);
+    if (byAssignments != null) {
+      return byAssignments;
+    }
+    return findResolverFromRequestOwnership(manager);
+  }
+
+  private boolean hasAnyLocalProviderResolver(IStandardRequestManager manager) {
+    if (manager == null) {
+      return false;
+    }
+    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
+    if (providerResolvers == null || providerResolvers.isEmpty()) {
+      return false;
+    }
+    for (IToken<?> token : providerResolvers) {
+      if (resolveLocalShopResolver(manager, token) != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasAnyLocalDeliverableResolver(
+      IStandardRequestManager manager, java.util.Collection<IToken<?>> deliverableAssignments) {
+    if (manager == null || deliverableAssignments == null || deliverableAssignments.isEmpty()) {
+      return false;
+    }
+    for (IToken<?> token : deliverableAssignments) {
+      if (resolveLocalShopResolver(manager, token) != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Nullable
+  private CreateShopRequestResolver resolveLocalShopResolver(
+      IStandardRequestManager manager, IToken<?> token) {
+    if (manager == null || token == null) {
+      return null;
+    }
+    try {
+      IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
+      if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
+        return shop;
+      }
+    } catch (Exception ignored) {
+      // Ignore stale token links.
+    }
+    return null;
+  }
+
+  private boolean hasAssignedRequestsForResolver(
+      IStandardRequestManager manager, IToken<?> resolverToken) {
+    if (manager == null || resolverToken == null) {
+      return false;
+    }
+    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return false;
+    }
+    var resolverAssignments = assignments.get(resolverToken);
+    return resolverAssignments != null && !resolverAssignments.isEmpty();
+  }
+
+  private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
+    if (resolver == null || resolver.getLocation() == null || getLocation() == null) {
+      return false;
+    }
+    return resolver.getLocation().getDimension().equals(getLocation().getDimension())
+        && resolver
+            .getLocation()
+            .getInDimensionLocation()
+            .equals(getLocation().getInDimensionLocation());
+  }
+
   public void ensureRackContainers() {
     rackIndex.ensureRackContainers();
   }
@@ -574,10 +871,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   /** Returns rack inventory counts for the given stack keys. */
   public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
     return rackIndex.getStockCountsForKeys(keys);
-  }
-
-  private void ensureDeliverableAssignment() {
-    resolverAssignments.ensureDeliverableAssignment();
   }
 
   public void ensurePickupLink() {

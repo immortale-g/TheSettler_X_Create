@@ -7,7 +7,7 @@ final class CreateShopWorkerAvailabilityGate {
   }
 
   boolean shouldResumePending(boolean workerWorking, int pendingCount) {
-    return workerWorking && pendingCount > 0;
+    return pendingCount > 0;
   }
 
   boolean shouldKeepPendingState(boolean workerWorking, int pendingCount) {

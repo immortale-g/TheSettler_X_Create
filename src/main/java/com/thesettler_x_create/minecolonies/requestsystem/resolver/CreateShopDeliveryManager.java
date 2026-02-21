@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
@@ -17,7 +18,6 @@ import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.DeliverymanAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
-import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -113,41 +113,98 @@ final class CreateShopDeliveryManager {
             targetLocation,
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
+    IRequester deliveryRequester = resolveDeliveryRequester(manager, request);
     IToken<?> token;
     try {
-      token = manager.createRequest(requester, delivery);
+      token = manager.createRequest(deliveryRequester, delivery);
     } catch (Exception ex) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery create failed requester={} error={}",
-            requester.getClass().getName(),
+            "[CreateShop] delivery create failed requester={} parentRequester={} error={}",
+            deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
+            requester == null ? "<null>" : requester.getClass().getName(),
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return Lists.newArrayList();
+    }
+    try {
+      boolean alreadyLinked = request.getChildren().contains(token);
+      if (!alreadyLinked) {
+        request.addChild(token);
+      }
+      int duplicateLinksRemoved = 0;
+      boolean seenNewChild = false;
+      for (IToken<?> childToken : java.util.List.copyOf(request.getChildren())) {
+        if (!token.equals(childToken)) {
+          continue;
+        }
+        if (!seenNewChild) {
+          seenNewChild = true;
+          continue;
+        }
+        request.removeChild(childToken);
+        duplicateLinksRemoved++;
+      }
+      IRequest<?> child = manager.getRequestForToken(token);
+      if (child != null) {
+        child.setParent(request.getId());
+      }
+      if (duplicateLinksRemoved > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link dedupe parent={} child={} removedDuplicates={}",
+            request.getId(),
+            token,
+            duplicateLinksRemoved);
+      }
+      if (alreadyLinked && Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link exists parent={} child={} skipAddChild=true",
+            request.getId(),
+            token);
+      }
+    } catch (Exception ex) {
+      try {
+        manager.updateRequestState(
+            token, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED);
+      } catch (Exception ignored) {
+        // Best-effort rollback only.
+      }
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery link failed parent={} child={} error={}",
+            request.getId(),
+            token,
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
       return Lists.newArrayList();
     }
     request.addDelivery(selected.copy());
     resolver.markDeliveriesCreated(request.getId());
-    resolver.getDeliveryParents().put(token, request.getId());
-    resolver.getDeliveryResolvers().put(token, resolver.getResolverToken());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       String key = token.toString();
       if (resolver.getDeliveryCreateLogged().add(key)) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery create token={} requesterClass={} managerClass={}",
+            "[CreateShop] delivery create token={} requesterClass={} parentRequesterClass={} managerClass={}",
             token,
-            requester.getClass().getName(),
+            deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
+            requester == null ? "<null>" : requester.getClass().getName(),
             manager.getClass().getName());
         IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
         if (standard != null && standard.getRequestHandler() != null) {
           try {
-            IRequest<?> created = standard.getRequestHandler().getRequest(token);
-            String createdRequester = created.getRequester().getClass().getName();
-            IToken<?> childParent = created.getParent();
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery create handler token={} createdRequester={} childParent={}",
-                token,
-                createdRequester,
-                childParent == null ? "<none>" : childParent);
+            IRequest<?> created = manager.getRequestForToken(token);
+            if (created != null) {
+              String createdRequester = created.getRequester().getClass().getName();
+              IToken<?> childParent = created.getParent();
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery create handler token={} createdRequester={} childParent={}",
+                  token,
+                  createdRequester,
+                  childParent == null ? "<none>" : childParent);
+            } else {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] delivery create handler token={} created=<null>", token);
+            }
           } catch (Exception ex) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] delivery create handler token={} error={}",
@@ -162,34 +219,12 @@ final class CreateShopDeliveryManager {
         }
       }
     }
-    IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
-    if (standard != null) {
-      var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
-      var assigned = assignmentStore.getAssignmentForValue(token);
-      if (assigned == null) {
-        try {
-          IRequest<?> created = standard.getRequestHandler().getRequest(token);
-          standard.getRequestHandler().assignRequest(created);
-        } catch (Exception ex) {
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery fallback assign failed token={} error={}",
-                token,
-                ex.getMessage() == null ? "<null>" : ex.getMessage());
-          }
-        }
-        // If still unassigned, enqueue into a warehouse request queue with couriers.
-        var assignedAfter = assignmentStore.getAssignmentForValue(token);
-        if (assignedAfter == null) {
-          boolean enqueued = tryEnqueueDelivery(standard, token);
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery fallback enqueue token={} result={}",
-                token,
-                enqueued ? "ok" : "none");
-          }
-        }
-      }
+    boolean enqueued = tryEnqueueDelivery(manager, token);
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] delivery native dispatch token={} viaWarehouseQueue={}",
+          token,
+          enqueued ? "ok" : "none");
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IDeliverable deliverable = request.getRequest() instanceof IDeliverable typed ? typed : null;
@@ -212,15 +247,47 @@ final class CreateShopDeliveryManager {
         resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
       }
     }
-    int notified = notifyDeliverymen(manager, token, shop);
-    if (notified == 0) {
-      IStandardRequestManager standardManager =
-          CreateShopRequestResolver.unwrapStandardManager(manager);
-      if (standardManager != null) {
-        tryEnqueueDelivery(standardManager, token);
+    notifyDeliverymen(manager, token, shop);
+    return Lists.newArrayList(token);
+  }
+
+  private IRequester resolveDeliveryRequester(IRequestManager manager, IRequest<?> parentRequest) {
+    if (manager instanceof IStandardRequestManager standard) {
+      try {
+        var owner = standard.getResolverHandler().getResolverForRequest(parentRequest);
+        if (owner instanceof IRequester requester
+            && owner.getClass().getSimpleName().contains("WarehouseConcreteRequestResolver")) {
+          return requester;
+        }
+      } catch (Exception ignored) {
+        // Best effort.
+      }
+      try {
+        var typeStore = standard.getRequestableTypeRequestResolverAssignmentDataStore();
+        var assignments = typeStore == null ? null : typeStore.getAssignments();
+        var requestableResolvers =
+            assignments == null ? null : assignments.get(TypeConstants.REQUESTABLE);
+        if (requestableResolvers != null) {
+          for (IToken<?> resolverToken : requestableResolvers) {
+            try {
+              var candidate = standard.getResolverHandler().getResolver(resolverToken);
+              if (candidate instanceof IRequester requester
+                  && candidate
+                      .getClass()
+                      .getSimpleName()
+                      .contains("WarehouseConcreteRequestResolver")) {
+                return requester;
+              }
+            } catch (Exception ignored) {
+              // Ignore stale resolver ids.
+            }
+          }
+        }
+      } catch (Exception ignored) {
+        // Best effort.
       }
     }
-    return Lists.newArrayList(token);
+    return resolver;
   }
 
   static boolean isSelfLoopDeliveryTarget(
@@ -305,7 +372,7 @@ final class CreateShopDeliveryManager {
         targetBlock);
   }
 
-  boolean tryEnqueueDelivery(IStandardRequestManager manager, IToken<?> token) {
+  boolean tryEnqueueDelivery(IRequestManager manager, IToken<?> token) {
     if (manager == null || token == null) {
       return false;
     }
@@ -333,6 +400,15 @@ final class CreateShopDeliveryManager {
         continue;
       }
       warehousesWithQueue++;
+      if (queue.getMutableRequestList().contains(token)) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] delivery enqueue token={} warehouse=<known> couriers={} queued=already",
+              token,
+              courierCount);
+        }
+        return true;
+      }
       queue.addRequest(token);
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         String warehouseInfo = "<unknown>";
@@ -374,7 +450,6 @@ final class CreateShopDeliveryManager {
       CourierAssignmentModule module = shop.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (module != null) {
         checked += notifyCourierModule(module, token);
-        notified += notifyCourierJobs(module, token);
       }
       if (notified > 0) {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -404,13 +479,11 @@ final class CreateShopDeliveryManager {
           building.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (warehouseCouriers != null) {
         checked += notifyCourierModule(warehouseCouriers, token);
-        notified += notifyCourierJobs(warehouseCouriers, token);
       }
       DeliverymanAssignmentModule deliverymanModule =
           building.getModule(BuildingModules.COURIER_WORK);
       if (deliverymanModule != null) {
         checked += notifyCourierModule(deliverymanModule, token);
-        notified += notifyCourierJobs(deliverymanModule, token);
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -429,32 +502,5 @@ final class CreateShopDeliveryManager {
     }
     var citizens = module.getAssignedCitizen();
     return citizens == null ? 0 : citizens.size();
-  }
-
-  private int notifyCourierJobs(AbstractAssignedCitizenModule module, IToken<?> token) {
-    if (module == null) {
-      return 0;
-    }
-    var citizens = module.getAssignedCitizen();
-    if (citizens == null || citizens.isEmpty()) {
-      return 0;
-    }
-    int notified = 0;
-    for (var citizen : citizens) {
-      if (citizen == null) {
-        continue;
-      }
-      var job = citizen.getJob();
-      if (job instanceof JobDeliveryman deliveryman) {
-        try {
-          deliveryman.addRequest(
-              token, AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
-          notified++;
-        } catch (Exception ignored) {
-          // Ignore enqueue errors.
-        }
-      }
-    }
-    return notified;
   }
 }

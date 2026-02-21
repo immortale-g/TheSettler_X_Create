@@ -1,9 +1,11 @@
 package com.thesettler_x_create.minecolonies.ai;
 
+import com.minecolonies.api.entity.ai.JobStatus;
 import com.minecolonies.api.entity.ai.statemachine.AITarget;
 import com.minecolonies.api.entity.ai.statemachine.states.AIWorkerState;
 import com.minecolonies.api.entity.ai.statemachine.states.IAIState;
 import com.minecolonies.api.entity.ai.statemachine.tickratestatemachine.IStateSupplier;
+import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.entity.ai.workers.AbstractEntityAIInteract;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
@@ -42,6 +44,10 @@ public class EntityAIWorkCreateShop
 
   @Override
   public boolean canGoIdle() {
+    BuildingCreateShop building = this.building;
+    if (building != null && building.hasResolverWork()) {
+      return false;
+    }
     return !isWorkingTime();
   }
 
@@ -51,8 +57,10 @@ public class EntityAIWorkCreateShop
 
   private IAIState prepare() {
     if (!isWorkingTime()) {
+      markIdle();
       return AIWorkerState.IDLE;
     }
+    markWorking();
     if (walkToBuilding()) {
       return AIWorkerState.START_WORKING;
     }
@@ -61,14 +69,21 @@ public class EntityAIWorkCreateShop
 
   private IAIState work() {
     if (!isWorkingTime()) {
+      markIdle();
       return AIWorkerState.IDLE;
     }
+    markWorking();
     walkToBuilding();
     return AIWorkerState.START_WORKING;
   }
 
   private IAIState idleState() {
-    return isWorkingTime() ? AIWorkerState.PREPARING : AIWorkerState.IDLE;
+    if (isWorkingTime()) {
+      markWorking();
+      return AIWorkerState.PREPARING;
+    }
+    markIdle();
+    return AIWorkerState.IDLE;
   }
 
   private boolean isWorkingTime() {
@@ -76,5 +91,20 @@ public class EntityAIWorkCreateShop
       return true;
     }
     return world.isDay();
+  }
+
+  private void markWorking() {
+    if (worker == null || worker.getCitizenData() == null) {
+      return;
+    }
+    worker.getCitizenData().setJobStatus(JobStatus.WORKING);
+    worker.getCitizenData().setVisibleStatus(VisibleCitizenStatus.WORKING);
+  }
+
+  private void markIdle() {
+    if (worker == null || worker.getCitizenData() == null) {
+      return;
+    }
+    worker.getCitizenData().setJobStatus(JobStatus.IDLE);
   }
 }
