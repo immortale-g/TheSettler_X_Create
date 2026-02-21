@@ -171,3 +171,6 @@ Implementation notes:
   `tickPending` now prioritizes per-request owner resolution (`getResolverForRequest`) over
   resolver-token assignment keys, reducing repeated stalls when resolver IDs drift while requests
   remain valid in MineColonies.
+- Delivery callback routing on the strict branch is authored in this project: child-delivery
+  callback resolution no longer depends on stored resolver tokens and instead resolves through
+  child->parent linkage plus MineColonies owner lookup for the parent request.

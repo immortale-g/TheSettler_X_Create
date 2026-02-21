@@ -20,6 +20,8 @@ Current behavior:
   requests can re-bind to the resolver that MineColonies currently considers owner.
 - Pending processing is now request-owner dynamic: assignment ownership (`getResolverForRequest`)
   is used as primary source each tick, with resolver-token key maps only as fallback hints.
+- Delivery callback resolution is now parent-request based (child -> parent -> owner lookup),
+  removing resolver-token map coupling from delivery callback routing.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

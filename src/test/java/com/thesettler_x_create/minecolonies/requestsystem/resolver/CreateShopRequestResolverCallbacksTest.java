@@ -26,17 +26,14 @@ class CreateShopRequestResolverCallbacksTest {
     IToken<?> resolverToken = mock(IToken.class);
     resolver = new CreateShopRequestResolver(resolverLocation, resolverToken);
     resolver.getDeliveryParents().clear();
-    resolver.getDeliveryResolvers().clear();
   }
 
   @Test
   void deliveryCompleteRemovesLinkMapsAndClearsParentDeliveryFlag() throws Exception {
     IToken<?> deliveryToken = mock(IToken.class);
     IToken<?> parentToken = mock(IToken.class);
-    IToken<?> resolverToken = mock(IToken.class);
 
     resolver.getDeliveryParents().put(deliveryToken, parentToken);
-    resolver.getDeliveryResolvers().put(deliveryToken, resolverToken);
     resolver.markDeliveriesCreated(parentToken);
 
     IRequest<?> deliveryRequest = mock(IRequest.class);
@@ -50,7 +47,6 @@ class CreateShopRequestResolverCallbacksTest {
         new Object[] {null, deliveryRequest});
 
     assertNull(resolver.getDeliveryParents().get(deliveryToken));
-    assertNull(resolver.getDeliveryResolvers().get(deliveryToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
   }
 

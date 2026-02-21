@@ -181,7 +181,6 @@ final class CreateShopDeliveryManager {
     request.addDelivery(selected.copy());
     resolver.markDeliveriesCreated(request.getId());
     resolver.getDeliveryParents().put(token, request.getId());
-    resolver.getDeliveryResolvers().put(token, resolver.getResolverToken());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       String key = token.toString();
       if (resolver.getDeliveryCreateLogged().add(key)) {

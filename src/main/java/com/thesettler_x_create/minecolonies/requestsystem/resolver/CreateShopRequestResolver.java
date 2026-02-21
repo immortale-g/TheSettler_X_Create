@@ -44,8 +44,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private static final java.util.Map<IToken<?>, IToken<?>> deliveryParents =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private static final java.util.Map<IToken<?>, IToken<?>> deliveryResolvers =
-      new java.util.concurrent.ConcurrentHashMap<>();
   private static final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
   private final Object debugLock = new Object();
@@ -610,7 +608,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 missing++;
                 request.removeChild(childToken);
                 deliveryParents.remove(childToken);
-                deliveryResolvers.remove(childToken);
               }
               if (child != null
                   && child.getRequest()
@@ -665,7 +662,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 if (terminalChild) {
                   request.removeChild(childToken);
                   deliveryParents.remove(childToken);
-                  deliveryResolvers.remove(childToken);
                 } else {
                   hasActiveChildren = true;
                 }
@@ -1145,7 +1141,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     } else {
       deliveryParents.remove(request.getId());
     }
-    deliveryResolvers.remove(request.getId());
     if (parentToken == null) {
       return;
     }
@@ -1220,7 +1215,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     } else {
       deliveryParents.remove(request.getId());
     }
-    deliveryResolvers.remove(request.getId());
     if (parentToken == null) {
       return;
     }
@@ -1500,8 +1494,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (deliveryToken == null) {
       return null;
     }
-    IToken<?> resolverToken = deliveryResolvers.get(deliveryToken);
-    if (resolverToken == null) {
+    IToken<?> parentToken = deliveryParents.get(deliveryToken);
+    if (parentToken == null) {
       return null;
     }
     IStandardRequestManager standard = unwrapStandardManager(manager);
@@ -1509,7 +1503,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return null;
     }
     try {
-      var resolver = standard.getResolverHandler().getResolver(resolverToken);
+      IRequest<?> parent = standard.getRequestHandler().getRequest(parentToken);
+      if (parent == null) {
+        return null;
+      }
+      var resolver = standard.getResolverHandler().getResolverForRequest(parent);
       if (resolver instanceof CreateShopRequestResolver shopResolver) {
         return shopResolver;
       }
@@ -1632,10 +1630,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return deliveryParents;
   }
 
-  java.util.Map<IToken<?>, IToken<?>> getDeliveryResolvers() {
-    return deliveryResolvers;
-  }
-
   java.util.Set<String> getDeliveryCreateLogged() {
     return deliveryCreateLogged;
   }
@@ -1655,7 +1649,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (cooldown.getOrderedCount() > 0) {
       return true;
     }
-    if (!deliveryParents.isEmpty() || !deliveryResolvers.isEmpty()) {
+    if (!deliveryParents.isEmpty()) {
       return true;
     }
     return !flowStateMachine.snapshot().isEmpty();
