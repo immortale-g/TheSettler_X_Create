@@ -1,4 +1,14 @@
 Installation information
+
+## ⚠ Disclaimer
+
+This mod has been tested on the **client side only**.  
+It has **not** been tested in a dedicated server environment.
+
+If you choose to install or run this mod on a server, you do so **at your own risk**.  
+Compatibility issues, unexpected behavior, or even world corruption may occur.
+
+Please make sure to create proper backups before installing this mod on any server.
 =======
 
 Project Positioning
