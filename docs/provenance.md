@@ -196,3 +196,7 @@ Implementation notes:
   extraction implementation in `CreateNetworkFacade.extract(...)` remains intentionally out of
   scope for this PR and is tracked as a local follow-up TODO, while current resolver flow continues
   to use existing network-order pathways.
+- Hotfix 0.0.13 legacy-save compatibility support is authored in this project: requester factory
+  `3001` (`SafeRequesterFactory`) and wrapper type (`SafeRequester`) were reintroduced as a
+  compatibility-only deserialization path for worlds created before removal, while current request
+  flow keeps native requester usage and does not re-enable legacy wrapping for new requests.
