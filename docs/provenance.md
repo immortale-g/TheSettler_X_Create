@@ -227,3 +227,13 @@ Implementation notes:
 - Planned task-tab observability extension is authored for this project scope: the Create Shop task
   UI will expose inflight package progress and shop-triggered MineColonies pickup/delivery request
   references as read-only diagnostics, without introducing client-authoritative request state.
+- Stale delivery-child recovery hardening is authored in this project scope: Create Shop resolver
+  tracks active delivery-child runtime and applies timeout-based API cancellation + parent cleanup
+  for long-running non-terminal children (`CREATED/ASSIGNED/IN_PROGRESS`) to unblock parent
+  progression without modifying MineColonies internals.
+- Delivery dispatch diagnostics/accounting hardening is authored in this project scope: courier
+  module notification scans now increment `notified` counters alongside `checked`, preventing
+  false `notified=0` diagnostics during active dispatch attempts.
+- Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
+  now subtracts rack-available stock from top-up deficit calculation before issuing Create network
+  orders, preventing duplicate network reorders when enough items are already in shop racks.
