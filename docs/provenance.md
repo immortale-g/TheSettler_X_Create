@@ -254,3 +254,6 @@ Implementation notes:
 - Housekeeping duplication fix is authored in this project scope: rack->hut transfer now computes
   insertable counts with `IItemHandler.insertItem(..., true)` simulation before extracting from
   racks, removing prior pre-extract probe insertion that could duplicate moved stacks.
+- Housekeeping rack-discovery recovery is authored in this project scope: before transfer, shop
+  racks are re-synchronized from registered containers and, when that set is empty (post-reload
+  drift), a bounded local rack scan is used so unreserved transfer work still executes.

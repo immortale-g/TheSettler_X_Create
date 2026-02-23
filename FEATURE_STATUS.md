@@ -72,6 +72,8 @@ Known focus area:
   unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
 - Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing
   pre-extract ghost inserts and eliminating rack->hut item duplication.
+- Housekeeping rack discovery now refreshes registered rack containers and falls back to a local
+  rack scan around the shop when container registrations are temporarily empty after reload.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked
