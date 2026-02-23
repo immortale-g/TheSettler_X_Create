@@ -3,7 +3,12 @@
     <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="190 244"/>
     <text id="desc" size="130 11" pos="30 14" color="black" textalign="MIDDLE"/>
 
-    <list id="stockList" size="164 170" pos="13 30">
+    <button id="viewHut" label="$(com.thesettler_x_create.gui.createshop.stock.view_hut)" size="76 14" pos="18 30"
+            source="minecolonies:textures/gui/builderhut/builder_button_very_small.png" color="black"/>
+    <button id="viewStorage" label="$(com.thesettler_x_create.gui.createshop.stock.view_storage)" size="94 14" pos="98 30"
+            source="minecolonies:textures/gui/builderhut/builder_button_very_small.png" color="black"/>
+
+    <list id="stockList" size="164 150" pos="13 48">
         <box size="100% 18" linewidth="1">
             <itemicon id="itemIcon" size="16 16" pos="2 1"/>
             <text id="itemName" size="96 12" pos="22 1" textalign="MIDDLE_LEFT" color="black"/>
