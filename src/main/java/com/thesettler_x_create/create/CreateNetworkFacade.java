@@ -291,9 +291,14 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         available -= chunk;
       }
     }
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-      for (ItemStack requested : consolidated) {
-        int acceptedCount = countAccepted(acceptedByCapacity, requested);
+    boolean capacityStalled = false;
+    for (ItemStack requested : consolidated) {
+      int acceptedCount = countAccepted(acceptedByCapacity, requested);
+      if (acceptedCount < requested.getCount()) {
+        capacityStalled = true;
+        shop.noteCapacityStall(requested, requested.getCount(), acceptedCount);
+      }
+      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         if (acceptedCount <= 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
@@ -309,6 +314,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
               acceptedCount);
         }
       }
+    }
+    if (!capacityStalled) {
+      shop.clearCapacityStall();
     }
     return normalized;
   }

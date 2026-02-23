@@ -447,6 +447,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return resolver != null && resolver.hasActiveWork();
   }
 
+  public boolean hasCapacityStall() {
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    return tile != null && tile.hasCapacityStall();
+  }
+
+  @Nullable
+  TileEntityCreateShop.CapacityStallNotice consumeCapacityStallNotice() {
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    if (tile == null) {
+      return null;
+    }
+    return tile.consumeCapacityStallNotice();
+  }
+
   public void notifyMissingNetwork() {
     networkNotifier.notifyMissingNetwork();
   }
