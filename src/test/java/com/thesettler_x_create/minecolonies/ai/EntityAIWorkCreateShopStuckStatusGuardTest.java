@@ -16,4 +16,15 @@ class EntityAIWorkCreateShopStuckStatusGuardTest {
     assertTrue(source.contains("building.hasCapacityStall()"));
     assertTrue(source.contains("JobStatus.STUCK"));
   }
+
+  @Test
+  void urgentWorkKeepsAiOutOfIdleOutsideDaytime() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/ai/EntityAIWorkCreateShop.java"));
+    assertTrue(source.contains("hasUrgentWork()"));
+    assertTrue(source.contains("shouldWorkNow()"));
+    assertTrue(source.contains("currentBuilding.hasUrgentWork()"));
+  }
 }

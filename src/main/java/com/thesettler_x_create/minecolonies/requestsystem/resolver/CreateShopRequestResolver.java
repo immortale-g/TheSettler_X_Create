@@ -829,6 +829,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
+      int reservedSynced =
+          syncReservationsFromRack(
+              tile,
+              pickup,
+              requestId,
+              request.getId(),
+              deliverable,
+              pendingCount,
+              reservedForRequest,
+              rackAvailable,
+              level.getGameTime());
+      if (reservedSynced > 0) {
+        reservedForRequest += reservedSynced;
+      }
       int topupNeeded =
           Math.max(0, pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailable));
       if (workerWorking && topupNeeded > 0) {
@@ -1908,6 +1922,57 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       total += stack.getCount();
     }
     return total;
+  }
+
+  private int syncReservationsFromRack(
+      TileEntityCreateShop tile,
+      CreateShopBlockEntity pickup,
+      UUID requestId,
+      IToken<?> requestToken,
+      IDeliverable deliverable,
+      int pendingCount,
+      int reservedForRequest,
+      int rackAvailable,
+      long now) {
+    if (tile == null
+        || pickup == null
+        || requestId == null
+        || requestToken == null
+        || deliverable == null
+        || pendingCount <= 0
+        || rackAvailable <= 0) {
+      return 0;
+    }
+    int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+    int rackUnreserved = Math.max(0, rackAvailable - Math.max(0, reservedForDeliverable));
+    int missingReservation = Math.max(0, pendingCount - Math.max(0, reservedForRequest));
+    int reserveTarget = Math.min(rackUnreserved, missingReservation);
+    if (reserveTarget <= 0) {
+      return 0;
+    }
+    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> reservePlan =
+        planning.planFromRacksWithPositions(tile, deliverable, Math.max(1, reserveTarget));
+    if (reservePlan.isEmpty()) {
+      return 0;
+    }
+    int reservedNow = 0;
+    for (var entry : reservePlan) {
+      if (entry == null) {
+        continue;
+      }
+      ItemStack stack = entry.getA();
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      pickup.reserve(requestId, stack.copy(), stack.getCount());
+      reservedNow += stack.getCount();
+    }
+    if (reservedNow > 0) {
+      pendingTracker.setPendingCount(requestToken, Math.max(1, pendingCount));
+      diagnostics.recordPendingSource(requestToken, "tickPending:reservation-refresh");
+      flowStateMachine.touch(requestToken, now, "tickPending:reservation-refresh");
+    }
+    return reservedNow;
   }
 
   private void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {

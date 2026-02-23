@@ -62,6 +62,12 @@ Known focus area:
   counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
 - Pending top-up now subtracts already-available rack stock before ordering from Create network,
   preventing duplicate reorders when requested quantity is already physically present in shop racks.
+- Pending reconciliation now refreshes missing request reservations from currently available rack
+  stock after request-state refresh, improving reload recovery when reservation maps drift or reset.
+- Shopkeeper AI now treats resolver work and unreserved incoming-rack housekeeping as urgent work,
+  so it does not drop into idle while pending resolvable requests or rack cleanup work remain.
+- Incoming rack housekeeping now runs in small timed batches, moving only unreserved rack items into
+  hut inventory and leaving reserved quantities in place for MineColonies delivery creation.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked
