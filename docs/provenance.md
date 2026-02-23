@@ -204,3 +204,6 @@ Implementation notes:
   now uses `TileEntityCreateShop.planInboundAcceptedStacks(...)` virtual slot simulation across
   rack + hut handlers, clamps requested counts to actually insertable amounts for mixed stacks, and
   logs skipped/clamped requests instead of relying on one-item probe checks.
+- Pending reorder timing hardening is authored in this project: `tickPending` no longer clears
+  the delivery-created marker preemptively and now blocks network top-up while active delivery work
+  exists for the parent request, preventing premature duplicate ordering before courier pickup.
