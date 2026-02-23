@@ -77,6 +77,12 @@ Known focus area:
 - Housekeeping now includes cadence catch-up budgeting: when MineColonies building ticks are sparse,
   each run can move multiple due stacks (capped) to approximate the configured one-stack-per-interval
   behavior over wall-clock time.
+- Housekeeping now targets hut-internal inventory first (with fallback to capability handler), so
+  successful transfers are visible in the hut storage view instead of only through aggregate handlers.
+- Housekeeping rack extraction now prefers rack capability handlers over generic inventory handlers,
+  improving reliability of real extraction on live racks.
+- Rate-limited housekeeping diagnostics are available under debug logging to surface gate reasons,
+  rack discovery, unreserved budget, cooldown waits, and moved counts during live validation.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

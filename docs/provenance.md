@@ -260,3 +260,10 @@ Implementation notes:
 - Housekeeping cadence catch-up is authored in this project scope: per-run transfer budget now
   scales by elapsed server ticks since the previous run (bounded cap), compensating for coarse
   MineColonies building tick cadence while preserving the intended average stack transfer rate.
+- Housekeeping live-diagnostics instrumentation is authored in this project scope: rate-limited
+  debug logs now expose worker gate reasons, cooldown waits, rack discovery counts, unreserved
+  transfer budget, and moved stack counts for live-world verification without client-side hacks.
+- Housekeeping transfer target reliability hardening is authored in this project scope: rack->hut
+  transfer now prioritizes hut-internal inventory as destination and rack capability handlers for
+  extraction, reducing false-positive move accounting on aggregate handlers and improving visible
+  in-hut transfer behavior.
