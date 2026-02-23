@@ -599,7 +599,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (tile == null || pickup == null || !isWorkerWorking()) {
+    if (tile == null || pickup == null || !hasActiveWorker()) {
       cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
       return;
     }
