@@ -247,3 +247,7 @@ Implementation notes:
 - Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
   is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
   cleanup progression continues without MineColonies internals changes.
+- Incoming-rack housekeeping availability gating is authored in this project scope: transfer work
+  now requires an assigned Create Shop worker that is not in MineColonies unavailable statuses
+  (sleep/eat/sick/mourning/raided and related unavailable states), preventing background moves
+  while the worker is unavailable.
