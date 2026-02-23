@@ -14,6 +14,7 @@ import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.tileentities.TileEntityRack;
+import com.simibubi.create.content.logistics.BigItemStack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
@@ -885,6 +886,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   /** Returns rack inventory counts for the given stack keys. */
   public java.util.Map<ItemStack, Integer> getStockCountsForKeys(List<ItemStack> keys) {
     return rackIndex.getStockCountsForKeys(keys);
+  }
+
+  public List<BigItemStack> getRegisteredStorageStock() {
+    return rackIndex.getRegisteredStorageStock();
   }
 
   public void ensurePickupLink() {

@@ -44,6 +44,9 @@ Current behavior:
   with guidance to expand rack capacity (hut upgrade) or assign more couriers.
 - Inbound order capacity planning is rack-only (shop rack containers), so hut-internal buffer space
   no longer masks rack jams or triggers premature reorder while entrance packages are blocked.
+- Create Shop stock tab now renders contents from registered shop storage containers
+  (rack/vault-capable handlers) instead of direct Create-network summary, matching actual local
+  pickup inventory context.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

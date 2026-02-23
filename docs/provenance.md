@@ -216,3 +216,7 @@ Implementation notes:
   now evaluates rack-container capacity only (no hut inventory fallback), so blocked entrance/rack
   states are not hidden by hut buffer space and top-up orders are not re-triggered from non-rack
   storage headroom.
+- Stock module data-source alignment is authored in this project: Create Shop stock module view
+  serialization now publishes aggregated contents from registered local storage containers
+  (rack and other item-handler containers registered to the shop) instead of querying Create network
+  summary directly, so the in-game stock tab reflects actual shop-side storage state.
