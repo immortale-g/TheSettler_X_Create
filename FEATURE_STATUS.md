@@ -32,6 +32,9 @@ Current behavior:
   are now opportunistically reassigned to the Create Shop resolver once `canResolve` becomes true.
 - Retrying-owner reassignment now iterates assignment snapshots and performs at most one reassignment
   per tick, preventing `ConcurrentModificationException` and reducing assignment churn/drift.
+- Legacy requester factory compatibility (`serialization id 3001`) is restored for load-time
+  backward compatibility with pre-removal saves; new request flow still does not create SafeRequester
+  wrappers.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
