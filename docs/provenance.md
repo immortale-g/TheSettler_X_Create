@@ -257,3 +257,6 @@ Implementation notes:
 - Housekeeping rack-discovery recovery is authored in this project scope: before transfer, shop
   racks are re-synchronized from registered containers and, when that set is empty (post-reload
   drift), a bounded local rack scan is used so unreserved transfer work still executes.
+- Housekeeping cadence catch-up is authored in this project scope: per-run transfer budget now
+  scales by elapsed server ticks since the previous run (bounded cap), compensating for coarse
+  MineColonies building tick cadence while preserving the intended average stack transfer rate.

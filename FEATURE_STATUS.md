@@ -74,6 +74,9 @@ Known focus area:
   pre-extract ghost inserts and eliminating rack->hut item duplication.
 - Housekeeping rack discovery now refreshes registered rack containers and falls back to a local
   rack scan around the shop when container registrations are temporarily empty after reload.
+- Housekeeping now includes cadence catch-up budgeting: when MineColonies building ticks are sparse,
+  each run can move multiple due stacks (capped) to approximate the configured one-stack-per-interval
+  behavior over wall-clock time.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

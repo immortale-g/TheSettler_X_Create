@@ -51,6 +51,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public static final String SCHEMATIC_NAME = "createshop";
   private static final long HOUSEKEEPING_TRANSFER_INTERVAL = 20L * 3L;
   private static final long HOUSEKEEPING_DEBUG_COOLDOWN = 20L * 5L;
+  private static final int HOUSEKEEPING_MAX_CATCHUP_STACKS = 16;
   private static final int HOUSEKEEPING_TRANSFER_STACKS = 1;
 
   static boolean isDebugRequests() {
@@ -607,12 +608,15 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return;
     }
     long now = colony.getWorld().getGameTime();
-    if (lastHousekeepingTransferTick >= 0L
-        && now - lastHousekeepingTransferTick < HOUSEKEEPING_TRANSFER_INTERVAL) {
+    long elapsed =
+        lastHousekeepingTransferTick < 0L
+            ? HOUSEKEEPING_TRANSFER_INTERVAL
+            : now - lastHousekeepingTransferTick;
+    if (elapsed < HOUSEKEEPING_TRANSFER_INTERVAL) {
       if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] housekeeping wait cooldown remaining={}t",
-            HOUSEKEEPING_TRANSFER_INTERVAL - (now - lastHousekeepingTransferTick));
+            HOUSEKEEPING_TRANSFER_INTERVAL - elapsed);
       }
       return;
     }
@@ -639,18 +643,28 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       return;
     }
-    int moved = tile.moveUnreservedRackStacksToHut(pickup, HOUSEKEEPING_TRANSFER_STACKS);
+    int dueStacks =
+        Math.max(
+            HOUSEKEEPING_TRANSFER_STACKS,
+            (int) Math.max(1L, elapsed / HOUSEKEEPING_TRANSFER_INTERVAL));
+    int transferBudget = Math.min(HOUSEKEEPING_MAX_CATCHUP_STACKS, dueStacks);
+    int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
     cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
     if (moved > 0 || cachedHasIncomingRackWork) {
       lastHousekeepingTransferTick = now;
     }
     if (moved > 0 && isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping moved unreserved rack stacks to hut count={}", moved);
+          "[CreateShop] housekeeping moved unreserved rack stacks to hut count={} budget={} elapsed={}t",
+          moved,
+          transferBudget,
+          elapsed);
     } else if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping ran but moved=0 pendingUnreserved={}",
-          cachedHasIncomingRackWork);
+          "[CreateShop] housekeeping ran but moved=0 pendingUnreserved={} budget={} elapsed={}t",
+          cachedHasIncomingRackWork,
+          transferBudget,
+          elapsed);
     }
   }
 
