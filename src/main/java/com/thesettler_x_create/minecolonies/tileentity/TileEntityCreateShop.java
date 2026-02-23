@@ -296,9 +296,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (pickup == null || maxStacks <= 0 || getBuilding() == null || getLevel() == null) {
       return 0;
     }
-    IItemHandler hut = getItemHandlerCap((Direction) null);
+    // Housekeeping target must be hut-internal inventory, not aggregate warehouse views.
+    IItemHandler hut = getInventory();
     if (hut == null) {
-      hut = getInventory();
+      hut = getItemHandlerCap((Direction) null);
     }
     if (hut == null) {
       return 0;
