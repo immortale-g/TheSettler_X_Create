@@ -8,6 +8,7 @@ import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import java.util.ArrayList;
 import java.util.List;
@@ -267,6 +268,99 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
+   * Returns true when at least one rack item is currently not reserved for pending requests.
+   *
+   * <p>Used to keep the shopkeeper active for inbound rack cleanup work.
+   */
+  public boolean hasUnreservedRackItems(@Nullable CreateShopBlockEntity pickup) {
+    if (pickup == null || getBuilding() == null || getLevel() == null) {
+      return false;
+    }
+    for (RackStackBudget budget : collectRackBudgets(pickup)) {
+      if (budget.remaining > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
+   *
+   * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
+   */
+  public int moveUnreservedRackStacksToHut(@Nullable CreateShopBlockEntity pickup, int maxStacks) {
+    if (pickup == null || maxStacks <= 0 || getBuilding() == null || getLevel() == null) {
+      return 0;
+    }
+    IItemHandler hut = getItemHandlerCap((Direction) null);
+    if (hut == null) {
+      return 0;
+    }
+    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    if (budgets.isEmpty()) {
+      return 0;
+    }
+    int movedStacks = 0;
+    for (BlockPos pos : getBuilding().getContainers()) {
+      if (movedStacks >= maxStacks || !WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = getLevel().getBlockEntity(pos);
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
+        continue;
+      }
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots() && movedStacks < maxStacks; slot++) {
+        ItemStack inSlot = handler.getStackInSlot(slot);
+        if (inSlot.isEmpty()) {
+          continue;
+        }
+        RackStackBudget budget = findBudget(budgets, inSlot);
+        if (budget == null || budget.remaining <= 0) {
+          continue;
+        }
+        int stackMoveTarget = Math.min(inSlot.getCount(), budget.remaining);
+        if (stackMoveTarget <= 0) {
+          continue;
+        }
+        ItemStack probe = inSlot.copy();
+        probe.setCount(stackMoveTarget);
+        ItemStack probeLeftover =
+            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+                probe.copy(), hut);
+        int insertable = stackMoveTarget - (probeLeftover.isEmpty() ? 0 : probeLeftover.getCount());
+        if (insertable <= 0) {
+          continue;
+        }
+        ItemStack extracted = handler.extractItem(slot, insertable, false);
+        if (extracted.isEmpty()) {
+          continue;
+        }
+        ItemStack leftover =
+            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(extracted, hut);
+        int inserted = insertable - (leftover.isEmpty() ? 0 : leftover.getCount());
+        if (!leftover.isEmpty()) {
+          InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+              leftover, handler);
+        }
+        if (inserted <= 0) {
+          continue;
+        }
+        budget.remaining -= inserted;
+        movedStacks++;
+      }
+    }
+    if (movedStacks > 0) {
+      setChanged();
+    }
+    return movedStacks;
+  }
+
+  /**
    * Marks a temporary capacity stall when requested inbound quantity cannot fit into shop storage.
    */
   public void noteCapacityStall(ItemStack stack, int requested, int accepted) {
@@ -522,6 +616,72 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         slots.set(i, placed);
         remaining.shrink(moved);
       }
+    }
+  }
+
+  private List<RackStackBudget> collectRackBudgets(CreateShopBlockEntity pickup) {
+    List<RackStackBudget> totals = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null || pickup == null) {
+      return totals;
+    }
+    for (BlockPos pos : getBuilding().getContainers()) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = getLevel().getBlockEntity(pos);
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
+        continue;
+      }
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots(); slot++) {
+        ItemStack stack = handler.getStackInSlot(slot);
+        if (stack.isEmpty() || stack.getCount() <= 0) {
+          continue;
+        }
+        RackStackBudget budget = findBudget(totals, stack);
+        if (budget == null) {
+          ItemStack key = stack.copy();
+          key.setCount(1);
+          totals.add(new RackStackBudget(key, stack.getCount()));
+        } else {
+          budget.remaining += stack.getCount();
+        }
+      }
+    }
+    totals.removeIf(
+        budget ->
+            budget == null
+                || budget.key == null
+                || budget.key.isEmpty()
+                || (budget.remaining =
+                        Math.max(0, budget.remaining - pickup.getReservedFor(budget.key)))
+                    <= 0);
+    return totals;
+  }
+
+  @Nullable
+  private static RackStackBudget findBudget(List<RackStackBudget> budgets, ItemStack stack) {
+    if (budgets == null || budgets.isEmpty() || stack == null || stack.isEmpty()) {
+      return null;
+    }
+    for (RackStackBudget budget : budgets) {
+      if (budget != null && ItemStack.isSameItemSameComponents(budget.key, stack)) {
+        return budget;
+      }
+    }
+    return null;
+  }
+
+  private static final class RackStackBudget {
+    private final ItemStack key;
+    private int remaining;
+
+    private RackStackBudget(ItemStack key, int remaining) {
+      this.key = key;
+      this.remaining = Math.max(0, remaining);
     }
   }
 

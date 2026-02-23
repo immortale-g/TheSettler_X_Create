@@ -237,3 +237,13 @@ Implementation notes:
 - Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
   now subtracts rack-available stock from top-up deficit calculation before issuing Create network
   orders, preventing duplicate network reorders when enough items are already in shop racks.
+- Reservation-refresh hardening is authored in this project scope: `tickPending` now reconstructs
+  missing per-request reservations from currently available rack stock after request refresh,
+  reducing post-reload reservation drift and avoiding premature unreserved treatment of pending
+  request goods.
+- Incoming-rack housekeeping is authored in this project scope: Create Shop now performs timed
+  rack->hut transfers for unreserved items only, preserving reserved quantities for MineColonies
+  delivery flow while keeping local storage cleanup server-authoritative and API-driven.
+- Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
+  is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
+  cleanup progression continues without MineColonies internals changes.

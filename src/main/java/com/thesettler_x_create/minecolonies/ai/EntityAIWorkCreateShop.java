@@ -44,19 +44,18 @@ public class EntityAIWorkCreateShop
 
   @Override
   public boolean canGoIdle() {
-    BuildingCreateShop building = this.building;
-    if (building != null && building.hasResolverWork()) {
+    if (hasUrgentWork()) {
       return false;
     }
     return !isWorkingTime();
   }
 
   protected IAIState decide() {
-    return isWorkingTime() ? AIWorkerState.PREPARING : AIWorkerState.IDLE;
+    return shouldWorkNow() ? AIWorkerState.PREPARING : AIWorkerState.IDLE;
   }
 
   private IAIState prepare() {
-    if (!isWorkingTime()) {
+    if (!shouldWorkNow()) {
       markIdle();
       return AIWorkerState.IDLE;
     }
@@ -68,7 +67,7 @@ public class EntityAIWorkCreateShop
   }
 
   private IAIState work() {
-    if (!isWorkingTime()) {
+    if (!shouldWorkNow()) {
       markIdle();
       return AIWorkerState.IDLE;
     }
@@ -78,7 +77,7 @@ public class EntityAIWorkCreateShop
   }
 
   private IAIState idleState() {
-    if (isWorkingTime()) {
+    if (shouldWorkNow()) {
       markWorking();
       return AIWorkerState.PREPARING;
     }
@@ -91,6 +90,15 @@ public class EntityAIWorkCreateShop
       return true;
     }
     return world.isDay();
+  }
+
+  private boolean hasUrgentWork() {
+    BuildingCreateShop currentBuilding = this.building;
+    return currentBuilding != null && currentBuilding.hasUrgentWork();
+  }
+
+  private boolean shouldWorkNow() {
+    return isWorkingTime() || hasUrgentWork();
   }
 
   private void markWorking() {
