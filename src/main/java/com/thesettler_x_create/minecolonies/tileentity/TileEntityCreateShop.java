@@ -305,11 +305,26 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
     List<RackStackBudget> budgets = collectRackBudgets(pickup);
     if (budgets.isEmpty()) {
+      logHousekeepingDebug("skip:budgets-empty");
       return 0;
     }
     List<AbstractTileEntityRack> racks = collectRacksForHousekeeping();
     if (racks.isEmpty()) {
+      logHousekeepingDebug("skip:racks-empty");
       return 0;
+    }
+    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      int unreserved = 0;
+      for (RackStackBudget budget : budgets) {
+        if (budget != null) {
+          unreserved += Math.max(0, budget.remaining);
+        }
+      }
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] housekeeping start racks={} stackKeys={} unreserved={}",
+          racks.size(),
+          budgets.size(),
+          unreserved);
     }
     int movedStacks = 0;
     for (AbstractTileEntityRack rack : racks) {
@@ -361,6 +376,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (movedStacks > 0) {
       setChanged();
     }
+    logHousekeepingDebug("done:moved=" + movedStacks);
     return movedStacks;
   }
 
@@ -684,7 +700,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       shop.ensureRackContainers();
     }
     Set<BlockPos> rackPositions = new LinkedHashSet<>(getBuilding().getContainers());
+    boolean fallbackScan = false;
     if (rackPositions.isEmpty() && getBuilding() instanceof BuildingCreateShop shop) {
+      fallbackScan = true;
       BlockPos origin = shop.getLocation().getInDimensionLocation();
       int radius = 16;
       int minX = origin.getX() - radius;
@@ -710,7 +728,18 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         racks.add(rack);
       }
     }
+    if (fallbackScan && com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] housekeeping rack fallback scan active around {}", worldPosition);
+    }
     return racks;
+  }
+
+  private void logHousekeepingDebug(String message) {
+    if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      return;
+    }
+    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info("[CreateShop] housekeeping {}", message);
   }
 
   @Nullable
