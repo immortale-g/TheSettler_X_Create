@@ -50,6 +50,7 @@ import org.jetbrains.annotations.Nullable;
 public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public static final String SCHEMATIC_NAME = "createshop";
   private static final long HOUSEKEEPING_TRANSFER_INTERVAL = 20L * 3L;
+  private static final long HOUSEKEEPING_DEBUG_COOLDOWN = 20L * 5L;
   private static final int HOUSEKEEPING_TRANSFER_STACKS = 1;
 
   static boolean isDebugRequests() {
@@ -84,6 +85,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private long lastResolverHealthcheckTick = -1L;
   private long lastHousekeepingTransferTick = -1L;
   private long lastHousekeepingWorkCheckTick = -1L;
+  private long lastHousekeepingDebugTick = -1L;
   private boolean cachedHasIncomingRackWork;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
@@ -453,6 +455,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return workerStatus.hasHousekeepingAvailableWorker();
   }
 
+  public String describeHousekeepingBlockReason() {
+    return workerStatus.describeHousekeepingBlockReason();
+  }
+
   public boolean isWorkerWorking() {
     return workerStatus.isWorkerWorking();
   }
@@ -603,12 +609,34 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     long now = colony.getWorld().getGameTime();
     if (lastHousekeepingTransferTick >= 0L
         && now - lastHousekeepingTransferTick < HOUSEKEEPING_TRANSFER_INTERVAL) {
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping wait cooldown remaining={}t",
+            HOUSEKEEPING_TRANSFER_INTERVAL - (now - lastHousekeepingTransferTick));
+      }
       return;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (tile == null || pickup == null || !hasHousekeepingAvailableWorker()) {
+    if (tile == null || pickup == null) {
       cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping skip tilePresent={} pickupPresent={} pendingUnreserved={}",
+            tile != null,
+            pickup != null,
+            cachedHasIncomingRackWork);
+      }
+      return;
+    }
+    if (!hasHousekeepingAvailableWorker()) {
+      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping blocked reason={} pendingUnreserved={}",
+            describeHousekeepingBlockReason(),
+            cachedHasIncomingRackWork);
+      }
       return;
     }
     int moved = tile.moveUnreservedRackStacksToHut(pickup, HOUSEKEEPING_TRANSFER_STACKS);
@@ -619,7 +647,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (moved > 0 && isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] housekeeping moved unreserved rack stacks to hut count={}", moved);
+    } else if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] housekeeping ran but moved=0 pendingUnreserved={}",
+          cachedHasIncomingRackWork);
     }
+  }
+
+  private boolean shouldLogHousekeepingDebug(long now) {
+    if (lastHousekeepingDebugTick >= 0L
+        && now - lastHousekeepingDebugTick < HOUSEKEEPING_DEBUG_COOLDOWN) {
+      return false;
+    }
+    lastHousekeepingDebugTick = now;
+    return true;
   }
 
   private void ensureResolverRegistrationHealthy(IColony colony) {

@@ -62,6 +62,25 @@ final class ShopWorkerStatus {
     return false;
   }
 
+  String describeHousekeepingBlockReason() {
+    boolean hasShopWorker = false;
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      hasShopWorker = true;
+      if (citizen.isAsleep()) {
+        return "asleep";
+      }
+      VisibleCitizenStatus status = citizen.getStatus();
+      if (status != null && HOUSEKEEPING_BLOCKING_STATUSES.contains(status)) {
+        return "status:" + status;
+      }
+      return "available";
+    }
+    return hasShopWorker ? "blocked" : "no-assigned-shopworker";
+  }
+
   boolean isWorkerWorking() {
     boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
