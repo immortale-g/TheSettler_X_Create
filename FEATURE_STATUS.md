@@ -58,6 +58,8 @@ Known focus area:
   request references directly in the task UI for easier live diagnosis.
 - Stale delivery-child recovery hardening: detect long-running `CREATED/ASSIGNED/IN_PROGRESS`
   delivery children and trigger controlled cancel/requeue cleanup so parent requests can continue.
+- Delivery dispatch notify accounting is corrected: courier module scan now increments `notified`
+  counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

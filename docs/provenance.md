@@ -231,3 +231,6 @@ Implementation notes:
   tracks active delivery-child runtime and applies timeout-based API cancellation + parent cleanup
   for long-running non-terminal children (`CREATED/ASSIGNED/IN_PROGRESS`) to unblock parent
   progression without modifying MineColonies internals.
+- Delivery dispatch diagnostics/accounting hardening is authored in this project scope: courier
+  module notification scans now increment `notified` counters alongside `checked`, preventing
+  false `notified=0` diagnostics during active dispatch attempts.
