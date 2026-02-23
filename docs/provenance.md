@@ -212,3 +212,7 @@ Implementation notes:
   `JobStatus.STUCK` while stalled, and raises a rate-limited citizen interaction with actionable
   guidance (upgrade hut/rack capacity or assign more couriers) instead of falling back to player
   resolver for stock that is still available in the Create network.
+- Capacity planner source-of-truth hardening is authored in this project: inbound order planning
+  now evaluates rack-container capacity only (no hut inventory fallback), so blocked entrance/rack
+  states are not hidden by hut buffer space and top-up orders are not re-triggered from non-rack
+  storage headroom.
