@@ -224,3 +224,6 @@ Implementation notes:
   stock module window is read-only again (registered storage view only, no custom request/order
   actions), while forced pickup behavior stays on the MineColonies-native worker-module action
   path (`forcePickup`) used by other huts.
+- Planned task-tab observability extension is authored for this project scope: the Create Shop task
+  UI will expose inflight package progress and shop-triggered MineColonies pickup/delivery request
+  references as read-only diagnostics, without introducing client-authoritative request state.
