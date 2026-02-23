@@ -8,12 +8,12 @@ import org.junit.jupiter.api.Test;
 
 class BuildingCreateShopHousekeepingGateGuardTest {
   @Test
-  void housekeepingIsGatedByAssignedWorkerNotTransientWorkingMetadata() throws Exception {
+  void housekeepingIsGatedByAvailableWorkerAndNotWorkingMetadata() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
-    assertTrue(source.contains("!hasActiveWorker()"));
+    assertTrue(source.contains("!hasAvailableWorker()"));
     assertTrue(!source.contains("|| !isWorkerWorking())"));
   }
 }

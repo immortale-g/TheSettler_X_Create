@@ -68,6 +68,8 @@ Known focus area:
   so it does not drop into idle while pending resolvable requests or rack cleanup work remain.
 - Incoming rack housekeeping now runs in small timed batches, moving only unreserved rack items into
   hut inventory and leaving reserved quantities in place for MineColonies delivery creation.
+- Incoming rack housekeeping is availability-gated: it pauses while the assigned shopkeeper is in
+  unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

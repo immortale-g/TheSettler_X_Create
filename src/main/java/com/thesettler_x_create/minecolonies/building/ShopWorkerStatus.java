@@ -29,6 +29,18 @@ final class ShopWorkerStatus {
         .anyMatch(citizen -> citizen.getJob() instanceof JobCreateShop);
   }
 
+  boolean hasAvailableWorker() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      if (!isCitizenUnavailable(citizen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   boolean isWorkerWorking() {
     boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
