@@ -2,13 +2,13 @@ Installation information
 
 ## ⚠️ Known Issue – Colony marked as “Abandoned” after updating to 0.0.12
 
-**Affected versions:**
+**Affected versions:**  
 Updating from **0.0.11 → 0.0.12**
 
 ### Description
 When updating an existing world from version `0.0.11` to `0.0.12`, some players may experience their colony being marked as **abandoned** or appearing to be missing.
 
-This is caused by a serialization compatibility issue with legacy request data.
+This is caused by a serialization compatibility issue with legacy request data.  
 Version `0.0.12` no longer registers a request factory that existed in `0.0.11`, which prevents certain saved request objects from being properly deserialized during world load.
 
 As a result, MineColonies may fail to fully restore the colony state.
@@ -37,10 +37,10 @@ This issue will be resolved in the next patch release (0.0.13+), which restores 
 
 ## ⚠ Disclaimer
 
-This mod has been tested on the **client side only**.
+This mod has been tested on the **client side only**.  
 It has **not** been tested in a dedicated server environment.
 
-If you choose to install or run this mod on a server, you do so **at your own risk**.
+If you choose to install or run this mod on a server, you do so **at your own risk**.  
 Compatibility issues, unexpected behavior, or even world corruption may occur.
 
 Please make sure to create proper backups before installing this mod on any server.
