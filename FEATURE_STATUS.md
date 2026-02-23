@@ -35,6 +35,22 @@ Current behavior:
 - Legacy requester factory compatibility (`serialization id 3001`) is restored for load-time
   backward compatibility with pre-removal saves; new request flow still does not create SafeRequester
   wrappers.
+- Create-network ordering now uses a virtual rack/hut slot-capacity simulation before broadcast,
+  clamping requested amounts to actually insertable counts and preventing over-ordering when free
+  slots for mixed item types are exhausted.
+- Pending top-up ordering is now blocked while delivery children are still in progress for the
+  same parent request, preventing premature reorders before couriers pick up shop-arrived items.
+- Capacity stalls now surface as shopkeeper `STUCK` state and a rate-limited citizen interaction
+  with guidance to expand rack capacity (hut upgrade) or assign more couriers.
+- Inbound order capacity planning is rack-only (shop rack containers), so hut-internal buffer space
+  no longer masks rack jams or triggers premature reorder while entrance packages are blocked.
+- Create Shop stock tab now renders contents from registered shop storage containers
+  (rack/vault-capable handlers) instead of direct Create-network summary, matching actual local
+  pickup inventory context.
+- Create Shop stock UI is read-only again (no in-tab order/request actions), showing registered
+  shop storage state only.
+- `Pickup now` remains MineColonies-native via the worker-module actions flow (`forcePickup`)
+  instead of custom stock-tab controls.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

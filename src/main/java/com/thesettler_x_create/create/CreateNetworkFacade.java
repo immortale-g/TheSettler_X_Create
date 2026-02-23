@@ -276,18 +276,10 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       return Collections.emptyList();
     }
     List<ItemStack> consolidated = consolidateRequestedStacks(requestedStacks);
+    List<ItemStack> acceptedByCapacity = shop.planInboundAcceptedStacks(consolidated);
     List<ItemStack> normalized = new ArrayList<>();
-    for (ItemStack requestStack : consolidated) {
+    for (ItemStack requestStack : acceptedByCapacity) {
       if (requestStack.isEmpty()) {
-        continue;
-      }
-      if (!shop.canAcceptInbound(requestStack)) {
-        if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
-              requestStack.getHoverName().getString(),
-              requestStack.getCount());
-        }
         continue;
       }
       int available = requestStack.getCount();
@@ -299,7 +291,50 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         available -= chunk;
       }
     }
+    boolean capacityStalled = false;
+    for (ItemStack requested : consolidated) {
+      int acceptedCount = countAccepted(acceptedByCapacity, requested);
+      if (acceptedCount < requested.getCount()) {
+        capacityStalled = true;
+        shop.noteCapacityStall(requested, requested.getCount(), acceptedCount);
+      }
+      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (acceptedCount <= 0) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
+              requested.getHoverName().getString(),
+              requested.getCount());
+          continue;
+        }
+        if (acceptedCount < requested.getCount()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] requestStacks clamped '{}' requested={} accepted={} (capacity-limited)",
+              requested.getHoverName().getString(),
+              requested.getCount(),
+              acceptedCount);
+        }
+      }
+    }
+    if (!capacityStalled) {
+      shop.clearCapacityStall();
+    }
     return normalized;
+  }
+
+  private static int countAccepted(List<ItemStack> accepted, ItemStack requested) {
+    if (accepted == null || accepted.isEmpty() || requested == null || requested.isEmpty()) {
+      return 0;
+    }
+    int total = 0;
+    for (ItemStack candidate : accepted) {
+      if (candidate == null || candidate.isEmpty()) {
+        continue;
+      }
+      if (ItemStack.isSameItemSameComponents(candidate, requested)) {
+        total += candidate.getCount();
+      }
+    }
+    return total;
   }
 
   private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {

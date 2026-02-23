@@ -16,16 +16,7 @@ public class CreateShopStockModuleView extends AbstractBuildingModuleView {
   @Override
   public void deserialize(RegistryFriendlyByteBuf buf) {
     hasNetwork = buf.readBoolean();
-    int count = buf.readVarInt();
-    if (count <= 0) {
-      stock = Collections.emptyList();
-      return;
-    }
-    List<BigItemStack> stacks = new ArrayList<>(count);
-    for (int i = 0; i < count; i++) {
-      stacks.add(BigItemStack.STREAM_CODEC.decode(buf));
-    }
-    stock = stacks;
+    stock = readStacks(buf);
   }
 
   public boolean hasNetwork() {
@@ -50,5 +41,17 @@ public class CreateShopStockModuleView extends AbstractBuildingModuleView {
   public net.minecraft.network.chat.Component getDesc() {
     return net.minecraft.network.chat.Component.translatable(
         "com.thesettler_x_create.gui.createshop.stock");
+  }
+
+  private static List<BigItemStack> readStacks(RegistryFriendlyByteBuf buf) {
+    int count = buf.readVarInt();
+    if (count <= 0) {
+      return Collections.emptyList();
+    }
+    List<BigItemStack> stacks = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      stacks.add(BigItemStack.STREAM_CODEC.decode(buf));
+    }
+    return stacks;
   }
 }

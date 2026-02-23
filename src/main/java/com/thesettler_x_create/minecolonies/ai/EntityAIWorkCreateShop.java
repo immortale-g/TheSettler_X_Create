@@ -97,6 +97,11 @@ public class EntityAIWorkCreateShop
     if (worker == null || worker.getCitizenData() == null) {
       return;
     }
+    if (building != null && building.hasCapacityStall()) {
+      worker.getCitizenData().setJobStatus(JobStatus.STUCK);
+      worker.getCitizenData().setVisibleStatus(VisibleCitizenStatus.WORKING);
+      return;
+    }
     worker.getCitizenData().setJobStatus(JobStatus.WORKING);
     worker.getCitizenData().setVisibleStatus(VisibleCitizenStatus.WORKING);
   }

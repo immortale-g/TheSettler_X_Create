@@ -29,9 +29,16 @@ import org.jetbrains.annotations.Nullable;
 public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private static final String TAG_NETWORK = "StockNetwork";
   private static final String TAG_ADDRESS = "ShopAddress";
+  private static final long CAPACITY_STALL_TTL = 20L * 45L;
+  private static final long CAPACITY_STALL_NOTICE_COOLDOWN = 20L * 90L;
   private UUID stockNetworkId;
   private String shopAddress = "";
   private long lastNotification;
+  private long capacityStallUntil;
+  private long capacityStallLastNotice;
+  private ItemStack capacityStallStack = ItemStack.EMPTY;
+  private int capacityStallRequested;
+  private int capacityStallAccepted;
 
   public TileEntityCreateShop(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_BUILDING.get(), pos, state);
@@ -259,6 +266,86 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return canInsertAtLeastOne(hut, probe);
   }
 
+  /**
+   * Marks a temporary capacity stall when requested inbound quantity cannot fit into shop storage.
+   */
+  public void noteCapacityStall(ItemStack stack, int requested, int accepted) {
+    if (stack == null || stack.isEmpty() || requested <= 0 || accepted >= requested) {
+      return;
+    }
+    long now = getLevel() == null ? 0L : getLevel().getGameTime();
+    capacityStallUntil = now + CAPACITY_STALL_TTL;
+    capacityStallStack = stack.copy();
+    capacityStallStack.setCount(1);
+    capacityStallRequested = Math.max(1, requested);
+    capacityStallAccepted = Math.max(0, accepted);
+  }
+
+  public void clearCapacityStall() {
+    capacityStallUntil = 0L;
+    capacityStallStack = ItemStack.EMPTY;
+    capacityStallRequested = 0;
+    capacityStallAccepted = 0;
+  }
+
+  public boolean hasCapacityStall() {
+    if (capacityStallUntil <= 0L || level == null) {
+      return false;
+    }
+    return level.getGameTime() < capacityStallUntil;
+  }
+
+  @Nullable
+  public CapacityStallNotice consumeCapacityStallNotice() {
+    if (!hasCapacityStall() || level == null || capacityStallStack.isEmpty()) {
+      return null;
+    }
+    long now = level.getGameTime();
+    if (capacityStallLastNotice > 0L
+        && now - capacityStallLastNotice < CAPACITY_STALL_NOTICE_COOLDOWN) {
+      return null;
+    }
+    capacityStallLastNotice = now;
+    return new CapacityStallNotice(
+        capacityStallStack.copy(), capacityStallRequested, capacityStallAccepted);
+  }
+
+  /**
+   * Computes how much of the requested inbound stacks can fit right now using a virtual slot
+   * simulation across racks and hut buffer.
+   *
+   * <p>This prevents over-ordering when only limited free slots are available for new item types.
+   */
+  public List<ItemStack> planInboundAcceptedStacks(List<ItemStack> requestedStacks) {
+    if (requestedStacks == null || requestedStacks.isEmpty()) {
+      return List.of();
+    }
+    List<VirtualItemHandler> virtualRacks = collectVirtualRacks();
+    List<ItemStack> accepted = new ArrayList<>();
+
+    for (ItemStack original : requestedStacks) {
+      if (ItemStackUtils.isEmpty(original) || original.getCount() <= 0) {
+        continue;
+      }
+      ItemStack remaining = original.copy();
+      int movedTotal = 0;
+      while (!remaining.isEmpty()) {
+        VirtualItemHandler rack = findBestVirtualRack(remaining, virtualRacks);
+        int moved = insertIntoVirtual(rack, remaining);
+        if (moved <= 0) {
+          break;
+        }
+        movedTotal += moved;
+      }
+      if (movedTotal > 0) {
+        ItemStack movedStack = original.copy();
+        movedStack.setCount(movedTotal);
+        accepted.add(movedStack);
+      }
+    }
+    return accepted;
+  }
+
   private static boolean canInsertAtLeastOne(IItemHandler handler, ItemStack stack) {
     if (handler == null || stack == null || stack.isEmpty()) {
       return false;
@@ -270,6 +357,172 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return false;
+  }
+
+  private List<VirtualItemHandler> collectVirtualRacks() {
+    List<VirtualItemHandler> racks = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null) {
+      return racks;
+    }
+    for (BlockPos pos : getBuilding().getContainers()) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = getLevel().getBlockEntity(pos);
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
+        continue;
+      }
+      VirtualItemHandler virtual = createVirtualHandler(rack.getItemHandlerCap());
+      if (virtual != null) {
+        racks.add(virtual);
+      }
+    }
+    return racks;
+  }
+
+  private static VirtualItemHandler createVirtualHandler(IItemHandler handler) {
+    if (handler == null) {
+      return null;
+    }
+    return new VirtualItemHandler(handler);
+  }
+
+  private static VirtualItemHandler findBestVirtualRack(
+      ItemStack stack, List<VirtualItemHandler> racks) {
+    if (stack == null || stack.isEmpty() || racks == null || racks.isEmpty()) {
+      return null;
+    }
+    for (VirtualItemHandler rack : racks) {
+      if (rack != null && rack.hasExactWithSpace(stack)) {
+        return rack;
+      }
+    }
+    for (VirtualItemHandler rack : racks) {
+      if (rack != null && rack.hasSimilarWithSpace(stack)) {
+        return rack;
+      }
+    }
+    VirtualItemHandler best = null;
+    int bestFree = 0;
+    for (VirtualItemHandler rack : racks) {
+      if (rack == null) {
+        continue;
+      }
+      int free = rack.freeSlots();
+      if (free > bestFree) {
+        best = rack;
+        bestFree = free;
+      }
+    }
+    return best;
+  }
+
+  private static int insertIntoVirtual(VirtualItemHandler handler, ItemStack stack) {
+    if (handler == null || stack == null || stack.isEmpty()) {
+      return 0;
+    }
+    int before = stack.getCount();
+    handler.insert(stack);
+    return before - stack.getCount();
+  }
+
+  private static final class VirtualItemHandler {
+    private final List<ItemStack> slots;
+    private final int[] slotLimits;
+
+    private VirtualItemHandler(IItemHandler source) {
+      this.slots = new ArrayList<>();
+      this.slotLimits = new int[source.getSlots()];
+      for (int i = 0; i < source.getSlots(); i++) {
+        ItemStack inSlot = source.getStackInSlot(i);
+        this.slots.add(inSlot == null ? ItemStack.EMPTY : inSlot.copy());
+        this.slotLimits[i] = Math.max(1, source.getSlotLimit(i));
+      }
+    }
+
+    private int freeSlots() {
+      int free = 0;
+      for (ItemStack stack : slots) {
+        if (stack == null || stack.isEmpty()) {
+          free++;
+        }
+      }
+      return free;
+    }
+
+    private boolean hasExactWithSpace(ItemStack incoming) {
+      for (int i = 0; i < slots.size(); i++) {
+        ItemStack slot = slots.get(i);
+        if (slot == null || slot.isEmpty()) {
+          continue;
+        }
+        if (!ItemStack.isSameItemSameComponents(slot, incoming)) {
+          continue;
+        }
+        int max = Math.min(slot.getMaxStackSize(), slotLimits[i]);
+        if (slot.getCount() < max) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    private boolean hasSimilarWithSpace(ItemStack incoming) {
+      for (int i = 0; i < slots.size(); i++) {
+        ItemStack slot = slots.get(i);
+        if (slot == null || slot.isEmpty()) {
+          continue;
+        }
+        if (!ItemStack.isSameItem(slot, incoming)) {
+          continue;
+        }
+        int max = Math.min(slot.getMaxStackSize(), slotLimits[i]);
+        if (slot.getCount() < max) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    private void insert(ItemStack remaining) {
+      if (remaining == null || remaining.isEmpty()) {
+        return;
+      }
+      for (int i = 0; i < slots.size() && !remaining.isEmpty(); i++) {
+        ItemStack slot = slots.get(i);
+        if (slot == null || slot.isEmpty()) {
+          continue;
+        }
+        if (!ItemStack.isSameItemSameComponents(slot, remaining)) {
+          continue;
+        }
+        int max = Math.min(slot.getMaxStackSize(), slotLimits[i]);
+        if (slot.getCount() >= max) {
+          continue;
+        }
+        int moved = Math.min(remaining.getCount(), max - slot.getCount());
+        if (moved <= 0) {
+          continue;
+        }
+        slot.grow(moved);
+        remaining.shrink(moved);
+      }
+      for (int i = 0; i < slots.size() && !remaining.isEmpty(); i++) {
+        ItemStack slot = slots.get(i);
+        if (slot != null && !slot.isEmpty()) {
+          continue;
+        }
+        int max = Math.min(remaining.getMaxStackSize(), slotLimits[i]);
+        int moved = Math.min(remaining.getCount(), max);
+        if (moved <= 0) {
+          continue;
+        }
+        ItemStack placed = remaining.copy();
+        placed.setCount(moved);
+        slots.set(i, placed);
+        remaining.shrink(moved);
+      }
+    }
   }
 
   private void maybeNotifyFull() {
@@ -360,5 +613,17 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return bestRack;
+  }
+
+  public static class CapacityStallNotice {
+    public final ItemStack stackKey;
+    public final int requested;
+    public final int accepted;
+
+    public CapacityStallNotice(ItemStack stackKey, int requested, int accepted) {
+      this.stackKey = stackKey;
+      this.requested = requested;
+      this.accepted = accepted;
+    }
   }
 }

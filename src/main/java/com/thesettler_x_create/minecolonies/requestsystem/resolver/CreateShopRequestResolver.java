@@ -732,15 +732,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
       }
       if (hasDeliveriesCreated(request.getId())) {
-        // If no active children remain, this parent is stale-blocked by a leftover delivery-created
-        // marker (for example when MineColonies consumed the child without callbacking resolver
-        // hooks).
-        clearDeliveriesCreated(request.getId());
-        diagnostics.logPendingReasonChange(request.getId(), "recover:clear-deliveries-created");
+        diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
+        flowStateMachine.touch(
+            request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} cleared stale deliveries-created marker", requestIdLog);
+              "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
+              requestIdLog);
         }
+        continue;
       }
 
       if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
