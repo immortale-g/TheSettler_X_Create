@@ -35,6 +35,9 @@ Current behavior:
 - Legacy requester factory compatibility (`serialization id 3001`) is restored for load-time
   backward compatibility with pre-removal saves; new request flow still does not create SafeRequester
   wrappers.
+- Create-network ordering now uses a virtual rack/hut slot-capacity simulation before broadcast,
+  clamping requested amounts to actually insertable counts and preventing over-ordering when free
+  slots for mixed item types are exhausted.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

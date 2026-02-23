@@ -200,3 +200,7 @@ Implementation notes:
   `3001` (`SafeRequesterFactory`) and wrapper type (`SafeRequester`) were reintroduced as a
   compatibility-only deserialization path for worlds created before removal, while current request
   flow keeps native requester usage and does not re-enable legacy wrapping for new requests.
+- Inbound capacity gating hardening is authored in this project: Create-network order normalization
+  now uses `TileEntityCreateShop.planInboundAcceptedStacks(...)` virtual slot simulation across
+  rack + hut handlers, clamps requested counts to actually insertable amounts for mixed stacks, and
+  logs skipped/clamped requests instead of relying on one-item probe checks.
