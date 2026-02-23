@@ -828,7 +828,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         continue;
       }
-      int topupNeeded = Math.max(0, pendingCount - Math.max(0, reservedForRequest));
+      int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
+      int topupNeeded =
+          Math.max(0, pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailable));
       if (workerWorking && topupNeeded > 0) {
         int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
         int topupCount = Math.min(networkAvailable, topupNeeded);
@@ -865,7 +867,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             request.getId(), level.getGameTime(), "tickPending:worker-idle-topup");
         diagnostics.logPendingReasonChange(request.getId(), "wait:worker-for-network-topup");
       }
-      int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
       int totalAvailable = rackAvailable;
       if (totalAvailable <= 0) {
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:waiting-arrival");

@@ -14,9 +14,10 @@ class CreateShopRequestResolverPartialTopupGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
 
-    assertTrue(
-        source.contains(
-            "int topupNeeded = Math.max(0, pendingCount - Math.max(0, reservedForRequest));"));
+    assertTrue(source.contains("int topupNeeded ="));
+    assertTrue(source.contains("pendingCount"));
+    assertTrue(source.contains("- Math.max(0, reservedForRequest)"));
+    assertTrue(source.contains("- Math.max(0, rackAvailable)"));
     assertTrue(source.contains("tickPending:network-topup"));
     assertTrue(
         source.contains(
