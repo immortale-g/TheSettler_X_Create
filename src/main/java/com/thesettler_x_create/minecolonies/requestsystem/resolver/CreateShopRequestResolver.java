@@ -37,6 +37,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   // Keep below warehouse resolvers so MineColonies prefers warehouse stock before Create Shop.
   private static final int PRIORITY = 140;
   private static final int MAX_CHAIN_SANITIZE_NODES = 512;
+  private static final long DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS = 20L * 30L;
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
@@ -62,6 +63,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Set<String> chainCycleLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+  private final java.util.Map<IToken<?>, Long> deliveryChildActiveSince =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
   private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
@@ -615,6 +618,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               if (child == null) {
                 missing++;
                 request.removeChild(childToken);
+                deliveryChildActiveSince.remove(childToken);
               }
               if (child != null
                   && child.getRequest()
@@ -668,9 +672,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                                 .RECEIVED;
                 if (terminalChild) {
                   request.removeChild(childToken);
+                  deliveryChildActiveSince.remove(childToken);
                 } else {
+                  if (isStaleDeliveryChild(level, childToken, childState)) {
+                    boolean recovered =
+                        recoverStaleDeliveryChild(
+                            standardManager, level, request, childToken, child);
+                    if (recovered) {
+                      missing++;
+                      continue;
+                    }
+                  }
                   hasActiveChildren = true;
                 }
+              } else {
+                deliveryChildActiveSince.remove(childToken);
               }
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 String childType =
@@ -692,6 +708,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             } catch (Exception ex) {
               missing++;
               request.removeChild(childToken);
+              deliveryChildActiveSince.remove(childToken);
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] tickPending: {} child {} lookup failed -> removed: {}",
@@ -811,7 +828,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         continue;
       }
-      int topupNeeded = Math.max(0, pendingCount - Math.max(0, reservedForRequest));
+      int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
+      int topupNeeded =
+          Math.max(0, pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailable));
       if (workerWorking && topupNeeded > 0) {
         int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
         int topupCount = Math.min(networkAvailable, topupNeeded);
@@ -848,7 +867,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             request.getId(), level.getGameTime(), "tickPending:worker-idle-topup");
         diagnostics.logPendingReasonChange(request.getId(), "wait:worker-for-network-topup");
       }
-      int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
       int totalAvailable = rackAvailable;
       if (totalAvailable <= 0) {
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:waiting-arrival");
@@ -1157,6 +1175,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (!(request.getRequest() instanceof Delivery delivery)) {
       return;
     }
+    if (request.getId() != null) {
+      deliveryChildActiveSince.remove(request.getId());
+    }
     IToken<?> parentToken = resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
@@ -1226,6 +1247,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+    if (request != null && request.getId() != null) {
+      deliveryChildActiveSince.remove(request.getId());
+    }
     IToken<?> parentToken = resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
@@ -1344,6 +1368,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
+    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
   }
 
   @Override
@@ -1361,6 +1386,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     releaseReservation(manager, request);
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
+    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
   }
 
   @Override
@@ -1377,6 +1403,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
     pendingTracker.remove(request.getId());
+    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
     if (request.getRequest() instanceof IDeliverable) {
       releaseReservation(manager, request);
     }
@@ -1396,6 +1423,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     pendingTracker.remove(request.getId());
     cooldown.clearRequestCooldown(request.getId());
     clearDeliveriesCreated(request.getId());
+    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
     if (request.getRequest() instanceof IDeliverable) {
       releaseReservation(manager, request);
     }
@@ -1765,7 +1793,106 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTracker.remove(token);
       cooldown.clearRequestCooldown(token);
       clearDeliveriesCreated(token);
+      clearTrackedChildrenForParent(manager, token);
       flowStateMachine.remove(token);
+    }
+  }
+
+  private boolean isStaleDeliveryChild(
+      Level level,
+      IToken<?> childToken,
+      com.minecolonies.api.colony.requestsystem.request.RequestState state) {
+    if (level == null || childToken == null || state == null) {
+      return false;
+    }
+    boolean activeState =
+        state == com.minecolonies.api.colony.requestsystem.request.RequestState.CREATED
+            || state == com.minecolonies.api.colony.requestsystem.request.RequestState.ASSIGNED
+            || state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS;
+    if (!activeState) {
+      deliveryChildActiveSince.remove(childToken);
+      return false;
+    }
+    long now = level.getGameTime();
+    Long since = deliveryChildActiveSince.putIfAbsent(childToken, now);
+    if (since == null) {
+      return false;
+    }
+    long timeout =
+        Math.max(
+            DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+    return now - since >= timeout;
+  }
+
+  private boolean recoverStaleDeliveryChild(
+      IStandardRequestManager manager,
+      Level level,
+      IRequest<?> parentRequest,
+      IToken<?> childToken,
+      IRequest<?> childRequest) {
+    if (manager == null || level == null || parentRequest == null || childToken == null) {
+      return false;
+    }
+    int childCount = 1;
+    String childItem = "<unknown>";
+    if (childRequest != null && childRequest.getRequest() instanceof Delivery delivery) {
+      ItemStack stack = delivery.getStack();
+      if (stack != null && !stack.isEmpty()) {
+        childCount = Math.max(1, stack.getCount());
+        childItem = stack.getItem().toString();
+      }
+    }
+    boolean stateUpdated = false;
+    try {
+      manager.updateRequestState(
+          childToken, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED);
+      stateUpdated = true;
+    } catch (Exception ignored) {
+      // Best effort; parent child-link cleanup below still runs.
+    }
+    try {
+      parentRequest.removeChild(childToken);
+    } catch (Exception ignored) {
+      // Best effort.
+    }
+    clearDeliveriesCreated(parentRequest.getId());
+    int currentPending = pendingTracker.getPendingCount(parentRequest.getId());
+    pendingTracker.setPendingCount(parentRequest.getId(), Math.max(currentPending, childCount));
+    diagnostics.recordPendingSource(parentRequest.getId(), "stale-child-recovery");
+    cooldown.markRequestOrdered(level, parentRequest.getId());
+    deliveryChildActiveSince.put(childToken, level.getGameTime());
+    recheck.scheduleParentChildRecheck(manager, parentRequest.getId());
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}",
+          parentRequest.getId(),
+          childToken,
+          stateUpdated,
+          childItem,
+          childCount);
+    }
+    return true;
+  }
+
+  private void clearTrackedChildrenForParent(
+      IStandardRequestManager manager, IToken<?> parentToken) {
+    if (manager == null || parentToken == null || deliveryChildActiveSince.isEmpty()) {
+      return;
+    }
+    var handler = manager.getRequestHandler();
+    if (handler == null) {
+      return;
+    }
+    for (IToken<?> childToken : java.util.List.copyOf(deliveryChildActiveSince.keySet())) {
+      try {
+        IRequest<?> child = handler.getRequest(childToken);
+        IToken<?> parent = child == null ? null : child.getParent();
+        if (parentToken.equals(parent)) {
+          deliveryChildActiveSince.remove(childToken);
+        }
+      } catch (Exception ignored) {
+        deliveryChildActiveSince.remove(childToken);
+      }
     }
   }
 
