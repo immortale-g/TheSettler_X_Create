@@ -10,8 +10,11 @@ import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
@@ -301,16 +304,19 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (budgets.isEmpty()) {
       return 0;
     }
+    List<AbstractTileEntityRack> racks = collectRacksForHousekeeping();
+    if (racks.isEmpty()) {
+      return 0;
+    }
     int movedStacks = 0;
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (movedStacks >= maxStacks || !WorldUtil.isBlockLoaded(level, pos)) {
+    for (AbstractTileEntityRack rack : racks) {
+      if (movedStacks >= maxStacks || rack == null) {
         continue;
       }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
+      IItemHandler handler = rack.getInventory();
+      if (handler == null) {
+        handler = rack.getItemHandlerCap();
       }
-      IItemHandler handler = rack.getItemHandlerCap();
       if (handler == null) {
         continue;
       }
@@ -632,15 +638,11 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (getBuilding() == null || getLevel() == null || pickup == null) {
       return totals;
     }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
+    for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
+      IItemHandler handler = rack.getInventory();
+      if (handler == null) {
+        handler = rack.getItemHandlerCap();
       }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      IItemHandler handler = rack.getItemHandlerCap();
       if (handler == null) {
         continue;
       }
@@ -668,6 +670,44 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
                         Math.max(0, budget.remaining - pickup.getReservedFor(budget.key)))
                     <= 0);
     return totals;
+  }
+
+  private List<AbstractTileEntityRack> collectRacksForHousekeeping() {
+    List<AbstractTileEntityRack> racks = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null) {
+      return racks;
+    }
+    if (getBuilding() instanceof BuildingCreateShop shop) {
+      shop.ensureRackContainers();
+    }
+    Set<BlockPos> rackPositions = new LinkedHashSet<>(getBuilding().getContainers());
+    if (rackPositions.isEmpty() && getBuilding() instanceof BuildingCreateShop shop) {
+      BlockPos origin = shop.getLocation().getInDimensionLocation();
+      int radius = 16;
+      int minX = origin.getX() - radius;
+      int maxX = origin.getX() + radius;
+      int minY = origin.getY() - 6;
+      int maxY = origin.getY() + 6;
+      int minZ = origin.getZ() - radius;
+      int maxZ = origin.getZ() + radius;
+      for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+          for (int z = minZ; z <= maxZ; z++) {
+            rackPositions.add(new BlockPos(x, y, z));
+          }
+        }
+      }
+    }
+    for (BlockPos pos : rackPositions) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = getLevel().getBlockEntity(pos);
+      if (entity instanceof AbstractTileEntityRack rack) {
+        racks.add(rack);
+      }
+    }
+    return racks;
   }
 
   @Nullable
