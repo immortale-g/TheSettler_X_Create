@@ -47,6 +47,9 @@ Current behavior:
 - Create Shop stock tab now renders contents from registered shop storage containers
   (rack/vault-capable handlers) instead of direct Create-network summary, matching actual local
   pickup inventory context.
+- Create Shop stock UI now provides two explicit views in one module window:
+  `Hut Inventory` (building item handler / pickup source) and `Shop Inventory` (registered storage),
+  with ordering actions shown only in `Shop Inventory` mode.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
