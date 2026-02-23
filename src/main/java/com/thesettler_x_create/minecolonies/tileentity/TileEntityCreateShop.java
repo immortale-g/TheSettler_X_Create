@@ -316,9 +316,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       if (movedStacks >= maxStacks || rack == null) {
         continue;
       }
-      IItemHandler handler = rack.getInventory();
+      IItemHandler handler = rack.getItemHandlerCap();
       if (handler == null) {
-        handler = rack.getItemHandlerCap();
+        handler = rack.getInventory();
       }
       if (handler == null) {
         continue;
@@ -642,9 +642,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return totals;
     }
     for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
-      IItemHandler handler = rack.getInventory();
+      IItemHandler handler = rack.getItemHandlerCap();
       if (handler == null) {
-        handler = rack.getItemHandlerCap();
+        handler = rack.getInventory();
       }
       if (handler == null) {
         continue;
