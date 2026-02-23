@@ -17,6 +17,13 @@ final class ShopWorkerStatus {
           VisibleCitizenStatus.RAIDED,
           VisibleCitizenStatus.BAD_WEATHER,
           VisibleCitizenStatus.HOUSE);
+  private static final Set<VisibleCitizenStatus> HOUSEKEEPING_BLOCKING_STATUSES =
+      Set.of(
+          VisibleCitizenStatus.SICK,
+          VisibleCitizenStatus.SLEEP,
+          VisibleCitizenStatus.EAT,
+          VisibleCitizenStatus.MOURNING,
+          VisibleCitizenStatus.RAIDED);
 
   private final BuildingCreateShop shop;
 
@@ -35,6 +42,18 @@ final class ShopWorkerStatus {
         continue;
       }
       if (!isCitizenUnavailable(citizen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  boolean hasHousekeepingAvailableWorker() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      if (!isHousekeepingBlocked(citizen)) {
         return true;
       }
     }
@@ -85,5 +104,13 @@ final class ShopWorkerStatus {
     }
     VisibleCitizenStatus status = citizen.getStatus();
     return status != null && UNAVAILABLE_STATUSES.contains(status);
+  }
+
+  private boolean isHousekeepingBlocked(ICitizenData citizen) {
+    if (citizen.isAsleep()) {
+      return true;
+    }
+    VisibleCitizenStatus status = citizen.getStatus();
+    return status != null && HOUSEKEEPING_BLOCKING_STATUSES.contains(status);
   }
 }

@@ -13,7 +13,7 @@ class BuildingCreateShopHousekeepingGateGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
-    assertTrue(source.contains("!hasAvailableWorker()"));
+    assertTrue(source.contains("!hasHousekeepingAvailableWorker()"));
     assertTrue(!source.contains("|| !isWorkerWorking())"));
   }
 }
