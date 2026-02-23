@@ -237,3 +237,33 @@ Implementation notes:
 - Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
   now subtracts rack-available stock from top-up deficit calculation before issuing Create network
   orders, preventing duplicate network reorders when enough items are already in shop racks.
+- Reservation-refresh hardening is authored in this project scope: `tickPending` now reconstructs
+  missing per-request reservations from currently available rack stock after request refresh,
+  reducing post-reload reservation drift and avoiding premature unreserved treatment of pending
+  request goods.
+- Incoming-rack housekeeping is authored in this project scope: Create Shop now performs timed
+  rack->hut transfers for unreserved items only, preserving reserved quantities for MineColonies
+  delivery flow while keeping local storage cleanup server-authoritative and API-driven.
+- Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
+  is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
+  cleanup progression continues without MineColonies internals changes.
+- Incoming-rack housekeeping availability gating is authored in this project scope: transfer work
+  now requires an assigned Create Shop worker that is not in MineColonies unavailable statuses
+  (sleep/eat/sick/mourning/raided and related unavailable states), preventing background moves
+  while the worker is unavailable.
+- Housekeeping duplication fix is authored in this project scope: rack->hut transfer now computes
+  insertable counts with `IItemHandler.insertItem(..., true)` simulation before extracting from
+  racks, removing prior pre-extract probe insertion that could duplicate moved stacks.
+- Housekeeping rack-discovery recovery is authored in this project scope: before transfer, shop
+  racks are re-synchronized from registered containers and, when that set is empty (post-reload
+  drift), a bounded local rack scan is used so unreserved transfer work still executes.
+- Housekeeping cadence catch-up is authored in this project scope: per-run transfer budget now
+  scales by elapsed server ticks since the previous run (bounded cap), compensating for coarse
+  MineColonies building tick cadence while preserving the intended average stack transfer rate.
+- Housekeeping live-diagnostics instrumentation is authored in this project scope: rate-limited
+  debug logs now expose worker gate reasons, cooldown waits, rack discovery counts, unreserved
+  transfer budget, and moved stack counts for live-world verification without client-side hacks.
+- Housekeeping transfer target reliability hardening is authored in this project scope: rack->hut
+  transfer now prioritizes hut-internal inventory as destination and rack capability handlers for
+  extraction, reducing false-positive move accounting on aggregate handlers and improving visible
+  in-hut transfer behavior.

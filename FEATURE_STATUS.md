@@ -62,6 +62,27 @@ Known focus area:
   counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
 - Pending top-up now subtracts already-available rack stock before ordering from Create network,
   preventing duplicate reorders when requested quantity is already physically present in shop racks.
+- Pending reconciliation now refreshes missing request reservations from currently available rack
+  stock after request-state refresh, improving reload recovery when reservation maps drift or reset.
+- Shopkeeper AI now treats resolver work and unreserved incoming-rack housekeeping as urgent work,
+  so it does not drop into idle while pending resolvable requests or rack cleanup work remain.
+- Incoming rack housekeeping now runs in small timed batches, moving only unreserved rack items into
+  hut inventory and leaving reserved quantities in place for MineColonies delivery creation.
+- Incoming rack housekeeping is availability-gated: it pauses while the assigned shopkeeper is in
+  unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
+- Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing
+  pre-extract ghost inserts and eliminating rack->hut item duplication.
+- Housekeeping rack discovery now refreshes registered rack containers and falls back to a local
+  rack scan around the shop when container registrations are temporarily empty after reload.
+- Housekeeping now includes cadence catch-up budgeting: when MineColonies building ticks are sparse,
+  each run can move multiple due stacks (capped) to approximate the configured one-stack-per-interval
+  behavior over wall-clock time.
+- Housekeeping now targets hut-internal inventory first (with fallback to capability handler), so
+  successful transfers are visible in the hut storage view instead of only through aggregate handlers.
+- Housekeeping rack extraction now prefers rack capability handlers over generic inventory handlers,
+  improving reliability of real extraction on live racks.
+- Rate-limited housekeeping diagnostics are available under debug logging to surface gate reasons,
+  rack discovery, unreserved budget, cooldown waits, and moved counts during live validation.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked
