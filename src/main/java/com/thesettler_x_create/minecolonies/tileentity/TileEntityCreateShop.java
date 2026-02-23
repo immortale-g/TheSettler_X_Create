@@ -298,6 +298,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
     IItemHandler hut = getItemHandlerCap((Direction) null);
     if (hut == null) {
+      hut = getInventory();
+    }
+    if (hut == null) {
       return 0;
     }
     List<RackStackBudget> budgets = collectRackBudgets(pickup);
