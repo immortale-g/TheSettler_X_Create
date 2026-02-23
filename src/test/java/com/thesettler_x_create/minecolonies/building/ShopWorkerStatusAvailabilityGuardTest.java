@@ -34,5 +34,7 @@ class ShopWorkerStatusAvailabilityGuardTest {
     assertTrue(source.contains("VisibleCitizenStatus.SLEEP"));
     assertTrue(source.contains("VisibleCitizenStatus.MOURNING"));
     assertTrue(source.contains("VisibleCitizenStatus.RAIDED"));
+    assertTrue(source.contains("VisibleCitizenStatus.BAD_WEATHER"));
+    assertTrue(source.contains("VisibleCitizenStatus.HOUSE"));
   }
 }
