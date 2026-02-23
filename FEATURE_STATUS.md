@@ -42,6 +42,8 @@ Current behavior:
   same parent request, preventing premature reorders before couriers pick up shop-arrived items.
 - Capacity stalls now surface as shopkeeper `STUCK` state and a rate-limited citizen interaction
   with guidance to expand rack capacity (hut upgrade) or assign more couriers.
+- Inbound order capacity planning is rack-only (shop rack containers), so hut-internal buffer space
+  no longer masks rack jams or triggers premature reorder while entrance packages are blocked.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

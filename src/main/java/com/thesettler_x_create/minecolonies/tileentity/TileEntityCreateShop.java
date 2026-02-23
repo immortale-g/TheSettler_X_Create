@@ -321,7 +321,6 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return List.of();
     }
     List<VirtualItemHandler> virtualRacks = collectVirtualRacks();
-    VirtualItemHandler virtualHut = createVirtualHandler(getItemHandlerCap((Direction) null));
     List<ItemStack> accepted = new ArrayList<>();
 
     for (ItemStack original : requestedStacks) {
@@ -333,9 +332,6 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       while (!remaining.isEmpty()) {
         VirtualItemHandler rack = findBestVirtualRack(remaining, virtualRacks);
         int moved = insertIntoVirtual(rack, remaining);
-        if (moved <= 0) {
-          moved = insertIntoVirtual(virtualHut, remaining);
-        }
         if (moved <= 0) {
           break;
         }
