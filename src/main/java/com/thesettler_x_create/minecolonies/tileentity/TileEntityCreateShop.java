@@ -29,9 +29,16 @@ import org.jetbrains.annotations.Nullable;
 public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private static final String TAG_NETWORK = "StockNetwork";
   private static final String TAG_ADDRESS = "ShopAddress";
+  private static final long CAPACITY_STALL_TTL = 20L * 45L;
+  private static final long CAPACITY_STALL_NOTICE_COOLDOWN = 20L * 90L;
   private UUID stockNetworkId;
   private String shopAddress = "";
   private long lastNotification;
+  private long capacityStallUntil;
+  private long capacityStallLastNotice;
+  private ItemStack capacityStallStack = ItemStack.EMPTY;
+  private int capacityStallRequested;
+  private int capacityStallAccepted;
 
   public TileEntityCreateShop(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_BUILDING.get(), pos, state);
@@ -257,6 +264,50 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
     IItemHandler hut = getItemHandlerCap((Direction) null);
     return canInsertAtLeastOne(hut, probe);
+  }
+
+  /**
+   * Marks a temporary capacity stall when requested inbound quantity cannot fit into shop storage.
+   */
+  public void noteCapacityStall(ItemStack stack, int requested, int accepted) {
+    if (stack == null || stack.isEmpty() || requested <= 0 || accepted >= requested) {
+      return;
+    }
+    long now = getLevel() == null ? 0L : getLevel().getGameTime();
+    capacityStallUntil = now + CAPACITY_STALL_TTL;
+    capacityStallStack = stack.copy();
+    capacityStallStack.setCount(1);
+    capacityStallRequested = Math.max(1, requested);
+    capacityStallAccepted = Math.max(0, accepted);
+  }
+
+  public void clearCapacityStall() {
+    capacityStallUntil = 0L;
+    capacityStallStack = ItemStack.EMPTY;
+    capacityStallRequested = 0;
+    capacityStallAccepted = 0;
+  }
+
+  public boolean hasCapacityStall() {
+    if (capacityStallUntil <= 0L || level == null) {
+      return false;
+    }
+    return level.getGameTime() < capacityStallUntil;
+  }
+
+  @Nullable
+  public CapacityStallNotice consumeCapacityStallNotice() {
+    if (!hasCapacityStall() || level == null || capacityStallStack.isEmpty()) {
+      return null;
+    }
+    long now = level.getGameTime();
+    if (capacityStallLastNotice > 0L
+        && now - capacityStallLastNotice < CAPACITY_STALL_NOTICE_COOLDOWN) {
+      return null;
+    }
+    capacityStallLastNotice = now;
+    return new CapacityStallNotice(
+        capacityStallStack.copy(), capacityStallRequested, capacityStallAccepted);
   }
 
   /**
@@ -566,5 +617,17 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return bestRack;
+  }
+
+  public static class CapacityStallNotice {
+    public final ItemStack stackKey;
+    public final int requested;
+    public final int accepted;
+
+    public CapacityStallNotice(ItemStack stackKey, int requested, int accepted) {
+      this.stackKey = stackKey;
+      this.requested = requested;
+      this.accepted = accepted;
+    }
   }
 }

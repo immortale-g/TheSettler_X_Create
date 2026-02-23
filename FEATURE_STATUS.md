@@ -40,6 +40,8 @@ Current behavior:
   slots for mixed item types are exhausted.
 - Pending top-up ordering is now blocked while delivery children are still in progress for the
   same parent request, preventing premature reorders before couriers pick up shop-arrived items.
+- Capacity stalls now surface as shopkeeper `STUCK` state and a rate-limited citizen interaction
+  with guidance to expand rack capacity (hut upgrade) or assign more couriers.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

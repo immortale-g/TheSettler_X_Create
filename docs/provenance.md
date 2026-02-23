@@ -207,3 +207,8 @@ Implementation notes:
 - Pending reorder timing hardening is authored in this project: `tickPending` no longer clears
   the delivery-created marker preemptively and now blocks network top-up while active delivery work
   exists for the parent request, preventing premature duplicate ordering before courier pickup.
+- Capacity-stall player feedback hardening is authored in this project: Create Shop now records
+  rack/hut capacity stalls during network order normalization, marks the shopkeeper as
+  `JobStatus.STUCK` while stalled, and raises a rate-limited citizen interaction with actionable
+  guidance (upgrade hut/rack capacity or assign more couriers) instead of falling back to player
+  resolver for stock that is still available in the Create network.
