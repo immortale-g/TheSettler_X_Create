@@ -38,6 +38,8 @@ Current behavior:
 - Create-network ordering now uses a virtual rack/hut slot-capacity simulation before broadcast,
   clamping requested amounts to actually insertable counts and preventing over-ordering when free
   slots for mixed item types are exhausted.
+- Pending top-up ordering is now blocked while delivery children are still in progress for the
+  same parent request, preventing premature reorders before couriers pick up shop-arrived items.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
