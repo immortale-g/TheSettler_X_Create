@@ -220,7 +220,7 @@ Implementation notes:
   serialization now publishes aggregated contents from registered local storage containers
   (rack and other item-handler containers registered to the shop) instead of querying Create network
   summary directly, so the in-game stock tab reflects actual shop-side storage state.
-- Dual stock-view UI alignment is authored in this project: Create Shop stock module serialization
-  now sends separate hut-inventory and registered-storage aggregates, and the hut window provides
-  explicit `Hut Inventory` and `Shop Inventory` toggles so pickup-source stock and total shop
-  storage can be inspected independently without external tooling.
+- Stock-tab simplification and native pickup alignment are authored in this project: the Create Shop
+  stock module window is read-only again (registered storage view only, no custom request/order
+  actions), while forced pickup behavior stays on the MineColonies-native worker-module action
+  path (`forcePickup`) used by other huts.
