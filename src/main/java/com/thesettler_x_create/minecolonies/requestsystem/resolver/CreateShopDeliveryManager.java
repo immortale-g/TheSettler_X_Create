@@ -449,7 +449,9 @@ final class CreateShopDeliveryManager {
     if (shop != null) {
       CourierAssignmentModule module = shop.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (module != null) {
-        checked += notifyCourierModule(module, token);
+        int count = notifyCourierModule(module, token);
+        checked += count;
+        notified += count;
       }
       if (notified > 0) {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -478,12 +480,16 @@ final class CreateShopDeliveryManager {
       CourierAssignmentModule warehouseCouriers =
           building.getModule(BuildingModules.WAREHOUSE_COURIERS);
       if (warehouseCouriers != null) {
-        checked += notifyCourierModule(warehouseCouriers, token);
+        int count = notifyCourierModule(warehouseCouriers, token);
+        checked += count;
+        notified += count;
       }
       DeliverymanAssignmentModule deliverymanModule =
           building.getModule(BuildingModules.COURIER_WORK);
       if (deliverymanModule != null) {
-        checked += notifyCourierModule(deliverymanModule, token);
+        int count = notifyCourierModule(deliverymanModule, token);
+        checked += count;
+        notified += count;
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
