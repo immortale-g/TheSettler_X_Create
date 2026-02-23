@@ -23,7 +23,9 @@ final class ShopWorkerStatus {
           VisibleCitizenStatus.SLEEP,
           VisibleCitizenStatus.EAT,
           VisibleCitizenStatus.MOURNING,
-          VisibleCitizenStatus.RAIDED);
+          VisibleCitizenStatus.RAIDED,
+          VisibleCitizenStatus.BAD_WEATHER,
+          VisibleCitizenStatus.HOUSE);
 
   private final BuildingCreateShop shop;
 
