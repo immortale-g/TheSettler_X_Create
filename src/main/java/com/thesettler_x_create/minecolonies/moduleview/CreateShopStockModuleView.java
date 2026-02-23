@@ -10,27 +10,21 @@ import java.util.List;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
 public class CreateShopStockModuleView extends AbstractBuildingModuleView {
-  private List<BigItemStack> hutStock = Collections.emptyList();
-  private List<BigItemStack> storageStock = Collections.emptyList();
+  private List<BigItemStack> stock = Collections.emptyList();
   private boolean hasNetwork;
 
   @Override
   public void deserialize(RegistryFriendlyByteBuf buf) {
     hasNetwork = buf.readBoolean();
-    hutStock = readStacks(buf);
-    storageStock = readStacks(buf);
+    stock = readStacks(buf);
   }
 
   public boolean hasNetwork() {
     return hasNetwork;
   }
 
-  public List<BigItemStack> getHutStock() {
-    return hutStock;
-  }
-
-  public List<BigItemStack> getStorageStock() {
-    return storageStock;
+  public List<BigItemStack> getStock() {
+    return stock;
   }
 
   @Override
