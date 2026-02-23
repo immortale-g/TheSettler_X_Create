@@ -70,6 +70,8 @@ Known focus area:
   hut inventory and leaving reserved quantities in place for MineColonies delivery creation.
 - Incoming rack housekeeping is availability-gated: it pauses while the assigned shopkeeper is in
   unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
+- Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing
+  pre-extract ghost inserts and eliminating rack->hut item duplication.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

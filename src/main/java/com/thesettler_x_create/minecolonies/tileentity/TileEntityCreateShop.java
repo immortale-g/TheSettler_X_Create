@@ -327,12 +327,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         if (stackMoveTarget <= 0) {
           continue;
         }
-        ItemStack probe = inSlot.copy();
-        probe.setCount(stackMoveTarget);
-        ItemStack probeLeftover =
-            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
-                probe.copy(), hut);
-        int insertable = stackMoveTarget - (probeLeftover.isEmpty() ? 0 : probeLeftover.getCount());
+        int insertable = simulateInsertCount(hut, inSlot, stackMoveTarget);
         if (insertable <= 0) {
           continue;
         }
@@ -451,6 +446,19 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return false;
+  }
+
+  private static int simulateInsertCount(IItemHandler handler, ItemStack stack, int maxCount) {
+    if (handler == null || stack == null || stack.isEmpty() || maxCount <= 0) {
+      return 0;
+    }
+    ItemStack remaining = stack.copy();
+    remaining.setCount(Math.min(maxCount, stack.getCount()));
+    int requested = remaining.getCount();
+    for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
+      remaining = handler.insertItem(slot, remaining, true);
+    }
+    return Math.max(0, requested - (remaining.isEmpty() ? 0 : remaining.getCount()));
   }
 
   private List<VirtualItemHandler> collectVirtualRacks() {

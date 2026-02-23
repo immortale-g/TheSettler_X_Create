@@ -251,3 +251,6 @@ Implementation notes:
   now requires an assigned Create Shop worker that is not in MineColonies unavailable statuses
   (sleep/eat/sick/mourning/raided and related unavailable states), preventing background moves
   while the worker is unavailable.
+- Housekeeping duplication fix is authored in this project scope: rack->hut transfer now computes
+  insertable counts with `IItemHandler.insertItem(..., true)` simulation before extracting from
+  racks, removing prior pre-extract probe insertion that could duplicate moved stacks.

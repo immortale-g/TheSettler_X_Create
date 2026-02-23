@@ -16,5 +16,7 @@ class TileEntityCreateShopHousekeepingGuardTest {
     assertTrue(source.contains("hasUnreservedRackItems("));
     assertTrue(source.contains("moveUnreservedRackStacksToHut("));
     assertTrue(source.contains("collectRackBudgets("));
+    assertTrue(source.contains("simulateInsertCount("));
+    assertTrue(!source.contains("probe.copy(), hut"));
   }
 }
