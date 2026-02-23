@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
+import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -48,6 +49,7 @@ final class ShopInflightTracker {
     if (!notices.isEmpty()) {
       notifyShopkeeperOverdue(notices);
     }
+    notifyShopkeeperCapacityStall();
   }
 
   private void notifyShopkeeperOverdue(List<CreateShopBlockEntity.InflightNotice> notices) {
@@ -78,5 +80,18 @@ final class ShopInflightTracker {
       }
     }
     return null;
+  }
+
+  private void notifyShopkeeperCapacityStall() {
+    ICitizenData citizen = getShopkeeperCitizen();
+    if (citizen == null) {
+      return;
+    }
+    TileEntityCreateShop.CapacityStallNotice notice = shop.consumeCapacityStallNotice();
+    if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
+      return;
+    }
+    citizen.triggerInteraction(
+        new ShopCapacityStallInteraction(notice.stackKey, notice.requested, notice.accepted));
   }
 }

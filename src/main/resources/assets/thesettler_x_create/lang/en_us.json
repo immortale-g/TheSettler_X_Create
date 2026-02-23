@@ -19,6 +19,8 @@
   "com.thesettler_x_create.job.createshop": "Create Shopkeeper",
   "com.thesettler_x_create.gui.createshop.address": "Create Shop - Address",
   "com.thesettler_x_create.gui.createshop.stock": "Create Shop - Stock",
+  "com.thesettler_x_create.gui.createshop.stock.storage_empty": "No items in registered shop storage.",
+  "com.thesettler_x_create.gui.createshop.stock.network_missing": "No stock network linked.",
   "com.thesettler_x_create.gui.createshop.perma": "Create Shop - Perma Requests",
   "com.thesettler_x_create.gui.createshop.perma.on": "On",
   "com.thesettler_x_create.gui.createshop.perma.off": "Off",
@@ -37,7 +39,6 @@
   "com.thesettler_x_create.gui.createshop.save": "Save",
   "com.thesettler_x_create.gui.createshop.amount": "Amount",
   "com.thesettler_x_create.gui.createshop.request": "Request",
-  "com.thesettler_x_create.gui.createshop.request_all": "Request Selected",
   "com.thesettler_x_create.message.createshop.no_network": "Create Shop has no linked stock network.",
   "com.thesettler_x_create.message.createshop.request_taken": "Create Shop accepted request: %s x%d",
   "com.thesettler_x_create.message.createshop.request_sent": "Create Shop ordered from network: %s x%d",
@@ -51,6 +52,11 @@
   "com.thesettler_x_create.message.createshop.flow_delivery_completed": "[Create Shop Flow] %s delivery completed: %s x%d",
   "com.thesettler_x_create.message.createshop.flow_request_completed": "[Create Shop Flow] %s request completed: %s x%d",
   "com.thesettler_x_create.message.createshop.flow_cancelled": "[Create Shop Flow] %s request cancelled: %s x%d",
-  "com.thesettler_x_create.message.createshop.flow_timeout": "[Create Shop Flow] %s request timed out and was reset: %s x%d"
+  "com.thesettler_x_create.message.createshop.flow_timeout": "[Create Shop Flow] %s request timed out and was reset: %s x%d",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry": "Create Shop is out of free rack space for %s. %s of %s item(s) are blocked. Upgrade the hut to add racks or assign more couriers to clear deliveries.",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.response_upgrade": "I will expand racks",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.answer_upgrade": "Good plan. A higher hut level gives more rack capacity.",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.response_courier": "I will add couriers",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.answer_courier": "Good plan. More couriers clear pickups faster and free slots."
 }
 

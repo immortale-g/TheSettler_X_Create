@@ -6,11 +6,8 @@
     <list id="stockList" size="164 170" pos="13 30">
         <box size="100% 18" linewidth="1">
             <itemicon id="itemIcon" size="16 16" pos="2 1"/>
-            <text id="itemName" size="96 12" pos="22 1" textalign="MIDDLE_LEFT" color="black"/>
-            <input id="requestAmount" size="36 16" pos="124 1" maxlength="6"/>
+            <text id="itemName" size="102 12" pos="22 1" textalign="MIDDLE_LEFT" color="black"/>
+            <text id="itemCount" size="28 12" pos="132 1" textalign="MIDDLE_RIGHT" color="black"/>
         </box>
     </list>
-
-    <button label="$(com.thesettler_x_create.gui.createshop.request_all)" id="requestAll" size="120 17" pos="35 206"
-            source="minecolonies:textures/gui/builderhut/builder_button_medium_large.png" color="black"/>
 </window>

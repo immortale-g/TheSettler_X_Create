@@ -200,3 +200,27 @@ Implementation notes:
   `3001` (`SafeRequesterFactory`) and wrapper type (`SafeRequester`) were reintroduced as a
   compatibility-only deserialization path for worlds created before removal, while current request
   flow keeps native requester usage and does not re-enable legacy wrapping for new requests.
+- Inbound capacity gating hardening is authored in this project: Create-network order normalization
+  now uses `TileEntityCreateShop.planInboundAcceptedStacks(...)` virtual slot simulation across
+  rack + hut handlers, clamps requested counts to actually insertable amounts for mixed stacks, and
+  logs skipped/clamped requests instead of relying on one-item probe checks.
+- Pending reorder timing hardening is authored in this project: `tickPending` no longer clears
+  the delivery-created marker preemptively and now blocks network top-up while active delivery work
+  exists for the parent request, preventing premature duplicate ordering before courier pickup.
+- Capacity-stall player feedback hardening is authored in this project: Create Shop now records
+  rack/hut capacity stalls during network order normalization, marks the shopkeeper as
+  `JobStatus.STUCK` while stalled, and raises a rate-limited citizen interaction with actionable
+  guidance (upgrade hut/rack capacity or assign more couriers) instead of falling back to player
+  resolver for stock that is still available in the Create network.
+- Capacity planner source-of-truth hardening is authored in this project: inbound order planning
+  now evaluates rack-container capacity only (no hut inventory fallback), so blocked entrance/rack
+  states are not hidden by hut buffer space and top-up orders are not re-triggered from non-rack
+  storage headroom.
+- Stock module data-source alignment is authored in this project: Create Shop stock module view
+  serialization now publishes aggregated contents from registered local storage containers
+  (rack and other item-handler containers registered to the shop) instead of querying Create network
+  summary directly, so the in-game stock tab reflects actual shop-side storage state.
+- Stock-tab simplification and native pickup alignment are authored in this project: the Create Shop
+  stock module window is read-only again (registered storage view only, no custom request/order
+  actions), while forced pickup behavior stays on the MineColonies-native worker-module action
+  path (`forcePickup`) used by other huts.
