@@ -449,6 +449,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return workerStatus.hasAvailableWorker();
   }
 
+  public boolean hasHousekeepingAvailableWorker() {
+    return workerStatus.hasHousekeepingAvailableWorker();
+  }
+
   public boolean isWorkerWorking() {
     return workerStatus.isWorkerWorking();
   }
@@ -603,7 +607,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (tile == null || pickup == null || !hasAvailableWorker()) {
+    if (tile == null || pickup == null || !hasHousekeepingAvailableWorker()) {
       cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
       return;
     }
