@@ -60,6 +60,8 @@ Known focus area:
   delivery children and trigger controlled cancel/requeue cleanup so parent requests can continue.
 - Delivery dispatch notify accounting is corrected: courier module scan now increments `notified`
   counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
+- Pending top-up now subtracts already-available rack stock before ordering from Create network,
+  preventing duplicate reorders when requested quantity is already physically present in shop racks.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

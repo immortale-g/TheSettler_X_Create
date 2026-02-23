@@ -234,3 +234,6 @@ Implementation notes:
 - Delivery dispatch diagnostics/accounting hardening is authored in this project scope: courier
   module notification scans now increment `notified` counters alongside `checked`, preventing
   false `notified=0` diagnostics during active dispatch attempts.
+- Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
+  now subtracts rack-available stock from top-up deficit calculation before issuing Create network
+  orders, preventing duplicate network reorders when enough items are already in shop racks.
