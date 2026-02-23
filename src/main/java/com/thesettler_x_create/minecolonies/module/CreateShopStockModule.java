@@ -2,8 +2,7 @@ package com.thesettler_x_create.minecolonies.module;
 
 import com.minecolonies.api.colony.buildings.modules.AbstractBuildingModule;
 import com.simibubi.create.content.logistics.BigItemStack;
-import com.simibubi.create.content.logistics.packager.InventorySummary;
-import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.Collections;
 import java.util.List;
@@ -22,9 +21,7 @@ public class CreateShopStockModule extends AbstractBuildingModule {
     }
 
     buf.writeBoolean(true);
-    InventorySummary summary = LogisticsManager.getSummaryOfNetwork(networkId, true);
-    List<BigItemStack> stacks =
-        summary == null ? Collections.emptyList() : summary.getStacksByCount();
+    List<BigItemStack> stacks = getRegisteredStorageStock();
     buf.writeVarInt(stacks.size());
     for (BigItemStack stack : stacks) {
       BigItemStack.STREAM_CODEC.encode(buf, stack);
@@ -39,5 +36,12 @@ public class CreateShopStockModule extends AbstractBuildingModule {
       return shop;
     }
     return null;
+  }
+
+  private List<BigItemStack> getRegisteredStorageStock() {
+    if (building instanceof BuildingCreateShop shopBuilding) {
+      return shopBuilding.getRegisteredStorageStock();
+    }
+    return Collections.emptyList();
   }
 }

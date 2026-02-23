@@ -4,6 +4,7 @@ import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
+import com.simibubi.create.content.logistics.BigItemStack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
@@ -12,6 +13,7 @@ import net.minecraft.util.Tuple;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.neoforge.capabilities.Capabilities;
 
 /** Maintains rack container discovery and inventory counting for the Create Shop. */
 final class ShopRackIndex {
@@ -111,6 +113,57 @@ final class ShopRackIndex {
     return counts;
   }
 
+  List<BigItemStack> getRegisteredStorageStock() {
+    java.util.List<ItemStack> merged = new java.util.ArrayList<>();
+    IColony colony = shop.getColony();
+    if (colony == null) {
+      return java.util.Collections.emptyList();
+    }
+    Level level = colony.getWorld();
+    if (level == null) {
+      return java.util.Collections.emptyList();
+    }
+    ensureRackContainers();
+    for (BlockPos pos : shop.getContainerList()) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = level.getBlockEntity(pos);
+      if (entity == null) {
+        continue;
+      }
+      net.neoforged.neoforge.items.IItemHandler handler = null;
+      if (entity instanceof TileEntityRack rack) {
+        handler = rack.getInventory();
+      } else {
+        var state = level.getBlockState(pos);
+        handler = Capabilities.ItemHandler.BLOCK.getCapability(level, pos, state, entity, null);
+        if (handler == null) {
+          handler =
+              Capabilities.ItemHandler.BLOCK.getCapability(
+                  level, pos, state, entity, net.minecraft.core.Direction.UP);
+        }
+      }
+      if (handler == null) {
+        continue;
+      }
+      mergeFromHandler(handler, merged);
+    }
+
+    if (merged.isEmpty()) {
+      return java.util.Collections.emptyList();
+    }
+    java.util.List<BigItemStack> result = new java.util.ArrayList<>();
+    for (ItemStack stack : merged) {
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      result.add(new BigItemStack(stack.copy(), stack.getCount()));
+    }
+    result.sort(java.util.Comparator.comparingInt((BigItemStack entry) -> entry.count).reversed());
+    return result;
+  }
+
   void onRackRegistered(Level world, BlockPos pos, BlockEntity entity) {
     if (!(entity instanceof TileEntityRack rack)) {
       return;
@@ -191,5 +244,29 @@ final class ShopRackIndex {
     ItemStack copy = stack.copy();
     copy.setCount(1);
     return copy;
+  }
+
+  private void mergeFromHandler(
+      net.neoforged.neoforge.items.IItemHandler handler, java.util.List<ItemStack> merged) {
+    if (handler == null || merged == null) {
+      return;
+    }
+    for (int slot = 0; slot < handler.getSlots(); slot++) {
+      ItemStack stack = handler.getStackInSlot(slot);
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      boolean found = false;
+      for (ItemStack existing : merged) {
+        if (ItemStack.isSameItemSameComponents(existing, stack)) {
+          existing.grow(stack.getCount());
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        merged.add(stack.copy());
+      }
+    }
   }
 }
