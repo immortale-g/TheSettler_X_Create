@@ -17,6 +17,15 @@ final class ShopWorkerStatus {
           VisibleCitizenStatus.RAIDED,
           VisibleCitizenStatus.BAD_WEATHER,
           VisibleCitizenStatus.HOUSE);
+  private static final Set<VisibleCitizenStatus> HOUSEKEEPING_BLOCKING_STATUSES =
+      Set.of(
+          VisibleCitizenStatus.SICK,
+          VisibleCitizenStatus.SLEEP,
+          VisibleCitizenStatus.EAT,
+          VisibleCitizenStatus.MOURNING,
+          VisibleCitizenStatus.RAIDED,
+          VisibleCitizenStatus.BAD_WEATHER,
+          VisibleCitizenStatus.HOUSE);
 
   private final BuildingCreateShop shop;
 
@@ -27,6 +36,49 @@ final class ShopWorkerStatus {
   boolean hasActiveWorker() {
     return shop.getAllAssignedCitizen().stream()
         .anyMatch(citizen -> citizen.getJob() instanceof JobCreateShop);
+  }
+
+  boolean hasAvailableWorker() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      if (!isCitizenUnavailable(citizen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  boolean hasHousekeepingAvailableWorker() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      if (!isHousekeepingBlocked(citizen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String describeHousekeepingBlockReason() {
+    boolean hasShopWorker = false;
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen == null || !(citizen.getJob() instanceof JobCreateShop)) {
+        continue;
+      }
+      hasShopWorker = true;
+      if (citizen.isAsleep()) {
+        return "asleep";
+      }
+      VisibleCitizenStatus status = citizen.getStatus();
+      if (status != null && HOUSEKEEPING_BLOCKING_STATUSES.contains(status)) {
+        return "status:" + status;
+      }
+      return "available";
+    }
+    return hasShopWorker ? "blocked" : "no-assigned-shopworker";
   }
 
   boolean isWorkerWorking() {
@@ -73,5 +125,13 @@ final class ShopWorkerStatus {
     }
     VisibleCitizenStatus status = citizen.getStatus();
     return status != null && UNAVAILABLE_STATUSES.contains(status);
+  }
+
+  private boolean isHousekeepingBlocked(ICitizenData citizen) {
+    if (citizen.isAsleep()) {
+      return true;
+    }
+    VisibleCitizenStatus status = citizen.getStatus();
+    return status != null && HOUSEKEEPING_BLOCKING_STATUSES.contains(status);
   }
 }

@@ -8,9 +8,13 @@ import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
@@ -267,6 +271,117 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
+   * Returns true when at least one rack item is currently not reserved for pending requests.
+   *
+   * <p>Used to keep the shopkeeper active for inbound rack cleanup work.
+   */
+  public boolean hasUnreservedRackItems(@Nullable CreateShopBlockEntity pickup) {
+    if (pickup == null || getBuilding() == null || getLevel() == null) {
+      return false;
+    }
+    for (RackStackBudget budget : collectRackBudgets(pickup)) {
+      if (budget.remaining > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
+   *
+   * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
+   */
+  public int moveUnreservedRackStacksToHut(@Nullable CreateShopBlockEntity pickup, int maxStacks) {
+    if (pickup == null || maxStacks <= 0 || getBuilding() == null || getLevel() == null) {
+      return 0;
+    }
+    // Housekeeping target must be hut-internal inventory, not aggregate warehouse views.
+    IItemHandler hut = getInventory();
+    if (hut == null) {
+      hut = getItemHandlerCap((Direction) null);
+    }
+    if (hut == null) {
+      return 0;
+    }
+    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    if (budgets.isEmpty()) {
+      logHousekeepingDebug("skip:budgets-empty");
+      return 0;
+    }
+    List<AbstractTileEntityRack> racks = collectRacksForHousekeeping();
+    if (racks.isEmpty()) {
+      logHousekeepingDebug("skip:racks-empty");
+      return 0;
+    }
+    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      int unreserved = 0;
+      for (RackStackBudget budget : budgets) {
+        if (budget != null) {
+          unreserved += Math.max(0, budget.remaining);
+        }
+      }
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] housekeeping start racks={} stackKeys={} unreserved={}",
+          racks.size(),
+          budgets.size(),
+          unreserved);
+    }
+    int movedStacks = 0;
+    for (AbstractTileEntityRack rack : racks) {
+      if (movedStacks >= maxStacks || rack == null) {
+        continue;
+      }
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        handler = rack.getInventory();
+      }
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots() && movedStacks < maxStacks; slot++) {
+        ItemStack inSlot = handler.getStackInSlot(slot);
+        if (inSlot.isEmpty()) {
+          continue;
+        }
+        RackStackBudget budget = findBudget(budgets, inSlot);
+        if (budget == null || budget.remaining <= 0) {
+          continue;
+        }
+        int stackMoveTarget = Math.min(inSlot.getCount(), budget.remaining);
+        if (stackMoveTarget <= 0) {
+          continue;
+        }
+        int insertable = simulateInsertCount(hut, inSlot, stackMoveTarget);
+        if (insertable <= 0) {
+          continue;
+        }
+        ItemStack extracted = handler.extractItem(slot, insertable, false);
+        if (extracted.isEmpty()) {
+          continue;
+        }
+        ItemStack leftover =
+            InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(extracted, hut);
+        int inserted = insertable - (leftover.isEmpty() ? 0 : leftover.getCount());
+        if (!leftover.isEmpty()) {
+          InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+              leftover, handler);
+        }
+        if (inserted <= 0) {
+          continue;
+        }
+        budget.remaining -= inserted;
+        movedStacks++;
+      }
+    }
+    if (movedStacks > 0) {
+      setChanged();
+    }
+    logHousekeepingDebug("done:moved=" + movedStacks);
+    return movedStacks;
+  }
+
+  /**
    * Marks a temporary capacity stall when requested inbound quantity cannot fit into shop storage.
    */
   public void noteCapacityStall(ItemStack stack, int requested, int accepted) {
@@ -357,6 +472,19 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return false;
+  }
+
+  private static int simulateInsertCount(IItemHandler handler, ItemStack stack, int maxCount) {
+    if (handler == null || stack == null || stack.isEmpty() || maxCount <= 0) {
+      return 0;
+    }
+    ItemStack remaining = stack.copy();
+    remaining.setCount(Math.min(maxCount, stack.getCount()));
+    int requested = remaining.getCount();
+    for (int slot = 0; slot < handler.getSlots() && !remaining.isEmpty(); slot++) {
+      remaining = handler.insertItem(slot, remaining, true);
+    }
+    return Math.max(0, requested - (remaining.isEmpty() ? 0 : remaining.getCount()));
   }
 
   private List<VirtualItemHandler> collectVirtualRacks() {
@@ -522,6 +650,119 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         slots.set(i, placed);
         remaining.shrink(moved);
       }
+    }
+  }
+
+  private List<RackStackBudget> collectRackBudgets(CreateShopBlockEntity pickup) {
+    List<RackStackBudget> totals = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null || pickup == null) {
+      return totals;
+    }
+    for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        handler = rack.getInventory();
+      }
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots(); slot++) {
+        ItemStack stack = handler.getStackInSlot(slot);
+        if (stack.isEmpty() || stack.getCount() <= 0) {
+          continue;
+        }
+        RackStackBudget budget = findBudget(totals, stack);
+        if (budget == null) {
+          ItemStack key = stack.copy();
+          key.setCount(1);
+          totals.add(new RackStackBudget(key, stack.getCount()));
+        } else {
+          budget.remaining += stack.getCount();
+        }
+      }
+    }
+    totals.removeIf(
+        budget ->
+            budget == null
+                || budget.key == null
+                || budget.key.isEmpty()
+                || (budget.remaining =
+                        Math.max(0, budget.remaining - pickup.getReservedFor(budget.key)))
+                    <= 0);
+    return totals;
+  }
+
+  private List<AbstractTileEntityRack> collectRacksForHousekeeping() {
+    List<AbstractTileEntityRack> racks = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null) {
+      return racks;
+    }
+    if (getBuilding() instanceof BuildingCreateShop shop) {
+      shop.ensureRackContainers();
+    }
+    Set<BlockPos> rackPositions = new LinkedHashSet<>(getBuilding().getContainers());
+    boolean fallbackScan = false;
+    if (rackPositions.isEmpty() && getBuilding() instanceof BuildingCreateShop shop) {
+      fallbackScan = true;
+      BlockPos origin = shop.getLocation().getInDimensionLocation();
+      int radius = 16;
+      int minX = origin.getX() - radius;
+      int maxX = origin.getX() + radius;
+      int minY = origin.getY() - 6;
+      int maxY = origin.getY() + 6;
+      int minZ = origin.getZ() - radius;
+      int maxZ = origin.getZ() + radius;
+      for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+          for (int z = minZ; z <= maxZ; z++) {
+            rackPositions.add(new BlockPos(x, y, z));
+          }
+        }
+      }
+    }
+    for (BlockPos pos : rackPositions) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
+      BlockEntity entity = getLevel().getBlockEntity(pos);
+      if (entity instanceof AbstractTileEntityRack rack) {
+        racks.add(rack);
+      }
+    }
+    if (fallbackScan && com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] housekeeping rack fallback scan active around {}", worldPosition);
+    }
+    return racks;
+  }
+
+  private void logHousekeepingDebug(String message) {
+    if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      return;
+    }
+    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info("[CreateShop] housekeeping {}", message);
+  }
+
+  @Nullable
+  private static RackStackBudget findBudget(List<RackStackBudget> budgets, ItemStack stack) {
+    if (budgets == null || budgets.isEmpty() || stack == null || stack.isEmpty()) {
+      return null;
+    }
+    for (RackStackBudget budget : budgets) {
+      if (budget != null && ItemStack.isSameItemSameComponents(budget.key, stack)) {
+        return budget;
+      }
+    }
+    return null;
+  }
+
+  private static final class RackStackBudget {
+    private final ItemStack key;
+    private int remaining;
+
+    private RackStackBudget(ItemStack key, int remaining) {
+      this.key = key;
+      this.remaining = Math.max(0, remaining);
     }
   }
 
