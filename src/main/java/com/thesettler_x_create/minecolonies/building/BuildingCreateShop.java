@@ -539,7 +539,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           requestedCount,
           consumed);
     }
-    return consumed >= remaining;
+    // Close the interaction as soon as a replacement order was successfully queued.
+    // Inflight cleanup is best-effort and can be partial if old entries drifted.
+    return true;
   }
 
   public boolean acceptLostPackageFromPlayer(
@@ -566,7 +568,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (removed.isEmpty()) {
         continue;
       }
-      List<ItemStack> leftovers = tile.insertIntoRacks(unpacked);
+      List<ItemStack> leftovers = tile.insertIntoRacksOnly(unpacked);
       for (ItemStack leftover : leftovers) {
         if (!leftover.isEmpty()) {
           Level level = getColony() == null ? null : getColony().getWorld();
@@ -594,7 +596,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             insertedMatching,
             consumed);
       }
-      return consumed >= targetAmount;
+      // Package was consumed from player inventory and processed (inserted and/or dropped
+      // leftovers).
+      // Keep interaction one-shot to avoid dead button state on partial inflight cleanup.
+      return true;
     }
     return false;
   }
