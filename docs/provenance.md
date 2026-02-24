@@ -274,3 +274,11 @@ Implementation notes:
   actions are now one-shot independent of strict inflight tuple consumption, package handover uses
   rack-only insertion of unpacked contents, and inflight consumption includes a stack-key fallback
   when requester/address fields drift across reloads or naming changes.
+- Lost-package interaction lifecycle hardening is authored in this project scope: interaction IDs
+  are now tuple-stable (`item/requester/address`) to avoid duplicate blocking dialogs for one
+  unresolved case, successful reorder/handover actions deterministically invalidate the active
+  dialog, and additional server-side debug logging was added for end-to-end handover tracing
+  (button response, inventory scan, package unpack, rack insert, inflight consumption).
+- Create Shop chat-noise reduction is authored in this project scope: detailed flow-step chat is
+  now controlled by a dedicated config flag (`flowChatMessagesEnabled`, default `false`) with
+  same-tick dedupe, while player-facing status chat was reduced to one concise line per stage.

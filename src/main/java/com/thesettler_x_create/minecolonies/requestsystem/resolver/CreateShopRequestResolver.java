@@ -317,8 +317,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTracker.setPendingCount(request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:network-ordered");
       messaging.sendShopChat(
-          manager, "com.thesettler_x_create.message.createshop.request_taken", ordered);
-      messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
     }
 
@@ -952,8 +950,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
           countStackList(ordered),
           "com.thesettler_x_create.message.createshop.flow_arrived");
-      messaging.sendShopChat(
-          manager, "com.thesettler_x_create.message.createshop.goods_arrived", ordered);
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
       transitionFlow(
