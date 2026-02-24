@@ -41,12 +41,17 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         true,
         ChatPriority.IMPORTANT,
         data -> true,
-        Component.literal("createshop_lost_package"),
+        Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id"),
         new Tuple<>(
-            Component.literal("Start a new order"),
-            Component.literal("I'll request a replacement.")),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder"),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_reorder")),
         new Tuple<>(
-            Component.literal("Hand over package"), Component.literal("I'll unpack it now.")));
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.response_handover"),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover")));
     this.stackKey = stackKey == null ? ItemStack.EMPTY : stackKey.copy();
     this.stackKey.setCount(1);
     this.remaining = Math.max(0, remaining);
@@ -182,16 +187,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
-    return Component.literal(
-        "Delivery seems lost for "
-            + requester
-            + ". Item: "
-            + itemLabel
-            + " x"
-            + Math.max(1, remaining)
-            + " (address: "
-            + destination
-            + ").");
+    return Component.translatable(
+        "com.thesettler_x_create.interaction.createshop.lost_package.inquiry",
+        requester,
+        itemLabel,
+        Math.max(1, remaining),
+        destination);
   }
 
   private static String sanitize(String value) {

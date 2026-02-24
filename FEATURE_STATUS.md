@@ -51,6 +51,9 @@ Current behavior:
   shop storage state only.
 - `Pickup now` remains MineColonies-native via the worker-module actions flow (`forcePickup`)
   instead of custom stock-tab controls.
+- Lost-package interaction responses now use translatable components (including validator/response
+  and answer texts) to stay compatible with MineColonies interaction client handling and avoid
+  `TranslatableContents` cast crashes on response button clicks.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
