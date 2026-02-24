@@ -267,3 +267,6 @@ Implementation notes:
   transfer now prioritizes hut-internal inventory as destination and rack capability handlers for
   extraction, reducing false-positive move accounting on aggregate handlers and improving visible
   in-hut transfer behavior.
+- Lost-package interaction compatibility hardening is authored in this project scope: interaction
+  validator/response/answer components were migrated to translatable keys (with localized lang
+  entries) so MineColonies interaction response handling does not crash on literal-content casts.
