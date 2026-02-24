@@ -54,6 +54,9 @@ Current behavior:
 - Lost-package interaction responses now use translatable components (including validator/response
   and answer texts) to stay compatible with MineColonies interaction client handling and avoid
   `TranslatableContents` cast crashes on response button clicks.
+- Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
+  by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
+  fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

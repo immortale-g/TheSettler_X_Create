@@ -270,3 +270,7 @@ Implementation notes:
 - Lost-package interaction compatibility hardening is authored in this project scope: interaction
   validator/response/answer components were migrated to translatable keys (with localized lang
   entries) so MineColonies interaction response handling does not crash on literal-content casts.
+- Lost-package recovery consistency hardening is authored in this project scope: replacement-order
+  actions are now one-shot independent of strict inflight tuple consumption, package handover uses
+  rack-only insertion of unpacked contents, and inflight consumption includes a stack-key fallback
+  when requester/address fields drift across reloads or naming changes.
