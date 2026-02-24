@@ -64,6 +64,15 @@ final class ShopInflightTracker {
       if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
         continue;
       }
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction trigger item={} remaining={} age={} requester='{}' address='{}'",
+            notice.stackKey.getHoverName().getString(),
+            notice.remaining,
+            notice.age,
+            notice.requesterName,
+            notice.address);
+      }
       citizen.triggerInteraction(
           new ShopLostPackageInteraction(
               notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address));

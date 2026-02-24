@@ -103,6 +103,11 @@ public class Config {
   public static final ModConfigSpec.BooleanValue CHAT_MESSAGES_ENABLED =
       BUILDER.comment("Enable Create Shop chat messages.").define("chatMessagesEnabled", true);
 
+  public static final ModConfigSpec.BooleanValue FLOW_CHAT_MESSAGES_ENABLED =
+      BUILDER
+          .comment("Enable detailed Create Shop flow-step chat messages.")
+          .define("flowChatMessagesEnabled", false);
+
   public static final ModConfigSpec.LongValue PERF_LOG_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) between performance timing summaries.")

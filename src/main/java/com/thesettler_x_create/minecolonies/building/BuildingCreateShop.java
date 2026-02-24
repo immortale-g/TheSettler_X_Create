@@ -509,12 +509,31 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public boolean restartLostPackage(
       ItemStack stackKey, int remaining, String requesterName, String address) {
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package restart requested item={} remaining={} requester='{}' address='{}'",
+          stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          remaining,
+          requesterName,
+          address);
+    }
     if (stackKey == null || stackKey.isEmpty() || remaining <= 0) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package restart rejected: invalid input");
+      }
       return false;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
     if (tile == null || pickup == null || tile.getStockNetworkId() == null) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package restart rejected: tilePresent={} pickupPresent={} networkPresent={}",
+            tile != null,
+            pickup != null,
+            tile != null && tile.getStockNetworkId() != null);
+      }
       return false;
     }
     ItemStack requested = stackKey.copy();
@@ -522,6 +541,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     var reordered =
         new CreateNetworkFacade(tile).requestStacksImmediate(List.of(requested), requesterName);
     if (reordered.isEmpty()) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package restart failed: network returned empty reorder list");
+      }
       return false;
     }
     int requestedCount = 0;
@@ -546,29 +569,81 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public boolean acceptLostPackageFromPlayer(
       Player player, ItemStack stackKey, int remaining, String requesterName, String address) {
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package handover requested player={} item={} remaining={} requester='{}' address='{}'",
+          player == null ? "<null>" : player.getName().getString(),
+          stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          remaining,
+          requesterName,
+          address);
+    }
     if (player == null || stackKey == null || stackKey.isEmpty()) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover rejected: invalid input");
+      }
       return false;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
     if (tile == null || pickup == null) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover rejected: tilePresent={} pickupPresent={}",
+            tile != null,
+            pickup != null);
+      }
       return false;
     }
     var inventory = player.getInventory();
     for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
       ItemStack candidate = inventory.getItem(slot);
+      if (isDebugRequests() && candidate != null && !candidate.isEmpty()) {
+        boolean isPackage =
+            com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
+        int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
+        if (isPackage || matching > 0) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover scan slot={} stack={} isPackage={} matchingCount={}",
+              slot,
+              candidate.getHoverName().getString(),
+              isPackage,
+              matching);
+        }
+      }
       if (!ShopLostPackageInteraction.packageContains(candidate, stackKey, 1)) {
         continue;
       }
       List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover slot={} unpackedStacks={}", slot, unpacked.size());
+      }
       if (unpacked.isEmpty()) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} skipped: package unpacked empty", slot);
+        }
         continue;
       }
       ItemStack removed = inventory.removeItem(slot, 1);
       if (removed.isEmpty()) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} failed: package remove returned empty",
+              slot);
+        }
         continue;
       }
       List<ItemStack> leftovers = tile.insertIntoRacksOnly(unpacked);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover slot={} insertedStacks={} leftoverStacks={}",
+            slot,
+            unpacked.size() - leftovers.size(),
+            leftovers.size());
+      }
       for (ItemStack leftover : leftovers) {
         if (!leftover.isEmpty()) {
           Level level = getColony() == null ? null : getColony().getWorld();
@@ -600,6 +675,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       // leftovers).
       // Keep interaction one-shot to avoid dead button state on partial inflight cleanup.
       return true;
+    }
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package handover failed: no matching package found in player inventory");
     }
     return false;
   }
