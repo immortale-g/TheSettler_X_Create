@@ -272,7 +272,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (timeout <= 0L || inflightEntries.isEmpty()) {
       return java.util.Collections.emptyList();
     }
-    List<InflightNotice> notices = new ArrayList<>();
+    Map<String, NoticeAggregate> grouped = new java.util.LinkedHashMap<>();
     boolean changed = false;
     for (InflightEntry entry : inflightEntries) {
       if (entry.remaining <= 0 || entry.notified) {
@@ -284,12 +284,32 @@ public class CreateShopBlockEntity extends BlockEntity {
       }
       entry.notified = true;
       changed = true;
-      notices.add(
-          new InflightNotice(
-              entry.stackKey.copy(), entry.remaining, age, entry.requesterName, entry.address));
+      String noticeKey = buildNoticeKey(entry.stackKey, entry.requesterName, entry.address);
+      NoticeAggregate existing = grouped.get(noticeKey);
+      if (existing == null) {
+        grouped.put(
+            noticeKey,
+            new NoticeAggregate(
+                entry.stackKey.copy(), entry.remaining, age, entry.requesterName, entry.address));
+      } else {
+        existing.remaining += entry.remaining;
+        if (age > existing.age) {
+          existing.age = age;
+        }
+      }
     }
     if (changed) {
       setChanged();
+    }
+    List<InflightNotice> notices = new ArrayList<>(grouped.size());
+    for (NoticeAggregate aggregate : grouped.values()) {
+      notices.add(
+          new InflightNotice(
+              aggregate.stackKey.copy(),
+              aggregate.remaining,
+              aggregate.age,
+              aggregate.requesterName,
+              aggregate.address));
     }
     return notices;
   }
@@ -557,6 +577,35 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? "" : trimmed;
+  }
+
+  private static String buildNoticeKey(ItemStack stackKey, String requesterName, String address) {
+    if (stackKey == null || stackKey.isEmpty()) {
+      return "minecraft:air||";
+    }
+    String itemId =
+        String.valueOf(
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    return itemId + "|" + requester + "|" + destination;
+  }
+
+  private static final class NoticeAggregate {
+    private final ItemStack stackKey;
+    private int remaining;
+    private long age;
+    private final String requesterName;
+    private final String address;
+
+    private NoticeAggregate(
+        ItemStack stackKey, int remaining, long age, String requesterName, String address) {
+      this.stackKey = stackKey;
+      this.remaining = remaining;
+      this.age = age;
+      this.requesterName = requesterName == null ? "" : requesterName;
+      this.address = address == null ? "" : address;
+    }
   }
 
   @Override

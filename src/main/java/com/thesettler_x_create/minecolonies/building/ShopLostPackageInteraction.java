@@ -207,7 +207,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     int found = 0;
     for (int i = 0; i < contents.getSlots(); i++) {
       ItemStack content = contents.getStackInSlot(i);
-      if (!content.isEmpty() && ItemStack.isSameItemSameComponents(content, key)) {
+      if (!content.isEmpty() && matchesForRecovery(content, key)) {
         found += content.getCount();
       }
     }
@@ -277,5 +277,15 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         itemId,
         requester,
         destination);
+  }
+
+  private static boolean matchesForRecovery(ItemStack candidate, ItemStack key) {
+    if (candidate == null || candidate.isEmpty() || key == null || key.isEmpty()) {
+      return false;
+    }
+    if (ItemStack.isSameItemSameComponents(candidate, key)) {
+      return true;
+    }
+    return ItemStack.isSameItem(candidate, key);
   }
 }

@@ -327,3 +327,10 @@ Implementation notes:
 - Recovery ownership revalidation hardening is authored in this project scope:
   stale/extra delivery-child recovery rechecks `getResolverForRequest(parent)` immediately before
   mutation and skips mutation when ownership drifted away from the local Create Shop resolver.
+- Lost-package prompt dedupe hardening is authored in this project scope:
+  overdue inflight notices are aggregated by `(item, requester, address)` tuple before citizen
+  interaction trigger, preventing duplicate same-tuple prompts from parallel overdue entries in a
+  single scan.
+- Lost-package handover matching hardening is authored in this project scope:
+  package-content matching now accepts same-item fallback when full component equality drifts,
+  improving manual handover recovery robustness without bypassing server-side inflight consumption.

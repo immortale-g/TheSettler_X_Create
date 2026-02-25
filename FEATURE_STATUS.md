@@ -90,6 +90,10 @@ Current behavior:
 - Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
   of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
   when notice text/amount drifts across ticks.
+- Overdue inflight notices are now aggregated per `(item, requester, address)` tuple before
+  interaction trigger, preventing duplicate same-tuple lost-package prompts in one scan cycle.
+- Lost-package handover matching now falls back to same-item matching when item components drift,
+  so package contents can still be accepted/recovered after component-text/metadata skew.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
   accepted by stock network or `Handover` package consumed and processed), and new blocking
   interactions only appear again when a fresh overdue notice is generated.
