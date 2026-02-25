@@ -4,7 +4,6 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
-import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.HashMap;
@@ -24,11 +23,9 @@ final class ShopCourierDiagnostics {
   private String lastCourierDebugDump;
   private String lastCourierEntityDump;
   private String lastAssignedCitizensDump;
-  private String lastModuleAssignDump;
   private String lastEntityRepairDump;
   private String lastWarehouseCompareDump;
   private final Map<String, String> lastAssignedCitizenInfo = new HashMap<>();
-  private final Map<String, String> lastModuleCitizenInfo = new HashMap<>();
   private final Map<Integer, Boolean> lastAccessResult = new HashMap<>();
   private final Map<String, Long> lastEntityRepairAttemptTime = new HashMap<>();
 
@@ -39,7 +36,6 @@ final class ShopCourierDiagnostics {
     this.lastCourierDebugDump = "";
     this.lastCourierEntityDump = "";
     this.lastAssignedCitizensDump = "";
-    this.lastModuleAssignDump = "";
     this.lastEntityRepairDump = "";
     this.lastWarehouseCompareDump = "";
   }
@@ -192,8 +188,6 @@ final class ShopCourierDiagnostics {
     }
 
     logAssignedCitizensChanges();
-    logModuleAssignments();
-    logWarehouseComparison(colony);
     logCourierWorkBuildings(colony);
   }
 
@@ -237,156 +231,6 @@ final class ShopCourierDiagnostics {
           attemptCitizenEntityRepair(citizen, level);
         }
       }
-    }
-  }
-
-  private void logModuleAssignments() {
-    CourierAssignmentModule module;
-    try {
-      module = shop.getFirstModuleOccurance(CourierAssignmentModule.class);
-    } catch (IllegalArgumentException ignored) {
-      // Create Shop no longer registers the courier module; diagnostics must fail-open.
-      return;
-    }
-    if (module == null) {
-      return;
-    }
-    java.util.List<String> entries = new java.util.ArrayList<>();
-    java.util.Map<String, String> currentInfo = new java.util.HashMap<>();
-    java.util.List<ICitizenData> assignedCitizens = java.util.Collections.emptyList();
-    java.util.List<? extends java.util.Optional<?>> assignedEntities =
-        java.util.Collections.emptyList();
-    try {
-      assignedCitizens = module.getAssignedCitizen();
-      assignedEntities = module.getAssignedEntities();
-      int count = Math.max(assignedCitizens.size(), assignedEntities.size());
-      for (int i = 0; i < count; i++) {
-        String citizenInfo =
-            i < assignedCitizens.size()
-                ? describeCitizenAssignmentDetail(assignedCitizens.get(i))
-                : "<no-citizen>";
-        if (i < assignedCitizens.size()) {
-          ICitizenData citizen = assignedCitizens.get(i);
-          currentInfo.put(
-              describeCitizenKey(citizen),
-              "slot=" + i + " " + describeCitizenAssignmentDetail(citizen));
-        }
-        String entityInfo = "<no-entity>";
-        if (i < assignedEntities.size()) {
-          var optionalEntity = assignedEntities.get(i);
-          if (optionalEntity != null && optionalEntity.isPresent()) {
-            Object entity = optionalEntity.get();
-            if (entity instanceof net.minecraft.world.entity.Entity mcEntity) {
-              entityInfo =
-                  mcEntity.getClass().getName()
-                      + " pos="
-                      + mcEntity.blockPosition()
-                      + " dim="
-                      + mcEntity.level().dimension().location();
-            } else {
-              entityInfo = entity.getClass().getName();
-            }
-          } else {
-            entityInfo = "<empty>";
-          }
-        }
-        entries.add("slot=" + i + " citizen=" + citizenInfo + " entity=" + entityInfo);
-      }
-    } catch (Exception ignored) {
-      // If module API changes, skip.
-    }
-    String dump = String.join(" | ", entries);
-    if (!dump.equals(lastModuleAssignDump)) {
-      lastModuleAssignDump = dump;
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] courier module assign: {}", dump.isEmpty() ? "<none>" : dump);
-      logAssignmentDelta("courier module assign", lastModuleCitizenInfo, currentInfo);
-      lastModuleCitizenInfo.clear();
-      lastModuleCitizenInfo.putAll(currentInfo);
-      Level level = shop.getColony() == null ? null : shop.getColony().getWorld();
-      int count = Math.min(assignedCitizens.size(), assignedEntities.size());
-      for (int i = 0; i < count; i++) {
-        ICitizenData citizen = assignedCitizens.get(i);
-        if (citizen == null || safeCitizenEntityId(citizen) >= 0) {
-          continue;
-        }
-        java.util.Optional<?> opt = assignedEntities.get(i);
-        if (opt == null || opt.isEmpty()) {
-          continue;
-        }
-        attemptForceEntityId(citizen, level);
-      }
-    }
-  }
-
-  private void logWarehouseComparison(IColony colony) {
-    if (colony == null) {
-      return;
-    }
-    var manager = colony.getServerBuildingManager();
-    if (manager == null) {
-      return;
-    }
-    var warehouses = manager.getWareHouses();
-    if (warehouses == null || warehouses.isEmpty()) {
-      return;
-    }
-    java.util.List<String> dumps = new java.util.ArrayList<>();
-    for (var warehouse : warehouses) {
-      if (warehouse == shop) {
-        continue;
-      }
-      if (!(warehouse instanceof AbstractBuilding building)) {
-        continue;
-      }
-      CourierAssignmentModule module =
-          building.getFirstModuleOccurance(CourierAssignmentModule.class);
-      if (module == null) {
-        continue;
-      }
-      String label =
-          building.getSchematicName() + "@" + building.getLocation().getInDimensionLocation();
-      java.util.List<String> entries = new java.util.ArrayList<>();
-      try {
-        var assignedCitizens = module.getAssignedCitizen();
-        var assignedEntities = module.getAssignedEntities();
-        int count = Math.max(assignedCitizens.size(), assignedEntities.size());
-        for (int i = 0; i < count; i++) {
-          String citizenInfo =
-              i < assignedCitizens.size()
-                  ? describeCitizenAssignmentDetail(assignedCitizens.get(i))
-                  : "<no-citizen>";
-          String entityInfo = "<no-entity>";
-          if (i < assignedEntities.size()) {
-            var optionalEntity = assignedEntities.get(i);
-            if (optionalEntity != null && optionalEntity.isPresent()) {
-              Object entity = optionalEntity.get();
-              if (entity instanceof net.minecraft.world.entity.Entity mcEntity) {
-                entityInfo =
-                    mcEntity.getClass().getName()
-                        + " pos="
-                        + mcEntity.blockPosition()
-                        + " dim="
-                        + mcEntity.level().dimension().location();
-              } else {
-                entityInfo = entity.getClass().getName();
-              }
-            } else {
-              entityInfo = "<empty>";
-            }
-          }
-          entries.add("slot=" + i + " citizen=" + citizenInfo + " entity=" + entityInfo);
-        }
-      } catch (Exception ignored) {
-        // Ignore module API changes.
-      }
-      dumps.add(label + " => " + String.join(" | ", entries));
-    }
-    String dump = String.join(" || ", dumps);
-    if (!dump.equals(lastWarehouseCompareDump)) {
-      lastWarehouseCompareDump = dump;
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] courier warehouse compare: {}", dump.isEmpty() ? "<none>" : dump);
     }
   }
 
