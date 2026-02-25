@@ -587,16 +587,34 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     var inventory = player.getInventory();
     rackIndex.ensureRackContainers();
     int targetAmount = Math.max(1, remaining);
+    int inflightBefore = pickup.getInflightRemaining(stackKey, requesterName, address);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package handover precheck inventorySlots={} target={} inflightBefore={} requester='{}' address='{}'",
+          inventory.getContainerSize(),
+          targetAmount,
+          inflightBefore,
+          requesterName,
+          address);
+    }
     int totalConsumed = 0;
     int totalInsertedMatching = 0;
+    int scannedPackages = 0;
+    int matchedPackages = 0;
+    int removedPackages = 0;
     for (int slot = 0;
         slot < inventory.getContainerSize() && totalConsumed < targetAmount;
         slot++) {
       ItemStack candidate = inventory.getItem(slot);
+      boolean isPackage =
+          candidate != null
+              && !candidate.isEmpty()
+              && com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
+      if (isPackage) {
+        scannedPackages++;
+      }
       int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
       if (isDebugRequests() && candidate != null && !candidate.isEmpty()) {
-        boolean isPackage =
-            com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
         if (isPackage || matching > 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover scan slot={} stack={} isPackage={} matchingCount={}",
@@ -609,8 +627,20 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (matching <= 0) {
         continue;
       }
+      matchedPackages++;
       List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package handover slot={} previewUnpackedStacks={} matching={}",
+            slot,
+            previewUnpacked.size(),
+            matching);
+      }
       if (previewUnpacked.isEmpty()) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} skip: preview unpack empty", slot);
+        }
         continue;
       }
       ItemStack removedPackage = inventory.removeItem(slot, 1);
@@ -622,6 +652,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         continue;
       }
+      removedPackages++;
       List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(removedPackage);
       if (unpacked.isEmpty() && !previewUnpacked.isEmpty()) {
         unpacked = new ArrayList<>(previewUnpacked.size());
@@ -678,7 +709,30 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             consumed,
             totalConsumed,
             targetAmount);
+        if (consumed <= 0 && consumeTarget > 0) {
+          int strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+          int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover consume-miss slot={} consumeTarget={} strictRemaining={} looseRemaining={}",
+              slot,
+              consumeTarget,
+              strictRemaining,
+              looseRemaining);
+        }
       }
+    }
+    int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package handover summary scannedPackages={} matchedPackages={} removedPackages={} insertedMatchingTotal={} consumedTotal={} target={} inflightBefore={} inflightAfter={}",
+          scannedPackages,
+          matchedPackages,
+          removedPackages,
+          totalInsertedMatching,
+          totalConsumed,
+          targetAmount,
+          inflightBefore,
+          inflightAfter);
     }
     if (totalConsumed > 0) {
       return totalConsumed;
