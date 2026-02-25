@@ -313,3 +313,7 @@ Implementation notes:
 - Partial inflight consumption recovery hardening is authored in this project scope:
   unresolved entry remainders reset `notified` on partial consume, allowing overdue scanning to
   surface unresolved amounts again instead of leaving them stranded after first notification.
+- Delivery-child mutation scope hardening is authored in this project scope:
+  stale-recovery/callback mutation paths in `CreateShopRequestResolver` are constrained to local
+  Create Shop delivery children by pickup/start location checks, while unresolved/non-local child
+  lookups remain fail-open (no forced cancel/remove mutation).

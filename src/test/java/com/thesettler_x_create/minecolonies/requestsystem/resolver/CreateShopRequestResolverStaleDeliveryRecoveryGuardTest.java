@@ -16,6 +16,9 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
 
     assertTrue(source.contains("isStaleDeliveryChild("));
     assertTrue(source.contains("recoverStaleDeliveryChild("));
+    assertTrue(source.contains("isLocalShopDeliveryChild("));
+    assertTrue(source.contains("isDeliveryFromPickup("));
+    assertTrue(source.contains("skip (non-local delivery child)"));
     assertTrue(source.contains("stale delivery-child recovery"));
     assertTrue(source.contains("stale-child-recovery"));
     assertTrue(source.contains("manager.updateRequestState("));
