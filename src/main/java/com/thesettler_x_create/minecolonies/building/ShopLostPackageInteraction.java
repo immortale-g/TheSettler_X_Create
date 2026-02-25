@@ -14,7 +14,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import org.jetbrains.annotations.Nullable;
 
 /** Shopkeeper chat interaction for lost package recovery actions. */
 public class ShopLostPackageInteraction extends ServerCitizenInteraction {
@@ -29,6 +31,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private String requesterName = "";
   private String address = "";
   private boolean active = true;
+  private Component interactionId =
+      Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
 
   public ShopLostPackageInteraction(ICitizen citizen) {
     super(citizen);
@@ -41,25 +45,54 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         true,
         ChatPriority.IMPORTANT,
         data -> true,
-        Component.literal("createshop_lost_package"),
+        Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id"),
         new Tuple<>(
-            Component.literal("Start a new order"),
-            Component.literal("I'll request a replacement.")),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder"),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_reorder")),
         new Tuple<>(
-            Component.literal("Hand over package"), Component.literal("I'll unpack it now.")));
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.response_handover"),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover")));
     this.stackKey = stackKey == null ? ItemStack.EMPTY : stackKey.copy();
     this.stackKey.setCount(1);
     this.remaining = Math.max(0, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
+    this.interactionId = buildInteractionId(this.stackKey, this.requesterName, this.address);
   }
 
   @Override
   public void onServerResponseTriggered(int response, Player player, ICitizenData citizen) {
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction response={} active={} player={} citizen={} item={} remaining={} requester='{}' address='{}'",
+          response,
+          active,
+          player == null ? "<null>" : player.getName().getString(),
+          citizen == null ? "<null>" : citizen.getName(),
+          stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          remaining,
+          requesterName,
+          address);
+    }
     if (!active || player == null || citizen == null) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction ignored active={} playerNull={} citizenNull={}",
+            active,
+            player == null,
+            citizen == null);
+      }
       return;
     }
     if (!(citizen.getWorkBuilding() instanceof BuildingCreateShop shop)) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction ignored: work building is not create shop");
+      }
       return;
     }
     boolean handled = false;
@@ -69,8 +102,13 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       handled =
           shop.acceptLostPackageFromPlayer(player, stackKey, remaining, requesterName, address);
     }
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction handled={} response={}", handled, response);
+    }
     if (handled) {
       active = false;
+      remaining = 0;
     }
   }
 
@@ -90,6 +128,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   public List<com.minecolonies.api.colony.interactionhandling.IInteractionResponseHandler>
       genChildInteractions() {
     return Collections.emptyList();
+  }
+
+  @Override
+  public Component getId() {
+    return interactionId;
   }
 
   @Override
@@ -124,6 +167,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
+    interactionId = buildInteractionId(stackKey, requesterName, address);
   }
 
   static boolean packageContains(ItemStack packageStack, ItemStack key, int required) {
@@ -137,17 +181,28 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (contents == null) {
       return false;
     }
+    return countMatchingInPackage(packageStack, key) >= Math.max(1, required);
+  }
+
+  static int countMatchingInPackage(@Nullable ItemStack packageStack, @Nullable ItemStack key) {
+    if (packageStack == null || packageStack.isEmpty() || key == null || key.isEmpty()) {
+      return 0;
+    }
+    if (!PackageItem.isPackage(packageStack)) {
+      return 0;
+    }
+    ItemStackHandler contents = PackageItem.getContents(packageStack);
+    if (contents == null) {
+      return 0;
+    }
     int found = 0;
     for (int i = 0; i < contents.getSlots(); i++) {
       ItemStack content = contents.getStackInSlot(i);
       if (!content.isEmpty() && ItemStack.isSameItemSameComponents(content, key)) {
         found += content.getCount();
-        if (found >= Math.max(1, required)) {
-          return true;
-        }
       }
     }
-    return false;
+    return found;
   }
 
   static List<ItemStack> unpackPackage(ItemStack packageStack) {
@@ -182,16 +237,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
-    return Component.literal(
-        "Delivery seems lost for "
-            + requester
-            + ". Item: "
-            + itemLabel
-            + " x"
-            + Math.max(1, remaining)
-            + " (address: "
-            + destination
-            + ").");
+    return Component.translatable(
+        "com.thesettler_x_create.interaction.createshop.lost_package.inquiry",
+        requester,
+        itemLabel,
+        Math.max(1, remaining),
+        destination);
   }
 
   private static String sanitize(String value) {
@@ -200,5 +251,22 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? "" : trimmed;
+  }
+
+  private static Component buildInteractionId(
+      @Nullable ItemStack stackKey, String requesterName, String address) {
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    String itemId = "minecraft:air";
+    if (stackKey != null && !stackKey.isEmpty() && stackKey.getItem() != Items.AIR) {
+      itemId =
+          String.valueOf(
+              net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
+    }
+    return Component.translatable(
+        "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id",
+        itemId,
+        requester,
+        destination);
   }
 }

@@ -51,6 +51,24 @@ Current behavior:
   shop storage state only.
 - `Pickup now` remains MineColonies-native via the worker-module actions flow (`forcePickup`)
   instead of custom stock-tab controls.
+- Lost-package interaction responses now use translatable components (including validator/response
+  and answer texts) to stay compatible with MineColonies interaction client handling and avoid
+  `TranslatableContents` cast crashes on response button clicks.
+- Capacity-stall and lost-package interaction IDs now use translatable components as well
+  (including tuple-stable runtime lost-package IDs), removing remaining literal-ID paths that could
+  trigger MineColonies interaction button-id cast failures.
+- Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
+  by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
+  fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
+- Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
+  of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
+  when notice text/amount drifts across ticks.
+- Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
+  accepted by stock network or `Handover` package consumed and processed), and new blocking
+  interactions only appear again when a fresh overdue notice is generated.
+- Flow-step chat lines are now independently configurable and default to disabled
+  (`flowChatMessagesEnabled=false`), while player-facing Create Shop chat keeps a single concise
+  message per stage (order and delivery-start) to avoid duplicate/near-duplicate chat spam.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

@@ -308,6 +308,30 @@ public class CreateShopBlockEntity extends BlockEntity {
     int remaining = amount;
     int consumed = 0;
     boolean changed = false;
+    remaining = consumeInflightMatches(stackKey, remaining, requester, destination);
+    consumed = amount - remaining;
+    changed = consumed > 0;
+
+    // Fallback: old inflight entries can drift in requester/address text after reloads/renames.
+    // If strict tuple matching consumed nothing, clear by stack key to avoid stuck overdue loops.
+    if (consumed <= 0 && (!requester.isEmpty() || !destination.isEmpty()) && remaining > 0) {
+      int before = remaining;
+      remaining = consumeInflightMatches(stackKey, remaining, "", "");
+      int fallbackConsumed = before - remaining;
+      if (fallbackConsumed > 0) {
+        consumed += fallbackConsumed;
+        changed = true;
+      }
+    }
+    if (changed) {
+      pruneBaselines();
+      setChanged();
+    }
+    return consumed;
+  }
+
+  private int consumeInflightMatches(
+      ItemStack stackKey, int remaining, String requester, String destination) {
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext() && remaining > 0) {
       InflightEntry entry = iterator.next();
@@ -323,17 +347,11 @@ public class CreateShopBlockEntity extends BlockEntity {
       int used = Math.min(remaining, entry.remaining);
       entry.remaining -= used;
       remaining -= used;
-      consumed += used;
-      changed = true;
       if (entry.remaining <= 0) {
         iterator.remove();
       }
     }
-    if (changed) {
-      pruneBaselines();
-      setChanged();
-    }
-    return consumed;
+    return remaining;
   }
 
   //    public int consumeReserved(ItemStack key, int amount) {
