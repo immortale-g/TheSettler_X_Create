@@ -15,6 +15,8 @@ class BuildingCreateShopLostPackagePartialGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
     assertTrue(source.contains("public int acceptLostPackageFromPlayer("));
-    assertTrue(source.contains("return consumed;"));
+    assertTrue(source.contains("int totalConsumed = 0;"));
+    assertTrue(source.contains("if (totalConsumed > 0) {"));
+    assertTrue(source.contains("return totalConsumed;"));
   }
 }

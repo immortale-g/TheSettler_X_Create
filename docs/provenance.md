@@ -334,3 +334,6 @@ Implementation notes:
 - Lost-package handover matching hardening is authored in this project scope:
   package-content matching now accepts same-item fallback when full component equality drifts,
   improving manual handover recovery robustness without bypassing server-side inflight consumption.
+- Lost-package handover amount-limiting hardening is authored in this project scope:
+  one handover action now iterates multiple matching player packages as needed but limits inflight
+  consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
