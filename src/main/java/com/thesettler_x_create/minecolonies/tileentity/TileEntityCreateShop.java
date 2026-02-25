@@ -213,6 +213,20 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
    * <p>Used for manual package handover recovery.
    */
   public List<ItemStack> insertIntoRacks(List<ItemStack> stacks) {
+    return insertIntoRacksInternal(stacks, true);
+  }
+
+  /**
+   * Tries to insert stacks into shop racks only and returns leftovers that did not fit.
+   *
+   * <p>Used for lost-package handover so rack-only delivery flow stays consistent.
+   */
+  public List<ItemStack> insertIntoRacksOnly(List<ItemStack> stacks) {
+    return insertIntoRacksInternal(stacks, false);
+  }
+
+  private List<ItemStack> insertIntoRacksInternal(
+      List<ItemStack> stacks, boolean allowHutFallback) {
     List<ItemStack> leftovers = new ArrayList<>();
     if (stacks == null || stacks.isEmpty()) {
       return leftovers;
@@ -238,7 +252,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
           break;
         }
       }
-      if (!remaining.isEmpty()) {
+      if (allowHutFallback && !remaining.isEmpty()) {
         IItemHandler hut = getItemHandlerCap((Direction) null);
         if (hut != null) {
           remaining =

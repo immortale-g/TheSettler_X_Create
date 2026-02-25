@@ -35,7 +35,7 @@ public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
         true,
         ChatPriority.IMPORTANT,
         data -> true,
-        Component.literal("createshop_capacity_stall"),
+        Component.translatable("com.thesettler_x_create.interaction.createshop.capacity_stall.id"),
         new Tuple<>(
             Component.translatable(
                 "com.thesettler_x_create.interaction.createshop.capacity_stall.response_upgrade"),
