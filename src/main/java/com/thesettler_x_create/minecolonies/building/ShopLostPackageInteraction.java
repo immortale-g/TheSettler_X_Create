@@ -31,7 +31,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private String requesterName = "";
   private String address = "";
   private boolean active = true;
-  private Component interactionId = Component.literal("createshop_lost_package");
+  private Component interactionId =
+      Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
 
   public ShopLostPackageInteraction(ICitizen citizen) {
     super(citizen);
@@ -262,12 +263,10 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
           String.valueOf(
               net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
     }
-    return Component.literal(
-        "createshop_lost_package|item="
-            + itemId
-            + "|requester="
-            + requester
-            + "|address="
-            + destination);
+    return Component.translatable(
+        "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id",
+        itemId,
+        requester,
+        destination);
   }
 }
