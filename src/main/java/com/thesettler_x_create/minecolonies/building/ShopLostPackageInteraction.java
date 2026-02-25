@@ -14,7 +14,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,24 +23,20 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private static final String TAG_REMAINING = "Remaining";
   private static final String TAG_REQUESTER = "Requester";
   private static final String TAG_ADDRESS = "Address";
-  private static final String TAG_REQUESTED_AT = "RequestedAt";
   private static final String TAG_ACTIVE = "Active";
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
   private String requesterName = "";
   private String address = "";
-  private long requestedAt;
   private boolean active = true;
-  private Component interactionId =
-      Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
 
   public ShopLostPackageInteraction(ICitizen citizen) {
     super(citizen);
   }
 
   public ShopLostPackageInteraction(
-      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+      ItemStack stackKey, int remaining, String requesterName, String address) {
     super(
         buildInquiry(stackKey, remaining, requesterName, address),
         true,
@@ -63,9 +58,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.remaining = Math.max(0, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
-    this.requestedAt = Math.max(0L, requestedAt);
-    this.interactionId =
-        buildInteractionId(this.stackKey, this.requesterName, this.address, this.requestedAt);
   }
 
   @Override
@@ -145,7 +137,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   @Override
   public Component getId() {
-    return interactionId;
+    return Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
   }
 
   @Override
@@ -162,9 +154,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     if (!address.isEmpty()) {
       tag.putString(TAG_ADDRESS, address);
-    }
-    if (requestedAt > 0L) {
-      tag.putLong(TAG_REQUESTED_AT, requestedAt);
     }
     if (!active) {
       tag.putBoolean(TAG_ACTIVE, false);
@@ -183,8 +172,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
-    requestedAt = Math.max(0L, tag.getLong(TAG_REQUESTED_AT));
-    interactionId = buildInteractionId(stackKey, requesterName, address, requestedAt);
   }
 
   static boolean packageContains(ItemStack packageStack, ItemStack key, int required) {
@@ -268,24 +255,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? "" : trimmed;
-  }
-
-  private static Component buildInteractionId(
-      @Nullable ItemStack stackKey, String requesterName, String address, long requestedAt) {
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    String itemId = "minecraft:air";
-    if (stackKey != null && !stackKey.isEmpty() && stackKey.getItem() != Items.AIR) {
-      itemId =
-          String.valueOf(
-              net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
-    }
-    return Component.translatable(
-        "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id",
-        itemId,
-        requester,
-        destination,
-        Long.toString(Math.max(0L, requestedAt)));
   }
 
   private static boolean matchesForRecovery(ItemStack candidate, ItemStack key) {

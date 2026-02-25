@@ -55,7 +55,7 @@ Current behavior:
   and answer texts) to stay compatible with MineColonies interaction client handling and avoid
   `TranslatableContents` cast crashes on response button clicks.
 - Capacity-stall and lost-package interaction IDs now use translatable components as well
-  (including tuple-stable runtime lost-package IDs), removing remaining literal-ID paths that could
+  (lost-package now uses a stable translatable ID), removing remaining literal-ID paths that could
   trigger MineColonies interaction button-id cast failures.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
   (`setAccessible`/declared-field write) and stays on API/public-method paths only.
@@ -90,10 +90,8 @@ Current behavior:
 - Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
   of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
   when notice text/amount drifts across ticks.
-- Overdue inflight notices now stay segment-scoped (per inflight entry/request-time) and no longer
-  sum quantities across matching `(item, requester, address)` tuples, preserving partial-package
-  recovery flows (for example `6 + 4`, not flattened to `10`) while still deduping exact duplicate
-  segments in one scan cycle.
+- Overdue inflight prompting is now single-interaction per tick (oldest overdue first) and uses a
+  prompt key based on `(item, address)` to avoid duplicate dialogs caused by requester-name drift.
 - Inflight load/record cleanup now removes exact duplicate lost-package segments and caps open
   segment history per `(item, requester, address)` tuple to avoid legacy prompt floods after
   repeated reloads or previously stuck handover loops.

@@ -75,11 +75,9 @@ final class ShopInflightTracker {
       }
       citizen.triggerInteraction(
           new ShopLostPackageInteraction(
-              notice.stackKey.copy(),
-              notice.remaining,
-              notice.requesterName,
-              notice.address,
-              notice.requestedAt));
+              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address));
+      // Hard gate: only one lost-package interaction should be triggered per tracker tick.
+      break;
     }
   }
 
