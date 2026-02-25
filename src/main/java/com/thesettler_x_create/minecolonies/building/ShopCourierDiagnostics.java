@@ -838,24 +838,7 @@ final class ShopCourierDiagnostics {
     } catch (Exception ex) {
       return ex.getMessage() == null ? "<error>" : ex.getMessage();
     }
-    try {
-      java.lang.reflect.Field field = null;
-      for (var f : citizen.getClass().getDeclaredFields()) {
-        String name = f.getName();
-        if ("entityId".equals(name) || "entityID".equals(name)) {
-          field = f;
-          break;
-        }
-      }
-      if (field == null) {
-        return "<no-field>";
-      }
-      field.setAccessible(true);
-      field.setInt(citizen, id);
-      return "field entityId ok id=" + id;
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
-    }
+    return "<no-public-setter>";
   }
 
   private int safeCitizenEntityId(ICitizenData citizen) {

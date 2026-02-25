@@ -57,6 +57,8 @@ Current behavior:
 - Capacity-stall and lost-package interaction IDs now use translatable components as well
   (including tuple-stable runtime lost-package IDs), removing remaining literal-ID paths that could
   trigger MineColonies interaction button-id cast failures.
+- Shop courier diagnostics no longer attempts private-field entityId mutation fallback
+  (`setAccessible`/declared-field write) and stays on API/public-method paths only.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
