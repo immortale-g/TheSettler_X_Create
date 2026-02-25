@@ -332,6 +332,10 @@ Implementation notes:
   quantities across matching `(item, requester, address)` tuples; exact duplicate segments are
   deduped per scan while distinct partial package segments (for example `6` and `4`) remain
   separate interactions.
+- Lost-package inflight history cleanup is authored in this project scope:
+  load/record-time compaction removes exact duplicate segment entries and caps retained open
+  segments per `(item, requester, address)` tuple to prevent legacy duplicate prompt floods while
+  keeping partial-package recovery semantics.
 - Lost-package handover matching hardening is authored in this project scope:
   package-content matching now accepts same-item fallback when full component equality drifts,
   improving manual handover recovery robustness without bypassing server-side inflight consumption.
