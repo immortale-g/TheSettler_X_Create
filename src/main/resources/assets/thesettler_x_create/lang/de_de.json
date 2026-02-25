@@ -22,7 +22,7 @@
   "com.thesettler_x_create.gui.createshop.save": "Speichern",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.id": "createshop_capacity_stall",
   "com.thesettler_x_create.interaction.createshop.lost_package.id": "Create-Shop verlorenes Paket",
-  "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id": "createshop_lost_package|item=%s|requester=%s|address=%s",
+  "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id": "createshop_lost_package|item=%s|requester=%s|address=%s|segment=%s",
   "com.thesettler_x_create.interaction.createshop.lost_package.inquiry": "Lieferung scheint verloren fuer %s. Item: %s x%s (Adresse: %s).",
   "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder": "Neu bestellen",
   "com.thesettler_x_create.interaction.createshop.lost_package.answer_reorder": "Ich fordere Ersatz an.",
