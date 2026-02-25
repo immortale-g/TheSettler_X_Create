@@ -535,17 +535,19 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
     }
     int consumed = pickup.consumeInflight(stackKey, requestedCount, requesterName, address);
+    int targetAmount = Math.max(1, remaining);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={}",
+          "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={} target={}",
           requesterName,
           stackKey.getHoverName().getString(),
           requestedCount,
-          consumed);
+          consumed,
+          targetAmount);
     }
-    // Close the interaction as soon as a replacement order was successfully queued.
-    // Inflight cleanup is best-effort and can be partial if old entries drifted.
-    return true;
+    // Keep interaction open until the full overdue target is actually cleared from inflight.
+    // Network reorder can be partially clamped by rack-capacity planning.
+    return consumed >= targetAmount;
   }
 
   public boolean acceptLostPackageFromPlayer(

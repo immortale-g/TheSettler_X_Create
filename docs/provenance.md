@@ -310,3 +310,7 @@ Implementation notes:
   handover responses now close only after full overdue target consumption from inflight tracking,
   and partial inflight consumption resets `notified` on remaining entries so unresolved overdue
   amounts can be surfaced again by overdue-notice scanning.
+- Lost-package partial-reorder lifecycle hardening is authored in this project scope:
+  reorder responses now close only after full overdue target consumption from inflight tracking,
+  so capacity-clamped partial network reorder acceptance cannot prematurely close overdue
+  interactions while unresolved remainder still exists.
