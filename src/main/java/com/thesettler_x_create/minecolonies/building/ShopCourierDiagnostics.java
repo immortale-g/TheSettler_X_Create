@@ -241,7 +241,13 @@ final class ShopCourierDiagnostics {
   }
 
   private void logModuleAssignments() {
-    CourierAssignmentModule module = shop.getFirstModuleOccurance(CourierAssignmentModule.class);
+    CourierAssignmentModule module;
+    try {
+      module = shop.getFirstModuleOccurance(CourierAssignmentModule.class);
+    } catch (IllegalArgumentException ignored) {
+      // Create Shop no longer registers the courier module; diagnostics must fail-open.
+      return;
+    }
     if (module == null) {
       return;
     }
