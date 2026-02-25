@@ -349,6 +349,9 @@ public class CreateShopBlockEntity extends BlockEntity {
       remaining -= used;
       if (entry.remaining <= 0) {
         iterator.remove();
+      } else if (used > 0) {
+        // Partial inflight consumption must be promptable again for the unresolved remainder.
+        entry.notified = false;
       }
     }
     return remaining;
