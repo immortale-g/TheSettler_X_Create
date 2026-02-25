@@ -576,12 +576,17 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return 0;
     }
     var inventory = player.getInventory();
-    for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+    int targetAmount = Math.max(1, remaining);
+    int totalConsumed = 0;
+    int totalInsertedMatching = 0;
+    for (int slot = 0;
+        slot < inventory.getContainerSize() && totalConsumed < targetAmount;
+        slot++) {
       ItemStack candidate = inventory.getItem(slot);
+      int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
       if (isDebugRequests() && candidate != null && !candidate.isEmpty()) {
         boolean isPackage =
             com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
-        int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
         if (isPackage || matching > 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover scan slot={} stack={} isPackage={} matchingCount={}",
@@ -591,10 +596,19 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
               matching);
         }
       }
-      if (!ShopLostPackageInteraction.packageContains(candidate, stackKey, 1)) {
+      if (matching <= 0) {
         continue;
       }
-      List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      ItemStack removedPackage = inventory.removeItem(slot, 1);
+      if (removedPackage.isEmpty()) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} failed: package remove returned empty",
+              slot);
+        }
+        continue;
+      }
+      List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(removedPackage);
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} unpackedStacks={}", slot, unpacked.size());
@@ -603,15 +617,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (isDebugRequests()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} skipped: package unpacked empty", slot);
-        }
-        continue;
-      }
-      ItemStack removed = inventory.removeItem(slot, 1);
-      if (removed.isEmpty()) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} failed: package remove returned empty",
-              slot);
         }
         continue;
       }
@@ -638,22 +643,28 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       }
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
-      int consumed =
-          pickup.consumeInflight(
-              stackKey, Math.min(Math.max(1, remaining), insertedMatching), requesterName, address);
+      totalInsertedMatching += Math.max(0, insertedMatching);
+      int consumeTarget = Math.min(targetAmount - totalConsumed, Math.max(0, insertedMatching));
+      int consumed = pickup.consumeInflight(stackKey, consumeTarget, requesterName, address);
+      totalConsumed += Math.max(0, consumed);
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={}",
+            "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={} totalConsumed={} target={}",
             requesterName,
             stackKey.getHoverName().getString(),
             insertedMatching,
-            consumed);
+            consumed,
+            totalConsumed,
+            targetAmount);
       }
-      return consumed;
+    }
+    if (totalConsumed > 0) {
+      return totalConsumed;
     }
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package handover failed: no matching package found in player inventory");
+          "[CreateShop] lost-package handover failed: no matching package found in player inventory or no inflight consumed (insertedMatchingTotal={})",
+          totalInsertedMatching);
     }
     return 0;
   }

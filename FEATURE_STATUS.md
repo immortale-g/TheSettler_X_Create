@@ -94,6 +94,9 @@ Current behavior:
   interaction trigger, preventing duplicate same-tuple lost-package prompts in one scan cycle.
 - Lost-package handover matching now falls back to same-item matching when item components drift,
   so package contents can still be accepted/recovered after component-text/metadata skew.
+- Lost-package handover now processes multiple matching player packages in one action and caps
+  inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
+  package removal beyond the required recovery amount.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
   accepted by stock network or `Handover` package consumed and processed), and new blocking
   interactions only appear again when a fresh overdue notice is generated.
