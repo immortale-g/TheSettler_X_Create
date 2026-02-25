@@ -11,6 +11,7 @@ import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.tileentities.TileEntityRack;
@@ -88,6 +89,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private long lastHousekeepingWorkCheckTick = -1L;
   private long lastHousekeepingDebugTick = -1L;
   private boolean cachedHasIncomingRackWork;
+  private boolean legacyCourierMigrationAttempted;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -105,6 +107,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
     this.resolverFactory = new ShopResolverFactory(this);
+    this.legacyCourierMigrationAttempted = false;
   }
 
   @Override
@@ -119,36 +122,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   @Override
   public boolean canAccessWareHouse(ICitizenData citizen) {
-    CourierAssignmentModule module = getFirstModuleOccurance(CourierAssignmentModule.class);
-    boolean result = module != null && module.hasAssignedCitizen(citizen);
-    if (!result && module != null && !hasDeliveryman(module)) {
-      // Allow warehouse deliverymen to access the shop if no shop courier is assigned.
-      if (citizen != null
-          && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
-        result = true;
-      }
-    }
+    boolean result =
+        citizen != null
+            && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman;
     if (isDebugRequests()) {
       courierDiagnostics.logAccessCheck(citizen, result);
     }
     return result;
-  }
-
-  private boolean hasDeliveryman(CourierAssignmentModule module) {
-    if (module == null) {
-      return false;
-    }
-    var citizens = module.getAssignedCitizen();
-    if (citizens == null || citizens.isEmpty()) {
-      return false;
-    }
-    for (var assigned : citizens) {
-      if (assigned != null
-          && assigned.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
-        return true;
-      }
-    }
-    return false;
   }
 
   @Override
@@ -300,6 +280,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   @Override
   public void onColonyTick(IColony colony) {
     super.onColonyTick(colony);
+    migrateLegacyShopCourierAssignments();
     ensureWarehouseRegistration();
     ensurePickupLink();
     ensureResolverRegistrationHealthy(colony);
@@ -507,7 +488,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     networkNotifier.notifyMissingNetwork();
   }
 
-  public boolean restartLostPackage(
+  public int restartLostPackage(
       ItemStack stackKey, int remaining, String requesterName, String address) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -522,7 +503,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: invalid input");
       }
-      return false;
+      return 0;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -534,7 +515,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             pickup != null,
             tile != null && tile.getStockNetworkId() != null);
       }
-      return false;
+      return 0;
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(remaining);
@@ -545,7 +526,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart failed: network returned empty reorder list");
       }
-      return false;
+      return 0;
     }
     int requestedCount = 0;
     for (ItemStack stack : reordered) {
@@ -562,12 +543,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           requestedCount,
           consumed);
     }
-    // Close the interaction as soon as a replacement order was successfully queued.
-    // Inflight cleanup is best-effort and can be partial if old entries drifted.
-    return true;
+    return consumed;
   }
 
-  public boolean acceptLostPackageFromPlayer(
+  public int acceptLostPackageFromPlayer(
       Player player, ItemStack stackKey, int remaining, String requesterName, String address) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -583,7 +562,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover rejected: invalid input");
       }
-      return false;
+      return 0;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -594,7 +573,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             tile != null,
             pickup != null);
       }
-      return false;
+      return 0;
     }
     var inventory = player.getInventory();
     for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
@@ -659,10 +638,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       }
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
-      int targetAmount = Math.max(1, remaining);
       int consumed =
           pickup.consumeInflight(
-              stackKey, Math.min(targetAmount, insertedMatching), requesterName, address);
+              stackKey, Math.min(Math.max(1, remaining), insertedMatching), requesterName, address);
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={}",
@@ -671,16 +649,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             insertedMatching,
             consumed);
       }
-      // Package was consumed from player inventory and processed (inserted and/or dropped
-      // leftovers).
-      // Keep interaction one-shot to avoid dead button state on partial inflight cleanup.
-      return true;
+      return consumed;
     }
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover failed: no matching package found in player inventory");
     }
-    return false;
+    return 0;
   }
 
   private void ensureWarehouseRegistration() {
@@ -1133,6 +1108,40 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private void clearPermaPending(
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     permaManager.clearPermaPending(request);
+  }
+
+  private void migrateLegacyShopCourierAssignments() {
+    if (legacyCourierMigrationAttempted) {
+      return;
+    }
+    CourierAssignmentModule legacy = getModule(BuildingModules.WAREHOUSE_COURIERS);
+    if (legacy == null) {
+      return;
+    }
+    legacyCourierMigrationAttempted = true;
+    boolean cleared = false;
+    try {
+      var citizens = legacy.getAssignedCitizen();
+      if (citizens != null && !citizens.isEmpty()) {
+        citizens.clear();
+        cleared = true;
+      }
+    } catch (Exception ignored) {
+      // Best-effort migration only.
+    }
+    try {
+      var entities = legacy.getAssignedEntities();
+      if (entities != null && !entities.isEmpty()) {
+        entities.clear();
+        cleared = true;
+      }
+    } catch (Exception ignored) {
+      // Best-effort migration only.
+    }
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] legacy shop-courier migration modulePresent=true cleared={}", cleared);
+    }
   }
 
   private static int countMatching(List<ItemStack> stacks, ItemStack key) {
