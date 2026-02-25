@@ -1980,6 +1980,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (manager == null || level == null || parentRequest == null || childToken == null) {
       return false;
     }
+    if (!isRequestOwnedByLocalResolver(manager, parentRequest)) {
+      clearStaleRecoveryArm(parentRequest.getId());
+      return false;
+    }
     if (!isLocalShopDeliveryChild(childRequest, shop, pickup)) {
       return false;
     }

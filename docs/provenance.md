@@ -324,3 +324,6 @@ Implementation notes:
   stale local delivery children are first marked for recheck (`parentStaleRecoveryArmedAt`) and
   only mutated (cancel/remove/requeue) if still stale after a short recheck window, reducing
   one-tick false-positive mutation against transient MineColonies assignment/state jitter.
+- Recovery ownership revalidation hardening is authored in this project scope:
+  stale/extra delivery-child recovery rechecks `getResolverForRequest(parent)` immediately before
+  mutation and skips mutation when ownership drifted away from the local Create Shop resolver.
