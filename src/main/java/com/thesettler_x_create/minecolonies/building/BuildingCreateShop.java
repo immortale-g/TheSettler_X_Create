@@ -517,8 +517,17 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       return 0;
     }
+    int trackedRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+    int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));
+    if (reorderTarget <= 0) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package restart skipped: no tracked inflight remaining for tuple");
+      }
+      return 0;
+    }
     ItemStack requested = stackKey.copy();
-    requested.setCount(remaining);
+    requested.setCount(reorderTarget);
     var reordered =
         new CreateNetworkFacade(tile).requestStacksImmediate(List.of(requested), requesterName);
     if (reordered.isEmpty()) {

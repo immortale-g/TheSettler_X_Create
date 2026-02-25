@@ -350,12 +350,39 @@ public class CreateShopBlockEntity extends BlockEntity {
     return consumed;
   }
 
+  /** Returns currently tracked inflight remainder for a lost-package tuple. */
+  public int getInflightRemaining(
+      ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
+    if (!ensureServerThread("getInflightRemaining")) {
+      return 0;
+    }
+    if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
+      return 0;
+    }
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    int remaining = 0;
+    for (InflightEntry entry : inflightEntries) {
+      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+        continue;
+      }
+      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
+        continue;
+      }
+      if (!destination.isEmpty() && !destination.equals(entry.address)) {
+        continue;
+      }
+      remaining += Math.max(0, entry.remaining);
+    }
+    return remaining;
+  }
+
   private int consumeInflightMatches(
       ItemStack stackKey, int remaining, String requester, String destination) {
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext() && remaining > 0) {
       InflightEntry entry = iterator.next();
-      if (!matches(entry.stackKey, stackKey)) {
+      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
         continue;
       }
       if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
@@ -542,6 +569,16 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   private static boolean matches(ItemStack a, ItemStack b) {
     return ItemStack.isSameItemSameComponents(a, b);
+  }
+
+  private static boolean matchesForInflightRecovery(ItemStack a, ItemStack b) {
+    if (a == null || a.isEmpty() || b == null || b.isEmpty()) {
+      return false;
+    }
+    if (matches(a, b)) {
+      return true;
+    }
+    return ItemStack.isSameItem(a, b);
   }
 
   private static boolean containsKey(List<ItemStack> keys, ItemStack key) {

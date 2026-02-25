@@ -97,6 +97,9 @@ Current behavior:
 - Lost-package handover now processes multiple matching player packages in one action and caps
   inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
   package removal beyond the required recovery amount.
+- Lost-package inflight consumption now falls back to same-item matching for component drift, and
+  restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
+  duplicate over-ordering after world reloads.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
   accepted by stock network or `Handover` package consumed and processed), and new blocking
   interactions only appear again when a fresh overdue notice is generated.
