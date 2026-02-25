@@ -282,3 +282,8 @@ Implementation notes:
 - Create Shop chat-noise reduction is authored in this project scope: detailed flow-step chat is
   now controlled by a dedicated config flag (`flowChatMessagesEnabled`, default `false`) with
   same-tick dedupe, while player-facing status chat was reduced to one concise line per stage.
+- Interaction-ID compatibility hardening is authored in this project scope: Create Shop
+  `ShopCapacityStallInteraction` and `ShopLostPackageInteraction` now use translatable ID
+  components (including tuple-stable runtime lost-package IDs) instead of literal ID components,
+  preventing MineColonies client response handling from hitting literal/translatable content-cast
+  mismatches on interaction button handling.
