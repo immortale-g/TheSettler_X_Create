@@ -58,6 +58,10 @@ final class ShopInflightTracker {
     }
     ICitizenData citizen = getShopkeeperCitizen();
     if (citizen == null) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction skipped: no shopkeeper citizen found");
+      }
       return;
     }
     for (CreateShopBlockEntity.InflightNotice notice : notices) {
@@ -73,9 +77,16 @@ final class ShopInflightTracker {
             notice.requesterName,
             notice.address);
       }
-      citizen.triggerInteraction(
+      ShopLostPackageInteraction interaction =
           new ShopLostPackageInteraction(
-              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address));
+              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address);
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction trigger dispatch citizen={} interactionId={}",
+            citizen.getName(),
+            interaction.getId().getString());
+      }
+      citizen.triggerInteraction(interaction);
       // Hard gate: only one lost-package interaction should be triggered per tracker tick.
       break;
     }

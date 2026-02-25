@@ -9,6 +9,7 @@ import com.simibubi.create.content.logistics.box.PackageItem;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -19,6 +20,7 @@ import org.jetbrains.annotations.Nullable;
 
 /** Shopkeeper chat interaction for lost package recovery actions. */
 public class ShopLostPackageInteraction extends ServerCitizenInteraction {
+  private static final AtomicLong DEBUG_INSTANCE_SEQ = new AtomicLong(1L);
   private static final String TAG_STACK = "Stack";
   private static final String TAG_REMAINING = "Remaining";
   private static final String TAG_REQUESTER = "Requester";
@@ -30,6 +32,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private String requesterName = "";
   private String address = "";
   private boolean active = true;
+  private final long debugInstanceId = DEBUG_INSTANCE_SEQ.getAndIncrement();
 
   public ShopLostPackageInteraction(ICitizen citizen) {
     super(citizen);
@@ -58,13 +61,23 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.remaining = Math.max(0, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction created debugId={} item={} remaining={} requester='{}' address='{}'",
+          debugInstanceId,
+          this.stackKey.isEmpty() ? "<empty>" : this.stackKey.getHoverName().getString(),
+          this.remaining,
+          this.requesterName,
+          this.address);
+    }
   }
 
   @Override
   public void onServerResponseTriggered(int response, Player player, ICitizenData citizen) {
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction response={} active={} player={} citizen={} item={} remaining={} requester='{}' address='{}'",
+          "[CreateShop] lost-package interaction response debugId={} response={} active={} player={} citizen={} item={} remaining={} requester='{}' address='{}'",
+          debugInstanceId,
           response,
           active,
           player == null ? "<null>" : player.getName().getString(),
@@ -119,6 +132,13 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   @Override
   public boolean isValid(ICitizenData citizen) {
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction isValid debugId={} active={} citizen={}",
+          debugInstanceId,
+          active,
+          citizen == null ? "<null>" : citizen.getName());
+    }
     return active;
   }
 
@@ -137,6 +157,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   @Override
   public Component getId() {
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction getId debugId={} idKey=com.thesettler_x_create.interaction.createshop.lost_package.id",
+          debugInstanceId);
+    }
     return Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
   }
 
@@ -172,6 +197,16 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
+    if (BuildingCreateShop.isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction deserialize debugId={} item={} remaining={} requester='{}' address='{}' active={}",
+          debugInstanceId,
+          stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          remaining,
+          requesterName,
+          address,
+          active);
+    }
   }
 
   static boolean packageContains(ItemStack packageStack, ItemStack key, int required) {
