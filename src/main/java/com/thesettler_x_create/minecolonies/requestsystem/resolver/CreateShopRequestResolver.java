@@ -1553,7 +1553,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return null;
   }
 
-  private void releaseReservation(IRequestManager manager, IRequest<?> request) {
+  void releaseReservation(IRequestManager manager, IRequest<?> request) {
     BuildingCreateShop shop = getShop(manager);
     if (shop == null) {
       return;
