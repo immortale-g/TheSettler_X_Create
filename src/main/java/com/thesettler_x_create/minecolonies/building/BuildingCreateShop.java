@@ -1153,7 +1153,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (stack == null || stack.isEmpty()) {
         continue;
       }
-      if (ItemStack.isSameItemSameComponents(stack, key)) {
+      if (ItemStack.isSameItemSameComponents(stack, key) || ItemStack.isSameItem(stack, key)) {
         count += stack.getCount();
       }
     }
