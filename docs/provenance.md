@@ -341,3 +341,6 @@ Implementation notes:
   inflight tuple consumption now supports same-item fallback for component drift, and restart
   reorder requests are clamped to currently tracked inflight remainder for the tuple, reducing
   duplicate/stacking reorders after world save reload cycles.
+- Lost-package reload-prompt hardening is authored in this project scope:
+  persisted inflight entries now reload with prompt state re-armed (`notified=false`) when still
+  unresolved, because MineColonies interactions are not reliably restored from prior runtime state.
