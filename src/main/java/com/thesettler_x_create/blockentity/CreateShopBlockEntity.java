@@ -29,6 +29,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_INFLIGHT = "Inflight";
   private static final String TAG_INFLIGHT_BASELINES = "InflightBaselines";
   private static final long RESERVATION_TTL = 20L * 60L * 5L;
+  private static final int MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE = 2;
 
   private final IItemHandler itemHandler = new VirtualCreateNetworkItemHandler(this);
   private final Map<UUID, Reservation> reservations = new HashMap<>();
@@ -207,6 +208,9 @@ public class CreateShopBlockEntity extends BlockEntity {
       inflightEntries.add(
           new InflightEntry(
               key, stack.getCount(), now, sanitize(requesterName), sanitize(address)));
+      changed = true;
+    }
+    if (compactInflightEntriesForPromptStability()) {
       changed = true;
     }
     if (changed) {
@@ -622,6 +626,72 @@ public class CreateShopBlockEntity extends BlockEntity {
     return itemId + "|" + requester + "|" + destination + "|" + requestedAt + "|" + remaining;
   }
 
+  private static String buildNoticeTupleKey(
+      ItemStack stackKey, String requesterName, String address) {
+    if (stackKey == null || stackKey.isEmpty()) {
+      return "minecraft:air||";
+    }
+    String itemId =
+        String.valueOf(
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    return itemId + "|" + requester + "|" + destination;
+  }
+
+  private boolean compactInflightEntriesForPromptStability() {
+    if (inflightEntries.size() <= 1) {
+      return false;
+    }
+    boolean changed = false;
+    Map<String, InflightEntry> unique = new java.util.LinkedHashMap<>();
+    for (InflightEntry entry : inflightEntries) {
+      if (entry == null
+          || entry.stackKey == null
+          || entry.stackKey.isEmpty()
+          || entry.remaining <= 0) {
+        changed = true;
+        continue;
+      }
+      String segmentKey =
+          buildNoticeSegmentKey(
+              entry.stackKey,
+              entry.requesterName,
+              entry.address,
+              entry.requestedAt,
+              entry.remaining);
+      InflightEntry existing = unique.get(segmentKey);
+      if (existing == null) {
+        unique.put(segmentKey, entry);
+      } else {
+        existing.notified = existing.notified || entry.notified;
+        changed = true;
+      }
+    }
+
+    List<InflightEntry> sorted = new ArrayList<>(unique.values());
+    sorted.sort((left, right) -> Long.compare(right.requestedAt, left.requestedAt));
+    Map<String, Integer> keptPerTuple = new HashMap<>();
+    List<InflightEntry> compacted = new ArrayList<>(sorted.size());
+    for (InflightEntry entry : sorted) {
+      String tupleKey = buildNoticeTupleKey(entry.stackKey, entry.requesterName, entry.address);
+      int kept = keptPerTuple.getOrDefault(tupleKey, 0);
+      if (kept >= MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE) {
+        changed = true;
+        continue;
+      }
+      keptPerTuple.put(tupleKey, kept + 1);
+      compacted.add(entry);
+    }
+    compacted.sort((left, right) -> Long.compare(left.requestedAt, right.requestedAt));
+    if (!changed && compacted.size() == inflightEntries.size()) {
+      return false;
+    }
+    inflightEntries.clear();
+    inflightEntries.addAll(compacted);
+    return true;
+  }
+
   @Override
   public void loadAdditional(
       @NotNull CompoundTag tag, @NotNull net.minecraft.core.HolderLookup.Provider registries) {
@@ -669,6 +739,9 @@ public class CreateShopBlockEntity extends BlockEntity {
           inflightEntries.add(inflight);
         }
       }
+    }
+    if (compactInflightEntriesForPromptStability()) {
+      setChanged();
     }
     inflightBaselines.clear();
     if (tag.contains(TAG_INFLIGHT_BASELINES)) {

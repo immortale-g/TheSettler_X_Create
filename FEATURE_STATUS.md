@@ -94,6 +94,9 @@ Current behavior:
   sum quantities across matching `(item, requester, address)` tuples, preserving partial-package
   recovery flows (for example `6 + 4`, not flattened to `10`) while still deduping exact duplicate
   segments in one scan cycle.
+- Inflight load/record cleanup now removes exact duplicate lost-package segments and caps open
+  segment history per `(item, requester, address)` tuple to avoid legacy prompt floods after
+  repeated reloads or previously stuck handover loops.
 - Lost-package handover matching now falls back to same-item matching when item components drift,
   so package contents can still be accepted/recovered after component-text/metadata skew.
 - Lost-package handover now processes multiple matching player packages in one action and caps
