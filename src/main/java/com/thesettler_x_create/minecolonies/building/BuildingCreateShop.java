@@ -585,6 +585,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return 0;
     }
     var inventory = player.getInventory();
+    rackIndex.ensureRackContainers();
     int targetAmount = Math.max(1, remaining);
     int totalConsumed = 0;
     int totalInsertedMatching = 0;
@@ -608,6 +609,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       if (matching <= 0) {
         continue;
       }
+      List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      if (previewUnpacked.isEmpty()) {
+        continue;
+      }
       ItemStack removedPackage = inventory.removeItem(slot, 1);
       if (removedPackage.isEmpty()) {
         if (isDebugRequests()) {
@@ -618,6 +623,14 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         continue;
       }
       List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(removedPackage);
+      if (unpacked.isEmpty() && !previewUnpacked.isEmpty()) {
+        unpacked = new ArrayList<>(previewUnpacked.size());
+        for (ItemStack stack : previewUnpacked) {
+          if (stack != null && !stack.isEmpty()) {
+            unpacked.add(stack.copy());
+          }
+        }
+      }
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} unpackedStacks={}", slot, unpacked.size());
