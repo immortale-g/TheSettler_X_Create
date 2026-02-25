@@ -23,7 +23,6 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
-import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -44,8 +43,7 @@ final class CreateShopDeliveryManager {
       IRequestManager manager,
       IRequest<?> request,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks,
-      CreateShopBlockEntity pickup,
-      BuildingCreateShop shop) {
+      CreateShopBlockEntity pickup) {
     if (manager == null || pickup == null || stacks == null) {
       return Lists.newArrayList();
     }
@@ -248,7 +246,7 @@ final class CreateShopDeliveryManager {
         resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
       }
     }
-    notifyDeliverymen(manager, token, shop);
+    notifyDeliverymen(manager, token);
     return Lists.newArrayList(token);
   }
 
@@ -443,30 +441,12 @@ final class CreateShopDeliveryManager {
     return false;
   }
 
-  private int notifyDeliverymen(IRequestManager manager, IToken<?> token, BuildingCreateShop shop) {
+  private int notifyDeliverymen(IRequestManager manager, IToken<?> token) {
     if (manager == null || token == null) {
       return 0;
     }
     int notified = 0;
     int checked = 0;
-    if (shop != null) {
-      CourierAssignmentModule module = shop.getModule(BuildingModules.WAREHOUSE_COURIERS);
-      if (module != null) {
-        int count = notifyCourierModule(module, token);
-        checked += count;
-        notified += count;
-      }
-      if (notified > 0) {
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery notify shop couriers token={} checked={} notified={}",
-              token,
-              checked,
-              notified);
-        }
-        return notified;
-      }
-    }
     var colony = manager.getColony();
     if (colony == null) {
       return notified;

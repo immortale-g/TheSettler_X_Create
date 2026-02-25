@@ -298,3 +298,11 @@ Implementation notes:
 - Warehouse-count null-safety hardening is authored in this project scope:
   `CreateShopRequestResolver.getWarehouseInternalCount(...)` now fail-opens with `0` when request,
   deliverable, colony manager, colony, or building manager context is missing.
+- Shop-courier module decoupling hardening is authored in this project scope:
+  Create Shop building registration no longer adds `BuildingModules.WAREHOUSE_COURIERS`,
+  warehouse access for delivery is role-based (`JobDeliveryman`), and delivery notify/dispatch
+  paths stay warehouse-queue-native without shop-courier module dependence.
+- Legacy courier-module load migration is authored in this project scope:
+  `BuildingCreateShop` performs a best-effort, one-time cleanup of assigned citizens/entities if a
+  legacy shop courier module instance is still present in existing saves, while keeping fail-open
+  behavior when that module is absent.

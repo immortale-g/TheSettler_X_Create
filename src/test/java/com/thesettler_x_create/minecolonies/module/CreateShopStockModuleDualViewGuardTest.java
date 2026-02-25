@@ -41,5 +41,6 @@ class CreateShopStockModuleDualViewGuardTest {
 
     assertTrue(source.contains("new WorkerBuildingModule("));
     assertTrue(source.contains("WorkerBuildingModuleView::new"));
+    assertFalse(source.contains("BuildingModules.WAREHOUSE_COURIERS"));
   }
 }
