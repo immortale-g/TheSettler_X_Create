@@ -337,3 +337,7 @@ Implementation notes:
 - Lost-package handover amount-limiting hardening is authored in this project scope:
   one handover action now iterates multiple matching player packages as needed but limits inflight
   consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
+- Lost-package reload-order hardening is authored in this project scope:
+  inflight tuple consumption now supports same-item fallback for component drift, and restart
+  reorder requests are clamped to currently tracked inflight remainder for the tuple, reducing
+  duplicate/stacking reorders after world save reload cycles.
