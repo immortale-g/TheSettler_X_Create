@@ -344,3 +344,6 @@ Implementation notes:
 - Lost-package reload-prompt hardening is authored in this project scope:
   persisted inflight entries now reload with prompt state re-armed (`notified=false`) when still
   unresolved, because MineColonies interactions are not reliably restored from prior runtime state.
+- Diagnostics fail-open hardening is authored in this project scope:
+  `ShopCourierDiagnostics` now catches missing `CourierAssignmentModule` lookups and returns
+  without mutation/exception, so diagnostics do not interrupt colony tick processing.
