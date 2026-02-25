@@ -65,6 +65,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Map<IToken<?>, Long> deliveryChildActiveSince =
       new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.Map<IToken<?>, Long> parentDeliveryActiveSince =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
   private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
@@ -700,7 +702,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   } else {
                     activeLocalDeliveryChild = childToken;
                   }
-                  if (isStaleDeliveryChild(level, childToken, childState)) {
+                  if (isStaleDeliveryChild(level, request.getId(), childToken, childState)) {
                     boolean recovered =
                         recoverStaleDeliveryChild(
                             standardManager, level, request, childToken, child, shop, pickup);
@@ -768,10 +770,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         if (missing > 0) {
           continue;
         }
+        if (!hasActiveChildren) {
+          parentDeliveryActiveSince.remove(request.getId());
+        }
         if (hasActiveChildren || request.hasChildren()) {
           continue;
         }
       }
+      parentDeliveryActiveSince.remove(request.getId());
       if (hasDeliveriesCreated(request.getId())) {
         diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
         flowStateMachine.touch(
@@ -1218,6 +1224,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
+    parentDeliveryActiveSince.remove(parentToken);
     UUID parentRequestId = toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
 
@@ -1290,6 +1297,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
+    parentDeliveryActiveSince.remove(parentToken);
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = unwrapStandardManager(manager);
     if (standard != null) {
@@ -1844,6 +1852,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       pendingTracker.remove(token);
       cooldown.clearRequestCooldown(token);
       clearDeliveriesCreated(token);
+      parentDeliveryActiveSince.remove(token);
       clearTrackedChildrenForParent(manager, token);
       flowStateMachine.remove(token);
     }
@@ -1851,9 +1860,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private boolean isStaleDeliveryChild(
       Level level,
+      IToken<?> parentToken,
       IToken<?> childToken,
       com.minecolonies.api.colony.requestsystem.request.RequestState state) {
-    if (level == null || childToken == null || state == null) {
+    if (level == null || parentToken == null || childToken == null || state == null) {
       return false;
     }
     boolean activeState =
@@ -1865,10 +1875,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return false;
     }
     long now = level.getGameTime();
-    Long since = deliveryChildActiveSince.putIfAbsent(childToken, now);
+    Long since = parentDeliveryActiveSince.putIfAbsent(parentToken, now);
     if (since == null) {
+      deliveryChildActiveSince.put(childToken, now);
       return false;
     }
+    deliveryChildActiveSince.put(childToken, since);
     long timeout =
         Math.max(
             DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
@@ -1958,6 +1970,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     pendingTracker.setPendingCount(parentRequest.getId(), Math.max(currentPending, childCount));
     diagnostics.recordPendingSource(parentRequest.getId(), pendingSource);
     cooldown.markRequestOrdered(level, parentRequest.getId());
+    parentDeliveryActiveSince.put(parentRequest.getId(), level.getGameTime());
     deliveryChildActiveSince.put(childToken, level.getGameTime());
     recheck.scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -1998,7 +2011,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
-    if (manager == null || parentToken == null || deliveryChildActiveSince.isEmpty()) {
+    if (manager == null || parentToken == null) {
+      return;
+    }
+    parentDeliveryActiveSince.remove(parentToken);
+    if (deliveryChildActiveSince.isEmpty()) {
       return;
     }
     var handler = manager.getRequestHandler();
