@@ -156,16 +156,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   }
 
   @Override
-  public Component getId() {
-    if (BuildingCreateShop.isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction getId debugId={} idKey=com.thesettler_x_create.interaction.createshop.lost_package.id",
-          debugInstanceId);
-    }
-    return Component.translatable("com.thesettler_x_create.interaction.createshop.lost_package.id");
-  }
-
-  @Override
   public CompoundTag serializeNBT(HolderLookup.Provider provider) {
     CompoundTag tag = super.serializeNBT(provider);
     if (!stackKey.isEmpty()) {
