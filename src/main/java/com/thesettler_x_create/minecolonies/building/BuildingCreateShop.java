@@ -488,7 +488,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     networkNotifier.notifyMissingNetwork();
   }
 
-  public boolean restartLostPackage(
+  public int restartLostPackage(
       ItemStack stackKey, int remaining, String requesterName, String address) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -503,7 +503,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: invalid input");
       }
-      return false;
+      return 0;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -515,7 +515,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             pickup != null,
             tile != null && tile.getStockNetworkId() != null);
       }
-      return false;
+      return 0;
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(remaining);
@@ -526,7 +526,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart failed: network returned empty reorder list");
       }
-      return false;
+      return 0;
     }
     int requestedCount = 0;
     for (ItemStack stack : reordered) {
@@ -535,22 +535,18 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
     }
     int consumed = pickup.consumeInflight(stackKey, requestedCount, requesterName, address);
-    int targetAmount = Math.max(1, remaining);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={} target={}",
+          "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={}",
           requesterName,
           stackKey.getHoverName().getString(),
           requestedCount,
-          consumed,
-          targetAmount);
+          consumed);
     }
-    // Keep interaction open until the full overdue target is actually cleared from inflight.
-    // Network reorder can be partially clamped by rack-capacity planning.
-    return consumed >= targetAmount;
+    return consumed;
   }
 
-  public boolean acceptLostPackageFromPlayer(
+  public int acceptLostPackageFromPlayer(
       Player player, ItemStack stackKey, int remaining, String requesterName, String address) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -566,7 +562,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover rejected: invalid input");
       }
-      return false;
+      return 0;
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -577,7 +573,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             tile != null,
             pickup != null);
       }
-      return false;
+      return 0;
     }
     var inventory = player.getInventory();
     for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
@@ -642,10 +638,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       }
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
-      int targetAmount = Math.max(1, remaining);
       int consumed =
           pickup.consumeInflight(
-              stackKey, Math.min(targetAmount, insertedMatching), requesterName, address);
+              stackKey, Math.min(Math.max(1, remaining), insertedMatching), requesterName, address);
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={}",
@@ -654,15 +649,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             insertedMatching,
             consumed);
       }
-      // Only close the interaction once the full overdue target was actually cleared from inflight.
-      // Partial handovers must keep the interaction active so unresolved remainder can be handled.
-      return consumed >= targetAmount;
+      return consumed;
     }
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover failed: no matching package found in player inventory");
     }
-    return false;
+    return 0;
   }
 
   private void ensureWarehouseRegistration() {
