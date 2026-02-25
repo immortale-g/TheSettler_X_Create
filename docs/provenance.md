@@ -320,3 +320,7 @@ Implementation notes:
 - Parent-scoped stale-clock hardening is authored in this project scope:
   stale child timeout tracking now keys on parent request identity (`parentDeliveryActiveSince`)
   with child tokens as transient observations, reducing drift from child token refresh/rotation.
+- Two-phase stale-recovery hardening is authored in this project scope:
+  stale local delivery children are first marked for recheck (`parentStaleRecoveryArmedAt`) and
+  only mutated (cancel/remove/requeue) if still stale after a short recheck window, reducing
+  one-tick false-positive mutation against transient MineColonies assignment/state jitter.

@@ -67,6 +67,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Map<IToken<?>, Long> parentDeliveryActiveSince =
       new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.Map<IToken<?>, Long> parentStaleRecoveryArmedAt =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
   private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
@@ -689,6 +691,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 if (terminalChild) {
                   request.removeChild(childToken);
                   deliveryChildActiveSince.remove(childToken);
+                  clearStaleRecoveryArm(request.getId());
                 } else {
                   if (activeLocalDeliveryChild != null
                       && !activeLocalDeliveryChild.equals(childToken)) {
@@ -703,6 +706,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                     activeLocalDeliveryChild = childToken;
                   }
                   if (isStaleDeliveryChild(level, request.getId(), childToken, childState)) {
+                    if (!isStaleRecoveryArmed(level, standardManager, request.getId())) {
+                      hasActiveChildren = true;
+                      continue;
+                    }
                     boolean recovered =
                         recoverStaleDeliveryChild(
                             standardManager, level, request, childToken, child, shop, pickup);
@@ -710,6 +717,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                       missing++;
                       continue;
                     }
+                  } else {
+                    clearStaleRecoveryArm(request.getId());
                   }
                   hasActiveChildren = true;
                 }
@@ -772,12 +781,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         }
         if (!hasActiveChildren) {
           parentDeliveryActiveSince.remove(request.getId());
+          clearStaleRecoveryArm(request.getId());
         }
         if (hasActiveChildren || request.hasChildren()) {
           continue;
         }
       }
       parentDeliveryActiveSince.remove(request.getId());
+      clearStaleRecoveryArm(request.getId());
       if (hasDeliveriesCreated(request.getId())) {
         diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
         flowStateMachine.touch(
@@ -1225,6 +1236,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     parentDeliveryActiveSince.remove(parentToken);
+    clearStaleRecoveryArm(parentToken);
     UUID parentRequestId = toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
 
@@ -1298,6 +1310,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     parentDeliveryActiveSince.remove(parentToken);
+    clearStaleRecoveryArm(parentToken);
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = unwrapStandardManager(manager);
     if (standard != null) {
@@ -1853,9 +1866,36 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       cooldown.clearRequestCooldown(token);
       clearDeliveriesCreated(token);
       parentDeliveryActiveSince.remove(token);
+      clearStaleRecoveryArm(token);
       clearTrackedChildrenForParent(manager, token);
       flowStateMachine.remove(token);
     }
+  }
+
+  private boolean isStaleRecoveryArmed(
+      Level level, IStandardRequestManager manager, IToken<?> parentToken) {
+    if (level == null || manager == null || parentToken == null) {
+      return false;
+    }
+    long now = level.getGameTime();
+    Long armedAt = parentStaleRecoveryArmedAt.get(parentToken);
+    if (armedAt == null) {
+      parentStaleRecoveryArmedAt.put(parentToken, now);
+      recheck.scheduleParentChildRecheck(manager, parentToken);
+      return false;
+    }
+    long staleRecheckDelay = 20L;
+    if (now - armedAt < staleRecheckDelay) {
+      return false;
+    }
+    return true;
+  }
+
+  private void clearStaleRecoveryArm(IToken<?> parentToken) {
+    if (parentToken == null) {
+      return;
+    }
+    parentStaleRecoveryArmedAt.remove(parentToken);
   }
 
   private boolean isStaleDeliveryChild(
@@ -1971,6 +2011,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     diagnostics.recordPendingSource(parentRequest.getId(), pendingSource);
     cooldown.markRequestOrdered(level, parentRequest.getId());
     parentDeliveryActiveSince.put(parentRequest.getId(), level.getGameTime());
+    clearStaleRecoveryArm(parentRequest.getId());
     deliveryChildActiveSince.put(childToken, level.getGameTime());
     recheck.scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -2015,6 +2056,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     parentDeliveryActiveSince.remove(parentToken);
+    clearStaleRecoveryArm(parentToken);
     if (deliveryChildActiveSince.isEmpty()) {
       return;
     }
