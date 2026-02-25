@@ -317,3 +317,6 @@ Implementation notes:
   stale-recovery/callback mutation paths in `CreateShopRequestResolver` are constrained to local
   Create Shop delivery children by pickup/start location checks, while unresolved/non-local child
   lookups remain fail-open (no forced cancel/remove mutation).
+- Parent-scoped stale-clock hardening is authored in this project scope:
+  stale child timeout tracking now keys on parent request identity (`parentDeliveryActiveSince`)
+  with child tokens as transient observations, reducing drift from child token refresh/rotation.
