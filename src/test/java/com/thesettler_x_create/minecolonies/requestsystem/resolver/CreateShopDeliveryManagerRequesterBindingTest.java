@@ -18,6 +18,8 @@ class CreateShopDeliveryManagerRequesterBindingTest {
         source.contains(
             "IRequester deliveryRequester = resolveDeliveryRequester(manager, request);"));
     assertTrue(source.contains("manager.createRequest(deliveryRequester, delivery)"));
-    assertTrue(source.contains("WarehouseConcreteRequestResolver"));
+    assertTrue(source.contains("isWarehouseDeliveryResolver("));
+    assertTrue(source.contains("candidate instanceof AbstractWarehouseRequestResolver"));
+    assertTrue(source.contains("!(candidate instanceof CreateShopRequestResolver)"));
   }
 }
