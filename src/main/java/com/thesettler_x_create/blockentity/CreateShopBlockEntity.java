@@ -276,8 +276,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (timeout <= 0L || inflightEntries.isEmpty()) {
       return java.util.Collections.emptyList();
     }
-    Map<String, InflightNotice> uniqueNotices = new java.util.LinkedHashMap<>();
-    boolean changed = false;
+    Map<String, InflightEntry> bestPerPromptKey = new java.util.LinkedHashMap<>();
     for (InflightEntry entry : inflightEntries) {
       if (entry.remaining <= 0 || entry.notified) {
         continue;
@@ -286,29 +285,38 @@ public class CreateShopBlockEntity extends BlockEntity {
       if (age < timeout) {
         continue;
       }
-      entry.notified = true;
-      changed = true;
-      String noticeKey =
-          buildNoticeSegmentKey(
-              entry.stackKey,
-              entry.requesterName,
-              entry.address,
-              entry.requestedAt,
-              entry.remaining);
-      uniqueNotices.putIfAbsent(
-          noticeKey,
-          new InflightNotice(
-              entry.stackKey.copy(),
-              entry.remaining,
-              age,
-              entry.requesterName,
-              entry.address,
-              entry.requestedAt));
+      String promptKey = buildNoticePromptKey(entry.stackKey, entry.address);
+      InflightEntry existing = bestPerPromptKey.get(promptKey);
+      if (existing == null || entry.requestedAt < existing.requestedAt) {
+        bestPerPromptKey.put(promptKey, entry);
+      }
     }
-    if (changed) {
-      setChanged();
+    if (bestPerPromptKey.isEmpty()) {
+      return java.util.Collections.emptyList();
     }
-    return new ArrayList<>(uniqueNotices.values());
+    InflightEntry selected = null;
+    for (InflightEntry candidate : bestPerPromptKey.values()) {
+      if (candidate == null) {
+        continue;
+      }
+      if (selected == null || candidate.requestedAt < selected.requestedAt) {
+        selected = candidate;
+      }
+    }
+    if (selected == null) {
+      return java.util.Collections.emptyList();
+    }
+    selected.notified = true;
+    setChanged();
+    long age = now - selected.requestedAt;
+    return java.util.List.of(
+        new InflightNotice(
+            selected.stackKey.copy(),
+            selected.remaining,
+            age,
+            selected.requesterName,
+            selected.address,
+            selected.requestedAt));
   }
 
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
@@ -624,6 +632,17 @@ public class CreateShopBlockEntity extends BlockEntity {
     String requester = sanitize(requesterName);
     String destination = sanitize(address);
     return itemId + "|" + requester + "|" + destination + "|" + requestedAt + "|" + remaining;
+  }
+
+  private static String buildNoticePromptKey(ItemStack stackKey, String address) {
+    if (stackKey == null || stackKey.isEmpty()) {
+      return "minecraft:air|";
+    }
+    String itemId =
+        String.valueOf(
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
+    String destination = sanitize(address);
+    return itemId + "|" + destination;
   }
 
   private static String buildNoticeTupleKey(

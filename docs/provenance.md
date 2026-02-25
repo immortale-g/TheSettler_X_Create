@@ -275,18 +275,18 @@ Implementation notes:
   rack-only insertion of unpacked contents, and inflight consumption includes a stack-key fallback
   when requester/address fields drift across reloads or naming changes.
 - Lost-package interaction lifecycle hardening is authored in this project scope: interaction IDs
-  are now tuple-stable (`item/requester/address`) to avoid duplicate blocking dialogs for one
-  unresolved case, successful reorder/handover actions deterministically invalidate the active
-  dialog, and additional server-side debug logging was added for end-to-end handover tracing
-  (button response, inventory scan, package unpack, rack insert, inflight consumption).
+  now use a stable translatable ID, successful reorder/handover actions deterministically
+  invalidate the active dialog, and additional server-side debug logging was added for end-to-end
+  handover tracing (button response, inventory scan, package unpack, rack insert, inflight
+  consumption).
 - Create Shop chat-noise reduction is authored in this project scope: detailed flow-step chat is
   now controlled by a dedicated config flag (`flowChatMessagesEnabled`, default `false`) with
   same-tick dedupe, while player-facing status chat was reduced to one concise line per stage.
 - Interaction-ID compatibility hardening is authored in this project scope: Create Shop
   `ShopCapacityStallInteraction` and `ShopLostPackageInteraction` now use translatable ID
-  components (including tuple-stable runtime lost-package IDs) instead of literal ID components,
-  preventing MineColonies client response handling from hitting literal/translatable content-cast
-  mismatches on interaction button handling.
+  components (stable for lost-package and capacity-stall) instead of literal ID components,
+  preventing MineColonies client response handling from hitting literal/translatable
+  content-cast mismatches on interaction button handling.
 - Diagnostics private-reflection cleanup is authored in this project scope:
   `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
   entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,
@@ -328,10 +328,8 @@ Implementation notes:
   stale/extra delivery-child recovery rechecks `getResolverForRequest(parent)` immediately before
   mutation and skips mutation when ownership drifted away from the local Create Shop resolver.
 - Lost-package prompt dedupe hardening is authored in this project scope:
-  overdue inflight notices are segment-scoped by inflight entry/request-time and no longer sum
-  quantities across matching `(item, requester, address)` tuples; exact duplicate segments are
-  deduped per scan while distinct partial package segments (for example `6` and `4`) remain
-  separate interactions.
+  overdue inflight scanning now emits at most one lost-package interaction per tick (oldest first)
+  and prompt dedupe uses `(item, address)` to avoid duplicate prompts from requester-name drift.
 - Lost-package inflight history cleanup is authored in this project scope:
   load/record-time compaction removes exact duplicate segment entries and caps retained open
   segments per `(item, requester, address)` tuple to prevent legacy duplicate prompt floods while

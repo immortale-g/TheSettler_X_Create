@@ -9,17 +9,16 @@ import org.junit.jupiter.api.Test;
 
 class CreateShopBlockEntityOverdueNoticeDedupGuardTest {
   @Test
-  void consumeOverdueNoticesKeepsSegmentsSeparateWithoutSumming() throws Exception {
+  void consumeOverdueNoticesTriggersSinglePromptByItemAndAddress() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java"));
 
-    assertTrue(source.contains("Map<String, InflightNotice> uniqueNotices"));
-    assertTrue(source.contains("buildNoticeSegmentKey("));
-    assertTrue(source.contains("entry.requestedAt,"));
-    assertTrue(source.contains("entry.remaining);"));
-    assertTrue(source.contains("uniqueNotices.putIfAbsent("));
+    assertTrue(source.contains("Map<String, InflightEntry> bestPerPromptKey"));
+    assertTrue(source.contains("buildNoticePromptKey(entry.stackKey, entry.address)"));
+    assertTrue(source.contains("selected.notified = true;"));
+    assertTrue(source.contains("return java.util.List.of("));
     assertFalse(source.contains("existing.remaining += entry.remaining;"));
   }
 }
