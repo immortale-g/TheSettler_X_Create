@@ -100,6 +100,8 @@ Current behavior:
 - Lost-package inflight consumption now falls back to same-item matching for component drift, and
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
+- Open inflight overdue entries are now re-armed for prompting on world load (`notified=false`
+  during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
   accepted by stock network or `Handover` package consumed and processed), and new blocking
   interactions only appear again when a fresh overdue notice is generated.

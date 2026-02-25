@@ -686,7 +686,9 @@ public class CreateShopBlockEntity extends BlockEntity {
         if (!stack.isEmpty() && remaining > 0) {
           InflightEntry inflight =
               new InflightEntry(makeKey(stack), remaining, requestedAt, requester, address);
-          inflight.notified = notified;
+          // Interactions are not reliably restored across reload; re-arm overdue prompting for
+          // still-open inflight entries after world load.
+          inflight.notified = false;
           inflightEntries.add(inflight);
         }
       }
