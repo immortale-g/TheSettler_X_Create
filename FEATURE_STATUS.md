@@ -79,6 +79,9 @@ Current behavior:
   matches the local Create Shop pickup block; non-local or unresolved child lookups stay fail-open.
 - Stale-child timeout tracking is now parent-scoped (`parentDeliveryActiveSince`) instead of relying
   on child-token-only clocks, reducing false reset/drift when child tokens refresh.
+- Stale delivery-child mutation is now two-phase: first stale observation only arms/schedules
+  recheck (`parentStaleRecoveryArmedAt`), and cancel/remove/requeue mutation executes only when
+  stale persists after the recheck window, reducing one-tick false-positive churn.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
