@@ -1839,7 +1839,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void processTimedOutFlows(IStandardRequestManager manager, Level level) {
-    long timeout = Math.max(20L * 30L, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+    long timeout = getInflightTimeoutTicksSafe();
     for (CreateShopFlowRecord record :
         flowStateMachine.collectTimedOut(level.getGameTime(), timeout)) {
       IToken<?> token = record.getRequestToken();
@@ -1922,9 +1922,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     deliveryChildActiveSince.put(childToken, since);
     long timeout =
-        Math.max(
-            DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+        Math.max(DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, getInflightTimeoutTicksSafe());
     return now - since >= timeout;
+  }
+
+  private long getInflightTimeoutTicksSafe() {
+    try {
+      return Math.max(
+          DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
+    } catch (IllegalStateException ignored) {
+      return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
+    }
   }
 
   private boolean recoverStaleDeliveryChild(
