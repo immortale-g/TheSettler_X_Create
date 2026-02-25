@@ -36,7 +36,6 @@ final class ShopWarehouseRegistrar {
   }
 
   boolean hasWarehouseModules() {
-    return shop.getModule(BuildingModules.WAREHOUSE_COURIERS) != null
-        && shop.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
+    return shop.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
   }
 }

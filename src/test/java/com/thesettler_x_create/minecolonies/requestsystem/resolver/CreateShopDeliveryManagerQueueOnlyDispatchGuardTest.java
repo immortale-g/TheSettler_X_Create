@@ -17,5 +17,6 @@ class CreateShopDeliveryManagerQueueOnlyDispatchGuardTest {
 
     assertTrue(source.contains("queue.getMutableRequestList().contains(token)"));
     assertFalse(source.contains("deliveryman.addRequest("));
+    assertFalse(source.contains("shop.getModule(BuildingModules.WAREHOUSE_COURIERS)"));
   }
 }
