@@ -59,6 +59,11 @@ Current behavior:
   trigger MineColonies interaction button-id cast failures.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
   (`setAccessible`/declared-field write) and stays on API/public-method paths only.
+- Delivery requester selection now uses type-safe resolver checks
+  (`AbstractWarehouseRequestResolver` excluding `CreateShopRequestResolver`) instead of fragile
+  resolver-classname string matching.
+- Warehouse-internal stock count path now fail-opens with `0` for missing request/location/colony
+  context, preventing null-dereference failures during resolver suitability/count checks.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.

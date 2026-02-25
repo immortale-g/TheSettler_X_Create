@@ -19,6 +19,7 @@ import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.DeliverymanAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -255,8 +256,7 @@ final class CreateShopDeliveryManager {
     if (manager instanceof IStandardRequestManager standard) {
       try {
         var owner = standard.getResolverHandler().getResolverForRequest(parentRequest);
-        if (owner instanceof IRequester requester
-            && owner.getClass().getSimpleName().contains("WarehouseConcreteRequestResolver")) {
+        if (isWarehouseDeliveryResolver(owner) && owner instanceof IRequester requester) {
           return requester;
         }
       } catch (Exception ignored) {
@@ -271,11 +271,8 @@ final class CreateShopDeliveryManager {
           for (IToken<?> resolverToken : requestableResolvers) {
             try {
               var candidate = standard.getResolverHandler().getResolver(resolverToken);
-              if (candidate instanceof IRequester requester
-                  && candidate
-                      .getClass()
-                      .getSimpleName()
-                      .contains("WarehouseConcreteRequestResolver")) {
+              if (isWarehouseDeliveryResolver(candidate)
+                  && candidate instanceof IRequester requester) {
                 return requester;
               }
             } catch (Exception ignored) {
@@ -288,6 +285,12 @@ final class CreateShopDeliveryManager {
       }
     }
     return resolver;
+  }
+
+  private boolean isWarehouseDeliveryResolver(Object candidate) {
+    return candidate instanceof AbstractWarehouseRequestResolver
+        && candidate instanceof IRequester
+        && !(candidate instanceof CreateShopRequestResolver);
   }
 
   static boolean isSelfLoopDeliveryTarget(
