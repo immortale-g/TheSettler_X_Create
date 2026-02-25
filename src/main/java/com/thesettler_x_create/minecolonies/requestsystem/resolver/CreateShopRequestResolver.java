@@ -597,6 +597,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         int missing = 0;
         int duplicateChildrenRemoved = 0;
         boolean hasActiveChildren = false;
+        IToken<?> activeLocalDeliveryChild = null;
         if (!children.isEmpty()) {
           java.util.Set<IToken<?>> seenChildren = new java.util.HashSet<>();
           for (IToken<?> childToken : java.util.List.copyOf(children)) {
@@ -687,6 +688,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   request.removeChild(childToken);
                   deliveryChildActiveSince.remove(childToken);
                 } else {
+                  if (activeLocalDeliveryChild != null
+                      && !activeLocalDeliveryChild.equals(childToken)) {
+                    boolean recovered =
+                        recoverExtraActiveDeliveryChild(
+                            standardManager, level, request, childToken, child, shop, pickup);
+                    if (recovered) {
+                      missing++;
+                      continue;
+                    }
+                  } else {
+                    activeLocalDeliveryChild = childToken;
+                  }
                   if (isStaleDeliveryChild(level, childToken, childState)) {
                     boolean recovered =
                         recoverStaleDeliveryChild(
@@ -1870,6 +1883,48 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IRequest<?> childRequest,
       BuildingCreateShop shop,
       CreateShopBlockEntity pickup) {
+    return recoverDeliveryChild(
+        manager,
+        level,
+        parentRequest,
+        childToken,
+        childRequest,
+        shop,
+        pickup,
+        "stale-child-recovery",
+        "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
+  }
+
+  private boolean recoverExtraActiveDeliveryChild(
+      IStandardRequestManager manager,
+      Level level,
+      IRequest<?> parentRequest,
+      IToken<?> childToken,
+      IRequest<?> childRequest,
+      BuildingCreateShop shop,
+      CreateShopBlockEntity pickup) {
+    return recoverDeliveryChild(
+        manager,
+        level,
+        parentRequest,
+        childToken,
+        childRequest,
+        shop,
+        pickup,
+        "extra-active-child-recovery",
+        "[CreateShop] extra active delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
+  }
+
+  private boolean recoverDeliveryChild(
+      IStandardRequestManager manager,
+      Level level,
+      IRequest<?> parentRequest,
+      IToken<?> childToken,
+      IRequest<?> childRequest,
+      BuildingCreateShop shop,
+      CreateShopBlockEntity pickup,
+      String pendingSource,
+      String logTemplate) {
     if (manager == null || level == null || parentRequest == null || childToken == null) {
       return false;
     }
@@ -1901,18 +1956,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     clearDeliveriesCreated(parentRequest.getId());
     int currentPending = pendingTracker.getPendingCount(parentRequest.getId());
     pendingTracker.setPendingCount(parentRequest.getId(), Math.max(currentPending, childCount));
-    diagnostics.recordPendingSource(parentRequest.getId(), "stale-child-recovery");
+    diagnostics.recordPendingSource(parentRequest.getId(), pendingSource);
     cooldown.markRequestOrdered(level, parentRequest.getId());
     deliveryChildActiveSince.put(childToken, level.getGameTime());
     recheck.scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}",
-          parentRequest.getId(),
-          childToken,
-          stateUpdated,
-          childItem,
-          childCount);
+          logTemplate, parentRequest.getId(), childToken, stateUpdated, childItem, childCount);
     }
     return true;
   }
