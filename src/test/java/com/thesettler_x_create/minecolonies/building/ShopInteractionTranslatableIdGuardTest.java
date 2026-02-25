@@ -31,6 +31,7 @@ class ShopInteractionTranslatableIdGuardTest {
     assertTrue(
         source.contains(
             "\"com.thesettler_x_create.interaction.createshop.lost_package.runtime_id\""));
+    assertTrue(source.contains("Long.toString(Math.max(0L, requestedAt))"));
     assertFalse(source.contains("Component.literal(\"createshop_lost_package"));
   }
 }

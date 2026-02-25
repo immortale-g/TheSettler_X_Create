@@ -75,7 +75,11 @@ final class ShopInflightTracker {
       }
       citizen.triggerInteraction(
           new ShopLostPackageInteraction(
-              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address));
+              notice.stackKey.copy(),
+              notice.remaining,
+              notice.requesterName,
+              notice.address,
+              notice.requestedAt));
     }
   }
 

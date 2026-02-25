@@ -272,7 +272,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (timeout <= 0L || inflightEntries.isEmpty()) {
       return java.util.Collections.emptyList();
     }
-    Map<String, NoticeAggregate> grouped = new java.util.LinkedHashMap<>();
+    Map<String, InflightNotice> uniqueNotices = new java.util.LinkedHashMap<>();
     boolean changed = false;
     for (InflightEntry entry : inflightEntries) {
       if (entry.remaining <= 0 || entry.notified) {
@@ -284,34 +284,27 @@ public class CreateShopBlockEntity extends BlockEntity {
       }
       entry.notified = true;
       changed = true;
-      String noticeKey = buildNoticeKey(entry.stackKey, entry.requesterName, entry.address);
-      NoticeAggregate existing = grouped.get(noticeKey);
-      if (existing == null) {
-        grouped.put(
-            noticeKey,
-            new NoticeAggregate(
-                entry.stackKey.copy(), entry.remaining, age, entry.requesterName, entry.address));
-      } else {
-        existing.remaining += entry.remaining;
-        if (age > existing.age) {
-          existing.age = age;
-        }
-      }
+      String noticeKey =
+          buildNoticeSegmentKey(
+              entry.stackKey,
+              entry.requesterName,
+              entry.address,
+              entry.requestedAt,
+              entry.remaining);
+      uniqueNotices.putIfAbsent(
+          noticeKey,
+          new InflightNotice(
+              entry.stackKey.copy(),
+              entry.remaining,
+              age,
+              entry.requesterName,
+              entry.address,
+              entry.requestedAt));
     }
     if (changed) {
       setChanged();
     }
-    List<InflightNotice> notices = new ArrayList<>(grouped.size());
-    for (NoticeAggregate aggregate : grouped.values()) {
-      notices.add(
-          new InflightNotice(
-              aggregate.stackKey.copy(),
-              aggregate.remaining,
-              aggregate.age,
-              aggregate.requesterName,
-              aggregate.address));
-    }
-    return notices;
+    return new ArrayList<>(uniqueNotices.values());
   }
 
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
@@ -616,33 +609,17 @@ public class CreateShopBlockEntity extends BlockEntity {
     return trimmed.isEmpty() ? "" : trimmed;
   }
 
-  private static String buildNoticeKey(ItemStack stackKey, String requesterName, String address) {
+  private static String buildNoticeSegmentKey(
+      ItemStack stackKey, String requesterName, String address, long requestedAt, int remaining) {
     if (stackKey == null || stackKey.isEmpty()) {
-      return "minecraft:air||";
+      return "minecraft:air|||" + requestedAt + "|" + remaining;
     }
     String itemId =
         String.valueOf(
             net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
     String requester = sanitize(requesterName);
     String destination = sanitize(address);
-    return itemId + "|" + requester + "|" + destination;
-  }
-
-  private static final class NoticeAggregate {
-    private final ItemStack stackKey;
-    private int remaining;
-    private long age;
-    private final String requesterName;
-    private final String address;
-
-    private NoticeAggregate(
-        ItemStack stackKey, int remaining, long age, String requesterName, String address) {
-      this.stackKey = stackKey;
-      this.remaining = remaining;
-      this.age = age;
-      this.requesterName = requesterName == null ? "" : requesterName;
-      this.address = address == null ? "" : address;
-    }
+    return itemId + "|" + requester + "|" + destination + "|" + requestedAt + "|" + remaining;
   }
 
   @Override
@@ -802,14 +779,21 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final long age;
     public final String requesterName;
     public final String address;
+    public final long requestedAt;
 
     public InflightNotice(
-        ItemStack stackKey, int remaining, long age, String requesterName, String address) {
+        ItemStack stackKey,
+        int remaining,
+        long age,
+        String requesterName,
+        String address,
+        long requestedAt) {
       this.stackKey = stackKey;
       this.remaining = remaining;
       this.age = age;
       this.requesterName = requesterName == null ? "" : requesterName;
       this.address = address == null ? "" : address;
+      this.requestedAt = requestedAt;
     }
   }
 

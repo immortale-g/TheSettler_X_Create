@@ -90,8 +90,10 @@ Current behavior:
 - Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
   of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
   when notice text/amount drifts across ticks.
-- Overdue inflight notices are now aggregated per `(item, requester, address)` tuple before
-  interaction trigger, preventing duplicate same-tuple lost-package prompts in one scan cycle.
+- Overdue inflight notices now stay segment-scoped (per inflight entry/request-time) and no longer
+  sum quantities across matching `(item, requester, address)` tuples, preserving partial-package
+  recovery flows (for example `6 + 4`, not flattened to `10`) while still deduping exact duplicate
+  segments in one scan cycle.
 - Lost-package handover matching now falls back to same-item matching when item components drift,
   so package contents can still be accepted/recovered after component-text/metadata skew.
 - Lost-package handover now processes multiple matching player packages in one action and caps
