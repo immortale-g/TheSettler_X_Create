@@ -64,6 +64,11 @@ Current behavior:
   resolver-classname string matching.
 - Warehouse-internal stock count path now fail-opens with `0` for missing request/location/colony
   context, preventing null-dereference failures during resolver suitability/count checks.
+- Create Shop building registration no longer adds `BuildingModules.WAREHOUSE_COURIERS`; access and
+  dispatch remain warehouse-native (`JobDeliveryman` access check + warehouse queue notify path).
+- Legacy-save compatibility for prior shop-courier data is handled best-effort during colony tick:
+  if a legacy shop courier module is still present, assigned citizens/entities are cleared once and
+  normal warehouse-native dispatch continues.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.

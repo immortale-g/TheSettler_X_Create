@@ -53,7 +53,6 @@ public final class ModMinecoloniesBuildings {
                                   true,
                                   building -> 1),
                           () -> WorkerBuildingModuleView::new))
-                  .addBuildingModuleProducer(BuildingModules.WAREHOUSE_COURIERS)
                   .addBuildingModuleProducer(BuildingModules.WAREHOUSE_REQUEST_QUEUE)
                   .addBuildingModuleProducer(
                       new ModuleProducer<>(

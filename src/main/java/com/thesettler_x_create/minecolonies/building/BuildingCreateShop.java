@@ -11,6 +11,7 @@ import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.tileentities.TileEntityRack;
@@ -88,6 +89,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private long lastHousekeepingWorkCheckTick = -1L;
   private long lastHousekeepingDebugTick = -1L;
   private boolean cachedHasIncomingRackWork;
+  private boolean legacyCourierMigrationAttempted;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
     super(colony, location);
@@ -105,6 +107,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
     this.resolverFactory = new ShopResolverFactory(this);
+    this.legacyCourierMigrationAttempted = false;
   }
 
   @Override
@@ -119,36 +122,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   @Override
   public boolean canAccessWareHouse(ICitizenData citizen) {
-    CourierAssignmentModule module = getFirstModuleOccurance(CourierAssignmentModule.class);
-    boolean result = module != null && module.hasAssignedCitizen(citizen);
-    if (!result && module != null && !hasDeliveryman(module)) {
-      // Allow warehouse deliverymen to access the shop if no shop courier is assigned.
-      if (citizen != null
-          && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
-        result = true;
-      }
-    }
+    boolean result =
+        citizen != null
+            && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman;
     if (isDebugRequests()) {
       courierDiagnostics.logAccessCheck(citizen, result);
     }
     return result;
-  }
-
-  private boolean hasDeliveryman(CourierAssignmentModule module) {
-    if (module == null) {
-      return false;
-    }
-    var citizens = module.getAssignedCitizen();
-    if (citizens == null || citizens.isEmpty()) {
-      return false;
-    }
-    for (var assigned : citizens) {
-      if (assigned != null
-          && assigned.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman) {
-        return true;
-      }
-    }
-    return false;
   }
 
   @Override
@@ -300,6 +280,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   @Override
   public void onColonyTick(IColony colony) {
     super.onColonyTick(colony);
+    migrateLegacyShopCourierAssignments();
     ensureWarehouseRegistration();
     ensurePickupLink();
     ensureResolverRegistrationHealthy(colony);
@@ -1133,6 +1114,40 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private void clearPermaPending(
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     permaManager.clearPermaPending(request);
+  }
+
+  private void migrateLegacyShopCourierAssignments() {
+    if (legacyCourierMigrationAttempted) {
+      return;
+    }
+    CourierAssignmentModule legacy = getModule(BuildingModules.WAREHOUSE_COURIERS);
+    if (legacy == null) {
+      return;
+    }
+    legacyCourierMigrationAttempted = true;
+    boolean cleared = false;
+    try {
+      var citizens = legacy.getAssignedCitizen();
+      if (citizens != null && !citizens.isEmpty()) {
+        citizens.clear();
+        cleared = true;
+      }
+    } catch (Exception ignored) {
+      // Best-effort migration only.
+    }
+    try {
+      var entities = legacy.getAssignedEntities();
+      if (entities != null && !entities.isEmpty()) {
+        entities.clear();
+        cleared = true;
+      }
+    } catch (Exception ignored) {
+      // Best-effort migration only.
+    }
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] legacy shop-courier migration modulePresent=true cleared={}", cleared);
+    }
   }
 
   private static int countMatching(List<ItemStack> stacks, ItemStack key) {

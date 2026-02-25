@@ -276,7 +276,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             countStackList(ordered),
             "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
-            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup, shop);
+            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
         if (plannedCount > 0 && reservedForRequest > 0) {
           consumeReservedForRequest(pickup, requestId, planned);
           transitionFlow(
@@ -931,7 +931,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             rackAvailable);
       }
       List<IToken<?>> created =
-          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup, shop);
+          deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
       if (created.isEmpty()) {
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:create-failed");
         diagnostics.logPendingReasonChange(request.getId(), "create:failed");
