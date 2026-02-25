@@ -8,13 +8,14 @@ import org.junit.jupiter.api.Test;
 
 class BuildingCreateShopLostPackageRestartPartialGuardTest {
   @Test
-  void restartClosesOnlyAfterFullOverdueClear() throws Exception {
+  void restartReturnsConsumedAmountForInteractionAccumulation() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("return consumed >= targetAmount;"));
+    assertTrue(source.contains("public int restartLostPackage("));
+    assertTrue(source.contains("return consumed;"));
     assertTrue(source.contains("lost-package restart requester={}"));
   }
 }

@@ -306,11 +306,10 @@ Implementation notes:
   `BuildingCreateShop` performs a best-effort, one-time cleanup of assigned citizens/entities if a
   legacy shop courier module instance is still present in existing saves, while keeping fail-open
   behavior when that module is absent.
-- Lost-package partial-handover lifecycle hardening is authored in this project scope:
-  handover responses now close only after full overdue target consumption from inflight tracking,
-  and partial inflight consumption resets `notified` on remaining entries so unresolved overdue
-  amounts can be surfaced again by overdue-notice scanning.
-- Lost-package partial-reorder lifecycle hardening is authored in this project scope:
-  reorder responses now close only after full overdue target consumption from inflight tracking,
-  so capacity-clamped partial network reorder acceptance cannot prematurely close overdue
-  interactions while unresolved remainder still exists.
+- Lost-package partial-response lifecycle hardening is authored in this project scope:
+  reorder/handover handlers now return consumed inflight quantity, interaction state accumulates
+  consumed amounts across retries, and dialog closure occurs only when accumulated consumption
+  clears the overdue target.
+- Partial inflight consumption recovery hardening is authored in this project scope:
+  unresolved entry remainders reset `notified` on partial consume, allowing overdue scanning to
+  surface unresolved amounts again instead of leaving them stranded after first notification.

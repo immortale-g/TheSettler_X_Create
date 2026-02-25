@@ -96,15 +96,24 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return;
     }
     boolean handled = false;
+    int consumed = 0;
     if (response == 0) {
-      handled = shop.restartLostPackage(stackKey, remaining, requesterName, address);
+      consumed = shop.restartLostPackage(stackKey, remaining, requesterName, address);
     } else if (response == 1) {
-      handled =
+      consumed =
           shop.acceptLostPackageFromPlayer(player, stackKey, remaining, requesterName, address);
+    }
+    if (consumed > 0) {
+      remaining = Math.max(0, remaining - consumed);
+      handled = remaining <= 0;
     }
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction handled={} response={}", handled, response);
+          "[CreateShop] lost-package interaction handled={} response={} consumed={} remaining={}",
+          handled,
+          response,
+          consumed,
+          remaining);
     }
     if (handled) {
       active = false;

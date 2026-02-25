@@ -69,11 +69,11 @@ Current behavior:
 - Legacy-save compatibility for prior shop-courier data is handled best-effort during colony tick:
   if a legacy shop courier module is still present, assigned citizens/entities are cleared once and
   normal warehouse-native dispatch continues.
-- Lost-package handover now only closes the interaction when the full overdue target was cleared
-  from inflight tracking; partial handovers keep the interaction active, and remaining overdue
-  inflight entries are re-promptable (`notified` reset on partial consume).
-- Lost-package reorder now also closes only after full overdue-target inflight consumption; partial
-  network reorders (for example capacity-clamped acceptance) no longer silently close the dialog.
+- Lost-package responses now accumulate consumed inflight amounts across repeated button clicks:
+  reorder/handover handlers return consumed quantities, interaction `remaining` is reduced per
+  attempt, and dialog closes only once accumulated consumption clears the overdue target.
+- Remaining overdue entries stay re-promptable after partial inflight consumption
+  (`notified` reset on partial consume), so partial success cannot strand unresolved remainder.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
