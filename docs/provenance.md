@@ -291,3 +291,10 @@ Implementation notes:
   `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
   entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,
   `setEntity`, citizen manager APIs).
+- Delivery requester resolver-selection hardening is authored in this project scope:
+  `CreateShopDeliveryManager` replaced resolver simple-classname string matching with type-safe
+  checks (`AbstractWarehouseRequestResolver` and `IRequester`, excluding
+  `CreateShopRequestResolver`) for warehouse-delivery requester binding.
+- Warehouse-count null-safety hardening is authored in this project scope:
+  `CreateShopRequestResolver.getWarehouseInternalCount(...)` now fail-opens with `0` when request,
+  deliverable, colony manager, colony, or building manager context is missing.

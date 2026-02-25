@@ -1454,11 +1454,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   protected int getWarehouseInternalCount(
       com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse ignored,
       IRequest<? extends IDeliverable> request) {
+    if (request == null || getLocation() == null) {
+      return 0;
+    }
     IDeliverable deliverable = request.getRequest();
+    if (deliverable == null) {
+      return 0;
+    }
     var colonyManager = com.minecolonies.api.colony.IColonyManager.getInstance();
+    if (colonyManager == null) {
+      return 0;
+    }
     var colony =
         colonyManager.getColonyByPosFromDim(
             getLocation().getDimension(), getLocation().getInDimensionLocation());
+    if (colony == null || colony.getServerBuildingManager() == null) {
+      return 0;
+    }
     var building =
         colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
     BuildingCreateShop shop = building instanceof BuildingCreateShop createShop ? createShop : null;
