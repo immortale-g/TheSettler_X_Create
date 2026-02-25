@@ -614,14 +614,29 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             try {
               IRequest<?> child = requestHandler.getRequest(childToken);
               if (child == null) {
-                missing++;
-                request.removeChild(childToken);
-                deliveryChildActiveSince.remove(childToken);
+                hasActiveChildren = true;
+                if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                  TheSettlerXCreate.LOGGER.info(
+                      "[CreateShop] tickPending: {} child {} missing -> keep (fail-open)",
+                      requestIdLog,
+                      childToken);
+                }
+                continue;
               }
               if (child != null
                   && child.getRequest()
                       instanceof
                       com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
+                if (!isLocalShopDeliveryChild(child, shop, pickup)) {
+                  hasActiveChildren = true;
+                  if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                    TheSettlerXCreate.LOGGER.info(
+                        "[CreateShop] tickPending: {} child {} skip (non-local delivery child)",
+                        requestIdLog,
+                        childToken);
+                  }
+                  continue;
+                }
                 var childAssigned = assignmentStore.getAssignmentForValue(childToken);
                 if (childAssigned == null) {
                   if (child.getState()
@@ -675,7 +690,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   if (isStaleDeliveryChild(level, childToken, childState)) {
                     boolean recovered =
                         recoverStaleDeliveryChild(
-                            standardManager, level, request, childToken, child);
+                            standardManager, level, request, childToken, child, shop, pickup);
                     if (recovered) {
                       missing++;
                       continue;
@@ -704,12 +719,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 }
               }
             } catch (Exception ex) {
-              missing++;
-              request.removeChild(childToken);
-              deliveryChildActiveSince.remove(childToken);
+              hasActiveChildren = true;
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] tickPending: {} child {} lookup failed -> removed: {}",
+                    "[CreateShop] tickPending: {} child {} lookup failed -> keep (fail-open): {}",
                     requestIdLog,
                     childToken,
                     ex.getMessage() == null ? "<null>" : ex.getMessage());
@@ -1214,12 +1227,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         pickup = shopPickup;
       }
     }
-
-    int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
-    int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
-    if (pickup != null) {
-      pickup.release(parentRequestId);
+    if (pickup == null || !isDeliveryFromPickup(delivery, pickup)) {
+      return;
     }
+
+    int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
+    int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
+    pickup.release(parentRequestId);
     pendingTracker.setPendingCount(parentToken, pendingCount);
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
     // Keep on cooldown so tickPending can retry once stock is available.
@@ -1227,9 +1241,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     clearDeliveriesCreated(parentToken);
 
     if (isDebugLoggingEnabled()) {
-      int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
-      BlockPos pickupPosition =
-          pickup == null ? delivery.getStart().getInDimensionLocation() : pickup.getBlockPos();
+      int reservedForStack = pickup.getReservedFor(stack);
+      BlockPos pickupPosition = pickup.getBlockPos();
       deliveryManager.logDeliveryDiagnostics(
           "cancel",
           manager,
@@ -1247,7 +1260,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           parentToken,
           pendingCount,
           reservedForRequest,
-          pickup == null ? "<none>" : pickup.getBlockPos());
+          pickup.getBlockPos());
       IStandardRequestManager standard = unwrapStandardManager(manager);
       if (standard != null) {
         diagnostics.logParentChildrenState(standard, parentToken, "delivery-cancel");
@@ -1297,11 +1310,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pickup = shopPickup;
           }
         }
+        if (pickup == null || !isDeliveryFromPickup(delivery, pickup)) {
+          return;
+        }
         UUID parentRequestId = toRequestId(parentToken);
         ItemStack stack = delivery.getStack().copy();
-        int reservedForRequest = pickup == null ? 0 : pickup.getReservedForRequest(parentRequestId);
-        int reservedForStack = pickup == null ? 0 : pickup.getReservedFor(stack);
-        BlockPos pickupPosition = pickup == null ? startPos : pickup.getBlockPos();
+        int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
+        int reservedForStack = pickup.getReservedFor(stack);
+        BlockPos pickupPosition = pickup.getBlockPos();
         deliveryManager.logDeliveryDiagnostics(
             "complete",
             manager,
@@ -1851,8 +1867,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       Level level,
       IRequest<?> parentRequest,
       IToken<?> childToken,
-      IRequest<?> childRequest) {
+      IRequest<?> childRequest,
+      BuildingCreateShop shop,
+      CreateShopBlockEntity pickup) {
     if (manager == null || level == null || parentRequest == null || childToken == null) {
+      return false;
+    }
+    if (!isLocalShopDeliveryChild(childRequest, shop, pickup)) {
       return false;
     }
     int childCount = 1;
@@ -1894,6 +1915,35 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           childCount);
     }
     return true;
+  }
+
+  private boolean isLocalShopDeliveryChild(
+      IRequest<?> childRequest, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
+    if (childRequest == null || shop == null || pickup == null) {
+      return false;
+    }
+    if (!(childRequest.getRequest() instanceof Delivery delivery)) {
+      return false;
+    }
+    ILocation start = delivery.getStart();
+    Level level = pickup.getLevel();
+    if (start == null || level == null || start.getDimension() == null) {
+      return false;
+    }
+    return level.dimension().equals(start.getDimension())
+        && pickup.getBlockPos().equals(start.getInDimensionLocation());
+  }
+
+  private boolean isDeliveryFromPickup(Delivery delivery, CreateShopBlockEntity pickup) {
+    if (delivery == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    ILocation start = delivery.getStart();
+    if (start == null || start.getDimension() == null) {
+      return false;
+    }
+    return pickup.getLevel().dimension().equals(start.getDimension())
+        && pickup.getBlockPos().equals(start.getInDimensionLocation());
   }
 
   private void clearTrackedChildrenForParent(

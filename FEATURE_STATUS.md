@@ -74,6 +74,9 @@ Current behavior:
   attempt, and dialog closes only once accumulated consumption clears the overdue target.
 - Remaining overdue entries stay re-promptable after partial inflight consumption
   (`notified` reset on partial consume), so partial success cannot strand unresolved remainder.
+- Stale delivery-child recovery and delivery callbacks are now local-shop scoped: mutation paths
+  (cancel/remove/requeue/release) run only for delivery requests whose pickup/start location
+  matches the local Create Shop pickup block; non-local or unresolved child lookups stay fail-open.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
