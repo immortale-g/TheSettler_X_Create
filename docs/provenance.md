@@ -287,3 +287,7 @@ Implementation notes:
   components (including tuple-stable runtime lost-package IDs) instead of literal ID components,
   preventing MineColonies client response handling from hitting literal/translatable content-cast
   mismatches on interaction button handling.
+- Diagnostics private-reflection cleanup is authored in this project scope:
+  `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
+  entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,
+  `setEntity`, citizen manager APIs).
