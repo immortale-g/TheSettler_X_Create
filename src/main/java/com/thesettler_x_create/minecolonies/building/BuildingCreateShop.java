@@ -652,10 +652,9 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             insertedMatching,
             consumed);
       }
-      // Package was consumed from player inventory and processed (inserted and/or dropped
-      // leftovers).
-      // Keep interaction one-shot to avoid dead button state on partial inflight cleanup.
-      return true;
+      // Only close the interaction once the full overdue target was actually cleared from inflight.
+      // Partial handovers must keep the interaction active so unresolved remainder can be handled.
+      return consumed >= targetAmount;
     }
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(

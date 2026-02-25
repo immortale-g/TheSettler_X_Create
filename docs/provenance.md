@@ -306,3 +306,7 @@ Implementation notes:
   `BuildingCreateShop` performs a best-effort, one-time cleanup of assigned citizens/entities if a
   legacy shop courier module instance is still present in existing saves, while keeping fail-open
   behavior when that module is absent.
+- Lost-package partial-handover lifecycle hardening is authored in this project scope:
+  handover responses now close only after full overdue target consumption from inflight tracking,
+  and partial inflight consumption resets `notified` on remaining entries so unresolved overdue
+  amounts can be surfaced again by overdue-notice scanning.
