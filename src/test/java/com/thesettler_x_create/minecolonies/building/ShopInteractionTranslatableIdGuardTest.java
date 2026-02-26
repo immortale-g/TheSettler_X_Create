@@ -22,18 +22,15 @@ class ShopInteractionTranslatableIdGuardTest {
   }
 
   @Test
-  void lostPackageUsesStableTranslatableInteractionId() throws Exception {
+  void lostPackageUsesStableRuntimeInteractionId() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageInteraction.java"));
 
+    assertTrue(source.contains("return Component.literal(runtimeId);"));
     assertTrue(
         source.contains(
             "Component.translatable(\"com.thesettler_x_create.interaction.createshop.lost_package.id\")"));
-    assertFalse(
-        source.contains(
-            "\"com.thesettler_x_create.interaction.createshop.lost_package.runtime_id\""));
-    assertFalse(source.contains("Component.literal(\"createshop_lost_package"));
   }
 }
