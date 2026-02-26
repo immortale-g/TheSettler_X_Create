@@ -1563,6 +1563,27 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     pickup.release(toRequestId(request.getId()));
+    if (request != null
+        && request.getState()
+            == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED
+        && request.getRequest() instanceof Delivery delivery) {
+      ItemStack key = delivery.getStack();
+      if (key != null && !key.isEmpty()) {
+        String requesterName = messaging.resolveRequesterName(manager, request);
+        TileEntityCreateShop tile = shop.getCreateShopTileEntity();
+        String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
+        int cleared = shop.cancelLostPackage(key, requesterName, address);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] releaseReservation cancelled request={} item={} requester='{}' address='{}' clearedInflight={}",
+              request.getId(),
+              key.getHoverName().getString(),
+              requesterName,
+              address,
+              cleared);
+        }
+      }
+    }
   }
 
   private void consumeReservedForRequest(
@@ -1816,6 +1837,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return 0L;
     }
     return manager.getColony().getWorld().getGameTime();
+  }
+
+  private static String sanitizeAddress(String value) {
+    if (value == null) {
+      return "";
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? "" : trimmed;
   }
 
   private void transitionFlow(

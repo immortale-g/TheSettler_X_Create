@@ -745,6 +745,26 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return 0;
   }
 
+  public int cancelLostPackage(ItemStack stackKey, String requesterName, String address) {
+    if (stackKey == null || stackKey.isEmpty()) {
+      return 0;
+    }
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (pickup == null) {
+      return 0;
+    }
+    int cleared = pickup.cancelInflight(stackKey, requesterName, address);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package cancel item={} requester='{}' address='{}' cleared={}",
+          stackKey.getHoverName().getString(),
+          requesterName,
+          address,
+          cleared);
+    }
+    return cleared;
+  }
+
   private void ensureWarehouseRegistration() {
     warehouseRegistrar.ensureWarehouseRegistration();
   }

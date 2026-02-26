@@ -382,6 +382,49 @@ public class CreateShopBlockEntity extends BlockEntity {
     return remaining;
   }
 
+  /** Clears tracked inflight entries for a matching stack/requester/address tuple. */
+  public int cancelInflight(
+      ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
+    if (!ensureServerThread("cancelInflight")) {
+      return 0;
+    }
+    if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
+      return 0;
+    }
+    String requester = sanitize(requesterName);
+    String destination = sanitize(address);
+    int removed = cancelInflightMatches(stackKey, requester, destination);
+    // Fallback: requester labels can drift (hut name vs citizen name); clear by stack+address.
+    if (removed <= 0 && !requester.isEmpty()) {
+      removed = cancelInflightMatches(stackKey, "", destination);
+    }
+    if (removed > 0) {
+      pruneBaselines();
+      setChanged();
+    }
+    return removed;
+  }
+
+  private int cancelInflightMatches(ItemStack stackKey, String requester, String destination) {
+    int removed = 0;
+    Iterator<InflightEntry> iterator = inflightEntries.iterator();
+    while (iterator.hasNext()) {
+      InflightEntry entry = iterator.next();
+      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+        continue;
+      }
+      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
+        continue;
+      }
+      if (!destination.isEmpty() && !destination.equals(entry.address)) {
+        continue;
+      }
+      removed += Math.max(0, entry.remaining);
+      iterator.remove();
+    }
+    return removed;
+  }
+
   private int consumeInflightMatches(
       ItemStack stackKey, int remaining, String requester, String destination) {
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
