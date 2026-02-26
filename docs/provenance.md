@@ -274,19 +274,18 @@ Implementation notes:
   actions are now one-shot independent of strict inflight tuple consumption, package handover uses
   rack-only insertion of unpacked contents, and inflight consumption includes a stack-key fallback
   when requester/address fields drift across reloads or naming changes.
-- Lost-package interaction lifecycle hardening is authored in this project scope: interaction IDs
-  now use a stable translatable ID, successful reorder/handover actions deterministically
-  invalidate the active dialog, and additional server-side debug logging was added for end-to-end
-  handover tracing (button response, inventory scan, package unpack, rack insert, inflight
-  consumption).
+- Lost-package interaction lifecycle hardening is authored in this project scope: interaction
+  response routing now uses a stable runtime ID key (segment-scoped) instead of inquiry-component
+  identity, successful reorder/handover actions deterministically invalidate the active dialog, and
+  additional server-side debug logging was added for end-to-end handover tracing (button response,
+  inventory scan, package unpack, rack insert, inflight consumption).
 - Create Shop chat-noise reduction is authored in this project scope: detailed flow-step chat is
   now controlled by a dedicated config flag (`flowChatMessagesEnabled`, default `false`) with
   same-tick dedupe, while player-facing status chat was reduced to one concise line per stage.
 - Interaction-ID compatibility hardening is authored in this project scope: Create Shop
-  `ShopCapacityStallInteraction` and `ShopLostPackageInteraction` now use translatable ID
-  components (stable for lost-package and capacity-stall) instead of literal ID components,
-  preventing MineColonies client response handling from hitting literal/translatable
-  content-cast mismatches on interaction button handling.
+  `ShopCapacityStallInteraction` uses a translatable ID component and
+  `ShopLostPackageInteraction` uses a stable runtime literal ID key; together this avoids both
+  literal/translatable content-cast mismatches and inquiry-component drift in response matching.
 - Lost-package response-routing locale hardening is authored in this project scope:
   `com.thesettler_x_create.interaction.createshop.lost_package.id` now resolves to the same
   machine token across language files (`createshop_lost_package`) to avoid locale-dependent
