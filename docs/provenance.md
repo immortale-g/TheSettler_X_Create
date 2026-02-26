@@ -287,6 +287,10 @@ Implementation notes:
   components (stable for lost-package and capacity-stall) instead of literal ID components,
   preventing MineColonies client response handling from hitting literal/translatable
   content-cast mismatches on interaction button handling.
+- Lost-package response-routing locale hardening is authored in this project scope:
+  `com.thesettler_x_create.interaction.createshop.lost_package.id` now resolves to the same
+  machine token across language files (`createshop_lost_package`) to avoid locale-dependent
+  interaction-id mismatches between client and server.
 - Diagnostics private-reflection cleanup is authored in this project scope:
   `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
   entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,

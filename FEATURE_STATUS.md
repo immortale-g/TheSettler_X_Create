@@ -57,6 +57,8 @@ Current behavior:
 - Capacity-stall and lost-package interaction IDs now use translatable components as well
   (lost-package now uses a stable translatable ID), removing remaining literal-ID paths that could
   trigger MineColonies interaction button-id cast failures.
+- Lost-package interaction ID translation is now locale-invariant (`createshop_lost_package`)
+  across language files, avoiding client/server locale mismatches in interaction response routing.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
   (`setAccessible`/declared-field write) and stays on API/public-method paths only.
 - Delivery requester selection now uses type-safe resolver checks
