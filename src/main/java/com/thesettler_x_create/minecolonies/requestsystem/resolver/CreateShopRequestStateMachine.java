@@ -49,6 +49,15 @@ final class CreateShopRequestStateMachine {
     return new ArrayList<>(active.values());
   }
 
+  boolean hasNonTerminalWork() {
+    for (CreateShopFlowRecord record : active.values()) {
+      if (record != null && !record.getState().isTerminal()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   List<CreateShopFlowRecord> collectTimedOut(long now, long timeoutTicks) {
     List<CreateShopFlowRecord> timedOut = new ArrayList<>();
     if (timeoutTicks <= 0L) {

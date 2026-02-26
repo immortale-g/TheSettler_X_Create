@@ -22,7 +22,7 @@ class ShopInteractionTranslatableIdGuardTest {
   }
 
   @Test
-  void lostPackageUsesTranslatableRuntimeInteractionId() throws Exception {
+  void lostPackageKeepsConfiguredTranslatableInteractionId() throws Exception {
     String source =
         Files.readString(
             Path.of(
@@ -30,7 +30,7 @@ class ShopInteractionTranslatableIdGuardTest {
 
     assertTrue(
         source.contains(
-            "\"com.thesettler_x_create.interaction.createshop.lost_package.runtime_id\""));
-    assertFalse(source.contains("Component.literal(\"createshop_lost_package"));
+            "Component.translatable(\"com.thesettler_x_create.interaction.createshop.lost_package.id\")"));
+    assertFalse(source.contains("return Component.literal(runtimeId);"));
   }
 }
