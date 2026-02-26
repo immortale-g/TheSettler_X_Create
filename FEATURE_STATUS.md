@@ -54,11 +54,9 @@ Current behavior:
 - Lost-package interaction responses now use translatable components (including validator/response
   and answer texts) to stay compatible with MineColonies interaction client handling and avoid
   `TranslatableContents` cast crashes on response button clicks.
-- Capacity-stall interaction IDs use translatable components, while lost-package interactions now
-  use a stable runtime literal ID per overdue segment; this avoids inquiry-component drift during
-  MineColonies response routing and prevents silent button no-op behavior.
-- Lost-package interaction ID translation is now locale-invariant (`createshop_lost_package`)
-  across language files, avoiding client/server locale mismatches in interaction response routing.
+- Capacity-stall and lost-package interaction IDs use translatable components, while lost-package
+  inquiry text now uses a deterministic literal payload to keep MineColonies response lookup stable
+  on button clicks.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
   (`setAccessible`/declared-field write) and stays on API/public-method paths only.
 - Delivery requester selection now uses type-safe resolver checks
@@ -107,6 +105,8 @@ Current behavior:
   duplicate over-ordering after world reloads.
 - Open inflight overdue entries are now re-armed for prompting on world load (`notified=false`
   during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
+- Cancelled requests now clear matching lost-package inflight entries immediately, so cancelling a
+  build/request also removes stale missing-package prompts for that cancelled demand.
 - Courier diagnostics no longer probes the legacy `CourierAssignmentModule` path at all, so
   diagnostics cannot trigger module-missing tick exceptions after shop-courier decoupling.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
