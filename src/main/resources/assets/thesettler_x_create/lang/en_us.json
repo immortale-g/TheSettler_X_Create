@@ -59,7 +59,7 @@
   "com.thesettler_x_create.interaction.createshop.capacity_stall.answer_upgrade": "Good plan. A higher hut level gives more rack capacity.",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.response_courier": "I will add couriers",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.answer_courier": "Good plan. More couriers clear pickups faster and free slots.",
-  "com.thesettler_x_create.interaction.createshop.lost_package.id": "Create Shop lost package",
+  "com.thesettler_x_create.interaction.createshop.lost_package.id": "createshop_lost_package",
   "com.thesettler_x_create.interaction.createshop.lost_package.runtime_id": "createshop_lost_package|item=%s|requester=%s|address=%s|segment=%s",
   "com.thesettler_x_create.interaction.createshop.lost_package.inquiry": "Delivery seems lost for %s. Item: %s x%s (address: %s).",
   "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder": "Start a new order",
