@@ -779,6 +779,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       return;
     }
+    CreateShopRequestResolver resolver = getOrCreateShopResolver();
+    if (resolver != null && resolver.hasActiveWork()) {
+      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping blocked reason=resolver-active-work pendingUnreserved={}",
+            cachedHasIncomingRackWork);
+      }
+      return;
+    }
     if (!hasHousekeepingAvailableWorker()) {
       cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
       if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
