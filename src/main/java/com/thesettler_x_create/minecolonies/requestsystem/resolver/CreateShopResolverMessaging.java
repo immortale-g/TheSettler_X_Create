@@ -16,7 +16,7 @@ final class CreateShopResolverMessaging {
   CreateShopResolverMessaging(CreateShopRequestResolver resolver) {}
 
   void sendShopChat(IRequestManager manager, String key, List<ItemStack> stacks) {
-    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
+    if (!isChatMessagesEnabled()) {
       return;
     }
     if (stacks == null || stacks.isEmpty()) {
@@ -38,8 +38,8 @@ final class CreateShopResolverMessaging {
       IRequest<?> request,
       @Nullable String stackLabel,
       int amount) {
-    if (!Config.CHAT_MESSAGES_ENABLED.getAsBoolean()
-        || !Config.FLOW_CHAT_MESSAGES_ENABLED.getAsBoolean()
+    if (!isChatMessagesEnabled()
+        || !isFlowChatMessagesEnabled()
         || manager == null
         || request == null) {
       return;
@@ -79,6 +79,22 @@ final class CreateShopResolverMessaging {
       return text == null || text.isBlank() ? "unknown" : text;
     } catch (Exception ignored) {
       return "unknown";
+    }
+  }
+
+  private static boolean isChatMessagesEnabled() {
+    try {
+      return Config.CHAT_MESSAGES_ENABLED.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
+    }
+  }
+
+  private static boolean isFlowChatMessagesEnabled() {
+    try {
+      return Config.FLOW_CHAT_MESSAGES_ENABLED.getAsBoolean();
+    } catch (IllegalStateException ignored) {
+      return false;
     }
   }
 }

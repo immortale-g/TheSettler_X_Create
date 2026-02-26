@@ -54,9 +54,9 @@ Current behavior:
 - Lost-package interaction responses now use translatable components (including validator/response
   and answer texts) to stay compatible with MineColonies interaction client handling and avoid
   `TranslatableContents` cast crashes on response button clicks.
-- Capacity-stall and lost-package interaction IDs now use translatable components as well
-  (including tuple-stable runtime lost-package IDs), removing remaining literal-ID paths that could
-  trigger MineColonies interaction button-id cast failures.
+- Capacity-stall and lost-package interaction IDs use translatable components, while lost-package
+  inquiry text now uses a deterministic literal payload to keep MineColonies response lookup stable
+  on button clicks.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
   (`setAccessible`/declared-field write) and stays on API/public-method paths only.
 - Delivery requester selection now uses type-safe resolver checks
@@ -74,12 +74,47 @@ Current behavior:
   attempt, and dialog closes only once accumulated consumption clears the overdue target.
 - Remaining overdue entries stay re-promptable after partial inflight consumption
   (`notified` reset on partial consume), so partial success cannot strand unresolved remainder.
+- Stale delivery-child recovery and delivery callbacks are now local-shop scoped: mutation paths
+  (cancel/remove/requeue/release) run only for delivery requests whose pickup/start location
+  matches the local Create Shop pickup block; non-local or unresolved child lookups stay fail-open.
+- Stale-child timeout tracking is now parent-scoped (`parentDeliveryActiveSince`) instead of relying
+  on child-token-only clocks, reducing false reset/drift when child tokens refresh.
+- Stale delivery-child mutation is now two-phase: first stale observation only arms/schedules
+  recheck (`parentStaleRecoveryArmedAt`), and cancel/remove/requeue mutation executes only when
+  stale persists after the recheck window, reducing one-tick false-positive churn.
+- Stale/extra-child recovery revalidates live MineColonies ownership before mutation; cancel/remove/
+  requeue only runs when the parent request is still owned by the local Create Shop resolver.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
-- Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
-  of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
-  when notice text/amount drifts across ticks.
+- Lost-package interaction identity is now stable per overdue segment
+  (`item + address + remaining + requestedAt`) instead of inquiry text, preventing duplicate
+  blocking dialogs when requester label text drifts.
+- Overdue inflight prompting is now single-interaction per tick (oldest overdue first) and uses a
+  prompt key based on `(item, address)` to avoid duplicate dialogs caused by requester-name drift.
+- Inflight load/record cleanup now removes exact duplicate lost-package segments and caps open
+  segment history per `(item, requester, address)` tuple to avoid legacy prompt floods after
+  repeated reloads or previously stuck handover loops.
+- Lost-package handover matching now falls back to same-item matching when item components drift,
+  so package contents can still be accepted/recovered after component-text/metadata skew.
+- Lost-package handover now processes multiple matching player packages in one action and caps
+  inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
+  package removal beyond the required recovery amount.
+- Lost-package handover now pre-checks preview-accepted package content against remaining inflight
+  before removing a player package, and stops further package removals after a consume-miss to
+  avoid multi-package loss when tuple consumption fails.
+- Lost-package inflight consumption now falls back to same-item matching for component drift, and
+  restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
+  duplicate over-ordering after world reloads.
+- Open inflight overdue entries are now re-armed for prompting on world load (`notified=false`
+  during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
+- Cancelled requests now clear matching lost-package inflight entries immediately, so cancelling a
+  build/request also removes stale missing-package prompts for that cancelled demand.
+- Delivery-cancel callbacks now requeue parent pending state even when pickup BE lookup is
+  temporarily unavailable, so parent requests retry instead of remaining blocked as
+  delivery-in-progress.
+- Courier diagnostics no longer probes the legacy `CourierAssignmentModule` path at all, so
+  diagnostics cannot trigger module-missing tick exceptions after shop-courier decoupling.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
   accepted by stock network or `Handover` package consumed and processed), and new blocking
   interactions only appear again when a fresh overdue notice is generated.
@@ -103,6 +138,12 @@ Known focus area:
   so it does not drop into idle while pending resolvable requests or rack cleanup work remain.
 - Incoming rack housekeeping now runs in small timed batches, moving only unreserved rack items into
   hut inventory and leaving reserved quantities in place for MineColonies delivery creation.
+- Incoming rack housekeeping is now resolver-work gated: rack->hut transfers pause while the local
+  Create Shop resolver still has active request work, reducing reservation-race drift where fresh
+  incoming request items could be moved before delivery linkage settles.
+- Resolver active-work detection now ignores terminal flow-history records and only treats
+  non-terminal flow states as active work, so completed/cancelled history cannot permanently block
+  housekeeping.
 - Incoming rack housekeeping is availability-gated: it pauses while the assigned shopkeeper is in
   unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
 - Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing

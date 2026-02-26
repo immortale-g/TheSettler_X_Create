@@ -244,6 +244,12 @@ Implementation notes:
 - Incoming-rack housekeeping is authored in this project scope: Create Shop now performs timed
   rack->hut transfers for unreserved items only, preserving reserved quantities for MineColonies
   delivery flow while keeping local storage cleanup server-authoritative and API-driven.
+- Incoming-rack housekeeping resolver-work gating is authored in this project scope: rack->hut
+  transfer now pauses while local Create Shop resolver work is still active, reducing races where
+  newly arrived request items could move before reservation/delivery reconciliation settles.
+- Resolver active-work classification hardening is authored in this project scope:
+  `CreateShopRequestResolver.hasActiveWork()` now uses non-terminal flow-state checks only, so
+  terminal flow history does not keep housekeeping blocked indefinitely.
 - Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
   is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
   cleanup progression continues without MineColonies internals changes.
@@ -274,19 +280,30 @@ Implementation notes:
   actions are now one-shot independent of strict inflight tuple consumption, package handover uses
   rack-only insertion of unpacked contents, and inflight consumption includes a stack-key fallback
   when requester/address fields drift across reloads or naming changes.
-- Lost-package interaction lifecycle hardening is authored in this project scope: interaction IDs
-  are now tuple-stable (`item/requester/address`) to avoid duplicate blocking dialogs for one
-  unresolved case, successful reorder/handover actions deterministically invalidate the active
-  dialog, and additional server-side debug logging was added for end-to-end handover tracing
-  (button response, inventory scan, package unpack, rack insert, inflight consumption).
+- Lost-package interaction lifecycle hardening is authored in this project scope: inquiry payload
+  for lost-package prompts is now deterministic literal text (instead of dynamic translatable
+  argument composition), improving MineColonies button-response key matching stability; successful
+  reorder/handover actions deterministically invalidate the active dialog, and additional
+  server-side debug logging was added for end-to-end handover tracing (button response, inventory
+  scan, package unpack, rack insert, inflight consumption).
 - Create Shop chat-noise reduction is authored in this project scope: detailed flow-step chat is
   now controlled by a dedicated config flag (`flowChatMessagesEnabled`, default `false`) with
   same-tick dedupe, while player-facing status chat was reduced to one concise line per stage.
 - Interaction-ID compatibility hardening is authored in this project scope: Create Shop
-  `ShopCapacityStallInteraction` and `ShopLostPackageInteraction` now use translatable ID
-  components (including tuple-stable runtime lost-package IDs) instead of literal ID components,
-  preventing MineColonies client response handling from hitting literal/translatable content-cast
-  mismatches on interaction button handling.
+  `ShopCapacityStallInteraction` and `ShopLostPackageInteraction` use translatable ID components,
+  while lost-package inquiry content uses deterministic literal text to avoid response-key drift on
+  MineColonies interaction button handling.
+- Lost-package response-routing locale hardening is authored in this project scope:
+  `com.thesettler_x_create.interaction.createshop.lost_package.id` now resolves to the same
+  machine token across language files (`createshop_lost_package`) to avoid locale-dependent
+  interaction-id mismatches between client and server.
+- Cancelled-request lost-package cleanup is authored in this project scope:
+  Create Shop reservation release now also clears matching inflight lost-package entries for
+  cancelled requests, preventing stale missing-package prompts after build/request cancellation.
+- Delivery-cancel missing-pickup fallback is authored in this project scope:
+  when delivery cancel callbacks cannot resolve the pickup BE (for example temporary load timing),
+  parent pending/cooldown/recheck state is still re-armed so parent requests retry instead of
+  remaining stuck behind stale delivery-created markers.
 - Diagnostics private-reflection cleanup is authored in this project scope:
   `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
   entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,
@@ -313,3 +330,44 @@ Implementation notes:
 - Partial inflight consumption recovery hardening is authored in this project scope:
   unresolved entry remainders reset `notified` on partial consume, allowing overdue scanning to
   surface unresolved amounts again instead of leaving them stranded after first notification.
+- Delivery-child mutation scope hardening is authored in this project scope:
+  stale-recovery/callback mutation paths in `CreateShopRequestResolver` are constrained to local
+  Create Shop delivery children by pickup/start location checks, while unresolved/non-local child
+  lookups remain fail-open (no forced cancel/remove mutation).
+- Parent-scoped stale-clock hardening is authored in this project scope:
+  stale child timeout tracking now keys on parent request identity (`parentDeliveryActiveSince`)
+  with child tokens as transient observations, reducing drift from child token refresh/rotation.
+- Two-phase stale-recovery hardening is authored in this project scope:
+  stale local delivery children are first marked for recheck (`parentStaleRecoveryArmedAt`) and
+  only mutated (cancel/remove/requeue) if still stale after a short recheck window, reducing
+  one-tick false-positive mutation against transient MineColonies assignment/state jitter.
+- Recovery ownership revalidation hardening is authored in this project scope:
+  stale/extra delivery-child recovery rechecks `getResolverForRequest(parent)` immediately before
+  mutation and skips mutation when ownership drifted away from the local Create Shop resolver.
+- Lost-package prompt dedupe hardening is authored in this project scope:
+  overdue inflight scanning now emits at most one lost-package interaction per tick (oldest first)
+  and prompt dedupe uses `(item, address)` to avoid duplicate prompts from requester-name drift.
+- Lost-package inflight history cleanup is authored in this project scope:
+  load/record-time compaction removes exact duplicate segment entries and caps retained open
+  segments per `(item, requester, address)` tuple to prevent legacy duplicate prompt floods while
+  keeping partial-package recovery semantics.
+- Lost-package handover matching hardening is authored in this project scope:
+  package-content matching now accepts same-item fallback when full component equality drifts,
+  improving manual handover recovery robustness without bypassing server-side inflight consumption.
+- Lost-package handover amount-limiting hardening is authored in this project scope:
+  one handover action now iterates multiple matching player packages as needed but limits inflight
+  consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
+- Lost-package handover consume-guard hardening is authored in this project scope:
+  package removal now requires preview-accepted matching content plus remaining inflight coverage,
+  and handover stops further package removals after a consume-miss to prevent multi-package loss
+  when inflight tuple matching fails.
+- Lost-package reload-order hardening is authored in this project scope:
+  inflight tuple consumption now supports same-item fallback for component drift, and restart
+  reorder requests are clamped to currently tracked inflight remainder for the tuple, reducing
+  duplicate/stacking reorders after world save reload cycles.
+- Lost-package reload-prompt hardening is authored in this project scope:
+  persisted inflight entries now reload with prompt state re-armed (`notified=false`) when still
+  unresolved, because MineColonies interactions are not reliably restored from prior runtime state.
+- Diagnostics decoupling hardening is authored in this project scope:
+  `ShopCourierDiagnostics` no longer executes courier-module assignment comparison paths tied to
+  `CourierAssignmentModule`, aligning diagnostics with shop-courier module removal.

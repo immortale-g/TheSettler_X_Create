@@ -57,6 +57,21 @@ class CreateShopRequestStateMachineTest {
     assertEquals(active, timedOut.get(0).getRequestToken());
   }
 
+  @Test
+  void nonTerminalWorkFlagIgnoresTerminalHistory() {
+    CreateShopRequestStateMachine stateMachine = new CreateShopRequestStateMachine();
+    IToken<?> token = token("req-e");
+
+    assertFalse(stateMachine.hasNonTerminalWork());
+    assertTrue(
+        stateMachine.transition(token, CreateShopFlowState.REQUEST_COMPLETED, 40L, "done", "", 0));
+    assertFalse(stateMachine.hasNonTerminalWork());
+    assertTrue(
+        stateMachine.transition(
+            token("req-f"), CreateShopFlowState.ORDERED_FROM_NETWORK, 41L, "ordered", "", 1));
+    assertTrue(stateMachine.hasNonTerminalWork());
+  }
+
   private IToken<?> token(String id) {
     IToken<?> token = mock(IToken.class);
     when(token.getIdentifier()).thenReturn(id);
