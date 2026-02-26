@@ -247,6 +247,9 @@ Implementation notes:
 - Incoming-rack housekeeping resolver-work gating is authored in this project scope: rack->hut
   transfer now pauses while local Create Shop resolver work is still active, reducing races where
   newly arrived request items could move before reservation/delivery reconciliation settles.
+- Resolver active-work classification hardening is authored in this project scope:
+  `CreateShopRequestResolver.hasActiveWork()` now uses non-terminal flow-state checks only, so
+  terminal flow history does not keep housekeeping blocked indefinitely.
 - Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
   is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
   cleanup progression continues without MineColonies internals changes.
@@ -297,6 +300,10 @@ Implementation notes:
 - Cancelled-request lost-package cleanup is authored in this project scope:
   Create Shop reservation release now also clears matching inflight lost-package entries for
   cancelled requests, preventing stale missing-package prompts after build/request cancellation.
+- Delivery-cancel missing-pickup fallback is authored in this project scope:
+  when delivery cancel callbacks cannot resolve the pickup BE (for example temporary load timing),
+  parent pending/cooldown/recheck state is still re-armed so parent requests retry instead of
+  remaining stuck behind stale delivery-created markers.
 - Diagnostics private-reflection cleanup is authored in this project scope:
   `ShopCourierDiagnostics` removed private-field fallback mutation (`setAccessible`/declared-field
   entityId writes) and now remains on public/API repair paths only (`updateEntityIfNecessary`,
@@ -350,6 +357,10 @@ Implementation notes:
 - Lost-package handover amount-limiting hardening is authored in this project scope:
   one handover action now iterates multiple matching player packages as needed but limits inflight
   consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
+- Lost-package handover consume-guard hardening is authored in this project scope:
+  package removal now requires preview-accepted matching content plus remaining inflight coverage,
+  and handover stops further package removals after a consume-miss to prevent multi-package loss
+  when inflight tuple matching fails.
 - Lost-package reload-order hardening is authored in this project scope:
   inflight tuple consumption now supports same-item fallback for component drift, and restart
   reorder requests are clamped to currently tracked inflight remainder for the tuple, reducing
