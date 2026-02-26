@@ -643,6 +643,31 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         continue;
       }
+      List<ItemStack> previewAccepted = tile.planInboundAcceptedStacks(previewUnpacked);
+      int previewInsertedMatching = countMatching(previewAccepted, stackKey);
+      int consumeTarget =
+          Math.min(targetAmount - totalConsumed, Math.max(0, previewInsertedMatching));
+      if (consumeTarget <= 0) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} skip: preview accepted no matching items",
+              slot);
+        }
+        continue;
+      }
+      int strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+      int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
+      if (strictRemaining < consumeTarget && looseRemaining < consumeTarget) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package handover slot={} skip: no inflight remainder for consumeTarget={} strictRemaining={} looseRemaining={}",
+              slot,
+              consumeTarget,
+              strictRemaining,
+              looseRemaining);
+        }
+        continue;
+      }
       ItemStack removedPackage = inventory.removeItem(slot, 1);
       if (removedPackage.isEmpty()) {
         if (isDebugRequests()) {
@@ -697,7 +722,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
       totalInsertedMatching += Math.max(0, insertedMatching);
-      int consumeTarget = Math.min(targetAmount - totalConsumed, Math.max(0, insertedMatching));
+      consumeTarget = Math.min(targetAmount - totalConsumed, Math.max(0, insertedMatching));
       int consumed = pickup.consumeInflight(stackKey, consumeTarget, requesterName, address);
       totalConsumed += Math.max(0, consumed);
       if (isDebugRequests()) {
@@ -710,8 +735,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             totalConsumed,
             targetAmount);
         if (consumed <= 0 && consumeTarget > 0) {
-          int strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
-          int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
+          strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+          looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover consume-miss slot={} consumeTarget={} strictRemaining={} looseRemaining={}",
               slot,
@@ -719,6 +744,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
               strictRemaining,
               looseRemaining);
         }
+      }
+      if (consumeTarget > 0 && consumed <= 0) {
+        // Avoid draining additional player packages when inflight tuple cannot be consumed.
+        break;
       }
     }
     int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address);

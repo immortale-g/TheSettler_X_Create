@@ -1259,7 +1259,26 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         pickup = shopPickup;
       }
     }
-    if (pickup == null || !isDeliveryFromPickup(delivery, pickup)) {
+    if (pickup == null) {
+      int fallbackPending = Math.max(1, stack.getCount());
+      pendingTracker.setPendingCount(parentToken, fallbackPending);
+      diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
+      cooldown.markRequestOrdered(level, parentToken);
+      clearDeliveriesCreated(parentToken);
+      if (isDebugLoggingEnabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} (pickup missing, fallback requeue)",
+            request.getId(),
+            parentToken,
+            fallbackPending);
+      }
+      IStandardRequestManager standard = unwrapStandardManager(manager);
+      if (standard != null) {
+        recheck.scheduleParentChildRecheck(standard, parentToken);
+      }
+      return;
+    }
+    if (!isDeliveryFromPickup(delivery, pickup)) {
       return;
     }
 
@@ -1824,7 +1843,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (cooldown.getOrderedCount() > 0) {
       return true;
     }
-    return !flowStateMachine.snapshot().isEmpty();
+    return flowStateMachine.hasNonTerminalWork();
   }
 
   void logDeliveryLinkStateForOps(
