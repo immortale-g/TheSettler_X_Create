@@ -100,6 +100,9 @@ Current behavior:
 - Lost-package handover now processes multiple matching player packages in one action and caps
   inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
   package removal beyond the required recovery amount.
+- Lost-package handover now pre-checks preview-accepted package content against remaining inflight
+  before removing a player package, and stops further package removals after a consume-miss to
+  avoid multi-package loss when tuple consumption fails.
 - Lost-package inflight consumption now falls back to same-item matching for component drift, and
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
@@ -107,6 +110,9 @@ Current behavior:
   during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
 - Cancelled requests now clear matching lost-package inflight entries immediately, so cancelling a
   build/request also removes stale missing-package prompts for that cancelled demand.
+- Delivery-cancel callbacks now requeue parent pending state even when pickup BE lookup is
+  temporarily unavailable, so parent requests retry instead of remaining blocked as
+  delivery-in-progress.
 - Courier diagnostics no longer probes the legacy `CourierAssignmentModule` path at all, so
   diagnostics cannot trigger module-missing tick exceptions after shop-courier decoupling.
 - Successful lost-package actions now close the blocking interaction deterministically (`Reorder`
@@ -135,6 +141,9 @@ Known focus area:
 - Incoming rack housekeeping is now resolver-work gated: rack->hut transfers pause while the local
   Create Shop resolver still has active request work, reducing reservation-race drift where fresh
   incoming request items could be moved before delivery linkage settles.
+- Resolver active-work detection now ignores terminal flow-history records and only treats
+  non-terminal flow states as active work, so completed/cancelled history cannot permanently block
+  housekeeping.
 - Incoming rack housekeeping is availability-gated: it pauses while the assigned shopkeeper is in
   unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
 - Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing
