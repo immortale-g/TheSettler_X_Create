@@ -54,9 +54,9 @@ Current behavior:
 - Lost-package interaction responses now use translatable components (including validator/response
   and answer texts) to stay compatible with MineColonies interaction client handling and avoid
   `TranslatableContents` cast crashes on response button clicks.
-- Capacity-stall and lost-package interaction IDs now use translatable components as well
-  (lost-package now uses a stable translatable ID), removing remaining literal-ID paths that could
-  trigger MineColonies interaction button-id cast failures.
+- Capacity-stall interaction IDs use translatable components, while lost-package interactions now
+  use a stable runtime literal ID per overdue segment; this avoids inquiry-component drift during
+  MineColonies response routing and prevents silent button no-op behavior.
 - Lost-package interaction ID translation is now locale-invariant (`createshop_lost_package`)
   across language files, avoiding client/server locale mismatches in interaction response routing.
 - Shop courier diagnostics no longer attempts private-field entityId mutation fallback
@@ -89,9 +89,9 @@ Current behavior:
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
-- Lost-package interaction identity is now stable per `(item, requester, address)` tuple instead
-  of inquiry-text identity, preventing duplicate blocking dialogs for the same unresolved package
-  when notice text/amount drifts across ticks.
+- Lost-package interaction identity is now stable per overdue segment
+  (`item + address + remaining + requestedAt`) instead of inquiry text, preventing duplicate
+  blocking dialogs when requester label text drifts.
 - Overdue inflight prompting is now single-interaction per tick (oldest overdue first) and uses a
   prompt key based on `(item, address)` to avoid duplicate dialogs caused by requester-name drift.
 - Inflight load/record cleanup now removes exact duplicate lost-package segments and caps open
