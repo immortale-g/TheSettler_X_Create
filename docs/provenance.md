@@ -244,6 +244,9 @@ Implementation notes:
 - Incoming-rack housekeeping is authored in this project scope: Create Shop now performs timed
   rack->hut transfers for unreserved items only, preserving reserved quantities for MineColonies
   delivery flow while keeping local storage cleanup server-authoritative and API-driven.
+- Incoming-rack housekeeping resolver-work gating is authored in this project scope: rack->hut
+  transfer now pauses while local Create Shop resolver work is still active, reducing races where
+  newly arrived request items could move before reservation/delivery reconciliation settles.
 - Shopkeeper urgent-work AI gating is authored in this project scope: non-daytime idle transition
   is blocked while resolver pending work or incoming-rack housekeeping work exists, so request and
   cleanup progression continues without MineColonies internals changes.
