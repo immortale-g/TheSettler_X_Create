@@ -1,20 +1,16 @@
 package com.thesettler_x_create.minecolonies.building;
 
-import com.ldtteam.blockui.views.BOWindow;
 import com.minecolonies.api.colony.ICitizen;
 import com.minecolonies.api.colony.ICitizenData;
-import com.minecolonies.api.colony.ICitizenDataView;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
-import com.minecolonies.core.network.messages.server.colony.InteractionResponse;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -30,15 +26,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private static final String TAG_REQUESTER = "Requester";
   private static final String TAG_ADDRESS = "Address";
   private static final String TAG_ACTIVE = "Active";
-  private static final String TAG_REQUESTED_AT = "RequestedAt";
-  private static final String TAG_RUNTIME_ID = "RuntimeId";
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
   private String requesterName = "";
   private String address = "";
-  private long requestedAt;
-  private String runtimeId = "createshop_lost_package|unknown";
   private boolean active = true;
   private final long debugInstanceId = DEBUG_INSTANCE_SEQ.getAndIncrement();
 
@@ -48,11 +40,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   public ShopLostPackageInteraction(
       ItemStack stackKey, int remaining, String requesterName, String address) {
-    this(stackKey, remaining, requesterName, address, 0L);
-  }
-
-  public ShopLostPackageInteraction(
-      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
     super(
         buildInquiry(stackKey, remaining, requesterName, address),
         true,
@@ -74,15 +61,10 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.remaining = Math.max(0, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
-    this.requestedAt = Math.max(0L, requestedAt);
-    this.runtimeId =
-        buildRuntimeId(
-            this.stackKey, this.remaining, this.requesterName, this.address, this.requestedAt);
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction created debugId={} runtimeId={} item={} remaining={} requester='{}' address='{}'",
+          "[CreateShop] lost-package interaction created debugId={} item={} remaining={} requester='{}' address='{}'",
           debugInstanceId,
-          runtimeId,
           this.stackKey.isEmpty() ? "<empty>" : this.stackKey.getHoverName().getString(),
           this.remaining,
           this.requesterName,
@@ -149,30 +131,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   }
 
   @Override
-  public boolean onClientResponseTriggered(
-      int response, Player player, ICitizenDataView citizen, BOWindow window) {
-    if (player == null || citizen == null) {
-      return false;
-    }
-    if (response < 0 || response >= getPossibleResponses().size()) {
-      return false;
-    }
-    if (BuildingCreateShop.isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction client response debugId={} runtimeId={} response={} player={} citizenId={}",
-          debugInstanceId,
-          runtimeId,
-          response,
-          player.getName().getString(),
-          citizen.getId());
-    }
-    new InteractionResponse(
-            citizen.getColonyId(), citizen.getId(), player.level().dimension(), getId(), response)
-        .sendToServer();
-    return true;
-  }
-
-  @Override
   public boolean isValid(ICitizenData citizen) {
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -182,11 +140,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
           citizen == null ? "<null>" : citizen.getName());
     }
     return active;
-  }
-
-  @Override
-  public Component getId() {
-    return Component.literal(runtimeId);
   }
 
   @Override
@@ -220,12 +173,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (!active) {
       tag.putBoolean(TAG_ACTIVE, false);
     }
-    if (requestedAt > 0L) {
-      tag.putLong(TAG_REQUESTED_AT, requestedAt);
-    }
-    if (!runtimeId.isEmpty()) {
-      tag.putString(TAG_RUNTIME_ID, runtimeId);
-    }
     return tag;
   }
 
@@ -239,17 +186,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     remaining = Math.max(0, tag.getInt(TAG_REMAINING));
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
-    requestedAt = Math.max(0L, tag.getLong(TAG_REQUESTED_AT));
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
-    runtimeId = sanitize(tag.getString(TAG_RUNTIME_ID));
-    if (runtimeId.isEmpty()) {
-      runtimeId = buildRuntimeId(stackKey, remaining, requesterName, address, requestedAt);
-    }
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package interaction deserialize debugId={} runtimeId={} item={} remaining={} requester='{}' address='{}' active={}",
+          "[CreateShop] lost-package interaction deserialize debugId={} item={} remaining={} requester='{}' address='{}' active={}",
           debugInstanceId,
-          runtimeId,
           stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
           remaining,
           requesterName,
@@ -325,12 +266,16 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
-    return Component.translatable(
-        "com.thesettler_x_create.interaction.createshop.lost_package.inquiry",
-        requester,
-        itemLabel,
-        Math.max(1, remaining),
-        destination);
+    return Component.literal(
+        "Delivery seems lost for "
+            + requester
+            + ". Item: "
+            + itemLabel
+            + " x"
+            + Math.max(1, remaining)
+            + " (address: "
+            + destination
+            + ").");
   }
 
   private static String sanitize(String value) {
@@ -349,17 +294,5 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return true;
     }
     return ItemStack.isSameItem(candidate, key);
-  }
-
-  private static String buildRuntimeId(
-      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
-    String itemId =
-        stackKey == null || stackKey.isEmpty()
-            ? "minecraft:air"
-            : String.valueOf(BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
-    String destination = sanitize(address);
-    int count = Math.max(1, remaining);
-    long segment = Math.max(0L, requestedAt);
-    return "createshop_lost_package|" + itemId + "|" + destination + "|" + count + "|" + segment;
   }
 }
