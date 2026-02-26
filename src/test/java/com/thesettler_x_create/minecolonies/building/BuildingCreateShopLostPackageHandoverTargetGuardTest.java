@@ -17,6 +17,7 @@ class BuildingCreateShopLostPackageHandoverTargetGuardTest {
     assertTrue(source.contains("int targetAmount = Math.max(1, remaining);"));
     assertTrue(
         source.contains("slot < inventory.getContainerSize() && totalConsumed < targetAmount"));
-    assertTrue(source.contains("int consumeTarget = Math.min(targetAmount - totalConsumed"));
+    assertTrue(source.contains("int consumeTarget ="));
+    assertTrue(source.contains("consumeTarget = Math.min(targetAmount - totalConsumed"));
   }
 }
