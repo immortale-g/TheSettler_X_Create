@@ -632,6 +632,28 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                   && child.getRequest()
                       instanceof
                       com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery) {
+                var childState = child.getState();
+                boolean terminalChild =
+                    childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .COMPLETED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .CANCELLED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState.FAILED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RESOLVED
+                        || childState
+                            == com.minecolonies.api.colony.requestsystem.request.RequestState
+                                .RECEIVED;
+                if (terminalChild) {
+                  request.removeChild(childToken);
+                  deliveryChildActiveSince.remove(childToken);
+                  clearStaleRecoveryArm(request.getId());
+                  continue;
+                }
                 if (!isLocalShopDeliveryChild(child, shop, pickup)) {
                   hasActiveChildren = true;
                   if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -672,56 +694,34 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                         enqueued ? "ok" : "none");
                   }
                 }
-                var childState = child.getState();
-                boolean terminalChild =
-                    childState
-                            == com.minecolonies.api.colony.requestsystem.request.RequestState
-                                .COMPLETED
-                        || childState
-                            == com.minecolonies.api.colony.requestsystem.request.RequestState
-                                .CANCELLED
-                        || childState
-                            == com.minecolonies.api.colony.requestsystem.request.RequestState.FAILED
-                        || childState
-                            == com.minecolonies.api.colony.requestsystem.request.RequestState
-                                .RESOLVED
-                        || childState
-                            == com.minecolonies.api.colony.requestsystem.request.RequestState
-                                .RECEIVED;
-                if (terminalChild) {
-                  request.removeChild(childToken);
-                  deliveryChildActiveSince.remove(childToken);
-                  clearStaleRecoveryArm(request.getId());
+                if (activeLocalDeliveryChild != null
+                    && !activeLocalDeliveryChild.equals(childToken)) {
+                  boolean recovered =
+                      recoverExtraActiveDeliveryChild(
+                          standardManager, level, request, childToken, child, shop, pickup);
+                  if (recovered) {
+                    missing++;
+                    continue;
+                  }
                 } else {
-                  if (activeLocalDeliveryChild != null
-                      && !activeLocalDeliveryChild.equals(childToken)) {
-                    boolean recovered =
-                        recoverExtraActiveDeliveryChild(
-                            standardManager, level, request, childToken, child, shop, pickup);
-                    if (recovered) {
-                      missing++;
-                      continue;
-                    }
-                  } else {
-                    activeLocalDeliveryChild = childToken;
-                  }
-                  if (isStaleDeliveryChild(level, request.getId(), childToken, childState)) {
-                    if (!isStaleRecoveryArmed(level, standardManager, request.getId())) {
-                      hasActiveChildren = true;
-                      continue;
-                    }
-                    boolean recovered =
-                        recoverStaleDeliveryChild(
-                            standardManager, level, request, childToken, child, shop, pickup);
-                    if (recovered) {
-                      missing++;
-                      continue;
-                    }
-                  } else {
-                    clearStaleRecoveryArm(request.getId());
-                  }
-                  hasActiveChildren = true;
+                  activeLocalDeliveryChild = childToken;
                 }
+                if (isStaleDeliveryChild(level, request.getId(), childToken, childState)) {
+                  if (!isStaleRecoveryArmed(level, standardManager, request.getId())) {
+                    hasActiveChildren = true;
+                    continue;
+                  }
+                  boolean recovered =
+                      recoverStaleDeliveryChild(
+                          standardManager, level, request, childToken, child, shop, pickup);
+                  if (recovered) {
+                    missing++;
+                    continue;
+                  }
+                } else {
+                  clearStaleRecoveryArm(request.getId());
+                }
+                hasActiveChildren = true;
               } else {
                 deliveryChildActiveSince.remove(childToken);
               }
@@ -2094,8 +2094,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (start == null || level == null || start.getDimension() == null) {
       return false;
     }
-    return level.dimension().equals(start.getDimension())
-        && pickup.getBlockPos().equals(start.getInDimensionLocation());
+    if (!level.dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (pickup.getBlockPos().equals(startPos)) {
+      return true;
+    }
+    return shop.hasContainerPosition(startPos);
   }
 
   private boolean isDeliveryFromPickup(Delivery delivery, CreateShopBlockEntity pickup) {

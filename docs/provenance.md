@@ -138,6 +138,11 @@ Implementation notes:
   Shop delivery dispatch no longer injects requests directly into deliveryman jobs and now relies
   on MineColonies warehouse queue dispatch only, with queue deduplication to avoid repeated
   token insertion.
+- Delivery-child locality completion hardening on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project: pending reconciliation now removes terminal
+  delivery children before locality gating, and locality checks accept both pickup-block starts and
+  registered shop container/rack starts, preventing false `non-local delivery child` stalls for
+  rack-sourced MineColonies native deliveries.
 - Resolver followup behavior alignment on the strict branch is authored in this project:
   Create Shop resolver followup completion now returns `null` (no explicit followups), matching
   MineColonies delivery-resolver semantics while avoiding unsafe warehouse-tile casts.
