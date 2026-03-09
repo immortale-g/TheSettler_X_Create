@@ -138,6 +138,11 @@ Implementation notes:
   Shop delivery dispatch no longer injects requests directly into deliveryman jobs and now relies
   on MineColonies warehouse queue dispatch only, with queue deduplication to avoid repeated
   token insertion.
+- Delivery-child locality completion hardening on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project: pending reconciliation now removes terminal
+  delivery children before locality gating, and locality checks accept both pickup-block starts and
+  registered shop container/rack starts, preventing false `non-local delivery child` stalls for
+  rack-sourced MineColonies native deliveries.
 - Resolver followup behavior alignment on the strict branch is authored in this project:
   Create Shop resolver followup completion now returns `null` (no explicit followups), matching
   MineColonies delivery-resolver semantics while avoiding unsafe warehouse-tile casts.
@@ -371,3 +376,13 @@ Implementation notes:
 - Diagnostics decoupling hardening is authored in this project scope:
   `ShopCourierDiagnostics` no longer executes courier-module assignment comparison paths tied to
   `CourierAssignmentModule`, aligning diagnostics with shop-courier module removal.
+- Network-arrival child-creation gating on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project scope: `attemptResolve` now defers delivery-child
+  creation whenever any request portion is ordered from the Create network, keeping child creation
+  in `tickPending` after rack-side arrival/reservation reconciliation instead of creating mixed
+  rack/network child sets in the initial resolve pass.
+- Reservation lifecycle ordering hardening on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project scope: Create Shop no longer consumes request
+  reservations at delivery-child creation time; reservation consumption is now tied to delivery
+  completion for local shop starts (pickup/rack containers), preventing housekeeping from treating
+  still-delivery-bound rack stock as unreserved.

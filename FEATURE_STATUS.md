@@ -84,6 +84,10 @@ Current behavior:
   stale persists after the recheck window, reducing one-tick false-positive churn.
 - Stale/extra-child recovery revalidates live MineColonies ownership before mutation; cancel/remove/
   requeue only runs when the parent request is still owned by the local Create Shop resolver.
+- Delivery-child locality now accepts both pickup-block starts and registered shop container/rack
+  starts, so rack-sourced native MineColonies deliveries are no longer misclassified as foreign.
+- Parent pending reconciliation now removes terminal delivery children before locality gating, so
+  completed/cancelled child tokens cannot keep parent requests stuck in `IN_PROGRESS`.
 - Lost-package recovery flow is now one-shot and rack-oriented: `Reorder` no longer stays blocked
   by strict inflight tuple cleanup, `Handover` inserts unpacked contents into rack flow (no hut
   fallback), and inflight cleanup now has a stack-key fallback when requester/address text drifts.
@@ -121,6 +125,12 @@ Current behavior:
 - Flow-step chat lines are now independently configurable and default to disabled
   (`flowChatMessagesEnabled=false`), while player-facing Create Shop chat keeps a single concise
   message per stage (order and delivery-start) to avoid duplicate/near-duplicate chat spam.
+- Mixed-source (rack + network) request handling now defers delivery-child creation from
+  `attemptResolve` to `tickPending`, so MineColonies courier pickup is only scheduled after
+  rack-side availability/reconciliation on the pending path.
+- Reservation consumption timing is now delivery-completion based for local Create Shop delivery
+  starts (pickup or registered rack containers), so rack housekeeping no longer pulls items into
+  hut inventory before MineColonies delivery children have actually completed pickup/transport.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
