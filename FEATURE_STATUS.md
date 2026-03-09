@@ -125,6 +125,9 @@ Current behavior:
 - Flow-step chat lines are now independently configurable and default to disabled
   (`flowChatMessagesEnabled=false`), while player-facing Create Shop chat keeps a single concise
   message per stage (order and delivery-start) to avoid duplicate/near-duplicate chat spam.
+- Mixed-source (rack + network) request handling now defers delivery-child creation from
+  `attemptResolve` to `tickPending`, so MineColonies courier pickup is only scheduled after
+  rack-side availability/reconciliation on the pending path.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
