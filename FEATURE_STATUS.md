@@ -128,6 +128,9 @@ Current behavior:
 - Mixed-source (rack + network) request handling now defers delivery-child creation from
   `attemptResolve` to `tickPending`, so MineColonies courier pickup is only scheduled after
   rack-side availability/reconciliation on the pending path.
+- Reservation consumption timing is now delivery-completion based for local Create Shop delivery
+  starts (pickup or registered rack containers), so rack housekeeping no longer pulls items into
+  hut inventory before MineColonies delivery children have actually completed pickup/transport.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

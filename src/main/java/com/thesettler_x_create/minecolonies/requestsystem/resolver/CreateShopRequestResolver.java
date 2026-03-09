@@ -289,17 +289,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
             deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
-        if (plannedCount > 0 && reservedForRequest > 0) {
-          consumeReservedForRequest(pickup, requestId, planned);
-          transitionFlow(
-              manager,
-              request,
-              CreateShopFlowState.RESERVED_FOR_DELIVERY,
-              "attemptResolve:reserved-consumed",
-              describeStack(ordered.get(0)),
-              plannedCount,
-              "com.thesettler_x_create.message.createshop.flow_reserved");
-        }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
@@ -1009,17 +998,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           "com.thesettler_x_create.message.createshop.flow_delivery_created");
       diagnostics.logPendingReasonChange(request.getId(), "create:delivery");
       int deliveredCount = planning.countPlanned(stacks);
-      if (reservedForRequest > 0 && deliveredCount > 0) {
-        consumeReservedForRequest(pickup, requestId, stacks);
-        transitionFlow(
-            manager,
-            request,
-            CreateShopFlowState.RESERVED_FOR_DELIVERY,
-            "tickPending:reserved-consumed",
-            describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
-            deliveredCount,
-            "com.thesettler_x_create.message.createshop.flow_reserved");
-      }
       int remainingCount = Math.max(0, pendingCount - deliveredCount);
       if (remainingCount > 0) {
         pendingTracker.setPendingCount(request.getId(), remainingCount);
@@ -1282,7 +1260,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
       return;
     }
-    if (!isDeliveryFromPickup(delivery, pickup)) {
+    if (!isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
       return;
     }
 
@@ -1354,26 +1332,52 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           request.getRequest() instanceof Delivery d ? d.getStack().getCount() : 0,
           "com.thesettler_x_create.message.createshop.flow_delivery_completed");
     }
-    if (isDebugLoggingEnabled()
-        && request != null
-        && request.getRequest() instanceof Delivery delivery) {
+    if (request != null && request.getRequest() instanceof Delivery delivery) {
       try {
+        BuildingCreateShop shop = getShop(manager);
         CreateShopBlockEntity pickup = null;
-        Level level = manager == null ? null : manager.getColony().getWorld();
-        BlockPos startPos = delivery.getStart().getInDimensionLocation();
-        if (level != null && WorldUtil.isBlockLoaded(level, startPos)) {
+        if (shop != null) {
+          pickup = shop.getPickupBlockEntity();
+        }
+        Level level =
+            manager == null || manager.getColony() == null ? null : manager.getColony().getWorld();
+        ILocation start = delivery.getStart();
+        BlockPos startPos = start == null ? null : start.getInDimensionLocation();
+        if (pickup == null
+            && level != null
+            && startPos != null
+            && WorldUtil.isBlockLoaded(level, startPos)) {
           BlockEntity startEntity = level.getBlockEntity(startPos);
           if (startEntity instanceof CreateShopBlockEntity shopPickup) {
             pickup = shopPickup;
           }
         }
-        if (pickup == null || !isDeliveryFromPickup(delivery, pickup)) {
+        if (pickup == null || !isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
           return;
         }
         UUID parentRequestId = toRequestId(parentToken);
         ItemStack stack = delivery.getStack().copy();
+        int reservedForStackBefore = pickup.getReservedFor(stack);
+        if (!stack.isEmpty()) {
+          pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
+        }
+        int reservedForStackAfter = pickup.getReservedFor(stack);
+        int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
+        if (consumedReserved > 0 && parentRequest != null) {
+          transitionFlow(
+              manager,
+              parentRequest,
+              CreateShopFlowState.RESERVED_FOR_DELIVERY,
+              "delivery-complete:reserved-consumed",
+              describeStack(stack),
+              consumedReserved,
+              "com.thesettler_x_create.message.createshop.flow_reserved");
+        }
+        if (!isDebugLoggingEnabled()) {
+          return;
+        }
         int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
-        int reservedForStack = pickup.getReservedFor(stack);
+        int reservedForStack = reservedForStackAfter;
         BlockPos pickupPosition = pickup.getBlockPos();
         deliveryManager.logDeliveryDiagnostics(
             "complete",
@@ -1387,13 +1391,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             -1,
             reservedForStack);
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={}",
+            "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
             request.getId(),
             parentToken,
             stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
             stack.getCount(),
             startPos,
-            delivery.getTarget().getInDimensionLocation());
+            delivery.getTarget().getInDimensionLocation(),
+            consumedReserved);
       } catch (Exception ignored) {
         // Ignore delivery detail logging failures.
       }
@@ -1606,25 +1611,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               cleared);
         }
       }
-    }
-  }
-
-  private void consumeReservedForRequest(
-      CreateShopBlockEntity pickup,
-      UUID requestId,
-      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks) {
-    if (pickup == null || requestId == null || stacks == null) {
-      return;
-    }
-    for (var entry : stacks) {
-      if (entry == null) {
-        continue;
-      }
-      ItemStack stack = entry.getA();
-      if (stack == null || stack.isEmpty()) {
-        continue;
-      }
-      pickup.consumeReservedForRequest(requestId, stack, stack.getCount());
     }
   }
 
@@ -2121,6 +2107,28 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     return pickup.getLevel().dimension().equals(start.getDimension())
         && pickup.getBlockPos().equals(start.getInDimensionLocation());
+  }
+
+  private boolean isDeliveryFromLocalShopStart(
+      Delivery delivery, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
+    if (delivery == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    ILocation start = delivery.getStart();
+    if (start == null || start.getDimension() == null) {
+      return false;
+    }
+    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (isDeliveryFromPickup(delivery, pickup)) {
+      return true;
+    }
+    return shop != null && shop.hasContainerPosition(startPos);
   }
 
   private void clearTrackedChildrenForParent(
