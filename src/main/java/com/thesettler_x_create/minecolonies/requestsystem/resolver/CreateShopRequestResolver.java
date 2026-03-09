@@ -246,6 +246,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           needed,
           ordered.size());
     }
+    boolean hasNetworkPortion = remaining > 0;
     if (!ordered.isEmpty()) {
       transitionFlow(
           manager,
@@ -255,8 +256,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           describeStack(ordered.get(0)),
           countStackList(ordered),
           "com.thesettler_x_create.message.createshop.flow_ordered");
-      // If we can satisfy from racks, create deliveries immediately.
-      if (rackUsable > 0) {
+      // If any portion came from the network, defer child creation to tickPending.
+      if (hasNetworkPortion) {
+        cooldown.markRequestOrdered(level, request.getId());
+        pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
+        diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-network-arrival");
+        flowStateMachine.touch(request.getId(), now, "attemptResolve:defer-network-arrival");
+        messaging.sendShopChat(
+            manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
+      } else if (rackUsable > 0) {
         if (unwrapStandardManager(manager) == null) {
           cooldown.markRequestOrdered(level, request.getId());
           pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
@@ -292,11 +300,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               plannedCount,
               "com.thesettler_x_create.message.createshop.flow_reserved");
         }
-        if (remaining > 0) {
-          cooldown.markRequestOrdered(level, request.getId());
-          pendingTracker.setPendingCount(request.getId(), Math.max(1, needed - plannedCount));
-          diagnostics.recordPendingSource(request.getId(), "attemptResolve:partial");
-        }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
@@ -315,13 +318,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               "com.thesettler_x_create.message.createshop.flow_delivery_created");
         }
         return created;
+      } else {
+        // Otherwise, order from network and wait for arrival.
+        cooldown.markRequestOrdered(level, request.getId());
+        pendingTracker.setPendingCount(request.getId(), needed);
+        diagnostics.recordPendingSource(request.getId(), "attemptResolve:network-ordered");
+        messaging.sendShopChat(
+            manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       }
-      // Otherwise, order from network and wait for arrival.
-      cooldown.markRequestOrdered(level, request.getId());
-      pendingTracker.setPendingCount(request.getId(), needed);
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:network-ordered");
-      messaging.sendShopChat(
-          manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
     }
 
     // Reserve ordered items so they count as in-progress and avoid re-ordering.
@@ -334,8 +338,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
     }
 
-    // If we ordered from the network, we wait for arrival and do not create deliveries yet.
-    if (rackUsable <= 0) {
+    // If we ordered from the network, we wait for arrival and do not create deliveries here.
+    if (hasNetworkPortion || rackUsable <= 0) {
       return Lists.newArrayList();
     }
 

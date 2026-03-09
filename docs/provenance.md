@@ -376,3 +376,8 @@ Implementation notes:
 - Diagnostics decoupling hardening is authored in this project scope:
   `ShopCourierDiagnostics` no longer executes courier-module assignment comparison paths tied to
   `CourierAssignmentModule`, aligning diagnostics with shop-courier module removal.
+- Network-arrival child-creation gating on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project scope: `attemptResolve` now defers delivery-child
+  creation whenever any request portion is ordered from the Create network, keeping child creation
+  in `tickPending` after rack-side arrival/reservation reconciliation instead of creating mixed
+  rack/network child sets in the initial resolve pass.
