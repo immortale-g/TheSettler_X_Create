@@ -1352,53 +1352,51 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pickup = shopPickup;
           }
         }
-        if (pickup == null || !isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
-          return;
+        if (pickup != null && isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
+          UUID parentRequestId = toRequestId(parentToken);
+          ItemStack stack = delivery.getStack().copy();
+          int reservedForStackBefore = pickup.getReservedFor(stack);
+          if (!stack.isEmpty()) {
+            pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
+          }
+          int reservedForStackAfter = pickup.getReservedFor(stack);
+          int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
+          if (consumedReserved > 0 && parentRequest != null) {
+            transitionFlow(
+                manager,
+                parentRequest,
+                CreateShopFlowState.RESERVED_FOR_DELIVERY,
+                "delivery-complete:reserved-consumed",
+                describeStack(stack),
+                consumedReserved,
+                "com.thesettler_x_create.message.createshop.flow_reserved");
+          }
+          if (isDebugLoggingEnabled()) {
+            int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
+            int reservedForStack = reservedForStackAfter;
+            BlockPos pickupPosition = pickup.getBlockPos();
+            deliveryManager.logDeliveryDiagnostics(
+                "complete",
+                manager,
+                request.getId(),
+                parentRequestId,
+                pickupPosition,
+                stack,
+                delivery.getTarget(),
+                reservedForRequest,
+                -1,
+                reservedForStack);
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
+                request.getId(),
+                parentToken,
+                stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
+                stack.getCount(),
+                startPos,
+                delivery.getTarget().getInDimensionLocation(),
+                consumedReserved);
+          }
         }
-        UUID parentRequestId = toRequestId(parentToken);
-        ItemStack stack = delivery.getStack().copy();
-        int reservedForStackBefore = pickup.getReservedFor(stack);
-        if (!stack.isEmpty()) {
-          pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
-        }
-        int reservedForStackAfter = pickup.getReservedFor(stack);
-        int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
-        if (consumedReserved > 0 && parentRequest != null) {
-          transitionFlow(
-              manager,
-              parentRequest,
-              CreateShopFlowState.RESERVED_FOR_DELIVERY,
-              "delivery-complete:reserved-consumed",
-              describeStack(stack),
-              consumedReserved,
-              "com.thesettler_x_create.message.createshop.flow_reserved");
-        }
-        if (!isDebugLoggingEnabled()) {
-          return;
-        }
-        int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
-        int reservedForStack = reservedForStackAfter;
-        BlockPos pickupPosition = pickup.getBlockPos();
-        deliveryManager.logDeliveryDiagnostics(
-            "complete",
-            manager,
-            request.getId(),
-            parentRequestId,
-            pickupPosition,
-            stack,
-            delivery.getTarget(),
-            reservedForRequest,
-            -1,
-            reservedForStack);
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
-            request.getId(),
-            parentToken,
-            stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
-            stack.getCount(),
-            startPos,
-            delivery.getTarget().getInDimensionLocation(),
-            consumedReserved);
       } catch (Exception ignored) {
         // Ignore delivery detail logging failures.
       }
