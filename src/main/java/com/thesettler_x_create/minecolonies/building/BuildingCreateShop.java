@@ -1042,6 +1042,17 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
       }
     }
+    // Ownership is authoritative for pending processing; prefer it when drift is detected.
+    CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
+    if (ownershipSelected != null && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolver ownership priority switch {} -> {}",
+            selected == null ? "<null>" : selected.getId(),
+            ownershipSelected.getId());
+      }
+      selected = ownershipSelected;
+    }
     if (selected == null) {
       return current;
     }
@@ -1086,6 +1097,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (assignments == null || assignments.isEmpty()) {
       return null;
     }
+    java.util.Map<IToken<?>, Integer> ownershipCounts = new java.util.HashMap<>();
+    java.util.Map<IToken<?>, CreateShopRequestResolver> resolversById = new java.util.HashMap<>();
     for (java.util.Collection<IToken<?>> requestTokens : assignments.values()) {
       if (requestTokens == null || requestTokens.isEmpty()) {
         continue;
@@ -1098,14 +1111,27 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           }
           IRequestResolver<?> owner = manager.getResolverHandler().getResolverForRequest(request);
           if (owner instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
-            return shop;
+            IToken<?> ownerId = shop.getId();
+            ownershipCounts.merge(ownerId, 1, Integer::sum);
+            resolversById.putIfAbsent(ownerId, shop);
           }
         } catch (Exception ignored) {
           // Ignore stale request/resolver links.
         }
       }
     }
-    return null;
+    if (ownershipCounts.isEmpty()) {
+      return null;
+    }
+    IToken<?> dominantOwner = null;
+    int dominantCount = 0;
+    for (var entry : ownershipCounts.entrySet()) {
+      if (entry.getValue() > dominantCount) {
+        dominantOwner = entry.getKey();
+        dominantCount = entry.getValue();
+      }
+    }
+    return dominantOwner == null ? null : resolversById.get(dominantOwner);
   }
 
   @Nullable
