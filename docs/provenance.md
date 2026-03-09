@@ -381,3 +381,8 @@ Implementation notes:
   creation whenever any request portion is ordered from the Create network, keeping child creation
   in `tickPending` after rack-side arrival/reservation reconciliation instead of creating mixed
   rack/network child sets in the initial resolve pass.
+- Reservation lifecycle ordering hardening on branch `fix/delivery-child-locality-completion`
+  (2026-03-09) is authored in this project scope: Create Shop no longer consumes request
+  reservations at delivery-child creation time; reservation consumption is now tied to delivery
+  completion for local shop starts (pickup/rack containers), preventing housekeeping from treating
+  still-delivery-bound rack stock as unreserved.
