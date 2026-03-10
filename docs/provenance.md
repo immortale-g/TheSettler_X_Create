@@ -399,3 +399,12 @@ Implementation notes:
   reservations at delivery-child creation time; reservation consumption is now tied to delivery
   completion for local shop starts (pickup/rack containers), preventing housekeeping from treating
   still-delivery-bound rack stock as unreserved.
+- Lost-package stale-interaction invalidation hardening on branch `fix/inflight-reorder-guard`
+  (2026-03-10) is authored in this project scope: lost-package interactions now carry a
+  shop-local runtime epoch, and `reset_live_state` bumps that epoch so pre-reset dialogs cannot
+  mutate post-reset runtime state.
+- Lost-package tuple-liveness response guard hardening on branch `fix/inflight-reorder-guard`
+  (2026-03-10) is authored in this project scope: interaction responses now validate live inflight
+  remainder for the exact overdue segment (`item + requester + address + requestedAt`) before
+  reorder/handover/cancel routing, preventing stale dialog responses from re-opening flows after
+  tuple resolution.

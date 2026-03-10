@@ -14,7 +14,8 @@ class BuildingCreateShopLostPackageRestartInflightGateGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("int trackedRemaining = pickup.getInflightRemaining("));
+    assertTrue(source.contains("pickup.getInflightRemaining("));
+    assertTrue(source.contains("requestedAt"));
     assertTrue(
         source.contains(
             "int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));"));

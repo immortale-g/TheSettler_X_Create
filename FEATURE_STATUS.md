@@ -117,6 +117,12 @@ Current behavior:
 - Lost-package inflight consumption now falls back to same-item matching for component drift, and
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
+- Lost-package interactions now carry a shop-local runtime epoch that is bumped during
+  `/thesettlerxcreate reset_live_state`, so stale pre-reset dialogs cannot mutate new post-reset
+  runtime state.
+- Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
+  before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
+  phantom follow-up interactions.
 - Open inflight overdue entries are now re-armed for prompting on world load (`notified=false`
   during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
 - Cancelled requests now clear matching lost-package inflight entries immediately, so cancelling a
