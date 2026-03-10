@@ -493,6 +493,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public int restartLostPackage(
       ItemStack stackKey, int remaining, String requesterName, String address) {
+    return restartLostPackageDetailed(stackKey, remaining, requesterName, address).consumed();
+  }
+
+  LostPackageReorderResult restartLostPackageDetailed(
+      ItemStack stackKey, int remaining, String requesterName, String address) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requested item={} remaining={} requester='{}' address='{}'",
@@ -506,7 +511,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: invalid input");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.INVALID_INPUT);
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -518,7 +523,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             pickup != null,
             tile != null && tile.getStockNetworkId() != null);
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.MISSING_CONTEXT);
     }
     int trackedRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
     int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));
@@ -527,7 +532,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart skipped: no tracked inflight remaining for tuple");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.NO_TRACKED_INFLIGHT);
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(reorderTarget);
@@ -538,7 +543,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart failed: network returned empty reorder list");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.NO_NETWORK_STOCK);
     }
     int requestedCount = 0;
     for (ItemStack stack : reordered) {
@@ -555,7 +560,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           requestedCount,
           consumed);
     }
-    return consumed;
+    return new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);
   }
 
   public int acceptLostPackageFromPlayer(
@@ -950,6 +955,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return requester.equals("unknown")
         || requester.equals("<unknown>")
         || requester.equals("unknown requester");
+  }
+
+  record LostPackageReorderResult(int consumed, LostPackageReorderStatus status) {}
+
+  enum LostPackageReorderStatus {
+    SUCCESS,
+    INVALID_INPUT,
+    MISSING_CONTEXT,
+    NO_TRACKED_INFLIGHT,
+    NO_NETWORK_STOCK
   }
 
   private void ensureWarehouseRegistration() {

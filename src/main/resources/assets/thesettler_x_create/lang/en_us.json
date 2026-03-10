@@ -67,6 +67,10 @@
   "com.thesettler_x_create.interaction.createshop.lost_package.response_handover": "Hand over package",
   "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover": "I'll unpack it now.",
   "com.thesettler_x_create.interaction.createshop.lost_package.response_cancel": "Cancel request",
-  "com.thesettler_x_create.interaction.createshop.lost_package.answer_cancel": "I'll cancel the stuck request."
+  "com.thesettler_x_create.interaction.createshop.lost_package.answer_cancel": "I'll cancel the stuck request.",
+  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.id": "createshop_lost_package_reorder_unavailable",
+  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.inquiry": "Re-order failed for %s. Not enough items in the stock network for %s x%s (address: %s).",
+  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.response_back": "Back",
+  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.answer_back": "Understood. I'll return to the lost package options."
 }
 
