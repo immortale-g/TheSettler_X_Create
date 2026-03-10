@@ -880,33 +880,52 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       int topupNeeded =
           Math.max(0, pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailable));
       if (workerWorking && topupNeeded > 0) {
-        int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
-        int topupCount = Math.min(networkAvailable, topupNeeded);
-        if (topupCount > 0) {
-          String requesterName = messaging.resolveRequesterName(manager, request);
-          List<ItemStack> topupOrdered =
-              stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName);
-          if (!topupOrdered.isEmpty()) {
-            for (ItemStack stack : topupOrdered) {
-              if (stack.isEmpty()) {
-                continue;
+        String requesterName = messaging.resolveRequesterName(manager, request);
+        int inflightRemaining =
+            pickup.getInflightRemaining(
+                deliverable.getResult(), requesterName, tile.getShopAddress());
+        if (inflightRemaining > 0) {
+          cooldown.markRequestOrdered(level, request.getId());
+          pendingTracker.setPendingCount(request.getId(), pendingCount);
+          diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
+          flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} network topup blocked (inflightRemaining={}, pending={}, reserved={}, rack={})",
+                requestIdLog,
+                inflightRemaining,
+                pendingCount,
+                reservedForRequest,
+                rackAvailable);
+          }
+        } else {
+          int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
+          int topupCount = Math.min(networkAvailable, topupNeeded);
+          if (topupCount > 0) {
+            List<ItemStack> topupOrdered =
+                stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName);
+            if (!topupOrdered.isEmpty()) {
+              for (ItemStack stack : topupOrdered) {
+                if (stack.isEmpty()) {
+                  continue;
+                }
+                pickup.reserve(requestId, stack.copy(), stack.getCount());
               }
-              pickup.reserve(requestId, stack.copy(), stack.getCount());
-            }
-            cooldown.markRequestOrdered(level, request.getId());
-            pendingTracker.setPendingCount(request.getId(), pendingCount);
-            diagnostics.recordPendingSource(request.getId(), "tickPending:network-topup");
-            flowStateMachine.touch(
-                request.getId(), level.getGameTime(), "tickPending:network-topup");
-            messaging.sendShopChat(
-                manager, "com.thesettler_x_create.message.createshop.request_sent", topupOrdered);
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] tickPending: {} network topup ordered={} pending={} reserved={}",
-                  requestIdLog,
-                  countStackList(topupOrdered),
-                  pendingCount,
-                  reservedForRequest);
+              cooldown.markRequestOrdered(level, request.getId());
+              pendingTracker.setPendingCount(request.getId(), pendingCount);
+              diagnostics.recordPendingSource(request.getId(), "tickPending:network-topup");
+              flowStateMachine.touch(
+                  request.getId(), level.getGameTime(), "tickPending:network-topup");
+              messaging.sendShopChat(
+                  manager, "com.thesettler_x_create.message.createshop.request_sent", topupOrdered);
+              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                TheSettlerXCreate.LOGGER.info(
+                    "[CreateShop] tickPending: {} network topup ordered={} pending={} reserved={}",
+                    requestIdLog,
+                    countStackList(topupOrdered),
+                    pendingCount,
+                    reservedForRequest);
+              }
             }
           }
         }

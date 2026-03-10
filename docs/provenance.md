@@ -242,6 +242,10 @@ Implementation notes:
 - Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
   now subtracts rack-available stock from top-up deficit calculation before issuing Create network
   orders, preventing duplicate network reorders when enough items are already in shop racks.
+- Pending inflight reorder guard hardening is authored in this project scope: `tickPending` now
+  blocks Create-network top-up for a parent while matching inflight stock for the same
+  deliverable/requester/address tuple remains open, keeping requests in waiting state instead of
+  repeatedly reordering before overdue/lost-package handling.
 - Reservation-refresh hardening is authored in this project scope: `tickPending` now reconstructs
   missing per-request reservations from currently available rack stock after request refresh,
   reducing post-reload reservation drift and avoiding premature unreserved treatment of pending

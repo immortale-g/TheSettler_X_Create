@@ -1044,7 +1044,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     // Ownership is authoritative for pending processing; prefer it when drift is detected.
     CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
-    if (ownershipSelected != null && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
+    if (ownershipSelected != null
+        && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver ownership priority switch {} -> {}",
