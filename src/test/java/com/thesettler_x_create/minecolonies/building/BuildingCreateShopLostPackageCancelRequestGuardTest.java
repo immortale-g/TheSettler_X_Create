@@ -16,6 +16,9 @@ class BuildingCreateShopLostPackageCancelRequestGuardTest {
 
     assertTrue(source.contains("cancelLostPackageRequestAndInflight("));
     assertTrue(source.contains("cancelMatchingLostPackageRequests("));
+    assertTrue(source.contains("matchesLostPackageRequest("));
+    assertTrue(source.contains("request.getChildren()"));
+    assertTrue(source.contains("instanceof Delivery"));
     assertTrue(
         source.contains("standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
   }
