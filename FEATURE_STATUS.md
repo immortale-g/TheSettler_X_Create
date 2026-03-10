@@ -108,6 +108,9 @@ Current behavior:
   local Create Shop-owned requests via MineColonies request-state updates and clears matching
   inflight tuple tracking, enabling clean native re-request from colony side when recovery is
   intentionally aborted.
+- Lost-package reorder failures caused by insufficient stock-network availability now open a
+  dedicated one-button info interaction (`Back`) and then return to the lost-package options,
+  instead of silently closing without player-visible feedback.
 - Lost-package handover now pre-checks preview-accepted package content against remaining inflight
   before removing a player package, and stops further package removals after a consume-miss to
   avoid multi-package loss when tuple consumption fails.

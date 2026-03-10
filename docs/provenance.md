@@ -371,6 +371,10 @@ Implementation notes:
   requests via MineColonies `updateRequestState(..., CANCELLED)` and clears matching inflight
   tracking for the tuple, so players can abort stuck overdue flows without forcing duplicate
   reorders.
+- Lost-package reorder-failure feedback hardening is authored in this project scope:
+  when reorder cannot be created due to missing stock-network availability, the shopkeeper now
+  presents a dedicated one-button info interaction (`Back`) and then re-opens the lost-package
+  options, avoiding silent UI close without player feedback.
 - Lost-package handover consume-guard hardening is authored in this project scope:
   package removal now requires preview-accepted matching content plus remaining inflight coverage,
   and handover stops further package removals after a consume-miss to prevent multi-package loss

@@ -109,10 +109,30 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       }
       return;
     }
+    // Lock interaction immediately to avoid duplicate reopen windows while handling a response.
+    active = false;
     boolean handled = false;
     int consumed = 0;
     if (response == 0) {
-      consumed = shop.restartLostPackage(stackKey, remaining, requesterName, address);
+      BuildingCreateShop.LostPackageReorderResult reorder =
+          shop.restartLostPackageDetailed(stackKey, remaining, requesterName, address);
+      consumed = reorder.consumed();
+      if (reorder.status() == BuildingCreateShop.LostPackageReorderStatus.NO_NETWORK_STOCK) {
+        active = false;
+        if (remaining > 0) {
+          citizen.triggerInteraction(
+              new ShopLostPackageReorderUnavailableInteraction(
+                  stackKey.copy(), remaining, requesterName, address));
+        }
+        if (BuildingCreateShop.isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package interaction reorder unavailable debugId={} item={} remaining={}",
+              debugInstanceId,
+              stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+              remaining);
+        }
+        return;
+      }
     } else if (response == 1) {
       consumed =
           shop.acceptLostPackageFromPlayer(player, stackKey, remaining, requesterName, address);
@@ -135,6 +155,10 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (handled) {
       active = false;
       remaining = 0;
+    } else if (consumed <= 0) {
+      // Re-arm the dialog when nothing was consumed and no dedicated fallback interaction took
+      // over.
+      active = true;
     }
   }
 
