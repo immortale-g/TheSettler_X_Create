@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -851,8 +852,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             || !isLocalResolver(owner, shopResolver)) {
           continue;
         }
-        if (!(request.getRequest() instanceof IDeliverable deliverable)
-            || !matchesLostPackageDeliverable(deliverable, stackKey)) {
+        if (!matchesLostPackageRequest(standard, request, stackKey)) {
           continue;
         }
         if (!matchesLostPackageRequester(standard, request, requesterName)) {
@@ -903,6 +903,47 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return true;
     }
     return ItemStack.isSameItem(result, stackKey);
+  }
+
+  private static boolean matchesLostPackageRequest(
+      IStandardRequestManager manager, IRequest<?> request, ItemStack stackKey) {
+    if (manager == null || request == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    if (matchesLostPackageRequestPayload(request, stackKey)) {
+      return true;
+    }
+    if (!request.hasChildren()) {
+      return false;
+    }
+    for (IToken<?> childToken : request.getChildren()) {
+      if (childToken == null) {
+        continue;
+      }
+      IRequest<?> child = manager.getRequestHandler().getRequest(childToken);
+      if (child != null && matchesLostPackageRequestPayload(child, stackKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean matchesLostPackageRequestPayload(IRequest<?> request, ItemStack stackKey) {
+    if (request == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    if (request.getRequest() instanceof IDeliverable deliverable
+        && matchesLostPackageDeliverable(deliverable, stackKey)) {
+      return true;
+    }
+    if (request.getRequest() instanceof Delivery delivery) {
+      ItemStack deliveryStack = delivery.getStack();
+      if (ItemStack.isSameItemSameComponents(deliveryStack, stackKey)
+          || ItemStack.isSameItem(deliveryStack, stackKey)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean matchesLostPackageRequester(
