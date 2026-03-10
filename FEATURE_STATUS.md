@@ -142,6 +142,9 @@ Known focus area:
   counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
 - Pending top-up now subtracts already-available rack stock before ordering from Create network,
   preventing duplicate reorders when requested quantity is already physically present in shop racks.
+- Pending top-up now hard-blocks network reorders while matching inflight stock for the same
+  request tuple is still open, preventing repeated order loops before overdue/lost-package
+  resolution.
 - Pending reconciliation now refreshes missing request reservations from currently available rack
   stock after request-state refresh, improving reload recovery when reservation maps drift or reset.
 - Shopkeeper AI now treats resolver work and unreserved incoming-rack housekeeping as urgent work,
