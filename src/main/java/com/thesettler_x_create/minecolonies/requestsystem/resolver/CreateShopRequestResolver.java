@@ -1617,7 +1617,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         String requesterName = messaging.resolveRequesterName(manager, request);
         TileEntityCreateShop tile = shop.getCreateShopTileEntity();
         String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
-        int cleared = shop.cancelLostPackage(key, requesterName, address);
+        int cleared = shop.cancelLostPackage(key, requesterName, address, -1L);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] releaseReservation cancelled request={} item={} requester='{}' address='{}' clearedInflight={}",

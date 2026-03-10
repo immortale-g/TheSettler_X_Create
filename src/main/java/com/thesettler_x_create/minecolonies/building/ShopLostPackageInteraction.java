@@ -25,12 +25,16 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private static final String TAG_REMAINING = "Remaining";
   private static final String TAG_REQUESTER = "Requester";
   private static final String TAG_ADDRESS = "Address";
+  private static final String TAG_REQUESTED_AT = "RequestedAt";
+  private static final String TAG_EPOCH = "Epoch";
   private static final String TAG_ACTIVE = "Active";
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
   private String requesterName = "";
   private String address = "";
+  private long requestedAt = -1L;
+  private long interactionEpoch;
   private boolean active = true;
   private final long debugInstanceId = DEBUG_INSTANCE_SEQ.getAndIncrement();
 
@@ -39,7 +43,17 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   }
 
   public ShopLostPackageInteraction(
-      ItemStack stackKey, int remaining, String requesterName, String address) {
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    this(stackKey, remaining, requesterName, address, requestedAt, 0L);
+  }
+
+  public ShopLostPackageInteraction(
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt,
+      long interactionEpoch) {
     super(
         buildInquiry(stackKey, remaining, requesterName, address),
         true,
@@ -66,6 +80,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.remaining = Math.max(0, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
+    this.requestedAt = requestedAt;
+    this.interactionEpoch = interactionEpoch;
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction created debugId={} item={} remaining={} requester='{}' address='{}'",
@@ -109,20 +125,34 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       }
       return;
     }
+    if (!isStillTracked(shop)) {
+      active = false;
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction stale debugId={} item={} remaining={} requester='{}' address='{}' requestedAt={} epoch={} shopEpoch={}",
+            debugInstanceId,
+            stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+            remaining,
+            requesterName,
+            address,
+            requestedAt,
+            interactionEpoch,
+            shop.getLostPackageInteractionEpoch());
+      }
+      return;
+    }
     // Lock interaction immediately to avoid duplicate reopen windows while handling a response.
     active = false;
     boolean handled = false;
     int consumed = 0;
     if (response == 0) {
       BuildingCreateShop.LostPackageReorderResult reorder =
-          shop.restartLostPackageDetailed(stackKey, remaining, requesterName, address);
+          shop.restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt);
       consumed = reorder.consumed();
       if (reorder.status() == BuildingCreateShop.LostPackageReorderStatus.NO_NETWORK_STOCK) {
         active = false;
         if (remaining > 0) {
-          citizen.triggerInteraction(
-              new ShopLostPackageReorderUnavailableInteraction(
-                  stackKey.copy(), remaining, requesterName, address));
+          deferReorderUnavailableInteraction(citizen);
         }
         if (BuildingCreateShop.isDebugRequests()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -135,10 +165,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       }
     } else if (response == 1) {
       consumed =
-          shop.acceptLostPackageFromPlayer(player, stackKey, remaining, requesterName, address);
+          shop.acceptLostPackageFromPlayer(
+              player, stackKey, remaining, requesterName, address, requestedAt);
     } else if (response == 2) {
       consumed =
-          shop.cancelLostPackageRequestAndInflight(stackKey, remaining, requesterName, address);
+          shop.cancelLostPackageRequestAndInflight(
+              stackKey, remaining, requesterName, address, requestedAt);
     }
     if (consumed > 0) {
       remaining = Math.max(0, remaining - consumed);
@@ -164,6 +196,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   @Override
   public boolean isValid(ICitizenData citizen) {
+    if (active && citizen != null && citizen.getWorkBuilding() instanceof BuildingCreateShop shop) {
+      if (!isStillTracked(shop)) {
+        active = false;
+      }
+    }
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction isValid debugId={} active={} citizen={}",
@@ -187,6 +224,29 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     return Collections.emptyList();
   }
 
+  private void deferReorderUnavailableInteraction(ICitizenData citizen) {
+    if (citizen == null || remaining <= 0 || stackKey.isEmpty()) {
+      return;
+    }
+    Runnable trigger =
+        () ->
+            citizen.triggerInteraction(
+                new ShopLostPackageReorderUnavailableInteraction(
+                    stackKey.copy(),
+                    remaining,
+                    requesterName,
+                    address,
+                    requestedAt,
+                    interactionEpoch));
+    net.minecraft.world.level.Level level =
+        citizen.getColony() == null ? null : citizen.getColony().getWorld();
+    if (level != null && level.getServer() != null) {
+      level.getServer().execute(trigger);
+      return;
+    }
+    trigger.run();
+  }
+
   @Override
   public CompoundTag serializeNBT(HolderLookup.Provider provider) {
     CompoundTag tag = super.serializeNBT(provider);
@@ -201,6 +261,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     if (!address.isEmpty()) {
       tag.putString(TAG_ADDRESS, address);
+    }
+    if (requestedAt > 0L) {
+      tag.putLong(TAG_REQUESTED_AT, requestedAt);
+    }
+    if (interactionEpoch > 0L) {
+      tag.putLong(TAG_EPOCH, interactionEpoch);
     }
     if (!active) {
       tag.putBoolean(TAG_ACTIVE, false);
@@ -218,6 +284,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     remaining = Math.max(0, tag.getInt(TAG_REMAINING));
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
+    requestedAt = tag.contains(TAG_REQUESTED_AT) ? tag.getLong(TAG_REQUESTED_AT) : -1L;
+    interactionEpoch = tag.contains(TAG_EPOCH) ? tag.getLong(TAG_EPOCH) : 0L;
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -316,6 +384,28 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? "" : trimmed;
+  }
+
+  private boolean isStillTracked(BuildingCreateShop shop) {
+    if (shop == null || stackKey == null || stackKey.isEmpty() || remaining <= 0) {
+      return false;
+    }
+    if (interactionEpoch > 0L && interactionEpoch != shop.getLostPackageInteractionEpoch()) {
+      return false;
+    }
+    var pickup = shop.getPickupBlockEntity();
+    if (pickup == null) {
+      return false;
+    }
+    int strictRemaining =
+        pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
+    if (strictRemaining > 0) {
+      return true;
+    }
+    if (requestedAt > 0L) {
+      return false;
+    }
+    return pickup.getInflightRemaining(stackKey, requesterName, address) > 0;
   }
 
   private static boolean matchesForRecovery(ItemStack candidate, ItemStack key) {

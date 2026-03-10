@@ -19,12 +19,16 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
   private static final String TAG_REMAINING = "Remaining";
   private static final String TAG_REQUESTER = "Requester";
   private static final String TAG_ADDRESS = "Address";
+  private static final String TAG_REQUESTED_AT = "RequestedAt";
+  private static final String TAG_EPOCH = "Epoch";
   private static final String TAG_ACTIVE = "Active";
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
   private String requesterName = "";
   private String address = "";
+  private long requestedAt = -1L;
+  private long interactionEpoch;
   private boolean active = true;
 
   public ShopLostPackageReorderUnavailableInteraction(ICitizen citizen) {
@@ -32,7 +36,17 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
   }
 
   public ShopLostPackageReorderUnavailableInteraction(
-      ItemStack stackKey, int remaining, String requesterName, String address) {
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    this(stackKey, remaining, requesterName, address, requestedAt, 0L);
+  }
+
+  public ShopLostPackageReorderUnavailableInteraction(
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt,
+      long interactionEpoch) {
     super(
         buildInquiry(stackKey, remaining, requesterName, address),
         true,
@@ -50,6 +64,8 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
     this.remaining = Math.max(1, remaining);
     this.requesterName = sanitize(requesterName);
     this.address = sanitize(address);
+    this.requestedAt = requestedAt;
+    this.interactionEpoch = interactionEpoch;
   }
 
   @Override
@@ -58,8 +74,20 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
     if (citizen == null || remaining <= 0 || stackKey.isEmpty()) {
       return;
     }
+    if (!(citizen.getWorkBuilding() instanceof BuildingCreateShop shop)) {
+      return;
+    }
+    if (interactionEpoch > 0L && interactionEpoch != shop.getLostPackageInteractionEpoch()) {
+      return;
+    }
+    var pickup = shop.getPickupBlockEntity();
+    if (pickup == null
+        || pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt) <= 0) {
+      return;
+    }
     citizen.triggerInteraction(
-        new ShopLostPackageInteraction(stackKey.copy(), remaining, requesterName, address));
+        new ShopLostPackageInteraction(
+            stackKey.copy(), remaining, requesterName, address, requestedAt, interactionEpoch));
   }
 
   @Override
@@ -94,6 +122,12 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
     if (!address.isEmpty()) {
       tag.putString(TAG_ADDRESS, address);
     }
+    if (requestedAt > 0L) {
+      tag.putLong(TAG_REQUESTED_AT, requestedAt);
+    }
+    if (interactionEpoch > 0L) {
+      tag.putLong(TAG_EPOCH, interactionEpoch);
+    }
     if (!active) {
       tag.putBoolean(TAG_ACTIVE, false);
     }
@@ -110,6 +144,8 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
     remaining = Math.max(0, tag.getInt(TAG_REMAINING));
     requesterName = sanitize(tag.getString(TAG_REQUESTER));
     address = sanitize(tag.getString(TAG_ADDRESS));
+    requestedAt = tag.contains(TAG_REQUESTED_AT) ? tag.getLong(TAG_REQUESTED_AT) : -1L;
+    interactionEpoch = tag.contains(TAG_EPOCH) ? tag.getLong(TAG_EPOCH) : 0L;
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
   }
 

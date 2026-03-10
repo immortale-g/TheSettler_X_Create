@@ -20,5 +20,7 @@ class CreateShopMaintenanceCommandsGuardTest {
     assertTrue(mainSource.contains("CreateShopMaintenanceCommands.register"));
     assertTrue(commandSource.contains("thesettlerxcreate"));
     assertTrue(commandSource.contains("prepare_uninstall"));
+    assertTrue(commandSource.contains("run_live_test"));
+    assertTrue(commandSource.contains("reset_live_state"));
   }
 }

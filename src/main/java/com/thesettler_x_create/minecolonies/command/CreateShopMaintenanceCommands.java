@@ -80,6 +80,32 @@ public final class CreateShopMaintenanceCommands {
                                         IntegerArgumentType.getInteger(context, "requests"),
                                         IntegerArgumentType.getInteger(context, "amount"))))));
 
+    root.then(
+        Commands.literal("reset_live_state")
+            .executes(
+                context -> {
+                  ResetLiveStateResult result = resetLiveState();
+                  context
+                      .getSource()
+                      .sendSuccess(
+                          () ->
+                              Component.literal(
+                                  "[CreateShop] Live state reset: colonies="
+                                      + result.colonies
+                                      + ", shops="
+                                      + result.shops
+                                      + ", requestsCancelled="
+                                      + result.requestsCancelled
+                                      + ", staleCleaned="
+                                      + result.staleCleaned
+                                      + ", runtimeTrackingCleared="
+                                      + result.runtimeTrackingCleared
+                                      + ", errors="
+                                      + result.errors),
+                          true);
+                  return result.errors == 0 ? 1 : 0;
+                }));
+
     dispatcher.register(root);
   }
 
@@ -338,6 +364,176 @@ public final class CreateShopMaintenanceCommands {
     return result;
   }
 
+  private static ResetLiveStateResult resetLiveState() {
+    ResetLiveStateResult result = new ResetLiveStateResult();
+    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+      result.colonies++;
+      if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
+        continue;
+      }
+
+      java.util.Set<BuildingCreateShop> shops = collectCreateShops(colony);
+      result.shops += shops.size();
+      for (BuildingCreateShop shop : shops) {
+        try {
+          result.runtimeTrackingCleared += Math.max(0, shop.clearRuntimeTrackingForDebug());
+        } catch (Exception ex) {
+          result.errors++;
+          TheSettlerXCreate.LOGGER.warn(
+              "[CreateShop] reset_live_state tracking clear failed shop={} error={}",
+              shop.getLocation() == null
+                  ? "<unknown>"
+                  : shop.getLocation().getInDimensionLocation(),
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+
+      java.util.Set<IToken<?>> requestTokens = collectAssignedRequestTokens(standard);
+      for (IToken<?> token : requestTokens) {
+        try {
+          var request = standard.getRequestHandler().getRequestOrNull(token);
+          if (request == null) {
+            continue;
+          }
+          if (!isCreateShopOwnedRootRequest(standard, request)) {
+            continue;
+          }
+          if (isTerminalState(request.getState())) {
+            if (request.getState() == RequestState.CANCELLED) {
+              standard.getRequestHandler().cleanRequestData(request.getId());
+              result.staleCleaned++;
+            }
+            continue;
+          }
+          standard.updateRequestState(request.getId(), RequestState.CANCELLED);
+          result.requestsCancelled++;
+        } catch (Exception ex) {
+          if (isStaleRequestGraphException(ex)) {
+            try {
+              standard.getRequestHandler().cleanRequestData(token);
+              result.staleCleaned++;
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] reset_live_state stale cleanup token={} reason={}",
+                  token,
+                  ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+              continue;
+            } catch (Exception cleanEx) {
+              result.errors++;
+              TheSettlerXCreate.LOGGER.warn(
+                  "[CreateShop] reset_live_state stale cleanup failed token={} error={}",
+                  token,
+                  cleanEx.getMessage() == null
+                      ? cleanEx.getClass().getSimpleName()
+                      : cleanEx.getMessage());
+              continue;
+            }
+          }
+          result.errors++;
+          TheSettlerXCreate.LOGGER.warn(
+              "[CreateShop] reset_live_state cancel failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+    return result;
+  }
+
+  private static java.util.Set<BuildingCreateShop> collectCreateShops(IColony colony) {
+    java.util.Set<BuildingCreateShop> shops = new java.util.LinkedHashSet<>();
+    if (colony == null) {
+      return shops;
+    }
+    var buildingManager = colony.getServerBuildingManager();
+    if (buildingManager == null || buildingManager.getBuildings() == null) {
+      return shops;
+    }
+    for (var entry : buildingManager.getBuildings().entrySet()) {
+      var building = entry.getValue();
+      if (building instanceof BuildingCreateShop shop) {
+        shops.add(shop);
+      }
+    }
+    return shops;
+  }
+
+  private static java.util.Set<IToken<?>> collectAssignedRequestTokens(
+      IStandardRequestManager standard) {
+    java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
+    if (standard == null) {
+      return tokens;
+    }
+    var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return tokens;
+    }
+    for (var assigned : assignments.values()) {
+      if (assigned != null) {
+        tokens.addAll(assigned);
+      }
+    }
+    return tokens;
+  }
+
+  private static boolean isCreateShopOwnedRequest(
+      IStandardRequestManager standard,
+      com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
+    if (standard == null || request == null) {
+      return false;
+    }
+    try {
+      var owner = standard.getResolverHandler().getResolverForRequest(request);
+      if (owner instanceof CreateShopRequestResolver) {
+        return true;
+      }
+      if (!request.hasParent()) {
+        return false;
+      }
+      var parent = standard.getRequestHandler().getRequest(request.getParent());
+      if (parent == null) {
+        return false;
+      }
+      var parentOwner = standard.getResolverHandler().getResolverForRequest(parent);
+      return parentOwner instanceof CreateShopRequestResolver;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private static boolean isCreateShopOwnedRootRequest(
+      IStandardRequestManager standard,
+      com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
+    if (!isCreateShopOwnedRequest(standard, request)) {
+      return false;
+    }
+    return request != null && !request.hasParent();
+  }
+
+  private static boolean isTerminalState(RequestState state) {
+    return state == RequestState.CANCELLED
+        || state == RequestState.COMPLETED
+        || state == RequestState.FAILED
+        || state == RequestState.RECEIVED
+        || state == RequestState.RESOLVED;
+  }
+
+  private static boolean isStaleRequestGraphException(Exception ex) {
+    if (ex == null) {
+      return false;
+    }
+    String message = ex.getMessage();
+    if (message == null || message.isEmpty()) {
+      return false;
+    }
+    String normalized = message.toLowerCase(java.util.Locale.ROOT);
+    boolean staleChildren =
+        normalized.contains("haschildren()")
+            && normalized.contains("request")
+            && normalized.contains("null");
+    boolean assignmentDrift = normalized.contains("intvalue()");
+    return staleChildren || assignmentDrift;
+  }
+
   private static final class Result {
     int colonies;
     int shops;
@@ -352,5 +548,14 @@ public final class CreateShopMaintenanceCommands {
     int created;
     int errors;
     String message = "";
+  }
+
+  private static final class ResetLiveStateResult {
+    int colonies;
+    int shops;
+    int requestsCancelled;
+    int staleCleaned;
+    int runtimeTrackingCleared;
+    int errors;
   }
 }

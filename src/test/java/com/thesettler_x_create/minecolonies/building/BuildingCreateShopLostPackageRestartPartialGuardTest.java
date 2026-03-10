@@ -17,7 +17,7 @@ class BuildingCreateShopLostPackageRestartPartialGuardTest {
     assertTrue(source.contains("public int restartLostPackage("));
     assertTrue(
         source.contains(
-            "return restartLostPackageDetailed(stackKey, remaining, requesterName, address).consumed();"));
+            "restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)"));
     assertTrue(
         source.contains(
             "new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);"));
