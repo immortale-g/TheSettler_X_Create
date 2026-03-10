@@ -65,6 +65,8 @@
   "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder": "Start a new order",
   "com.thesettler_x_create.interaction.createshop.lost_package.answer_reorder": "I'll request a replacement.",
   "com.thesettler_x_create.interaction.createshop.lost_package.response_handover": "Hand over package",
-  "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover": "I'll unpack it now."
+  "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover": "I'll unpack it now.",
+  "com.thesettler_x_create.interaction.createshop.lost_package.response_cancel": "Cancel request",
+  "com.thesettler_x_create.interaction.createshop.lost_package.answer_cancel": "I'll cancel the stuck request."
 }
 

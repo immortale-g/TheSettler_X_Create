@@ -366,6 +366,11 @@ Implementation notes:
 - Lost-package handover amount-limiting hardening is authored in this project scope:
   one handover action now iterates multiple matching player packages as needed but limits inflight
   consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
+- Lost-package cancel-action hardening is authored in this project scope:
+  interaction response routing now supports a third action that cancels matching local Create Shop
+  requests via MineColonies `updateRequestState(..., CANCELLED)` and clears matching inflight
+  tracking for the tuple, so players can abort stuck overdue flows without forcing duplicate
+  reorders.
 - Lost-package handover consume-guard hardening is authored in this project scope:
   package removal now requires preview-accepted matching content plus remaining inflight coverage,
   and handover stops further package removals after a consume-miss to prevent multi-package loss

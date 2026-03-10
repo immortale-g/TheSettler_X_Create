@@ -55,7 +55,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
             Component.translatable(
                 "com.thesettler_x_create.interaction.createshop.lost_package.response_handover"),
             Component.translatable(
-                "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover")));
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover")),
+        new Tuple<>(
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.response_cancel"),
+            Component.translatable(
+                "com.thesettler_x_create.interaction.createshop.lost_package.answer_cancel")));
     this.stackKey = stackKey == null ? ItemStack.EMPTY : stackKey.copy();
     this.stackKey.setCount(1);
     this.remaining = Math.max(0, remaining);
@@ -111,6 +116,9 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     } else if (response == 1) {
       consumed =
           shop.acceptLostPackageFromPlayer(player, stackKey, remaining, requesterName, address);
+    } else if (response == 2) {
+      consumed =
+          shop.cancelLostPackageRequestAndInflight(stackKey, remaining, requesterName, address);
     }
     if (consumed > 0) {
       remaining = Math.max(0, remaining - consumed);
