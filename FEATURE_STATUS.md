@@ -104,6 +104,10 @@ Current behavior:
 - Lost-package handover now processes multiple matching player packages in one action and caps
   inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
   package removal beyond the required recovery amount.
+- Lost-package interaction now includes a third action (`Cancel request`) that cancels matching
+  local Create Shop-owned requests via MineColonies request-state updates and clears matching
+  inflight tuple tracking, enabling clean native re-request from colony side when recovery is
+  intentionally aborted.
 - Lost-package handover now pre-checks preview-accepted package content against remaining inflight
   before removing a player package, and stops further package removals after a consume-miss to
   avoid multi-package loss when tuple consumption fails.

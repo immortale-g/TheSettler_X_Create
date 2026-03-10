@@ -27,5 +27,7 @@
   "com.thesettler_x_create.interaction.createshop.lost_package.response_reorder": "Neu bestellen",
   "com.thesettler_x_create.interaction.createshop.lost_package.answer_reorder": "Ich fordere Ersatz an.",
   "com.thesettler_x_create.interaction.createshop.lost_package.response_handover": "Paket uebergeben",
-  "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover": "Ich packe es jetzt aus."
+  "com.thesettler_x_create.interaction.createshop.lost_package.answer_handover": "Ich packe es jetzt aus.",
+  "com.thesettler_x_create.interaction.createshop.lost_package.response_cancel": "Anfrage abbrechen",
+  "com.thesettler_x_create.interaction.createshop.lost_package.answer_cancel": "Ich breche die haengende Anfrage ab."
 }

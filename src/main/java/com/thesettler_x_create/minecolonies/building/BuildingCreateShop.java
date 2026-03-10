@@ -5,6 +5,9 @@ import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -792,6 +795,161 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           cleared);
     }
     return cleared;
+  }
+
+  public int cancelLostPackageRequestAndInflight(
+      ItemStack stackKey, int remaining, String requesterName, String address) {
+    int clearedInflight = cancelLostPackage(stackKey, requesterName, address);
+    int cancelledRequests = cancelMatchingLostPackageRequests(stackKey, requesterName, address);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package cancel+requests item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
+          stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          requesterName,
+          address,
+          clearedInflight,
+          cancelledRequests);
+    }
+    if (clearedInflight > 0 || cancelledRequests > 0) {
+      return Math.max(Math.max(1, remaining), clearedInflight);
+    }
+    return 0;
+  }
+
+  private int cancelMatchingLostPackageRequests(
+      ItemStack stackKey, String requesterName, String address) {
+    if (stackKey == null || stackKey.isEmpty() || getColony() == null) {
+      return 0;
+    }
+    if (!(getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
+      return 0;
+    }
+    var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return 0;
+    }
+    java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
+    for (var value : assignments.values()) {
+      if (value != null) {
+        tokens.addAll(value);
+      }
+    }
+    int cancelled = 0;
+    for (IToken<?> token : tokens) {
+      try {
+        IRequest<?> request = standard.getRequestHandler().getRequest(token);
+        if (request == null || isTerminalRequestState(request.getState())) {
+          continue;
+        }
+        IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(request);
+        if (!(owner instanceof CreateShopRequestResolver shopResolver)
+            || !isLocalResolver(owner, shopResolver)) {
+          continue;
+        }
+        if (!(request.getRequest() instanceof IDeliverable deliverable)
+            || !matchesLostPackageDeliverable(deliverable, stackKey)) {
+          continue;
+        }
+        if (!matchesLostPackageRequester(standard, request, requesterName)) {
+          continue;
+        }
+        standard.updateRequestState(request.getId(), RequestState.CANCELLED);
+        cancelled++;
+      } catch (Exception ex) {
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package cancel request failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+    return cancelled;
+  }
+
+  private boolean isLocalResolver(IRequestResolver<?> owner, CreateShopRequestResolver resolver) {
+    if (owner == null
+        || resolver == null
+        || resolver.getLocation() == null
+        || getLocation() == null) {
+      return false;
+    }
+    return resolver.getLocation().equals(getLocation());
+  }
+
+  private static boolean isTerminalRequestState(RequestState state) {
+    return state == RequestState.CANCELLED
+        || state == RequestState.COMPLETED
+        || state == RequestState.FAILED
+        || state == RequestState.RECEIVED
+        || state == RequestState.RESOLVED;
+  }
+
+  private static boolean matchesLostPackageDeliverable(
+      IDeliverable deliverable, ItemStack stackKey) {
+    if (deliverable == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    ItemStack result = deliverable.getResult();
+    if (result == null || result.isEmpty()) {
+      return false;
+    }
+    if (ItemStack.isSameItemSameComponents(result, stackKey)) {
+      return true;
+    }
+    return ItemStack.isSameItem(result, stackKey);
+  }
+
+  private boolean matchesLostPackageRequester(
+      IStandardRequestManager manager, IRequest<?> request, String requesterName) {
+    String expected = normalizeRequesterLabel(requesterName);
+    if (isUnknownRequesterLabel(expected)) {
+      return true;
+    }
+    String actual = resolveRequesterName(manager, request);
+    if (actual.isEmpty()) {
+      return false;
+    }
+    if (actual.equals(expected)) {
+      return true;
+    }
+    return actual.contains(expected) || expected.contains(actual);
+  }
+
+  private String resolveRequesterName(IStandardRequestManager manager, IRequest<?> request) {
+    if (request == null) {
+      return "";
+    }
+    try {
+      var requester = request.getRequester();
+      if (requester == null) {
+        return "";
+      }
+      var display = requester.getRequesterDisplayName(manager, request);
+      if (display == null) {
+        return "";
+      }
+      return normalizeRequesterLabel(display.getString());
+    } catch (Exception ignored) {
+      return "";
+    }
+  }
+
+  private static String normalizeRequesterLabel(String value) {
+    if (value == null) {
+      return "";
+    }
+    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+    return normalized.isEmpty() ? "" : normalized;
+  }
+
+  private static boolean isUnknownRequesterLabel(String requester) {
+    if (requester == null || requester.isEmpty()) {
+      return true;
+    }
+    return requester.equals("unknown")
+        || requester.equals("<unknown>")
+        || requester.equals("unknown requester");
   }
 
   private void ensureWarehouseRegistration() {
