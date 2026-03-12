@@ -174,6 +174,9 @@ Current behavior:
 - Pending-count normalization and worker-availability gating decisions are now centralized in
   `CreateShopPendingStateDecisionService`, reducing `tickPendingDeliveries` branching and keeping
   derived-pending, stale-cooldown recovery, and worker-unavailable pending retention in one flow.
+- Post-delivery-creation updates (flow transitions, player chat, pending/cooldown update after
+  created child deliveries) are now centralized in `CreateShopPostCreationUpdateService`, and
+  remaining-count values are normalized to non-negative before state updates.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

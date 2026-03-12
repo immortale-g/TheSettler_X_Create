@@ -480,3 +480,8 @@ Implementation notes:
   is authored in this project scope: pending-count derivation/no-pending skip logic/stale-cooldown
   recovery/worker-unavailable retention moved from `CreateShopRequestResolver.tickPendingDeliveries`
   into `CreateShopPendingStateDecisionService`, while preserving existing player-visible behavior.
+- Post-creation update refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: tick-pending post-delivery-creation flow transitions/chat and
+  pending/cooldown updates moved from `CreateShopRequestResolver` into
+  `CreateShopPostCreationUpdateService`, with non-negative normalization of `remainingCount`
+  before tracker mutation.
