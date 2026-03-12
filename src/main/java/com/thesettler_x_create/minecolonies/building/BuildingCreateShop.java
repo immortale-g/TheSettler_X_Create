@@ -472,6 +472,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return cachedHasIncomingRackWork;
   }
 
+  public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    return hasActiveLocalDeliveryChildren(colony, pickup);
+  }
+
   public boolean hasUrgentWork() {
     return hasResolverWork();
   }
@@ -819,7 +824,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   /** Clears request runtime tracking caches used by Create Shop for debug/test clean-state runs. */
   public int clearRuntimeTrackingForDebug() {
-    lostPackageInteractionEpoch++;
+    advanceLostPackageInteractionEpoch("debug-reset");
     CreateShopBlockEntity pickup = getPickupBlockEntity();
     if (pickup == null) {
       return 0;
@@ -836,6 +841,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   long getLostPackageInteractionEpoch() {
     return lostPackageInteractionEpoch;
+  }
+
+  void advanceLostPackageInteractionEpoch(String reason) {
+    lostPackageInteractionEpoch++;
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction epoch advanced to {} reason={}",
+          lostPackageInteractionEpoch,
+          reason == null ? "<none>" : reason);
+    }
   }
 
   public int cancelLostPackageRequestAndInflight(
@@ -1112,6 +1127,15 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       }
       return;
     }
+    if (hasActiveLocalDeliveryChildren(colony, pickup)) {
+      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping blocked reason=active-delivery-child pendingUnreserved={}",
+            cachedHasIncomingRackWork);
+      }
+      return;
+    }
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
     if (resolver != null && resolver.hasActiveWork()) {
       cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
@@ -1155,6 +1179,109 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           transferBudget,
           elapsed);
     }
+  }
+
+  private boolean hasActiveLocalDeliveryChildren(IColony colony, CreateShopBlockEntity pickup) {
+    if (colony == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
+      return false;
+    }
+    var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
+    if (assignmentStore == null) {
+      return false;
+    }
+    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return false;
+    }
+    var requestHandler = standard.getRequestHandler();
+    if (requestHandler == null) {
+      return false;
+    }
+    for (var assignmentEntry : assignments.entrySet()) {
+      java.util.Collection<IToken<?>> assigned = assignmentEntry.getValue();
+      if (assigned == null || assigned.isEmpty()) {
+        continue;
+      }
+      for (IToken<?> token : java.util.List.copyOf(assigned)) {
+        if (token == null) {
+          continue;
+        }
+        try {
+          IRequest<?> request = requestHandler.getRequest(token);
+          if (request == null || !(request.getRequest() instanceof Delivery delivery)) {
+            continue;
+          }
+          RequestState state = request.getState();
+          boolean activeState =
+              state == RequestState.CREATED
+                  || state == RequestState.ASSIGNED
+                  || state == RequestState.IN_PROGRESS;
+          if (!activeState) {
+            continue;
+          }
+          if (!isLocalDeliveryStart(delivery, pickup)) {
+            continue;
+          }
+          if (!isLocalCreateShopDeliveryParent(standard, request)) {
+            continue;
+          }
+          return true;
+        } catch (Exception ex) {
+          if (isDebugRequests()) {
+            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] housekeeping delivery-child check failed token={} error={}",
+                token,
+                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean isLocalCreateShopDeliveryParent(
+      IStandardRequestManager standard, IRequest<?> child) {
+    if (standard == null || child == null || !child.hasParent()) {
+      return false;
+    }
+    try {
+      IRequest<?> parent = standard.getRequestHandler().getRequest(child.getParent());
+      if (parent == null) {
+        return false;
+      }
+      IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(parent);
+      if (!(owner instanceof CreateShopRequestResolver resolver)) {
+        return false;
+      }
+      return resolver.getLocation() != null && resolver.getLocation().equals(getLocation());
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private boolean isLocalDeliveryStart(Delivery delivery, CreateShopBlockEntity pickup) {
+    if (delivery == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    var start = delivery.getStart();
+    if (start == null || start.getDimension() == null) {
+      return false;
+    }
+    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (pickup.getBlockPos().equals(startPos)) {
+      return true;
+    }
+    return hasContainerPosition(startPos);
   }
 
   private boolean shouldLogHousekeepingDebug(long now) {

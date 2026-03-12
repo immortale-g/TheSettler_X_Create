@@ -17,5 +17,10 @@ class BuildingCreateShopHousekeepingResolverGuardTest {
     assertTrue(source.contains("resolver != null && resolver.hasActiveWork()"));
     assertTrue(
         source.contains("housekeeping blocked reason=resolver-active-work pendingUnreserved={}"));
+    assertTrue(source.contains("hasActiveLocalDeliveryChildren(colony, pickup)"));
+    assertTrue(
+        source.contains("housekeeping blocked reason=active-delivery-child pendingUnreserved={}"));
+    assertTrue(source.contains("for (var assignmentEntry : assignments.entrySet())"));
+    assertTrue(source.contains("isLocalCreateShopDeliveryParent(standard, request)"));
   }
 }
