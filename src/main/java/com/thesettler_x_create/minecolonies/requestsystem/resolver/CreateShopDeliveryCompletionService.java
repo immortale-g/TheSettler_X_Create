@@ -69,7 +69,7 @@ final class CreateShopDeliveryCompletionService {
     }
     if (request != null && request.getRequest() instanceof Delivery delivery) {
       try {
-        BuildingCreateShop shop = resolver.getShopForOps(manager);
+        BuildingCreateShop shop = resolver.getShop(manager);
         CreateShopBlockEntity pickup = null;
         if (shop != null) {
           pickup = shop.getPickupBlockEntity();
