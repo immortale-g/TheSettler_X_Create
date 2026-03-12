@@ -45,7 +45,7 @@ final class CreateShopDeliveryChildRecoveryService {
       return false;
     }
     if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
-      resolver.clearStaleRecoveryArm(parentRequest.getId());
+      requestStateMutatorService.clearStaleRecoveryArm(resolver, parentRequest.getId());
       return false;
     }
     if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(childRequest, shop, pickup)) {

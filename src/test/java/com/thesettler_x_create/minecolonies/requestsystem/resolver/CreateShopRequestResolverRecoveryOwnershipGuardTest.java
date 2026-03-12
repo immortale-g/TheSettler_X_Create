@@ -17,6 +17,8 @@ class CreateShopRequestResolverRecoveryOwnershipGuardTest {
     assertTrue(
         source.contains(
             "if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest))"));
-    assertTrue(source.contains("resolver.clearStaleRecoveryArm(parentRequest.getId())"));
+    assertTrue(
+        source.contains(
+            "requestStateMutatorService.clearStaleRecoveryArm(resolver, parentRequest.getId())"));
   }
 }

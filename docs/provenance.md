@@ -675,3 +675,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: full token lifecycle reset (`clearPendingTokenState`)
   now executes through `CreateShopRequestStateMutatorService`, with resolver delegating, to keep
   terminal/reset multi-structure cleanup in a single write-owner path.
+- Stale-arm reset path simplification on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: stale-recovery arm clearing now routes directly
+  through `CreateShopRequestStateMutatorService` from pending/rehydrate/recovery/timeout services,
+  and redundant resolver->lifecycle delegation for this write path was removed.

@@ -40,7 +40,7 @@ final class CreateShopRequestStateMutatorService {
     }
     markOrderedWithPendingAtLeastOne(resolver, level, parentToken, Math.max(1, pendingCount));
     resolver.markParentDeliveryActiveIfAbsent(parentToken, level == null ? 0L : level.getGameTime());
-    resolver.clearStaleRecoveryArm(parentToken);
+    clearStaleRecoveryArm(resolver, parentToken);
     if (childToken != null) {
       resolver.markChildActive(childToken, level == null ? 0L : level.getGameTime());
     }
@@ -56,7 +56,7 @@ final class CreateShopRequestStateMutatorService {
     }
     if (parentToken != null) {
       resolver.clearParentDeliveryActive(parentToken);
-      resolver.clearStaleRecoveryArm(parentToken);
+      clearStaleRecoveryArm(resolver, parentToken);
       resolver.clearDeliveriesCreated(parentToken);
     }
   }

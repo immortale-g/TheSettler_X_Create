@@ -65,13 +65,13 @@ final class CreateShopLifecycleRehydrateService {
       } catch (Exception ignored) {
         resolver.clearPendingTokenState(token, true);
         resolver.clearTrackedChildrenForParent(manager, token);
-        resolver.clearStaleRecoveryArm(token);
+        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (request == null || CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
         resolver.clearPendingTokenState(token, true);
         resolver.clearTrackedChildrenForParent(manager, token);
-        resolver.clearStaleRecoveryArm(token);
+        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (!(request.getRequest() instanceof IDeliverable deliverable)) {
@@ -99,7 +99,7 @@ final class CreateShopLifecycleRehydrateService {
       } else {
         resolver.clearPendingTokenState(token, false);
         resolver.clearTrackedChildrenForParent(manager, token);
-        resolver.clearStaleRecoveryArm(token);
+        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
       }
     }
     return active;

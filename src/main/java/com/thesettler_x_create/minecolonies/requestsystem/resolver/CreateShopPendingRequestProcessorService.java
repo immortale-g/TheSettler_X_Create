@@ -132,7 +132,7 @@ final class CreateShopPendingRequestProcessorService {
       }
       if (!childResult.hasActiveChildren()) {
         requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
-        resolver.clearStaleRecoveryArm(request.getId());
+        requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
         return;
@@ -163,7 +163,7 @@ final class CreateShopPendingRequestProcessorService {
     }
     requestStateMutatorService.setParentChildrenSnapshot(resolver, request.getId(), 0, "[]");
     requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
-    resolver.clearStaleRecoveryArm(request.getId());
+    requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
       resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
