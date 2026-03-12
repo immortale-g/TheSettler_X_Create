@@ -453,7 +453,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public boolean hasResolverWork() {
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    return (resolver != null && resolver.hasActiveWork()) || hasIncomingRackWork();
+    return (resolver != null && resolver.hasProtectedInventoryWindow()) || hasIncomingRackWork();
   }
 
   public boolean hasIncomingRackWork() {
@@ -922,7 +922,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return;
     }
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    if (resolver != null && resolver.hasActiveWork()) {
+    if (resolver != null && resolver.hasProtectedInventoryWindow()) {
       cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
       if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(

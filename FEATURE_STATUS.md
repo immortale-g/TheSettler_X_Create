@@ -313,6 +313,16 @@ Current behavior:
   `CreateShopPendingStateDecisionService`, `CreateShopDeliveryChildRecoveryService`,
   `CreateShopPostCreationUpdateService`, `CreateShopReservationSyncService`) to reduce direct
   resolver accessor coupling.
+- Tick start now performs explicit lifecycle rehydrate (`CreateShopLifecycleRehydrateService`)
+  before pending processing, deriving active pending state from MineColonies request graph
+  (assigned/pending tokens, request terminal state, children/inflight markers, requested amounts)
+  instead of trusting stale local maps after reload/drift.
+- Delivery cancel/complete/recovery now use atomic lifecycle state transitions via
+  `CreateShopRequestStateMutatorService` (`openDeliveryWindow` / `closeDeliveryWindow`) to avoid
+  split multi-map writes for parent/child inflight tracking.
+- Resolver/housekeeping inventory ownership window is now explicit (`hasProtectedInventoryWindow`)
+  and used by `BuildingCreateShop` housekeeping gates so rack cleanup and request lifecycle block on
+  the same protection condition.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

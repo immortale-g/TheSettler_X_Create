@@ -118,6 +118,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopRequestStateMutatorService();
   private final CreateShopReservationSyncService reservationSyncService;
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
+  private final CreateShopLifecycleRehydrateService lifecycleRehydrateService;
   private final CreateShopAttemptResolveService attemptResolveService;
   private final CreateShopTickPendingService tickPendingService;
   private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
@@ -151,6 +152,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             requestStateMutatorService, ownership, diagnostics);
     this.reservationSyncService =
         new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
+    this.lifecycleRehydrateService =
+        new CreateShopLifecycleRehydrateService(
+            requestStateMutatorService, outstandingNeededService, diagnostics);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
             requestStateMutatorService, messaging, deliveryManager, outstandingNeededService);
@@ -185,7 +189,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingTokenCollectorService,
             pendingRequestProcessorService,
             flowTimeoutCleanupService,
-            tickPendingTelemetryService);
+            tickPendingTelemetryService,
+            lifecycleRehydrateService);
   }
 
   @Override
@@ -486,6 +491,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return true;
     }
     return flowStateMachine.hasNonTerminalWork();
+  }
+
+  public boolean hasProtectedInventoryWindow() {
+    return hasActiveWork()
+        || !deliveryChildActiveSince.isEmpty()
+        || !parentDeliveryActiveSince.isEmpty()
+        || pendingTracker.hasEntries();
   }
 
   long resolveNowTick(IRequestManager manager) {

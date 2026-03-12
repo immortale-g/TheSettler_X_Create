@@ -40,16 +40,13 @@ final class CreateShopDeliveryCancelService {
     if (!(request.getRequest() instanceof Delivery delivery)) {
       return;
     }
-    if (request.getId() != null) {
-      resolver.getDeliveryChildActiveSince().remove(request.getId());
-    }
+    IToken<?> childToken = request.getId();
     IToken<?> parentToken =
         CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSince().remove(parentToken);
-    resolver.clearStaleRecoveryArm(parentToken);
+    requestStateMutatorService.closeDeliveryWindow(resolver, parentToken, childToken);
     UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
 
@@ -58,7 +55,6 @@ final class CreateShopDeliveryCancelService {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, null, parentToken, stack.getCount());
       diagnostics.recordPendingSource(parentToken, "delivery-cancel");
-      resolver.clearDeliveriesCreated(parentToken);
       return;
     }
 
@@ -79,7 +75,6 @@ final class CreateShopDeliveryCancelService {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, parentToken, fallbackPending);
       diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
-      resolver.clearDeliveriesCreated(parentToken);
       if (resolver.isDebugLoggingEnabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} (pickup missing, fallback requeue)",
@@ -103,7 +98,6 @@ final class CreateShopDeliveryCancelService {
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentToken, pendingCount);
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
-    resolver.clearDeliveriesCreated(parentToken);
 
     if (resolver.isDebugLoggingEnabled()) {
       int reservedForStack = pickup.getReservedFor(stack);
