@@ -35,6 +35,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private static final int PRIORITY = 140;
   private static final int MAX_CHAIN_SANITIZE_NODES = 512;
   private static final long DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS = 20L * 30L;
+  private static final CreateShopDeliveryCallbackService deliveryCallbackService =
+      new CreateShopDeliveryCallbackService();
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
@@ -262,16 +264,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
-    CreateShopRequestResolver resolver =
-        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
-    if (resolver == null) {
-      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
-    }
-    if (resolver != null) {
-      resolver.handleDeliveryCancelled(manager, request);
-      return;
-    }
-    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
+    deliveryCallbackService.onDeliveryCancelled(manager, request);
   }
 
   private void logTickPendingCandidates(
@@ -296,23 +289,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-    CreateShopRequestResolver resolver =
-        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
-    if (resolver == null) {
-      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
-    }
-    if (resolver != null) {
-      resolver.handleDeliveryComplete(manager, request);
-      return;
-    }
-    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("complete", manager, request);
+    deliveryCallbackService.onDeliveryComplete(manager, request);
   }
 
-  private void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryCancelledForOps(IRequestManager manager, IRequest<?> request) {
     deliveryCancelService.handleDeliveryCancelled(this, manager, request);
   }
 
-  private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryCompleteForOps(IRequestManager manager, IRequest<?> request) {
     deliveryCompletionService.handleDeliveryComplete(this, manager, request);
   }
 

@@ -239,6 +239,8 @@ Current behavior:
 - Local delivery-origin matching and stack count/label helpers are now shared utilities
   (`CreateShopDeliveryOriginMatcher`, `CreateShopStackMetrics`) used directly by resolver
   services, removing duplicate helper logic and narrowing resolver surface area.
+- Delivery callback routing (`onDeliveryCancelled` / `onDeliveryComplete`) is now centralized in
+  `CreateShopDeliveryCallbackService`, keeping resolver callback entrypoints as thin delegates.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
