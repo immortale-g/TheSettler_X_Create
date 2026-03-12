@@ -164,6 +164,10 @@ Current behavior:
   tracker drift.
 - Tick-pending candidate debug logging is now isolated in a dedicated helper method, reducing
   top-level `tickPendingDeliveries` control-flow noise while keeping existing debug output.
+- Parent-child reconciliation for pending parents (duplicate child removal, fail-open missing-child
+  grace, stale/extra-active local-delivery recovery, and local-scope child diagnostics) is now
+  centralized in `CreateShopChildReconciliationService`, reducing `tickPendingDeliveries`
+  branching and isolating child-lifecycle handling into one dedicated flow.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

@@ -12,7 +12,7 @@ class CreateShopRequestResolverLocalScopeGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
     assertTrue(source.contains("missing -> keep (fail-open)"));
     assertTrue(source.contains("lookup failed -> keep (fail-open)"));
