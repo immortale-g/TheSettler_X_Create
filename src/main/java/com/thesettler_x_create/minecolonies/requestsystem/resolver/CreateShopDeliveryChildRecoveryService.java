@@ -78,7 +78,7 @@ final class CreateShopDeliveryChildRecoveryService {
     resolver.getParentDeliveryActiveSinceForOps().put(parentRequest.getId(), level.getGameTime());
     resolver.clearStaleRecoveryArmForOps(parentRequest.getId());
     resolver.getDeliveryChildActiveSinceForOps().put(childToken, level.getGameTime());
-    resolver.getRecheckForOps().scheduleParentChildRecheck(manager, parentRequest.getId());
+    resolver.getRecheck().scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           logTemplate, parentRequest.getId(), childToken, stateUpdated, childItem, childCount);

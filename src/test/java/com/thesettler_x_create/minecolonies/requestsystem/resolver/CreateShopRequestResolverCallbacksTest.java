@@ -39,7 +39,7 @@ class CreateShopRequestResolverCallbacksTest {
     when(deliveryRequest.getRequest()).thenReturn(mock(IDeliverable.class));
 
     invokePrivate(
-        "handleDeliveryCompleteForOps",
+        "handleDeliveryComplete",
         new Class<?>[] {IRequestManager.class, IRequest.class},
         new Object[] {null, deliveryRequest});
 

@@ -288,6 +288,10 @@ Current behavior:
 - Terminal-state gate in pending processing now uses shared static classification
   (`CreateShopRequestResolver.isTerminalRequestState`) directly, removing one more resolver
   forwarding alias while preserving terminal-skip behavior.
+- Delivery callback and pending tick orchestration now call direct resolver methods
+  (`handleDeliveryComplete`, `handleDeliveryCancelled`, `reassignResolvableRetryingRequests`,
+  `getRecheck`) instead of `*ForOps` aliases, continuing resolver ops-surface reduction without
+  behavior changes.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

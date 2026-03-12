@@ -260,11 +260,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     deliveryCallbackService.onDeliveryComplete(manager, request);
   }
 
-  void handleDeliveryCancelledForOps(IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
     deliveryCancelService.handleDeliveryCancelled(this, manager, request);
   }
 
-  void handleDeliveryCompleteForOps(IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
     deliveryCompletionService.handleDeliveryComplete(this, manager, request);
   }
 
@@ -530,7 +530,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
     }
   }
-  void reassignResolvableRetryingRequestsForOps(IStandardRequestManager manager, Level level) {
+  void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
 
@@ -602,7 +602,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return diagnostics;
   }
 
-  CreateShopResolverRecheck getRecheckForOps() {
+  CreateShopResolverRecheck getRecheck() {
     return recheck;
   }
 
