@@ -41,8 +41,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> retryingReassignAttempts =
-      new java.util.concurrent.ConcurrentHashMap<>();
+  private final CreateShopLifecycleStateStore lifecycleStateStore =
+      new CreateShopLifecycleStateStore();
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
@@ -57,24 +57,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Set<String> chainCycleLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final java.util.Map<IToken<?>, Long> deliveryChildActiveSince =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> missingChildSince =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> parentDeliveryActiveSince =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> parentStaleRecoveryArmedAt =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Integer> parentLastKnownChildCount =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, String> parentLastKnownChildren =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> parentChildDropLastLogTick =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, String> deliveryRootCauseSnapshots =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> deliveryRootCauseLastLogTick =
-      new java.util.concurrent.ConcurrentHashMap<>();
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
   private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
@@ -92,8 +74,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
   private final CreateShopTickPendingTelemetryService tickPendingTelemetryService =
       new CreateShopTickPendingTelemetryService();
-  private final CreateShopPendingDeliveryTracker pendingTracker =
-      new CreateShopPendingDeliveryTracker();
   private final CreateShopPendingTopupService pendingTopupService;
   private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
   private final CreateShopReservationReleaseService reservationReleaseService;
@@ -163,7 +143,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             requestStateMutatorService, cooldown, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
-            cooldown, pendingTracker, diagnostics, flowStateMachine, stockResolver, messaging);
+            cooldown,
+            lifecycleStateStore.getPendingTracker(),
+            diagnostics,
+            flowStateMachine,
+            stockResolver,
+            messaging);
     this.pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
@@ -256,7 +241,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return false;
     }
     long now = level.getGameTime();
-    Long since = missingChildSince.putIfAbsent(childToken, now);
+    Long since = lifecycleStateStore.getMissingChildSince().putIfAbsent(childToken, now);
     if (since == null) {
       return false;
     }
@@ -385,15 +370,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   boolean hasDeliveriesCreated(IToken<?> token) {
-    return pendingTracker.isDeliveryCreated(token);
+    return lifecycleStateStore.getPendingTracker().isDeliveryCreated(token);
   }
 
   void markDeliveriesCreated(IToken<?> token) {
-    pendingTracker.markDeliveryCreated(token);
+    lifecycleStateStore.getPendingTracker().markDeliveryCreated(token);
   }
 
   void clearDeliveriesCreated(IToken<?> token) {
-    pendingTracker.clearDeliveryCreated(token);
+    lifecycleStateStore.getPendingTracker().clearDeliveryCreated(token);
   }
 
   String tryDescribeResolver(Object resolver) {
@@ -464,7 +449,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   CreateShopPendingDeliveryTracker getPendingTracker() {
-    return pendingTracker;
+    return lifecycleStateStore.getPendingTracker();
   }
 
   CreateShopStockResolver getStockResolver() {
@@ -484,7 +469,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public boolean hasActiveWork() {
-    if (pendingTracker.hasEntries()) {
+    if (lifecycleStateStore.getPendingTracker().hasEntries()) {
       return true;
     }
     if (cooldown.getOrderedCount() > 0) {
@@ -495,9 +480,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public boolean hasProtectedInventoryWindow() {
     return hasActiveWork()
-        || !deliveryChildActiveSince.isEmpty()
-        || !parentDeliveryActiveSince.isEmpty()
-        || pendingTracker.hasEntries();
+        || !lifecycleStateStore.getDeliveryChildActiveSince().isEmpty()
+        || !lifecycleStateStore.getParentDeliveryActiveSince().isEmpty()
+        || lifecycleStateStore.getPendingTracker().hasEntries();
   }
 
   long resolveNowTick(IRequestManager manager) {
@@ -544,31 +529,31 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   java.util.Map<IToken<?>, Long> getParentDeliveryActiveSince() {
-    return parentDeliveryActiveSince;
+    return lifecycleStateStore.getParentDeliveryActiveSince();
   }
 
   java.util.Map<IToken<?>, Long> getParentStaleRecoveryArmedAt() {
-    return parentStaleRecoveryArmedAt;
+    return lifecycleStateStore.getParentStaleRecoveryArmedAt();
   }
 
   java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshots() {
-    return deliveryRootCauseSnapshots;
+    return lifecycleStateStore.getDeliveryRootCauseSnapshots();
   }
 
   java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTick() {
-    return deliveryRootCauseLastLogTick;
+    return lifecycleStateStore.getDeliveryRootCauseLastLogTick();
   }
 
   java.util.Map<IToken<?>, Integer> getParentLastKnownChildCount() {
-    return parentLastKnownChildCount;
+    return lifecycleStateStore.getParentLastKnownChildCount();
   }
 
   java.util.Map<IToken<?>, String> getParentLastKnownChildren() {
-    return parentLastKnownChildren;
+    return lifecycleStateStore.getParentLastKnownChildren();
   }
 
   java.util.Map<IToken<?>, Long> getParentChildDropLastLogTick() {
-    return parentChildDropLastLogTick;
+    return lifecycleStateStore.getParentChildDropLastLogTick();
   }
 
   void clearStaleRecoveryArm(IToken<?> parentToken) {
@@ -581,11 +566,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   java.util.Map<IToken<?>, Long> getDeliveryChildActiveSince() {
-    return deliveryChildActiveSince;
+    return lifecycleStateStore.getDeliveryChildActiveSince();
   }
 
   java.util.Map<IToken<?>, Long> getMissingChildSince() {
-    return missingChildSince;
+    return lifecycleStateStore.getMissingChildSince();
   }
 
   CreateShopResolverDiagnostics getDiagnostics() {
@@ -601,7 +586,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   java.util.Map<IToken<?>, Long> getRetryingReassignAttempts() {
-    return retryingReassignAttempts;
+    return lifecycleStateStore.getRetryingReassignAttempts();
   }
 
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {
@@ -609,7 +594,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     cooldown.clearRequestCooldown(token);
-    pendingTracker.remove(token);
+    lifecycleStateStore.getPendingTracker().remove(token);
     clearDeliveriesCreated(token);
     if (clearFlowState) {
       flowStateMachine.remove(token);

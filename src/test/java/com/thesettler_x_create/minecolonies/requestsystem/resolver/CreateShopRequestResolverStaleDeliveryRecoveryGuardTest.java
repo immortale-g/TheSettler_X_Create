@@ -13,6 +13,10 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String lifecycleStoreSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleStateStore.java"));
     String lifecycleSource =
         Files.readString(
             Path.of(
@@ -34,7 +38,8 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
     assertTrue(reconcileSource.contains("stale-child-recovery"));
     assertTrue(originSource.contains("isLocalShopDeliveryChild("));
     assertTrue(originSource.contains("isDeliveryFromLocalShopStart("));
-    assertTrue(resolverSource.contains("parentDeliveryActiveSince"));
+    assertTrue(resolverSource.contains("lifecycleStateStore"));
+    assertTrue(lifecycleStoreSource.contains("parentDeliveryActiveSince"));
     assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
     assertTrue(reconcileSource.contains("stale delivery-child recovery"));
     assertTrue(reconcileSource.contains("stale-child-recovery"));
