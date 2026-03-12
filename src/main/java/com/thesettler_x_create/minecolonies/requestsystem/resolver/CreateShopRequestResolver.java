@@ -9,7 +9,6 @@ import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
-import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.api.util.WorldUtil;
@@ -106,6 +105,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopFlowTimeoutCleanupService();
   private final CreateShopDeliveryCompletionService deliveryCompletionService =
       new CreateShopDeliveryCompletionService();
+  private final CreateShopRetryingReassignService retryingReassignService =
+      new CreateShopRetryingReassignService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1860,89 +1861,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {
-    if (manager == null || level == null) {
-      return;
-    }
-    var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
-    var requestHandler = manager.getRequestHandler();
-    if (assignmentStore == null || requestHandler == null) {
-      return;
-    }
-    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return;
-    }
-    // Snapshot to avoid ConcurrentModificationException when reassignRequest mutates assignment
-    // store.
-    java.util.List<Map.Entry<IToken<?>, java.util.Collection<IToken<?>>>> assignmentSnapshot =
-        new java.util.ArrayList<>(assignments.entrySet());
-    long now = level.getGameTime();
-    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignmentSnapshot) {
-      IToken<?> ownerToken = entry.getKey();
-      java.util.Collection<IToken<?>> tokens = entry.getValue();
-      if (ownerToken == null || tokens == null || tokens.isEmpty()) {
-        continue;
-      }
-      IRequestResolver<?> ownerResolver;
-      try {
-        ownerResolver = manager.getResolverHandler().getResolver(ownerToken);
-      } catch (Exception ignored) {
-        continue;
-      }
-      if (ownerResolver == null
-          || !"StandardRetryingRequestResolver".equals(ownerResolver.getClass().getSimpleName())) {
-        continue;
-      }
-      java.util.List<IToken<?>> tokenSnapshot = new java.util.ArrayList<>(tokens);
-      for (IToken<?> requestToken : tokenSnapshot) {
-        if (requestToken == null) {
-          continue;
-        }
-        Long last = retryingReassignAttempts.get(requestToken);
-        if (last != null && now - last < 40L) {
-          continue;
-        }
-        IRequest<?> request;
-        try {
-          request = requestHandler.getRequest(requestToken);
-        } catch (Exception ignored) {
-          continue;
-        }
-        if (request == null
-            || !(request.getRequest() instanceof IDeliverable deliverable)
-            || request.getState()
-                == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-          continue;
-        }
-        @SuppressWarnings("unchecked")
-        IRequest<? extends IDeliverable> casted = (IRequest<? extends IDeliverable>) request;
-        if (!canResolveRequest(manager, casted)) {
-          continue;
-        }
-        retryingReassignAttempts.put(requestToken, now);
-        try {
-          IToken<?> newResolver =
-              manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] retrying reassign token={} from={} to={}",
-                requestToken,
-                ownerToken,
-                newResolver);
-          }
-          // Keep one reassignment per tick to reduce assignment churn and avoid drift races.
-          return;
-        } catch (Exception ex) {
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] retrying reassign failed token={} from={} error={}",
-                requestToken,
-                ownerToken,
-                ex.getMessage() == null ? "<null>" : ex.getMessage());
-          }
-        }
-      }
-    }
+    retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
 
   private String describeStack(ItemStack stack) {
@@ -2164,5 +2083,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   String describeStackForOps(ItemStack stack) {
     return describeStack(stack);
+  }
+
+  java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
+    return retryingReassignAttempts;
   }
 }

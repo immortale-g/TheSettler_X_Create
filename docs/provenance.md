@@ -445,3 +445,7 @@ Implementation notes:
   from `CreateShopRequestResolver` into `CreateShopDeliveryCompletionService`, preserving parent
   flow transition, local pickup reservation consumption, cooldown/pending reconciliation, and debug
   recheck diagnostics.
+- Retrying-reassign refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: retrying resolver assignment scan/reassign logic moved from
+  `CreateShopRequestResolver` into `CreateShopRetryingReassignService`, preserving cooldown guards,
+  resolvability checks, and one-reassign-per-tick behavior.
