@@ -137,6 +137,9 @@ Current behavior:
   in `CreateShopRequestResolver`.
 - Terminal request cleanup paths now share a unified resolver cleanup routine
   (`cleanupTerminalRequest`), reducing duplicated cancel/complete cleanup branches.
+- Reservation-release and cancelled-request lost-package inflight cleanup are now centralized in
+  `CreateShopReservationReleaseService`, reducing resolver responsibility and keeping terminal
+  cleanup wiring in one shared service.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

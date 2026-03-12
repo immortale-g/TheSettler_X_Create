@@ -99,6 +99,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPendingDeliveryTracker();
   private final CreateShopPendingTopupService pendingTopupService;
   private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
+  private final CreateShopReservationReleaseService reservationReleaseService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -112,6 +113,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
+    this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
   }
 
   @Override
@@ -1494,36 +1496,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   void releaseReservation(IRequestManager manager, IRequest<?> request) {
-    BuildingCreateShop shop = getShop(manager);
-    if (shop == null) {
-      return;
-    }
-    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
-    if (pickup == null) {
-      return;
-    }
-    pickup.release(toRequestId(request.getId()));
-    if (request != null
-        && request.getState()
-            == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED
-        && request.getRequest() instanceof Delivery delivery) {
-      ItemStack key = delivery.getStack();
-      if (key != null && !key.isEmpty()) {
-        String requesterName = messaging.resolveRequesterName(manager, request);
-        TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-        String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
-        int cleared = shop.cancelLostPackage(key, requesterName, address, -1L);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] releaseReservation cancelled request={} item={} requester='{}' address='{}' clearedInflight={}",
-              request.getId(),
-              key.getHoverName().getString(),
-              requesterName,
-              address,
-              cleared);
-        }
-      }
-    }
+    reservationReleaseService.releaseReservation(manager, request, getLocation());
   }
 
   private void cleanupTerminalRequest(
@@ -1540,7 +1513,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  UUID toRequestId(IToken<?> token) {
+  static UUID toRequestId(IToken<?> token) {
     Object id = token == null ? null : token.getIdentifier();
     if (id instanceof UUID uuid) {
       return uuid;
@@ -1705,14 +1678,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return 0L;
     }
     return manager.getColony().getWorld().getGameTime();
-  }
-
-  private static String sanitizeAddress(String value) {
-    if (value == null) {
-      return "";
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
   }
 
   private void transitionFlow(
