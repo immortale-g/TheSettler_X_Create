@@ -143,6 +143,9 @@ Current behavior:
 - Warehouse internal stock-count bridging to MineColonies is now centralized in
   `CreateShopWarehouseCountService`, reducing resolver-side null/context guard sprawl while keeping
   the same fail-open semantics.
+- Flow-timeout cleanup (`collectTimedOut` + failed transition + reservation/cooldown/pending
+  cleanup) is now centralized in `CreateShopFlowTimeoutCleanupService`, reducing resolver tick
+  orchestration responsibility while preserving existing timeout behavior.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

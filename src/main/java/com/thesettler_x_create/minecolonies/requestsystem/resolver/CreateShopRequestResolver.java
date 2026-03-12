@@ -102,6 +102,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopReservationReleaseService reservationReleaseService;
   private final CreateShopWarehouseCountService warehouseCountService =
       new CreateShopWarehouseCountService();
+  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService =
+      new CreateShopFlowTimeoutCleanupService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1670,37 +1672,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void processTimedOutFlows(IStandardRequestManager manager, Level level) {
-    long timeout = getInflightTimeoutTicksSafe();
-    for (CreateShopFlowRecord record :
-        flowStateMachine.collectTimedOut(level.getGameTime(), timeout)) {
-      IToken<?> token = record.getRequestToken();
-      IRequest<?> request = null;
-      try {
-        request = manager.getRequestHandler().getRequest(token);
-      } catch (Exception ignored) {
-        // Missing requests are cleaned up below.
-      }
-      if (request != null) {
-        transitionFlow(
-            manager,
-            request,
-            CreateShopFlowState.FAILED,
-            "timeout-cleanup",
-            record.getStackLabel(),
-            record.getAmount(),
-            "com.thesettler_x_create.message.createshop.flow_timeout");
-        if (request.getRequest() instanceof IDeliverable) {
-          releaseReservation(manager, request);
-        }
-      }
-      pendingTracker.remove(token);
-      cooldown.clearRequestCooldown(token);
-      clearDeliveriesCreated(token);
-      parentDeliveryActiveSince.remove(token);
-      clearStaleRecoveryArm(token);
-      clearTrackedChildrenForParent(manager, token);
-      flowStateMachine.remove(token);
-    }
+    flowTimeoutCleanupService.processTimedOutFlows(this, manager, level);
   }
 
   private boolean isStaleRecoveryArmed(
@@ -2263,5 +2235,37 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       TheSettlerXCreate.LOGGER.info("[CreateShop] root-cause delivery snapshot {}", snapshot);
       deliveryRootCauseLastLogTick.put(childToken, now);
     }
+  }
+
+  CreateShopRequestStateMachine getFlowStateMachineForOps() {
+    return flowStateMachine;
+  }
+
+  long getInflightTimeoutTicksSafeForOps() {
+    return getInflightTimeoutTicksSafe();
+  }
+
+  java.util.Map<IToken<?>, Long> getParentDeliveryActiveSinceForOps() {
+    return parentDeliveryActiveSince;
+  }
+
+  void clearStaleRecoveryArmForOps(IToken<?> parentToken) {
+    clearStaleRecoveryArm(parentToken);
+  }
+
+  void clearTrackedChildrenForParentForOps(
+      IStandardRequestManager manager, IToken<?> parentToken) {
+    clearTrackedChildrenForParent(manager, parentToken);
+  }
+
+  void transitionFlowForOps(
+      IRequestManager manager,
+      IRequest<?> request,
+      CreateShopFlowState state,
+      String detail,
+      String stackLabel,
+      int amount,
+      String messageKey) {
+    transitionFlow(manager, request, state, detail, stackLabel, amount, messageKey);
   }
 }

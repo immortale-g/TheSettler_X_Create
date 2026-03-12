@@ -1,0 +1,48 @@
+package com.thesettler_x_create.minecolonies.requestsystem.resolver;
+
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import net.minecraft.world.level.Level;
+
+/** Handles timeout-driven resolver cleanup for stale non-terminal flow records. */
+final class CreateShopFlowTimeoutCleanupService {
+  void processTimedOutFlows(
+      CreateShopRequestResolver resolver, IStandardRequestManager manager, Level level) {
+    if (resolver == null || manager == null || level == null) {
+      return;
+    }
+    long timeout = resolver.getInflightTimeoutTicksSafeForOps();
+    for (CreateShopFlowRecord record :
+        resolver.getFlowStateMachineForOps().collectTimedOut(level.getGameTime(), timeout)) {
+      IToken<?> token = record.getRequestToken();
+      IRequest<?> request = null;
+      try {
+        request = manager.getRequestHandler().getRequest(token);
+      } catch (Exception ignored) {
+        // Missing requests are cleaned up below.
+      }
+      if (request != null) {
+        resolver.transitionFlowForOps(
+            manager,
+            request,
+            CreateShopFlowState.FAILED,
+            "timeout-cleanup",
+            record.getStackLabel(),
+            record.getAmount(),
+            "com.thesettler_x_create.message.createshop.flow_timeout");
+        if (request.getRequest() instanceof IDeliverable) {
+          resolver.releaseReservation(manager, request);
+        }
+      }
+      resolver.getPendingTracker().remove(token);
+      resolver.getCooldown().clearRequestCooldown(token);
+      resolver.clearDeliveriesCreated(token);
+      resolver.getParentDeliveryActiveSinceForOps().remove(token);
+      resolver.clearStaleRecoveryArmForOps(token);
+      resolver.clearTrackedChildrenForParentForOps(manager, token);
+      resolver.getFlowStateMachineForOps().remove(token);
+    }
+  }
+}
