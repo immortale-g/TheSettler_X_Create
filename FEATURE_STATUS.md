@@ -279,6 +279,9 @@ Current behavior:
 - Pending gate/reconciliation services now call shared resolver state operations directly
   (`clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) instead of `*ForOps`
   forwarding aliases, reducing duplicated resolver ops surface while keeping behavior unchanged.
+- Terminal resolve lifecycle now owns its own skip/completion diagnostics (ordered/cooldown gate +
+  post-resolve state log) with constructor-injected cooldown/diagnostics dependencies, reducing
+  resolver helper forwarding in the `resolveRequest` path.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

@@ -3,26 +3,55 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.Config;
+import com.thesettler_x_create.TheSettlerXCreate;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
 /** Handles terminal request lifecycle cleanup and resolver completion/cancel transitions. */
 final class CreateShopTerminalRequestLifecycleService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverCooldown cooldown;
+  private final CreateShopResolverDiagnostics diagnostics;
 
   CreateShopTerminalRequestLifecycleService(
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverCooldown cooldown,
+      CreateShopResolverDiagnostics diagnostics) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.cooldown = cooldown;
+    this.diagnostics = diagnostics;
   }
 
   void resolveRequest(
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<? extends IDeliverable> request) {
-    if (resolver.shouldSkipResolveForOps(manager, request)) {
+    Level level = manager.getColony().getWorld();
+    boolean ordered = cooldown.isOrdered(request.getId());
+    boolean onCooldown = cooldown.isRequestOnCooldown(level, request.getId());
+    if (ordered || onCooldown) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolveRequest skip parent={} ordered={} cooldown={}",
+            request.getId(),
+            ordered,
+            onCooldown);
+      }
+      if (manager instanceof IStandardRequestManager standardManager) {
+        diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest-skip");
+      }
       return;
     }
-    resolver.resolveViaWarehouseForOps(manager, request);
-    resolver.logResolveCompletionForOps(manager, request);
+    resolver.resolveViaWarehouse(manager, request);
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolveRequest parent={} state={}", request.getId(), request.getState());
+    }
+    if (manager instanceof IStandardRequestManager standardManager) {
+      diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
+    }
   }
 
   void onAssignedRequestBeingCancelled(

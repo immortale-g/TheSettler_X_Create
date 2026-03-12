@@ -58,6 +58,10 @@ Implementation notes:
 - Resolver ops-surface cleanup refactor (removing selected `*ForOps` forwarding aliases and using
   direct shared methods: `clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) is
   authored in this project as a behavior-preserving internal simplification.
+- Terminal resolve-lifecycle refactor (moving ordered/cooldown skip and completion diagnostics into
+  `CreateShopTerminalRequestLifecycleService` with injected cooldown/diagnostics dependencies) is
+  authored in this project as a behavior-preserving internal split that reduces resolver helper
+  forwarding in the resolve path.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

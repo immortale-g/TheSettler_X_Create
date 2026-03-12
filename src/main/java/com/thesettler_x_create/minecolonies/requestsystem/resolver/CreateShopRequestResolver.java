@@ -152,7 +152,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopAttemptResolveService(
             requestStateMutatorService, messaging, deliveryManager, outstandingNeededService);
     this.terminalRequestLifecycleService =
-        new CreateShopTerminalRequestLifecycleService(requestStateMutatorService);
+        new CreateShopTerminalRequestLifecycleService(
+            requestStateMutatorService, cooldown, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
             cooldown, pendingTracker, diagnostics, flowStateMachine, stockResolver, messaging);
@@ -704,41 +705,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     flowStateMachine.touch(requestToken, nowTick, detail);
   }
 
-  boolean shouldSkipResolveForOps(
-      IRequestManager manager, IRequest<? extends IDeliverable> request) {
-    Level level = manager.getColony().getWorld();
-    boolean ordered = cooldown.isOrdered(request.getId());
-    boolean cooldown = this.cooldown.isRequestOnCooldown(level, request.getId());
-    if (ordered || cooldown) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolveRequest skip parent={} ordered={} cooldown={}",
-            request.getId(),
-            ordered,
-            cooldown);
-      }
-      if (manager instanceof IStandardRequestManager standardManager) {
-        diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest-skip");
-      }
-      return true;
-    }
-    return false;
-  }
-
-  void resolveViaWarehouseForOps(
+  void resolveViaWarehouse(
       IRequestManager manager, IRequest<? extends IDeliverable> request) {
     super.resolveRequest(manager, request);
-  }
-
-  void logResolveCompletionForOps(
-      IRequestManager manager, IRequest<? extends IDeliverable> request) {
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] resolveRequest parent={} state={}", request.getId(), request.getState());
-    }
-    if (manager instanceof IStandardRequestManager standardManager) {
-      diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
-    }
   }
 
 }
