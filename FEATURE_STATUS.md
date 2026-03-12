@@ -301,6 +301,8 @@ Current behavior:
   (`resolveNowTick`, `getFlowStateMachine`, `getInflightTimeoutTicksSafe`,
   `clearStaleRecoveryArm`, `clearTrackedChildrenForParent`, `isDebugLoggingEnabled`,
   `getRetryingReassignAttempts`, `logDeliveryLinkState`) instead of `*ForOps` aliases.
+- Resolver diagnostics access now uses direct `getDiagnostics()` across attempt/pending/recovery/
+  post-creation services, removing the `getDiagnosticsForOps()` forwarding alias.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

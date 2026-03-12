@@ -68,7 +68,7 @@ final class CreateShopPendingRequestProcessorService {
     }
     if (CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
       resolver.clearPendingTokenState(request.getId(), true);
-      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:terminal-state");
+      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:terminal-state");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (terminal state={})",
@@ -77,14 +77,14 @@ final class CreateShopPendingRequestProcessorService {
       }
       return;
     }
-    resolver.getDiagnosticsForOps().logRequestStateChange(standardManager, token, "tickPending");
+    resolver.getDiagnostics().logRequestStateChange(standardManager, token, "tickPending");
     IDeliverable deliverable = (IDeliverable) request.getRequest();
     String requestIdLog = request.getId().toString();
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     boolean onCooldown = resolver.getCooldown().isRequestOnCooldown(level, request.getId());
     if (request.hasChildren()) {
-      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:has-children");
+      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
           java.util.Objects.requireNonNull(request.getChildren(), "children");
       resolver.getParentLastKnownChildCountForOps().put(request.getId(), children.size());
@@ -103,7 +103,7 @@ final class CreateShopPendingRequestProcessorService {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
-        resolver.getDiagnosticsForOps().logParentChildrenState(standardManager, request.getId(), "tickPending");
+        resolver.getDiagnostics().logParentChildrenState(standardManager, request.getId(), "tickPending");
         if (childResult.childrenEmpty()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} children list empty despite hasChildren", requestIdLog);
@@ -158,7 +158,7 @@ final class CreateShopPendingRequestProcessorService {
     resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
     resolver.clearStaleRecoveryArm(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
-      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
+      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
       resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(

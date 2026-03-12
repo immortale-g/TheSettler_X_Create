@@ -83,6 +83,9 @@ Implementation notes:
   helper names for flow/timeout/debug/retry/link-state calls and removing the alias wrappers) is
   authored in this project as a behavior-preserving internal simplification that further reduces
   resolver surface indirection.
+- Resolver diagnostics-forwarding cleanup (switching service call sites from
+  `getDiagnosticsForOps()` to direct `getDiagnostics()`) is authored in this project as a
+  behavior-preserving internal simplification that removes another resolver facade alias.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

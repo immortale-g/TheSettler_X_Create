@@ -32,7 +32,7 @@ final class CreateShopPendingRequestGateService {
         resolver.getCancelledRequests().remove(request.getId());
       } else {
         resolver.clearPendingTokenState(request.getId(), true);
-        resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:cancelled");
+        resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:cancelled");
         resolver.transitionFlow(
             manager,
             request,
@@ -65,7 +65,7 @@ final class CreateShopPendingRequestGateService {
       return true;
     }
     if (!(request.getRequest() instanceof IDeliverable)) {
-      resolver.getDiagnosticsForOps().logPendingReasonChange(token, "skip:not-deliverable");
+      resolver.getDiagnostics().logPendingReasonChange(token, "skip:not-deliverable");
       return true;
     }
     return false;
