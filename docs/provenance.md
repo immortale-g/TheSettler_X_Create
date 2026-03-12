@@ -427,3 +427,8 @@ Implementation notes:
   remainder for the exact overdue segment (`item + requester + address + requestedAt`) before
   reorder/handover/cancel routing, preventing stale dialog responses from re-opening flows after
   tuple resolution.
+- Reservation release refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: cancelled-request reservation release and matching lost-package
+  inflight cleanup moved from `CreateShopRequestResolver` into
+  `CreateShopReservationReleaseService`, while resolver terminal cleanup continues to call a shared
+  release entrypoint.

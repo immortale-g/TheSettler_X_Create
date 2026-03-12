@@ -12,7 +12,7 @@ class CreateShopRequestResolverCancelLostPackageGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopReservationReleaseService.java"));
 
     assertTrue(source.contains("request.getState()"));
     assertTrue(source.contains("RequestState.CANCELLED"));
