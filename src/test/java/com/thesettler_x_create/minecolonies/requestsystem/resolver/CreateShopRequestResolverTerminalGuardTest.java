@@ -18,9 +18,11 @@ class CreateShopRequestResolverTerminalGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingRequestProcessorService.java"));
 
-    assertTrue(processorSource.contains("if (resolver.isTerminalRequestStateForOps(request.getState()))"));
+    assertTrue(
+        processorSource.contains(
+            "if (CreateShopRequestResolver.isTerminalRequestState(request.getState()))"));
     assertTrue(processorSource.contains("skip:terminal-state"));
     assertTrue(
-        resolverSource.contains("private static boolean isTerminalRequestState(RequestState state)"));
+        resolverSource.contains("static boolean isTerminalRequestState(RequestState state)"));
   }
 }

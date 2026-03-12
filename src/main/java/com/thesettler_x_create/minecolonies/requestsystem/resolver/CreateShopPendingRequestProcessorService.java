@@ -66,7 +66,7 @@ final class CreateShopPendingRequestProcessorService {
         resolver, manager, standardManager, request, token)) {
       return;
     }
-    if (resolver.isTerminalRequestStateForOps(request.getState())) {
+    if (CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
       resolver.clearPendingTokenState(request.getId(), true);
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:terminal-state");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {

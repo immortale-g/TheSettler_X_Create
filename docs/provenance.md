@@ -66,6 +66,9 @@ Implementation notes:
   `CreateShopTickPendingTelemetryService` and injecting it into pending token collection + tick
   orchestration) is authored in this project as a behavior-preserving internal split that reduces
   resolver-owned debug/perf state and forwarding.
+- Terminal-state gate refactor (switching pending processor terminal classification to direct shared
+  static `CreateShopRequestResolver.isTerminalRequestState(...)`) is authored in this project as a
+  behavior-preserving internal simplification and removes one resolver forwarding alias.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.
