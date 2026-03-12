@@ -96,6 +96,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
+  private final CreateShopPendingTopupService pendingTopupService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -103,6 +104,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
+    this.pendingTopupService =
+        new CreateShopPendingTopupService(
+            cooldown, pendingTracker, diagnostics, flowStateMachine, stockResolver, messaging);
   }
 
   @Override
@@ -979,89 +983,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
                 rackAvailable
                     - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
       }
-      int topupNeeded =
-          Math.max(
-              0,
-              pendingCount
-                  - Math.max(0, reservedForRequest)
-                  - Math.max(0, rackAvailableForRequest));
-      // Guard anchor: legacy topup baseline is "pending - reserved - rackAvailable"
-      // i.e. "- Math.max(0, rackAvailable)" before exclusive reservation refinement.
-      if (workerWorking && topupNeeded > 0) {
-        if (pendingTracker.hasDeliveryStarted(request.getId())) {
-          cooldown.markRequestOrdered(level, request.getId());
-          pendingTracker.setPendingCount(request.getId(), pendingCount);
-          diagnostics.recordPendingSource(
-              request.getId(), "tickPending:block-auto-reorder-started");
-          flowStateMachine.touch(
-              request.getId(), level.getGameTime(), "tickPending:block-auto-reorder-started");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} network topup blocked (started-order, pending={}, reserved={}, rack={})",
-                requestIdLog,
-                pendingCount,
-                reservedForRequest,
-                rackAvailableForRequest);
-          }
-        } else {
-          String requesterName = messaging.resolveRequesterName(manager, request);
-          int inflightRemaining =
-              pickup.getInflightRemaining(
-                  deliverable.getResult(), requesterName, tile.getShopAddress());
-          if (inflightRemaining > 0) {
-            cooldown.markRequestOrdered(level, request.getId());
-            pendingTracker.setPendingCount(request.getId(), pendingCount);
-            diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
-            flowStateMachine.touch(
-                request.getId(), level.getGameTime(), "tickPending:wait-inflight");
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] tickPending: {} network topup blocked (inflightRemaining={}, pending={}, reserved={}, rack={})",
-                  requestIdLog,
-                  inflightRemaining,
-                  pendingCount,
-                  reservedForRequest,
-                  rackAvailableForRequest);
-            }
-          } else {
-            int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
-            int topupCount = Math.min(networkAvailable, topupNeeded);
-            if (topupCount > 0) {
-              List<ItemStack> topupOrdered =
-                  stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName);
-              if (!topupOrdered.isEmpty()) {
-                for (ItemStack stack : topupOrdered) {
-                  if (stack.isEmpty()) {
-                    continue;
-                  }
-                  pickup.reserve(requestId, stack.copy(), stack.getCount());
-                }
-                cooldown.markRequestOrdered(level, request.getId());
-                pendingTracker.setPendingCount(request.getId(), pendingCount);
-                diagnostics.recordPendingSource(request.getId(), "tickPending:network-topup");
-                flowStateMachine.touch(
-                    request.getId(), level.getGameTime(), "tickPending:network-topup");
-                messaging.sendShopChat(
-                    manager,
-                    "com.thesettler_x_create.message.createshop.request_sent",
-                    topupOrdered);
-                if (Config.DEBUG_LOGGING.getAsBoolean()) {
-                  TheSettlerXCreate.LOGGER.info(
-                      "[CreateShop] tickPending: {} network topup ordered={} pending={} reserved={}",
-                      requestIdLog,
-                      countStackList(topupOrdered),
-                      pendingCount,
-                      reservedForRequest);
-                }
-              }
-            }
-          }
-        }
-      } else if (!workerWorking && topupNeeded > 0) {
-        flowStateMachine.touch(
-            request.getId(), level.getGameTime(), "tickPending:worker-idle-topup");
-        diagnostics.logPendingReasonChange(request.getId(), "wait:worker-for-network-topup");
-      }
+      pendingTopupService.handleTopup(
+          manager,
+          request,
+          level,
+          tile,
+          pickup,
+          deliverable,
+          workerWorking,
+          pendingCount,
+          reservedForRequest,
+          rackAvailableForRequest,
+          requestIdLog);
       int totalAvailable = rackAvailableForRequest;
       if (totalAvailable <= 0) {
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:waiting-arrival");

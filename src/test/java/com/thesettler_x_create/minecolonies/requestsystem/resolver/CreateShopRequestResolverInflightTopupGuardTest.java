@@ -12,7 +12,7 @@ class CreateShopRequestResolverInflightTopupGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingTopupService.java"));
 
     assertTrue(source.contains("pickup.getInflightRemaining("));
     assertTrue(source.contains("deliverable.getResult()"));

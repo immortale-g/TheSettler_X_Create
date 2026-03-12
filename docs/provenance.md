@@ -38,6 +38,9 @@ Implementation notes:
 - Lost-package root-request cancel matching refactor (extracting tuple-aware cancellation matching
   into `ShopLostPackageRequestCanceller` from `BuildingCreateShop`) is authored in this project and
   is a behavior-preserving internal split to reduce orchestrator class responsibility.
+- Resolver pending top-up refactor (extracting network topup decision/mutation from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingTopupService`) is authored
+  in this project as a behavior-preserving internal split to reduce central resolver complexity.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
