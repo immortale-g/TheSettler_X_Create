@@ -19,16 +19,19 @@ final class CreateShopTickPendingService {
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
   private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
   private final CreateShopTickPendingTelemetryService tickPendingTelemetryService;
+  private final CreateShopLifecycleRehydrateService lifecycleRehydrateService;
 
   CreateShopTickPendingService(
       CreateShopPendingTokenCollectorService pendingTokenCollectorService,
       CreateShopPendingRequestProcessorService pendingRequestProcessorService,
       CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService,
-      CreateShopTickPendingTelemetryService tickPendingTelemetryService) {
+      CreateShopTickPendingTelemetryService tickPendingTelemetryService,
+      CreateShopLifecycleRehydrateService lifecycleRehydrateService) {
     this.pendingTokenCollectorService = pendingTokenCollectorService;
     this.pendingRequestProcessorService = pendingRequestProcessorService;
     this.flowTimeoutCleanupService = flowTimeoutCleanupService;
     this.tickPendingTelemetryService = tickPendingTelemetryService;
+    this.lifecycleRehydrateService = lifecycleRehydrateService;
   }
 
   void tickPendingDeliveries(CreateShopRequestResolver resolver, IRequestManager manager) {
@@ -70,6 +73,8 @@ final class CreateShopTickPendingService {
     Set<IToken<?>> pendingTokens =
         pendingTokenCollectorService.collectPendingTokens(
             resolver, standardManager, level, assignments);
+    pendingTokens =
+        lifecycleRehydrateService.rehydrateAndFilter(resolver, standardManager, level, pendingTokens);
     if (pendingTokens.isEmpty()) {
       return;
     }

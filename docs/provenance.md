@@ -94,6 +94,15 @@ Implementation notes:
   pending/recovery/post-creation/reservation services instead of resolving diagnostics via resolver
   getter calls) is authored in this project as a behavior-preserving internal simplification that
   reduces resolver-as-service-locator coupling.
+- Lifecycle rehydrate refactor (adding `CreateShopLifecycleRehydrateService` and invoking it at
+  tick start before pending processing) is authored in this project to rebuild pending/inflight
+  state from MineColonies request graph after reload/drift and reduce stale local-map dependence.
+- Atomic delivery lifecycle transition refactor (adding `openDeliveryWindow` / `closeDeliveryWindow`
+  to `CreateShopRequestStateMutatorService` and using them in delivery cancel/complete/recovery
+  callbacks) is authored in this project to reduce split multi-map mutation paths.
+- Housekeeping protection-window alignment (`CreateShopRequestResolver.hasProtectedInventoryWindow`)
+  is authored in this project to align rack housekeeping gating with request lifecycle ownership
+  state under active inflight/pending work.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

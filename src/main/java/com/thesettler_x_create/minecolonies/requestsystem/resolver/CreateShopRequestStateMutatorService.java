@@ -28,4 +28,38 @@ final class CreateShopRequestStateMutatorService {
     resolver.getCooldown().clearRequestCooldown(requestToken);
     resolver.getPendingTracker().remove(requestToken);
   }
+
+  void openDeliveryWindow(
+      CreateShopRequestResolver resolver,
+      Level level,
+      IToken<?> parentToken,
+      IToken<?> childToken,
+      int pendingCount) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    markOrderedWithPendingAtLeastOne(resolver, level, parentToken, Math.max(1, pendingCount));
+    resolver.getParentDeliveryActiveSince().put(parentToken, level == null ? 0L : level.getGameTime());
+    resolver.clearStaleRecoveryArm(parentToken);
+    if (childToken != null) {
+      resolver
+          .getDeliveryChildActiveSince()
+          .put(childToken, level == null ? 0L : level.getGameTime());
+    }
+  }
+
+  void closeDeliveryWindow(
+      CreateShopRequestResolver resolver, IToken<?> parentToken, IToken<?> childToken) {
+    if (resolver == null) {
+      return;
+    }
+    if (childToken != null) {
+      resolver.getDeliveryChildActiveSince().remove(childToken);
+    }
+    if (parentToken != null) {
+      resolver.getParentDeliveryActiveSince().remove(parentToken);
+      resolver.clearStaleRecoveryArm(parentToken);
+      resolver.clearDeliveriesCreated(parentToken);
+    }
+  }
 }

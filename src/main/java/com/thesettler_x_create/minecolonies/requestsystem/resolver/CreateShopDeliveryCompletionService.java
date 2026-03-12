@@ -37,16 +37,13 @@ final class CreateShopDeliveryCompletionService {
     if (resolver == null) {
       return;
     }
-    if (request != null && request.getId() != null) {
-      resolver.getDeliveryChildActiveSince().remove(request.getId());
-    }
+    IToken<?> childToken = request == null ? null : request.getId();
     IToken<?> parentToken =
         CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSince().remove(parentToken);
-    resolver.clearStaleRecoveryArm(parentToken);
+    requestStateMutatorService.closeDeliveryWindow(resolver, parentToken, childToken);
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
     if (standard != null) {
@@ -137,7 +134,6 @@ final class CreateShopDeliveryCompletionService {
         // Ignore delivery detail logging failures.
       }
     }
-    resolver.clearDeliveriesCreated(parentToken);
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
     if (pending > 0) {
       if (manager != null && manager.getColony() != null) {

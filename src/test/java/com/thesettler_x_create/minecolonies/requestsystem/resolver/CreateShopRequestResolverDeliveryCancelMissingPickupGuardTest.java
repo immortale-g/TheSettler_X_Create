@@ -15,7 +15,7 @@ class CreateShopRequestResolverDeliveryCancelMissingPickupGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryCancelService.java"));
 
     assertTrue(source.contains("delivery-cancel-missing-pickup"));
-    assertTrue(source.contains("clearDeliveriesCreated(parentToken);"));
+    assertTrue(source.contains("requestStateMutatorService.closeDeliveryWindow("));
     assertTrue(source.contains("requestStateMutatorService.markOrderedWithPendingAtLeastOne("));
   }
 }
