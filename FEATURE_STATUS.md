@@ -194,6 +194,9 @@ Current behavior:
 - Rack reservation refresh reconciliation is now centralized in
   `CreateShopReservationSyncService`, isolating reservation-refresh semantics and reducing
   reservation drift fixes spread across resolver code paths.
+- Child lookup failure handling now uses the same grace/drop lifecycle as missing children
+  (instead of infinite fail-open), so repeated lookup exceptions eventually prune stale child
+  links and unblock parent progress.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

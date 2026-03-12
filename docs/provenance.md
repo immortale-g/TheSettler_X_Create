@@ -508,3 +508,7 @@ Implementation notes:
   authored in this project scope: rack reservation refresh logic moved from
   `CreateShopRequestResolver` into `CreateShopReservationSyncService`, preserving reservation
   refresh source tagging and flow touch semantics.
+- Child lookup-failure lifecycle hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: repeated child lookup exceptions in
+  `CreateShopChildReconciliationService` now follow the same grace/drop path as missing children,
+  preventing infinite fail-open child retention on persistent lookup failures.
