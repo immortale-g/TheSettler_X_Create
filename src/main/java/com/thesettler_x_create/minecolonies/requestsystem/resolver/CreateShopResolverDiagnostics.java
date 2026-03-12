@@ -20,8 +20,11 @@ final class CreateShopResolverDiagnostics {
     }
     var handler = manager.getRequestHandler();
     logRequestStateChange(manager, parentToken, phase);
-    IRequest<?> parent = handler.getRequest(parentToken);
-    var children = java.util.Objects.requireNonNull(parent.getChildren(), "children");
+    IRequest<?> parent = handler.getRequestOrNull(parentToken);
+    if (parent == null || parent.getChildren() == null) {
+      return;
+    }
+    var children = parent.getChildren();
     StringBuilder builder = new StringBuilder();
     builder.append("count=").append(children.size());
     for (IToken<?> child : children) {
@@ -29,7 +32,7 @@ final class CreateShopResolverDiagnostics {
         continue;
       }
       logRequestStateChange(manager, child, phase + "-child");
-      IRequest<?> childReq = handler.getRequest(child);
+      IRequest<?> childReq = handler.getRequestOrNull(child);
       String childState = childReq == null ? "<null>" : childReq.getState().toString();
       builder.append(" ").append(child).append(":").append(childState);
     }

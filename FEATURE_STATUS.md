@@ -104,12 +104,25 @@ Current behavior:
 - Lost-package handover now processes multiple matching player packages in one action and caps
   inflight consumption to the overdue target amount (`remaining`), preventing unnecessary extra
   package removal beyond the required recovery amount.
+- Lost-package interaction now includes a third action (`Cancel request`) that cancels matching
+  local Create Shop-owned requests via MineColonies request-state updates and clears matching
+  inflight tuple tracking, enabling clean native re-request from colony side when recovery is
+  intentionally aborted.
+- Lost-package reorder failures caused by insufficient stock-network availability now open a
+  dedicated one-button info interaction (`Back`) and then return to the lost-package options,
+  instead of silently closing without player-visible feedback.
 - Lost-package handover now pre-checks preview-accepted package content against remaining inflight
   before removing a player package, and stops further package removals after a consume-miss to
   avoid multi-package loss when tuple consumption fails.
 - Lost-package inflight consumption now falls back to same-item matching for component drift, and
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
+- Lost-package interactions now carry a shop-local runtime epoch that is bumped during
+  `/thesettlerxcreate reset_live_state`, so stale pre-reset dialogs cannot mutate new post-reset
+  runtime state.
+- Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
+  before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
+  phantom follow-up interactions.
 - Open inflight overdue entries are now re-armed for prompting on world load (`notified=false`
   during load), so blocked/lost-package interactions can reappear after reload when still unresolved.
 - Cancelled requests now clear matching lost-package inflight entries immediately, so cancelling a
@@ -142,6 +155,9 @@ Known focus area:
   counters consistently (instead of always logging `notified=0`) for clearer delivery diagnostics.
 - Pending top-up now subtracts already-available rack stock before ordering from Create network,
   preventing duplicate reorders when requested quantity is already physically present in shop racks.
+- Pending top-up now hard-blocks network reorders while matching inflight stock for the same
+  request tuple is still open, preventing repeated order loops before overdue/lost-package
+  resolution.
 - Pending reconciliation now refreshes missing request reservations from currently available rack
   stock after request-state refresh, improving reload recovery when reservation maps drift or reset.
 - Shopkeeper AI now treats resolver work and unreserved incoming-rack housekeeping as urgent work,

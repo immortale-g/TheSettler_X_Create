@@ -44,6 +44,14 @@ final class ShopInflightTracker {
     }
     var currentCounts = shop.getStockCountsForKeys(inflightKeys);
     pickup.reconcileInflight(currentCounts);
+    if (shop.hasActiveLocalDeliveryChildrenForInflight(colony)) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction skipped: local delivery still active");
+      }
+      notifyShopkeeperCapacityStall();
+      return;
+    }
     List<CreateShopBlockEntity.InflightNotice> notices =
         pickup.consumeOverdueNotices(now, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
     if (!notices.isEmpty()) {
@@ -79,7 +87,12 @@ final class ShopInflightTracker {
       }
       ShopLostPackageInteraction interaction =
           new ShopLostPackageInteraction(
-              notice.stackKey.copy(), notice.remaining, notice.requesterName, notice.address);
+              notice.stackKey.copy(),
+              notice.remaining,
+              notice.requesterName,
+              notice.address,
+              notice.requestedAt,
+              shop.getLostPackageInteractionEpoch());
       if (BuildingCreateShop.isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction trigger dispatch citizen={} interactionId={}",

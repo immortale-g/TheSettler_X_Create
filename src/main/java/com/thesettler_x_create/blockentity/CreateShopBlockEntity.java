@@ -322,6 +322,15 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
   public int consumeInflight(
       ItemStack stackKey, int amount, @Nullable String requesterName, @Nullable String address) {
+    return consumeInflight(stackKey, amount, requesterName, address, -1L);
+  }
+
+  public int consumeInflight(
+      ItemStack stackKey,
+      int amount,
+      @Nullable String requesterName,
+      @Nullable String address,
+      long requestedAt) {
     if (!ensureServerThread("consumeInflight")) {
       return 0;
     }
@@ -333,7 +342,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     int remaining = amount;
     int consumed = 0;
     boolean changed = false;
-    remaining = consumeInflightMatches(stackKey, remaining, requester, destination);
+    remaining = consumeInflightMatches(stackKey, remaining, requester, destination, requestedAt);
     consumed = amount - remaining;
     changed = consumed > 0;
 
@@ -341,7 +350,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     // If strict tuple matching consumed nothing, clear by stack key to avoid stuck overdue loops.
     if (consumed <= 0 && (!requester.isEmpty() || !destination.isEmpty()) && remaining > 0) {
       int before = remaining;
-      remaining = consumeInflightMatches(stackKey, remaining, "", "");
+      remaining = consumeInflightMatches(stackKey, remaining, "", "", requestedAt);
       int fallbackConsumed = before - remaining;
       if (fallbackConsumed > 0) {
         consumed += fallbackConsumed;
@@ -358,6 +367,14 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Returns currently tracked inflight remainder for a lost-package tuple. */
   public int getInflightRemaining(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
+    return getInflightRemaining(stackKey, requesterName, address, -1L);
+  }
+
+  public int getInflightRemaining(
+      ItemStack stackKey,
+      @Nullable String requesterName,
+      @Nullable String address,
+      long requestedAt) {
     if (!ensureServerThread("getInflightRemaining")) {
       return 0;
     }
@@ -377,6 +394,9 @@ public class CreateShopBlockEntity extends BlockEntity {
       if (!destination.isEmpty() && !destination.equals(entry.address)) {
         continue;
       }
+      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
+        continue;
+      }
       remaining += Math.max(0, entry.remaining);
     }
     return remaining;
@@ -385,6 +405,14 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Clears tracked inflight entries for a matching stack/requester/address tuple. */
   public int cancelInflight(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
+    return cancelInflight(stackKey, requesterName, address, -1L);
+  }
+
+  public int cancelInflight(
+      ItemStack stackKey,
+      @Nullable String requesterName,
+      @Nullable String address,
+      long requestedAt) {
     if (!ensureServerThread("cancelInflight")) {
       return 0;
     }
@@ -393,10 +421,10 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
     String requester = sanitize(requesterName);
     String destination = sanitize(address);
-    int removed = cancelInflightMatches(stackKey, requester, destination);
+    int removed = cancelInflightMatches(stackKey, requester, destination, requestedAt);
     // Fallback: requester labels can drift (hut name vs citizen name); clear by stack+address.
     if (removed <= 0 && !requester.isEmpty()) {
-      removed = cancelInflightMatches(stackKey, "", destination);
+      removed = cancelInflightMatches(stackKey, "", destination, requestedAt);
     }
     if (removed > 0) {
       pruneBaselines();
@@ -405,7 +433,24 @@ public class CreateShopBlockEntity extends BlockEntity {
     return removed;
   }
 
-  private int cancelInflightMatches(ItemStack stackKey, String requester, String destination) {
+  /** Clears reservations and inflight tracking for test/debug clean-state runs. */
+  public int clearRuntimeTrackingForDebug() {
+    if (!ensureServerThread("clearRuntimeTrackingForDebug")) {
+      return 0;
+    }
+    int removed = reservations.size() + inflightEntries.size() + inflightBaselines.size();
+    if (removed <= 0) {
+      return 0;
+    }
+    reservations.clear();
+    inflightEntries.clear();
+    inflightBaselines.clear();
+    setChanged();
+    return removed;
+  }
+
+  private int cancelInflightMatches(
+      ItemStack stackKey, String requester, String destination, long requestedAt) {
     int removed = 0;
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext()) {
@@ -419,6 +464,9 @@ public class CreateShopBlockEntity extends BlockEntity {
       if (!destination.isEmpty() && !destination.equals(entry.address)) {
         continue;
       }
+      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
+        continue;
+      }
       removed += Math.max(0, entry.remaining);
       iterator.remove();
     }
@@ -426,7 +474,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   }
 
   private int consumeInflightMatches(
-      ItemStack stackKey, int remaining, String requester, String destination) {
+      ItemStack stackKey, int remaining, String requester, String destination, long requestedAt) {
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext() && remaining > 0) {
       InflightEntry entry = iterator.next();
@@ -437,6 +485,9 @@ public class CreateShopBlockEntity extends BlockEntity {
         continue;
       }
       if (!destination.isEmpty() && !destination.equals(entry.address)) {
+        continue;
+      }
+      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
         continue;
       }
       int used = Math.min(remaining, entry.remaining);
