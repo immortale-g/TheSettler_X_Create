@@ -36,8 +36,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private static final long DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS = 20L * 30L;
   private static final CreateShopDeliveryCallbackService deliveryCallbackService =
       new CreateShopDeliveryCallbackService();
-  private long lastPerfLogTime = 0L;
-  private long lastTickPendingNanos = 0L;
 
   private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -45,8 +43,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Map<IToken<?>, Long> retryingReassignAttempts =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private final Object debugLock = new Object();
-  private volatile long lastTickPendingDebugTime = 0L;
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
@@ -94,6 +90,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopOutstandingNeededService outstandingNeededService =
       new CreateShopOutstandingNeededService();
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
+  private final CreateShopTickPendingTelemetryService tickPendingTelemetryService =
+      new CreateShopTickPendingTelemetryService();
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
   private final CreateShopPendingTopupService pendingTopupService;
@@ -106,7 +104,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
-      new CreateShopPendingTokenCollectorService(ownership);
+      new CreateShopPendingTokenCollectorService(ownership, tickPendingTelemetryService);
   private final CreateShopPendingRequestGateService pendingRequestGateService =
       new CreateShopPendingRequestGateService(ownership);
   private final CreateShopChildReconciliationService childReconciliationService;
@@ -177,7 +175,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingDeliveryCreationService,
             postCreationUpdateService);
     this.tickPendingService =
-        new CreateShopTickPendingService(pendingTokenCollectorService, pendingRequestProcessorService);
+        new CreateShopTickPendingService(
+            pendingTokenCollectorService,
+            pendingRequestProcessorService,
+            flowTimeoutCleanupService,
+            tickPendingTelemetryService);
   }
 
   @Override
@@ -238,36 +240,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     tickPendingService.tickPendingDeliveries(this, manager);
   }
 
-  private boolean shouldLogTickPending(Level level) {
-    long now = level.getGameTime();
-    if (now == 0L) {
-      return true;
-    }
-    synchronized (debugLock) {
-      if (now - lastTickPendingDebugTime >= Config.TICK_PENDING_DEBUG_COOLDOWN.getAsLong()) {
-        lastTickPendingDebugTime = now;
-        return true;
-      }
-      return false;
-    }
-  }
-
-  private void maybeLogPerf(Level level) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
-      return;
-    }
-    if (level == null) {
-      return;
-    }
-    long now = level.getGameTime();
-    if (now != 0L && now - lastPerfLogTime < Config.PERF_LOG_COOLDOWN.getAsLong()) {
-      return;
-    }
-    lastPerfLogTime = now;
-    TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
-  }
-
   boolean shouldDropMissingChild(Level level, IToken<?> childToken) {
     if (level == null || childToken == null) {
       return false;
@@ -282,27 +254,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
     deliveryCallbackService.onDeliveryCancelled(manager, request);
-  }
-
-  private void logTickPendingCandidates(
-      com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
-      java.util.Set<IToken<?>> pendingTokens) {
-    int logged = 0;
-    for (IToken<?> token : java.util.List.copyOf(pendingTokens)) {
-      if (logged >= 5) {
-        break;
-      }
-      try {
-        IRequest<?> req = requestHandler.getRequest(token);
-        String type = req == null ? "<null>" : req.getRequest().getClass().getName();
-        String state = req == null ? "<null>" : req.getState().toString();
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: candidate {} type={} state={}", token, type, state);
-        logged++;
-      } catch (IllegalArgumentException ignored) {
-        // Missing request.
-      }
-    }
   }
 
   public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
@@ -663,30 +614,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return retryingReassignAttempts;
   }
 
-  boolean shouldLogTickPendingForOps(Level level) {
-    return shouldLogTickPending(level);
-  }
-
   boolean isTerminalRequestStateForOps(RequestState state) {
     return isTerminalRequestState(state);
-  }
-
-  void processTimedOutFlowsForOps(IStandardRequestManager manager, Level level) {
-    flowTimeoutCleanupService.processTimedOutFlows(this, manager, level);
-  }
-
-  void setLastTickPendingNanosForOps(long nanos) {
-    lastTickPendingNanos = nanos;
-  }
-
-  void maybeLogPerfForOps(Level level) {
-    maybeLogPerf(level);
-  }
-
-  void logTickPendingCandidatesForOps(
-      com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
-      java.util.Set<IToken<?>> pendingTokens) {
-    logTickPendingCandidates(requestHandler, pendingTokens);
   }
 
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {

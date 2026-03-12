@@ -11,9 +11,13 @@ import net.minecraft.world.level.Level;
 /** Collects pending request tokens from direct assignments, ownership recovery, and pending maps. */
 final class CreateShopPendingTokenCollectorService {
   private final CreateShopResolverOwnership ownership;
+  private final CreateShopTickPendingTelemetryService tickPendingTelemetryService;
 
-  CreateShopPendingTokenCollectorService(CreateShopResolverOwnership ownership) {
+  CreateShopPendingTokenCollectorService(
+      CreateShopResolverOwnership ownership,
+      CreateShopTickPendingTelemetryService tickPendingTelemetryService) {
     this.ownership = ownership;
+    this.tickPendingTelemetryService = tickPendingTelemetryService;
   }
 
   Set<IToken<?>> collectPendingTokens(
@@ -32,7 +36,7 @@ final class CreateShopPendingTokenCollectorService {
       int before = assigned.size();
       assigned.addAll(assignedByOwner);
       if (Config.DEBUG_LOGGING.getAsBoolean()
-          && resolver.shouldLogTickPendingForOps(level)
+          && tickPendingTelemetryService.shouldLogTickPending(level)
           && (before == 0 || assignedByOwner.size() > before)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending owner-sync: resolverId={} directAssignments={} ownerAssignments={} effective={}",
@@ -42,11 +46,12 @@ final class CreateShopPendingTokenCollectorService {
             assigned.size());
       }
     } else {
-      java.util.Set<IToken<?>> recovered =
+        java.util.Set<IToken<?>> recovered =
           ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
         assigned.addAll(recovered);
-        if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()
+            && tickPendingTelemetryService.shouldLogTickPending(level)) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending assignment drift recovered: resolverId={} recoveredAssignments={}",
               resolver.getResolverToken(),
@@ -64,7 +69,8 @@ final class CreateShopPendingTokenCollectorService {
     pendingTokens.addAll(assigned);
     pendingTokens.addAll(resolver.getPendingTracker().getTokens());
     if (pendingTokens.isEmpty()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()
+          && tickPendingTelemetryService.shouldLogTickPending(level)) {
         if (resolver.getPendingTracker().hasEntries()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
@@ -72,7 +78,8 @@ final class CreateShopPendingTokenCollectorService {
               resolver.getPendingTracker().size());
         }
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()
+          && tickPendingTelemetryService.shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: no assigned or ordered requests for resolver {}",
             resolver.getResolverToken());
