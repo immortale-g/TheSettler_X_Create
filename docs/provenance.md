@@ -529,3 +529,8 @@ Implementation notes:
   is authored in this project scope: stale-recovery arm bookkeeping, parent-scoped stale timeout
   detection, and tracked-child cleanup moved from `CreateShopRequestResolver` into
   `CreateShopDeliveryChildLifecycleService`, with resolver methods retained as delegating facades.
+- Terminal request lifecycle refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: resolve-request skip/complete orchestration and
+  assigned/requested terminal cleanup transitions moved from `CreateShopRequestResolver` into
+  `CreateShopTerminalRequestLifecycleService`, preserving cooldown/ordered skip semantics and
+  release/cleanup behavior.

@@ -233,6 +233,9 @@ Current behavior:
 - Delivery-child stale/recovery-arm lifecycle and tracked-child cleanup are now centralized in
   `CreateShopDeliveryChildLifecycleService`, reducing resolver state mutation fan-out and keeping
   stale timeout ownership in one place.
+- Terminal request lifecycle handling (`resolveRequest` skip/complete path + completion/cancel
+  cleanup hooks) is now centralized in `CreateShopTerminalRequestLifecycleService`, reducing
+  request-end mutation duplication inside `CreateShopRequestResolver`.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
