@@ -86,6 +86,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
   private final CreateShopResolverChain chain = new CreateShopResolverChain(this);
+  private final CreateShopResolverOwnership ownership = new CreateShopResolverOwnership(this);
   private final CreateShopResolverRecheck recheck =
       new CreateShopResolverRecheck(this, diagnostics);
   private final CreateShopResolverCooldown cooldown = new CreateShopResolverCooldown(this);
@@ -466,7 +467,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       assigned.addAll(directAssigned);
     }
     java.util.Set<IToken<?>> assignedByOwner =
-        collectAssignedTokensByRequestResolver(standardManager, assignments);
+        ownership.collectAssignedTokensByRequestResolver(standardManager, assignments);
     if (!assignedByOwner.isEmpty()) {
       int before = assigned.size();
       assigned.addAll(assignedByOwner);
@@ -482,7 +483,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       }
     } else {
       java.util.Set<IToken<?>> recovered =
-          collectAssignedTokensFromLocalResolvers(standardManager, assignments);
+          ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
         assigned.addAll(recovered);
         if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
@@ -570,7 +571,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         pendingTracker.remove(token);
         continue;
       }
-      if (!isRequestOwnedByLocalResolver(standardManager, request)) {
+      if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
         cooldown.clearRequestCooldown(token);
         pendingTracker.remove(token);
         clearDeliveriesCreated(token);
@@ -1154,100 +1155,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
     needed = Math.max(0, needed - Math.max(0, reservedForRequest));
     return needed;
-  }
-
-  private java.util.Set<IToken<?>> collectAssignedTokensFromLocalResolvers(
-      IStandardRequestManager manager,
-      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
-    java.util.Set<IToken<?>> recovered = new java.util.LinkedHashSet<>();
-    if (manager == null || assignments == null || assignments.isEmpty()) {
-      return recovered;
-    }
-    for (Map.Entry<IToken<?>, java.util.Collection<IToken<?>>> entry : assignments.entrySet()) {
-      java.util.Collection<IToken<?>> values = entry.getValue();
-      if (values == null || values.isEmpty()) {
-        continue;
-      }
-      IToken<?> resolverToken = entry.getKey();
-      IRequestResolver<?> resolver;
-      try {
-        resolver = manager.getResolverHandler().getResolver(resolverToken);
-      } catch (Exception ignored) {
-        continue;
-      }
-      if (resolver instanceof CreateShopRequestResolver shopResolver
-          && isLocalShopResolver(shopResolver)) {
-        recovered.addAll(values);
-      }
-    }
-    return recovered;
-  }
-
-  private java.util.Set<IToken<?>> collectAssignedTokensByRequestResolver(
-      IStandardRequestManager manager,
-      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
-    java.util.Set<IToken<?>> recovered = new java.util.LinkedHashSet<>();
-    if (manager == null || assignments == null || assignments.isEmpty()) {
-      return recovered;
-    }
-    var requestHandler = manager.getRequestHandler();
-    if (requestHandler == null) {
-      return recovered;
-    }
-    for (java.util.Collection<IToken<?>> values : assignments.values()) {
-      if (values == null || values.isEmpty()) {
-        continue;
-      }
-      for (IToken<?> token : values) {
-        IRequest<?> request;
-        try {
-          request = requestHandler.getRequest(token);
-        } catch (Exception ignored) {
-          continue;
-        }
-        if (request == null) {
-          continue;
-        }
-        IRequestResolver<?> ownerResolver;
-        try {
-          ownerResolver = manager.getResolverHandler().getResolverForRequest(request);
-        } catch (Exception ignored) {
-          continue;
-        }
-        if (ownerResolver instanceof CreateShopRequestResolver shopResolver
-            && isLocalShopResolver(shopResolver)) {
-          recovered.add(token);
-        }
-      }
-    }
-    return recovered;
-  }
-
-  private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
-    if (resolver == null || resolver.getLocation() == null || getLocation() == null) {
-      return false;
-    }
-    return resolver.getLocation().getDimension().equals(getLocation().getDimension())
-        && resolver
-            .getLocation()
-            .getInDimensionLocation()
-            .equals(getLocation().getInDimensionLocation());
-  }
-
-  private boolean isRequestOwnedByLocalResolver(
-      IStandardRequestManager manager, IRequest<?> request) {
-    if (manager == null || request == null) {
-      return false;
-    }
-    try {
-      IRequestResolver<?> owner = manager.getResolverHandler().getResolverForRequest(request);
-      if (owner instanceof CreateShopRequestResolver shopResolver) {
-        return isLocalShopResolver(shopResolver);
-      }
-    } catch (Exception ignored) {
-      // Treat unresolved owner as stale for this resolver tick.
-    }
-    return false;
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
@@ -2183,7 +2090,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (manager == null || level == null || parentRequest == null || childToken == null) {
       return false;
     }
-    if (!isRequestOwnedByLocalResolver(manager, parentRequest)) {
+    if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
       clearStaleRecoveryArm(parentRequest.getId());
       return false;
     }
