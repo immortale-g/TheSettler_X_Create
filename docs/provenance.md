@@ -656,3 +656,8 @@ Implementation notes:
   pending/cooldown, delivery-created marker, parent stale/active/snapshot tracking, child-active
   + missing-child tracking, root-cause snapshot tracking, and retrying-reassign attempts for the
   token, reducing stale runtime residue after terminal or invalid-token transitions.
+- Lifecycle accessor cleanup on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: resolver pending/housekeeping paths now use token-scoped
+  lifecycle helpers (`markMissingChildIfAbsent`, active-child + parent-delivery snapshots) and the
+  unused root-cause child-token snapshot accessor was removed, reducing lifecycle API surface and
+  direct store-touch points.
