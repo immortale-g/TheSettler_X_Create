@@ -7,7 +7,6 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.api.util.WorldUtil;
@@ -92,6 +91,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopResolverPendingState(this);
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
   private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
+  private final CreateShopOutstandingNeededService outstandingNeededService =
+      new CreateShopOutstandingNeededService();
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
@@ -137,7 +138,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopDeliveryCompletionService(
             requestStateMutatorService, deliveryManager, diagnostics, recheck);
     this.pendingStateDecisionService =
-        new CreateShopPendingStateDecisionService(requestStateMutatorService, workerAvailabilityGate);
+        new CreateShopPendingStateDecisionService(
+            requestStateMutatorService, workerAvailabilityGate, outstandingNeededService);
     this.postCreationUpdateService =
         new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging);
     this.deliveryCancelService =
@@ -147,7 +149,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
     this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
     this.attemptResolveService =
-        new CreateShopAttemptResolveService(requestStateMutatorService, messaging, deliveryManager);
+        new CreateShopAttemptResolveService(
+            requestStateMutatorService, messaging, deliveryManager, outstandingNeededService);
     this.terminalRequestLifecycleService =
         new CreateShopTerminalRequestLifecycleService(requestStateMutatorService);
     this.pendingTopupService =
@@ -274,19 +277,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return false;
     }
     return now - since >= 40L;
-  }
-
-  private int computeOutstandingNeeded(
-      IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
-    if (request == null || deliverable == null) {
-      return 0;
-    }
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
-    needed = Math.max(0, needed - Math.max(0, reservedForRequest));
-    return needed;
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
@@ -712,11 +702,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Set<IToken<?>> getCancelledRequestsForOps() {
     return cancelledRequests;
-  }
-
-  int computeOutstandingNeededForOps(
-      IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
-    return computeOutstandingNeeded(request, deliverable, reservedForRequest);
   }
 
   void touchFlowForOps(IToken<?> requestToken, long nowTick, String detail) {

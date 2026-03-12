@@ -10,12 +10,15 @@ import net.minecraft.world.level.Level;
 final class CreateShopPendingStateDecisionService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate;
+  private final CreateShopOutstandingNeededService outstandingNeededService;
 
   CreateShopPendingStateDecisionService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopWorkerAvailabilityGate workerAvailabilityGate) {
+      CreateShopWorkerAvailabilityGate workerAvailabilityGate,
+      CreateShopOutstandingNeededService outstandingNeededService) {
     this.requestStateMutatorService = requestStateMutatorService;
     this.workerAvailabilityGate = workerAvailabilityGate;
+    this.outstandingNeededService = outstandingNeededService;
   }
 
   PendingDecision decide(
@@ -32,8 +35,7 @@ final class CreateShopPendingStateDecisionService {
       pendingCount = Math.max(0, resolver.getPendingTracker().getPendingCount(request.getId()));
     }
     if (pendingCount <= 0) {
-      int derivedPending =
-          resolver.computeOutstandingNeededForOps(request, deliverable, reservedForRequest);
+      int derivedPending = outstandingNeededService.compute(request, deliverable, reservedForRequest);
       if (derivedPending > 0) {
         requestStateMutatorService.markOrderedWithPending(
             resolver, null, request.getId(), derivedPending);
