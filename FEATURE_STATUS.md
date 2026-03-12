@@ -262,6 +262,9 @@ Current behavior:
   services (`CreateShopPendingRequestGateService`, `CreateShopPendingTokenCollectorService`,
   `CreateShopDeliveryChildRecoveryService`, `CreateShopPendingStateDecisionService`), removing
   additional resolver ops getter dependencies.
+- Resolver messaging is now constructor-injected into attempt/post-creation services
+  (`CreateShopAttemptResolveService`, `CreateShopPostCreationUpdateService`), allowing removal of
+  the resolver messaging ops getter.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

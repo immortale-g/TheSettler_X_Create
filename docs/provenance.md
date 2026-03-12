@@ -570,3 +570,7 @@ Implementation notes:
   `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
   ownership checks and worker-availability policy are now injected directly into gate/collector/
   recovery/decision services, and resolver ownership/worker getter passthroughs were removed.
+- Messaging dependency injection refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: Create Shop chat/requester-name messaging is now
+  injected into `CreateShopAttemptResolveService` and `CreateShopPostCreationUpdateService`,
+  removing resolver-level messaging getter passthrough usage.
