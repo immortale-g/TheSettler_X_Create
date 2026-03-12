@@ -531,32 +531,93 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return flowStateMachine;
   }
 
-  java.util.Map<IToken<?>, Long> getParentDeliveryActiveSince() {
-    return lifecycleStateStore.getParentDeliveryActiveSince();
+  Long getParentStaleRecoveryArmedAt(IToken<?> parentToken) {
+    return lifecycleStateStore.getParentStaleRecoveryArmedAt().get(parentToken);
   }
 
-  java.util.Map<IToken<?>, Long> getParentStaleRecoveryArmedAt() {
-    return lifecycleStateStore.getParentStaleRecoveryArmedAt();
+  boolean armStaleRecoveryIfMissing(IToken<?> parentToken, long nowTick) {
+    return lifecycleStateStore.getParentStaleRecoveryArmedAt().putIfAbsent(parentToken, nowTick) == null;
   }
 
-  java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshots() {
-    return lifecycleStateStore.getDeliveryRootCauseSnapshots();
+  void clearParentStaleRecoveryArm(IToken<?> parentToken) {
+    lifecycleStateStore.getParentStaleRecoveryArmedAt().remove(parentToken);
   }
 
-  java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTick() {
-    return lifecycleStateStore.getDeliveryRootCauseLastLogTick();
+  Long markParentDeliveryActiveIfAbsent(IToken<?> parentToken, long nowTick) {
+    return lifecycleStateStore.getParentDeliveryActiveSince().putIfAbsent(parentToken, nowTick);
   }
 
-  java.util.Map<IToken<?>, Integer> getParentLastKnownChildCount() {
-    return lifecycleStateStore.getParentLastKnownChildCount();
+  void clearParentDeliveryActive(IToken<?> parentToken) {
+    lifecycleStateStore.getParentDeliveryActiveSince().remove(parentToken);
   }
 
-  java.util.Map<IToken<?>, String> getParentLastKnownChildren() {
-    return lifecycleStateStore.getParentLastKnownChildren();
+  java.util.Set<IToken<?>> getParentDeliveryTokensSnapshot() {
+    return java.util.Set.copyOf(lifecycleStateStore.getParentDeliveryActiveSince().keySet());
   }
 
-  java.util.Map<IToken<?>, Long> getParentChildDropLastLogTick() {
-    return lifecycleStateStore.getParentChildDropLastLogTick();
+  void markChildActive(IToken<?> childToken, long sinceTick) {
+    lifecycleStateStore.getDeliveryChildActiveSince().put(childToken, sinceTick);
+  }
+
+  void clearChildActive(IToken<?> childToken) {
+    lifecycleStateStore.getDeliveryChildActiveSince().remove(childToken);
+  }
+
+  boolean hasAnyActiveChild() {
+    return !lifecycleStateStore.getDeliveryChildActiveSince().isEmpty();
+  }
+
+  java.util.Set<IToken<?>> getActiveChildTokensSnapshot() {
+    return java.util.Set.copyOf(lifecycleStateStore.getDeliveryChildActiveSince().keySet());
+  }
+
+  void clearMissingChildSince(IToken<?> childToken) {
+    lifecycleStateStore.getMissingChildSince().remove(childToken);
+  }
+
+  java.util.Set<IToken<?>> getRootCauseChildTokensSnapshot() {
+    return java.util.Set.copyOf(lifecycleStateStore.getDeliveryRootCauseLastLogTick().keySet());
+  }
+
+  Long getRootCauseLastLogTick(IToken<?> childToken) {
+    return lifecycleStateStore.getDeliveryRootCauseLastLogTick().get(childToken);
+  }
+
+  void markRootCauseLastLogTick(IToken<?> childToken, long nowTick) {
+    lifecycleStateStore.getDeliveryRootCauseLastLogTick().put(childToken, nowTick);
+  }
+
+  String putRootCauseSnapshot(IToken<?> childToken, String snapshot) {
+    return lifecycleStateStore.getDeliveryRootCauseSnapshots().put(childToken, snapshot);
+  }
+
+  Integer getParentLastKnownChildCount(IToken<?> parentToken) {
+    return lifecycleStateStore.getParentLastKnownChildCount().get(parentToken);
+  }
+
+  String getParentLastKnownChildren(IToken<?> parentToken) {
+    return lifecycleStateStore.getParentLastKnownChildren().get(parentToken);
+  }
+
+  Long getParentChildDropLastLogTick(IToken<?> parentToken) {
+    return lifecycleStateStore.getParentChildDropLastLogTick().get(parentToken);
+  }
+
+  void markParentChildDropLastLogTick(IToken<?> parentToken, long nowTick) {
+    lifecycleStateStore.getParentChildDropLastLogTick().put(parentToken, nowTick);
+  }
+
+  void setParentChildrenSnapshot(IToken<?> parentToken, int childCount, String childrenState) {
+    lifecycleStateStore.getParentLastKnownChildCount().put(parentToken, Math.max(0, childCount));
+    lifecycleStateStore
+        .getParentLastKnownChildren()
+        .put(parentToken, childrenState == null ? "[]" : childrenState);
+  }
+
+  void clearParentChildrenSnapshot(IToken<?> parentToken) {
+    lifecycleStateStore.getParentLastKnownChildCount().remove(parentToken);
+    lifecycleStateStore.getParentLastKnownChildren().remove(parentToken);
+    lifecycleStateStore.getParentChildDropLastLogTick().remove(parentToken);
   }
 
   void clearStaleRecoveryArm(IToken<?> parentToken) {
@@ -566,14 +627,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
-  }
-
-  java.util.Map<IToken<?>, Long> getDeliveryChildActiveSince() {
-    return lifecycleStateStore.getDeliveryChildActiveSince();
-  }
-
-  java.util.Map<IToken<?>, Long> getMissingChildSince() {
-    return lifecycleStateStore.getMissingChildSince();
   }
 
   CreateShopResolverDiagnostics getDiagnostics() {
@@ -588,8 +641,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return isDebugLoggingEnabledSafe();
   }
 
-  java.util.Map<IToken<?>, Long> getRetryingReassignAttempts() {
-    return lifecycleStateStore.getRetryingReassignAttempts();
+  Long getRetryingReassignAttempt(IToken<?> token) {
+    return lifecycleStateStore.getRetryingReassignAttempts().get(token);
+  }
+
+  void markRetryingReassignAttempt(IToken<?> token, long nowTick) {
+    lifecycleStateStore.getRetryingReassignAttempts().put(token, nowTick);
   }
 
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {

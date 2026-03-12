@@ -39,12 +39,10 @@ final class CreateShopRequestStateMutatorService {
       return;
     }
     markOrderedWithPendingAtLeastOne(resolver, level, parentToken, Math.max(1, pendingCount));
-    resolver.getParentDeliveryActiveSince().put(parentToken, level == null ? 0L : level.getGameTime());
+    resolver.markParentDeliveryActiveIfAbsent(parentToken, level == null ? 0L : level.getGameTime());
     resolver.clearStaleRecoveryArm(parentToken);
     if (childToken != null) {
-      resolver
-          .getDeliveryChildActiveSince()
-          .put(childToken, level == null ? 0L : level.getGameTime());
+      resolver.markChildActive(childToken, level == null ? 0L : level.getGameTime());
     }
   }
 
@@ -54,10 +52,10 @@ final class CreateShopRequestStateMutatorService {
       return;
     }
     if (childToken != null) {
-      resolver.getDeliveryChildActiveSince().remove(childToken);
+      resolver.clearChildActive(childToken);
     }
     if (parentToken != null) {
-      resolver.getParentDeliveryActiveSince().remove(parentToken);
+      resolver.clearParentDeliveryActive(parentToken);
       resolver.clearStaleRecoveryArm(parentToken);
       resolver.clearDeliveriesCreated(parentToken);
     }
@@ -68,14 +66,14 @@ final class CreateShopRequestStateMutatorService {
     if (resolver == null || parentToken == null) {
       return false;
     }
-    return resolver.getParentStaleRecoveryArmedAt().putIfAbsent(parentToken, nowTick) == null;
+    return resolver.armStaleRecoveryIfMissing(parentToken, nowTick);
   }
 
   void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
     if (resolver == null || parentToken == null) {
       return;
     }
-    resolver.getParentStaleRecoveryArmedAt().remove(parentToken);
+    resolver.clearParentStaleRecoveryArm(parentToken);
   }
 
   Long markParentDeliveryActiveIfAbsent(
@@ -83,35 +81,35 @@ final class CreateShopRequestStateMutatorService {
     if (resolver == null || parentToken == null) {
       return null;
     }
-    return resolver.getParentDeliveryActiveSince().putIfAbsent(parentToken, nowTick);
+    return resolver.markParentDeliveryActiveIfAbsent(parentToken, nowTick);
   }
 
   void clearParentDeliveryActive(CreateShopRequestResolver resolver, IToken<?> parentToken) {
     if (resolver == null || parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSince().remove(parentToken);
+    resolver.clearParentDeliveryActive(parentToken);
   }
 
   void markChildActive(CreateShopRequestResolver resolver, IToken<?> childToken, long sinceTick) {
     if (resolver == null || childToken == null) {
       return;
     }
-    resolver.getDeliveryChildActiveSince().put(childToken, sinceTick);
+    resolver.markChildActive(childToken, sinceTick);
   }
 
   void clearChildActive(CreateShopRequestResolver resolver, IToken<?> childToken) {
     if (resolver == null || childToken == null) {
       return;
     }
-    resolver.getDeliveryChildActiveSince().remove(childToken);
+    resolver.clearChildActive(childToken);
   }
 
   void clearMissingChild(CreateShopRequestResolver resolver, IToken<?> childToken) {
     if (resolver == null || childToken == null) {
       return;
     }
-    resolver.getMissingChildSince().remove(childToken);
+    resolver.clearMissingChildSince(childToken);
   }
 
   void setParentChildrenSnapshot(
@@ -119,23 +117,20 @@ final class CreateShopRequestStateMutatorService {
     if (resolver == null || parentToken == null) {
       return;
     }
-    resolver.getParentLastKnownChildCount().put(parentToken, Math.max(0, childCount));
-    resolver.getParentLastKnownChildren().put(parentToken, childrenState == null ? "[]" : childrenState);
+    resolver.setParentChildrenSnapshot(parentToken, childCount, childrenState);
   }
 
   void clearParentChildrenSnapshot(CreateShopRequestResolver resolver, IToken<?> parentToken) {
     if (resolver == null || parentToken == null) {
       return;
     }
-    resolver.getParentLastKnownChildCount().remove(parentToken);
-    resolver.getParentLastKnownChildren().remove(parentToken);
-    resolver.getParentChildDropLastLogTick().remove(parentToken);
+    resolver.clearParentChildrenSnapshot(parentToken);
   }
 
   void markParentChildDropLog(CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
     if (resolver == null || parentToken == null) {
       return;
     }
-    resolver.getParentChildDropLastLogTick().put(parentToken, nowTick);
+    resolver.markParentChildDropLastLogTick(parentToken, nowTick);
   }
 }
