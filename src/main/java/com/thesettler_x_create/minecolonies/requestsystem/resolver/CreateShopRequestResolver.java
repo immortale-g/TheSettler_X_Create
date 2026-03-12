@@ -244,7 +244,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return false;
     }
     long now = level.getGameTime();
-    Long since = lifecycleStateStore.getMissingChildSince().putIfAbsent(childToken, now);
+    Long since = markMissingChildIfAbsent(childToken, now);
     if (since == null) {
       return false;
     }
@@ -483,8 +483,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public boolean hasProtectedInventoryWindow() {
     return hasActiveWork()
-        || !lifecycleStateStore.getDeliveryChildActiveSince().isEmpty()
-        || !lifecycleStateStore.getParentDeliveryActiveSince().isEmpty()
+        || hasAnyActiveChild()
+        || !getParentDeliveryTokensSnapshot().isEmpty()
         || lifecycleStateStore.getPendingTracker().hasEntries();
   }
 
@@ -575,8 +575,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lifecycleStateStore.getMissingChildSince().remove(childToken);
   }
 
-  java.util.Set<IToken<?>> getRootCauseChildTokensSnapshot() {
-    return java.util.Set.copyOf(lifecycleStateStore.getDeliveryRootCauseLastLogTick().keySet());
+  Long markMissingChildIfAbsent(IToken<?> childToken, long nowTick) {
+    return lifecycleStateStore.getMissingChildSince().putIfAbsent(childToken, nowTick);
   }
 
   Long getRootCauseLastLogTick(IToken<?> childToken) {
