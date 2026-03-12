@@ -17,6 +17,10 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
+    String recoverySource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildRecoveryService.java"));
 
     assertTrue(source.contains("isStaleDeliveryChild("));
     assertTrue(source.contains("recoverStaleDeliveryChild("));
@@ -26,9 +30,9 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
     assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
     assertTrue(source.contains("stale delivery-child recovery"));
     assertTrue(source.contains("stale-child-recovery"));
-    assertTrue(source.contains("manager.updateRequestState("));
+    assertTrue(recoverySource.contains("manager.updateRequestState("));
     assertTrue(
-        source.contains(
+        recoverySource.contains(
             "childToken, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED"));
   }
 }

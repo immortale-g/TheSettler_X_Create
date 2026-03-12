@@ -121,6 +121,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopDeliveryCancelService();
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
       new CreateShopDeliveryRootCauseSnapshotService();
+  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService =
+      new CreateShopDeliveryChildRecoveryService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1237,52 +1239,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       CreateShopBlockEntity pickup,
       String pendingSource,
       String logTemplate) {
-    if (manager == null || level == null || parentRequest == null || childToken == null) {
-      return false;
-    }
-    if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
-      clearStaleRecoveryArm(parentRequest.getId());
-      return false;
-    }
-    if (!isLocalShopDeliveryChild(childRequest, shop, pickup)) {
-      return false;
-    }
-    int childCount = 1;
-    String childItem = "<unknown>";
-    if (childRequest != null && childRequest.getRequest() instanceof Delivery delivery) {
-      ItemStack stack = delivery.getStack();
-      if (stack != null && !stack.isEmpty()) {
-        childCount = Math.max(1, stack.getCount());
-        childItem = stack.getItem().toString();
-      }
-    }
-    boolean stateUpdated = false;
-    try {
-      manager.updateRequestState(
-          childToken, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED);
-      stateUpdated = true;
-    } catch (Exception ignored) {
-      // Best effort; parent child-link cleanup below still runs.
-    }
-    try {
-      parentRequest.removeChild(childToken);
-    } catch (Exception ignored) {
-      // Best effort.
-    }
-    clearDeliveriesCreated(parentRequest.getId());
-    int currentPending = pendingTracker.getPendingCount(parentRequest.getId());
-    pendingTracker.setPendingCount(parentRequest.getId(), Math.max(currentPending, childCount));
-    diagnostics.recordPendingSource(parentRequest.getId(), pendingSource);
-    cooldown.markRequestOrdered(level, parentRequest.getId());
-    parentDeliveryActiveSince.put(parentRequest.getId(), level.getGameTime());
-    clearStaleRecoveryArm(parentRequest.getId());
-    deliveryChildActiveSince.put(childToken, level.getGameTime());
-    recheck.scheduleParentChildRecheck(manager, parentRequest.getId());
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          logTemplate, parentRequest.getId(), childToken, stateUpdated, childItem, childCount);
-    }
-    return true;
+    return deliveryChildRecoveryService.recover(
+        this,
+        manager,
+        level,
+        parentRequest,
+        childToken,
+        childRequest,
+        shop,
+        pickup,
+        pendingSource,
+        logTemplate);
   }
 
   private boolean isLocalShopDeliveryChild(

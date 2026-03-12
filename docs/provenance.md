@@ -495,3 +495,7 @@ Implementation notes:
   queue/courier details + assigned resolver snapshot) moved from `CreateShopRequestResolver` into
   `CreateShopDeliveryRootCauseSnapshotService`, preserving rate-limit and snapshot-diff logging
   behavior.
+- Delivery-child recovery refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: stale/extra-active delivery-child mutation logic
+  moved from `CreateShopRequestResolver` into `CreateShopDeliveryChildRecoveryService`, preserving
+  ownership revalidation, local-child mutation scope, and parent requeue/recheck behavior.
