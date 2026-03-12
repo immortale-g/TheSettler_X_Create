@@ -466,3 +466,9 @@ Implementation notes:
   `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
   candidate debug emission loop is moved into a dedicated resolver helper method without behavior
   change.
+- Child-reconciliation refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: pending parent child-reconciliation loop moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopChildReconciliationService`, preserving duplicate-child cleanup, fail-open
+  missing-child grace, local-only delivery-child mutation scope, and stale/extra-active delivery
+  recovery behavior.
