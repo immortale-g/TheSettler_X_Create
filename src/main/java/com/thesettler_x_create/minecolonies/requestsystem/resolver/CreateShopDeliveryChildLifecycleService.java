@@ -17,9 +17,9 @@ final class CreateShopDeliveryChildLifecycleService {
       return false;
     }
     long now = level.getGameTime();
-    Long armedAt = resolver.getParentStaleRecoveryArmedAtForOps().get(parentToken);
+    Long armedAt = resolver.getParentStaleRecoveryArmedAt().get(parentToken);
     if (armedAt == null) {
-      resolver.getParentStaleRecoveryArmedAtForOps().put(parentToken, now);
+      resolver.getParentStaleRecoveryArmedAt().put(parentToken, now);
       resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken);
       return false;
     }
@@ -34,7 +34,7 @@ final class CreateShopDeliveryChildLifecycleService {
     if (parentToken == null) {
       return;
     }
-    resolver.getParentStaleRecoveryArmedAtForOps().remove(parentToken);
+    resolver.getParentStaleRecoveryArmedAt().remove(parentToken);
   }
 
   boolean isStaleDeliveryChild(
@@ -49,16 +49,16 @@ final class CreateShopDeliveryChildLifecycleService {
     boolean activeState =
         state == RequestState.CREATED || state == RequestState.ASSIGNED || state == RequestState.IN_PROGRESS;
     if (!activeState) {
-      resolver.getDeliveryChildActiveSinceForOps().remove(childToken);
+      resolver.getDeliveryChildActiveSince().remove(childToken);
       return false;
     }
     long now = level.getGameTime();
-    Long since = resolver.getParentDeliveryActiveSinceForOps().putIfAbsent(parentToken, now);
+    Long since = resolver.getParentDeliveryActiveSince().putIfAbsent(parentToken, now);
     if (since == null) {
-      resolver.getDeliveryChildActiveSinceForOps().put(childToken, now);
+      resolver.getDeliveryChildActiveSince().put(childToken, now);
       return false;
     }
-    resolver.getDeliveryChildActiveSinceForOps().put(childToken, since);
+    resolver.getDeliveryChildActiveSince().put(childToken, since);
     long timeout =
         Math.max(
             CreateShopRequestResolver.getDeliveryChildStaleTimeoutFloorTicks(),
@@ -71,12 +71,12 @@ final class CreateShopDeliveryChildLifecycleService {
     if (manager == null || parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSinceForOps().remove(parentToken);
+    resolver.getParentDeliveryActiveSince().remove(parentToken);
     clearStaleRecoveryArm(resolver, parentToken);
-    resolver.getParentLastKnownChildCountForOps().remove(parentToken);
-    resolver.getParentLastKnownChildrenForOps().remove(parentToken);
-    resolver.getParentChildDropLastLogTickForOps().remove(parentToken);
-    if (resolver.getDeliveryChildActiveSinceForOps().isEmpty()) {
+    resolver.getParentLastKnownChildCount().remove(parentToken);
+    resolver.getParentLastKnownChildren().remove(parentToken);
+    resolver.getParentChildDropLastLogTick().remove(parentToken);
+    if (resolver.getDeliveryChildActiveSince().isEmpty()) {
       return;
     }
     var handler = manager.getRequestHandler();
@@ -84,17 +84,18 @@ final class CreateShopDeliveryChildLifecycleService {
       return;
     }
     for (IToken<?> childToken :
-        java.util.List.copyOf(resolver.getDeliveryChildActiveSinceForOps().keySet())) {
+        java.util.List.copyOf(resolver.getDeliveryChildActiveSince().keySet())) {
       try {
         IRequest<?> child = handler.getRequest(childToken);
         IToken<?> parent = child == null ? null : child.getParent();
         if (parentToken.equals(parent)) {
-          resolver.getDeliveryChildActiveSinceForOps().remove(childToken);
+          resolver.getDeliveryChildActiveSince().remove(childToken);
         }
       } catch (Exception ignored) {
-        resolver.getDeliveryChildActiveSinceForOps().remove(childToken);
+        resolver.getDeliveryChildActiveSince().remove(childToken);
       }
     }
   }
 }
+
 

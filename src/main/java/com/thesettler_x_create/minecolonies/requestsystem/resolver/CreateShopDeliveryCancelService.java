@@ -41,14 +41,14 @@ final class CreateShopDeliveryCancelService {
       return;
     }
     if (request.getId() != null) {
-      resolver.getDeliveryChildActiveSinceForOps().remove(request.getId());
+      resolver.getDeliveryChildActiveSince().remove(request.getId());
     }
     IToken<?> parentToken =
         CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSinceForOps().remove(parentToken);
+    resolver.getParentDeliveryActiveSince().remove(parentToken);
     resolver.clearStaleRecoveryArm(parentToken);
     UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
@@ -134,4 +134,5 @@ final class CreateShopDeliveryCancelService {
     }
   }
 }
+
 

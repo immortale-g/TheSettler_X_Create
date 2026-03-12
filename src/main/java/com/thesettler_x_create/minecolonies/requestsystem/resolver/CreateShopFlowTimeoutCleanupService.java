@@ -45,11 +45,12 @@ final class CreateShopFlowTimeoutCleanupService {
       }
       requestStateMutatorService.clearOrderedAndPending(resolver, token);
       resolver.clearDeliveriesCreated(token);
-      resolver.getParentDeliveryActiveSinceForOps().remove(token);
+      resolver.getParentDeliveryActiveSince().remove(token);
       resolver.clearStaleRecoveryArm(token);
       resolver.clearTrackedChildrenForParent(manager, token);
       resolver.getFlowStateMachine().remove(token);
     }
   }
 }
+
 

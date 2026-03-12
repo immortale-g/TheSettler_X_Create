@@ -303,6 +303,11 @@ Current behavior:
   `getRetryingReassignAttempts`, `logDeliveryLinkState`) instead of `*ForOps` aliases.
 - Resolver diagnostics access now uses direct `getDiagnostics()` across attempt/pending/recovery/
   post-creation services, removing the `getDiagnosticsForOps()` forwarding alias.
+- Delivery lifecycle/root-cause/pending services now use direct map accessors
+  (`getDeliveryChildActiveSince`, `getParentDeliveryActiveSince`, `getParentStaleRecoveryArmedAt`,
+  `getParentLastKnownChildCount`, `getParentLastKnownChildren`, `getParentChildDropLastLogTick`,
+  `getDeliveryRootCauseSnapshots`, `getDeliveryRootCauseLastLogTick`, `getMissingChildSince`)
+  instead of `*ForOps` accessor aliases.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

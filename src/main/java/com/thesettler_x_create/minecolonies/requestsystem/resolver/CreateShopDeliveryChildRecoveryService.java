@@ -75,9 +75,9 @@ final class CreateShopDeliveryChildRecoveryService {
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
     resolver.getDiagnostics().recordPendingSource(parentRequest.getId(), pendingSource);
-    resolver.getParentDeliveryActiveSinceForOps().put(parentRequest.getId(), level.getGameTime());
+    resolver.getParentDeliveryActiveSince().put(parentRequest.getId(), level.getGameTime());
     resolver.clearStaleRecoveryArm(parentRequest.getId());
-    resolver.getDeliveryChildActiveSinceForOps().put(childToken, level.getGameTime());
+    resolver.getDeliveryChildActiveSince().put(childToken, level.getGameTime());
     resolver.getRecheck().scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
@@ -86,4 +86,5 @@ final class CreateShopDeliveryChildRecoveryService {
     return true;
   }
 }
+
 

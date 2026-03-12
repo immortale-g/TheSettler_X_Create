@@ -33,7 +33,7 @@ final class CreateShopDeliveryRootCauseSnapshotService {
     }
 
     long now = level.getGameTime();
-    Long last = resolver.getDeliveryRootCauseLastLogTickForOps().get(childToken);
+    Long last = resolver.getDeliveryRootCauseLastLogTick().get(childToken);
     if (last != null && now - last < 100L) {
       return;
     }
@@ -156,11 +156,12 @@ final class CreateShopDeliveryRootCauseSnapshotService {
             + " warehouses="
             + warehouseDebug;
 
-    String previous = resolver.getDeliveryRootCauseSnapshotsForOps().put(childToken, snapshot);
+    String previous = resolver.getDeliveryRootCauseSnapshots().put(childToken, snapshot);
     if (!snapshot.equals(previous)) {
       TheSettlerXCreate.LOGGER.info("[CreateShop] root-cause delivery snapshot {}", snapshot);
-      resolver.getDeliveryRootCauseLastLogTickForOps().put(childToken, now);
+      resolver.getDeliveryRootCauseLastLogTick().put(childToken, now);
     }
   }
 }
+
 
