@@ -41,11 +41,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private long lastPerfLogTime = 0L;
   private long lastTickPendingNanos = 0L;
 
-  private static final java.util.Set<IToken<?>> cancelledRequests =
+  private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private static final java.util.Map<IToken<?>, Long> pendingNotices =
+  private final java.util.Map<IToken<?>, Long> pendingNotices =
       new java.util.concurrent.ConcurrentHashMap<>();
-  private static final java.util.Map<IToken<?>, Long> retryingReassignAttempts =
+  private final java.util.Map<IToken<?>, Long> retryingReassignAttempts =
       new java.util.concurrent.ConcurrentHashMap<>();
   private final Object debugLock = new Object();
   private volatile long lastTickPendingDebugTime = 0L;
