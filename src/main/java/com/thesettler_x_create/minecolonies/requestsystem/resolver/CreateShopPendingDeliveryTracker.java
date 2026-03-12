@@ -82,6 +82,7 @@ final class CreateShopPendingDeliveryTracker {
   void markDeliveryCreated(IToken<?> token) {
     CreateShopPendingDeliveryState state = getOrCreate(token);
     state.setDeliveryCreated(true);
+    state.setDeliveryStarted(true);
   }
 
   void clearDeliveryCreated(IToken<?> token) {
@@ -90,6 +91,11 @@ final class CreateShopPendingDeliveryTracker {
       state.setDeliveryCreated(false);
       pruneIfEmpty(token, state);
     }
+  }
+
+  boolean hasDeliveryStarted(IToken<?> token) {
+    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
+    return state != null && state.isDeliveryStarted();
   }
 
   void setReason(IToken<?> token, String reason) {
@@ -115,6 +121,7 @@ final class CreateShopPendingDeliveryTracker {
     }
     return state.getPendingCount() > 0
         || state.isDeliveryCreated()
+        || state.isDeliveryStarted()
         || state.getCooldownUntil() > 0L;
   }
 
@@ -132,6 +139,7 @@ final class CreateShopPendingDeliveryTracker {
     }
     if (state.getPendingCount() <= 0
         && !state.isDeliveryCreated()
+        && !state.isDeliveryStarted()
         && state.getCooldownUntil() <= 0L) {
       pending.invalidate(token);
     }

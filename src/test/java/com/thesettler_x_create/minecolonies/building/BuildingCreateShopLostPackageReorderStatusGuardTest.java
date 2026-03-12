@@ -6,19 +6,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-class BuildingCreateShopLostPackageRestartInflightGateGuardTest {
+class BuildingCreateShopLostPackageReorderStatusGuardTest {
   @Test
-  void restartIsBoundedByTrackedInflightRemaining() throws Exception {
+  void restartDetailedDistinguishesNoNetworkStock() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("pickup.getInflightRemaining("));
-    assertTrue(source.contains("requestedAt"));
+    assertTrue(source.contains("restartLostPackageDetailed("));
+    assertTrue(source.contains("LostPackageReorderStatus.NO_NETWORK_STOCK"));
     assertTrue(
         source.contains(
-            "int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));"));
-    assertTrue(source.contains("requested.setCount(reorderTarget);"));
+            "new LostPackageReorderResult(0, LostPackageReorderStatus.NO_NETWORK_STOCK)"));
   }
 }

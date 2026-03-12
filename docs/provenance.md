@@ -242,6 +242,10 @@ Implementation notes:
 - Pending top-up coverage hardening is authored in this project scope: Create Shop `tickPending`
   now subtracts rack-available stock from top-up deficit calculation before issuing Create network
   orders, preventing duplicate network reorders when enough items are already in shop racks.
+- Pending inflight reorder guard hardening is authored in this project scope: `tickPending` now
+  blocks Create-network top-up for a parent while matching inflight stock for the same
+  deliverable/requester/address tuple remains open, keeping requests in waiting state instead of
+  repeatedly reordering before overdue/lost-package handling.
 - Reservation-refresh hardening is authored in this project scope: `tickPending` now reconstructs
   missing per-request reservations from currently available rack stock after request refresh,
   reducing post-reload reservation drift and avoiding premature unreserved treatment of pending
@@ -362,6 +366,15 @@ Implementation notes:
 - Lost-package handover amount-limiting hardening is authored in this project scope:
   one handover action now iterates multiple matching player packages as needed but limits inflight
   consumption to the interaction target (`remaining`) so recovery does not over-consume requests.
+- Lost-package cancel-action hardening is authored in this project scope:
+  interaction response routing now supports a third action that cancels matching local Create Shop
+  requests via MineColonies `updateRequestState(..., CANCELLED)` and clears matching inflight
+  tracking for the tuple, so players can abort stuck overdue flows without forcing duplicate
+  reorders.
+- Lost-package reorder-failure feedback hardening is authored in this project scope:
+  when reorder cannot be created due to missing stock-network availability, the shopkeeper now
+  presents a dedicated one-button info interaction (`Back`) and then re-opens the lost-package
+  options, avoiding silent UI close without player feedback.
 - Lost-package handover consume-guard hardening is authored in this project scope:
   package removal now requires preview-accepted matching content plus remaining inflight coverage,
   and handover stops further package removals after a consume-miss to prevent multi-package loss
@@ -386,3 +399,12 @@ Implementation notes:
   reservations at delivery-child creation time; reservation consumption is now tied to delivery
   completion for local shop starts (pickup/rack containers), preventing housekeeping from treating
   still-delivery-bound rack stock as unreserved.
+- Lost-package stale-interaction invalidation hardening on branch `fix/inflight-reorder-guard`
+  (2026-03-10) is authored in this project scope: lost-package interactions now carry a
+  shop-local runtime epoch, and `reset_live_state` bumps that epoch so pre-reset dialogs cannot
+  mutate post-reset runtime state.
+- Lost-package tuple-liveness response guard hardening on branch `fix/inflight-reorder-guard`
+  (2026-03-10) is authored in this project scope: interaction responses now validate live inflight
+  remainder for the exact overdue segment (`item + requester + address + requestedAt`) before
+  reorder/handover/cancel routing, preventing stale dialog responses from re-opening flows after
+  tuple resolution.

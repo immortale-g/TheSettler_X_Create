@@ -23,6 +23,7 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -385,6 +386,11 @@ final class CreateShopDeliveryManager {
     int warehousesWithCouriers = 0;
     int warehousesWithQueue = 0;
     for (var entry : buildingManager.getBuildings().entrySet()) {
+      if (entry.getValue() instanceof BuildingCreateShop) {
+        // The shop is IRequester/IWareHouse for MineColonies integration, but must never be used as
+        // a deliveryman source.
+        continue;
+      }
       if (!(entry.getValue() instanceof IWareHouse warehouse)) {
         continue;
       }
@@ -458,6 +464,10 @@ final class CreateShopDeliveryManager {
     for (var entry : buildingManager.getBuildings().entrySet()) {
       var building = entry.getValue();
       if (building == null) {
+        continue;
+      }
+      if (building instanceof BuildingCreateShop) {
+        // Never treat the Create Shop worker as courier.
         continue;
       }
       CourierAssignmentModule warehouseCouriers =

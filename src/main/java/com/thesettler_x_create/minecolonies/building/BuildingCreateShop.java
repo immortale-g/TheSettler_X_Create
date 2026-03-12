@@ -5,6 +5,10 @@ import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -88,6 +92,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   private long lastHousekeepingTransferTick = -1L;
   private long lastHousekeepingWorkCheckTick = -1L;
   private long lastHousekeepingDebugTick = -1L;
+  private long lostPackageInteractionEpoch;
   private boolean cachedHasIncomingRackWork;
   private boolean legacyCourierMigrationAttempted;
 
@@ -107,6 +112,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
     this.resolverFactory = new ShopResolverFactory(this);
+    this.lostPackageInteractionEpoch = 0L;
     this.legacyCourierMigrationAttempted = false;
   }
 
@@ -466,6 +472,11 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return cachedHasIncomingRackWork;
   }
 
+  public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    return hasActiveLocalDeliveryChildren(colony, pickup);
+  }
+
   public boolean hasUrgentWork() {
     return hasResolverWork();
   }
@@ -489,7 +500,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   public int restartLostPackage(
-      ItemStack stackKey, int remaining, String requesterName, String address) {
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    return restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)
+        .consumed();
+  }
+
+  LostPackageReorderResult restartLostPackageDetailed(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requested item={} remaining={} requester='{}' address='{}'",
@@ -503,7 +520,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: invalid input");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.INVALID_INPUT);
     }
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -515,16 +532,17 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             pickup != null,
             tile != null && tile.getStockNetworkId() != null);
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.MISSING_CONTEXT);
     }
-    int trackedRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+    int trackedRemaining =
+        pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
     int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));
     if (reorderTarget <= 0) {
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart skipped: no tracked inflight remaining for tuple");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.NO_TRACKED_INFLIGHT);
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(reorderTarget);
@@ -535,7 +553,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart failed: network returned empty reorder list");
       }
-      return 0;
+      return new LostPackageReorderResult(0, LostPackageReorderStatus.NO_NETWORK_STOCK);
     }
     int requestedCount = 0;
     for (ItemStack stack : reordered) {
@@ -543,7 +561,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         requestedCount += stack.getCount();
       }
     }
-    int consumed = pickup.consumeInflight(stackKey, requestedCount, requesterName, address);
+    int consumed =
+        pickup.consumeInflight(stackKey, requestedCount, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={}",
@@ -552,11 +571,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           requestedCount,
           consumed);
     }
-    return consumed;
+    return new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);
   }
 
   public int acceptLostPackageFromPlayer(
-      Player player, ItemStack stackKey, int remaining, String requesterName, String address) {
+      Player player,
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover requested player={} item={} remaining={} requester='{}' address='{}'",
@@ -587,7 +611,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     var inventory = player.getInventory();
     rackIndex.ensureRackContainers();
     int targetAmount = Math.max(1, remaining);
-    int inflightBefore = pickup.getInflightRemaining(stackKey, requesterName, address);
+    int inflightBefore = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover precheck inventorySlots={} target={} inflightBefore={} requester='{}' address='{}'",
@@ -655,7 +679,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         }
         continue;
       }
-      int strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+      int strictRemaining =
+          pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
       int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
       if (strictRemaining < consumeTarget && looseRemaining < consumeTarget) {
         if (isDebugRequests()) {
@@ -723,7 +748,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
       totalInsertedMatching += Math.max(0, insertedMatching);
       consumeTarget = Math.min(targetAmount - totalConsumed, Math.max(0, insertedMatching));
-      int consumed = pickup.consumeInflight(stackKey, consumeTarget, requesterName, address);
+      int consumed =
+          pickup.consumeInflight(stackKey, consumeTarget, requesterName, address, requestedAt);
       totalConsumed += Math.max(0, consumed);
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -735,7 +761,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             totalConsumed,
             targetAmount);
         if (consumed <= 0 && consumeTarget > 0) {
-          strictRemaining = pickup.getInflightRemaining(stackKey, requesterName, address);
+          strictRemaining =
+              pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
           looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover consume-miss slot={} consumeTarget={} strictRemaining={} looseRemaining={}",
@@ -750,7 +777,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         break;
       }
     }
-    int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address);
+    int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover summary scannedPackages={} matchedPackages={} removedPackages={} insertedMatchingTotal={} consumedTotal={} target={} inflightBefore={} inflightAfter={}",
@@ -774,7 +801,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return 0;
   }
 
-  public int cancelLostPackage(ItemStack stackKey, String requesterName, String address) {
+  public int cancelLostPackage(
+      ItemStack stackKey, String requesterName, String address, long requestedAt) {
     if (stackKey == null || stackKey.isEmpty()) {
       return 0;
     }
@@ -782,7 +810,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (pickup == null) {
       return 0;
     }
-    int cleared = pickup.cancelInflight(stackKey, requesterName, address);
+    int cleared = pickup.cancelInflight(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package cancel item={} requester='{}' address='{}' cleared={}",
@@ -792,6 +820,319 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           cleared);
     }
     return cleared;
+  }
+
+  /** Clears request runtime tracking caches used by Create Shop for debug/test clean-state runs. */
+  public int clearRuntimeTrackingForDebug() {
+    advanceLostPackageInteractionEpoch("debug-reset");
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (pickup == null) {
+      return 0;
+    }
+    int cleared = pickup.clearRuntimeTrackingForDebug();
+    if (isDebugRequests() && cleared > 0) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] debug reset runtime tracking shop={} cleared={}",
+          getLocation() == null ? "<unknown>" : getLocation().getInDimensionLocation(),
+          cleared);
+    }
+    return cleared;
+  }
+
+  long getLostPackageInteractionEpoch() {
+    return lostPackageInteractionEpoch;
+  }
+
+  void advanceLostPackageInteractionEpoch(String reason) {
+    lostPackageInteractionEpoch++;
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package interaction epoch advanced to {} reason={}",
+          lostPackageInteractionEpoch,
+          reason == null ? "<none>" : reason);
+    }
+  }
+
+  public int cancelLostPackageRequestAndInflight(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    int clearedInflight = cancelLostPackage(stackKey, requesterName, address, requestedAt);
+    int cancelledRequests =
+        cancelMatchingLostPackageRequests(stackKey, requesterName, address, requestedAt);
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] lost-package cancel+requests item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
+          stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
+          requesterName,
+          address,
+          clearedInflight,
+          cancelledRequests);
+    }
+    if (clearedInflight > 0 || cancelledRequests > 0) {
+      return Math.max(Math.max(1, remaining), clearedInflight);
+    }
+    return 0;
+  }
+
+  private int cancelMatchingLostPackageRequests(
+      ItemStack stackKey, String requesterName, String address, long requestedAt) {
+    if (stackKey == null || stackKey.isEmpty() || getColony() == null) {
+      return 0;
+    }
+    if (!(getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
+      return 0;
+    }
+    var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return 0;
+    }
+    java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
+    for (var value : assignments.values()) {
+      if (value != null) {
+        tokens.addAll(value);
+      }
+    }
+    boolean tupleScoped = requestedAt > 0L;
+    int cancelled = 0;
+    for (IToken<?> token : tokens) {
+      try {
+        IRequest<?> request = standard.getRequestHandler().getRequest(token);
+        if (request == null || isTerminalRequestState(request.getState())) {
+          continue;
+        }
+        if (request.hasParent()) {
+          continue;
+        }
+        IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(request);
+        if (!(owner instanceof CreateShopRequestResolver shopResolver)
+            || !isLocalResolver(owner, shopResolver)) {
+          continue;
+        }
+        if (!matchesLostPackageRequest(standard, request, stackKey)) {
+          continue;
+        }
+        if (!matchesLostPackageRequester(standard, request, requesterName)) {
+          continue;
+        }
+        if (!matchesLostPackageAddress(standard, request, address)) {
+          continue;
+        }
+        standard.updateRequestState(request.getId(), RequestState.CANCELLED);
+        cancelled++;
+        if (tupleScoped) {
+          // requestedAt is tuple-scoped; without a stable request timestamp in MineColonies
+          // requests, cancel only a single matched root request to avoid collateral cancels.
+          break;
+        }
+      } catch (Exception ex) {
+        if (tryForceCleanRequest(standard, token, ex)) {
+          cancelled++;
+          continue;
+        }
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package cancel request failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+    return cancelled;
+  }
+
+  private boolean tryForceCleanRequest(
+      IStandardRequestManager standard, IToken<?> token, Exception cause) {
+    if (standard == null || token == null || cause == null) {
+      return false;
+    }
+    String message = cause.getMessage();
+    if (message == null || message.isEmpty()) {
+      return false;
+    }
+    String normalized = message.toLowerCase(java.util.Locale.ROOT);
+    boolean staleGraph =
+        (normalized.contains("haschildren()") && normalized.contains("request"))
+            || normalized.contains("intvalue()");
+    if (!staleGraph) {
+      return false;
+    }
+    try {
+      standard.getRequestHandler().cleanRequestData(token);
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package cancel force-clean token={} reason={}", token, message);
+      }
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private boolean isLocalResolver(IRequestResolver<?> owner, CreateShopRequestResolver resolver) {
+    if (owner == null
+        || resolver == null
+        || resolver.getLocation() == null
+        || getLocation() == null) {
+      return false;
+    }
+    return resolver.getLocation().equals(getLocation());
+  }
+
+  private static boolean isTerminalRequestState(RequestState state) {
+    return state == RequestState.CANCELLED
+        || state == RequestState.COMPLETED
+        || state == RequestState.FAILED
+        || state == RequestState.RECEIVED
+        || state == RequestState.RESOLVED;
+  }
+
+  private static boolean matchesLostPackageDeliverable(
+      IDeliverable deliverable, ItemStack stackKey) {
+    if (deliverable == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    ItemStack result = deliverable.getResult();
+    if (result == null || result.isEmpty()) {
+      return false;
+    }
+    if (ItemStack.isSameItemSameComponents(result, stackKey)) {
+      return true;
+    }
+    return ItemStack.isSameItem(result, stackKey);
+  }
+
+  private static boolean matchesLostPackageRequest(
+      IStandardRequestManager manager, IRequest<?> request, ItemStack stackKey) {
+    if (manager == null || request == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    if (matchesLostPackageRequestPayload(request, stackKey)) {
+      return true;
+    }
+    if (!request.hasChildren()) {
+      return false;
+    }
+    for (IToken<?> childToken : request.getChildren()) {
+      if (childToken == null) {
+        continue;
+      }
+      IRequest<?> child = manager.getRequestHandler().getRequest(childToken);
+      if (child != null && matchesLostPackageRequestPayload(child, stackKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean matchesLostPackageRequestPayload(IRequest<?> request, ItemStack stackKey) {
+    if (request == null || stackKey == null || stackKey.isEmpty()) {
+      return false;
+    }
+    if (request.getRequest() instanceof IDeliverable deliverable
+        && matchesLostPackageDeliverable(deliverable, stackKey)) {
+      return true;
+    }
+    if (request.getRequest() instanceof Delivery delivery) {
+      ItemStack deliveryStack = delivery.getStack();
+      if (ItemStack.isSameItemSameComponents(deliveryStack, stackKey)
+          || ItemStack.isSameItem(deliveryStack, stackKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean matchesLostPackageRequester(
+      IStandardRequestManager manager, IRequest<?> request, String requesterName) {
+    String expected = normalizeRequesterLabel(requesterName);
+    if (isUnknownRequesterLabel(expected)) {
+      return true;
+    }
+    String actual = resolveRequesterName(manager, request);
+    if (actual.isEmpty()) {
+      return false;
+    }
+    if (actual.equals(expected)) {
+      return true;
+    }
+    return actual.contains(expected) || expected.contains(actual);
+  }
+
+  private boolean matchesLostPackageAddress(
+      IStandardRequestManager manager, IRequest<?> request, String address) {
+    String expected = normalizeRequesterLabel(address);
+    if (expected.isEmpty() || expected.equals("unknown address") || expected.equals("<unknown>")) {
+      return true;
+    }
+    String requesterDisplay = resolveRequesterDisplay(manager, request);
+    if (!requesterDisplay.isEmpty()
+        && (requesterDisplay.contains(expected) || expected.contains(requesterDisplay))) {
+      return true;
+    }
+    String shortDisplay = normalizeRequesterLabel(request == null ? "" : request.getShortDisplayString().getString());
+    if (!shortDisplay.isEmpty()
+        && (shortDisplay.contains(expected) || expected.contains(shortDisplay))) {
+      return true;
+    }
+    String longDisplay = normalizeRequesterLabel(request == null ? "" : request.getLongDisplayString().getString());
+    if (!longDisplay.isEmpty()
+        && (longDisplay.contains(expected) || expected.contains(longDisplay))) {
+      return true;
+    }
+    return false;
+  }
+
+  private String resolveRequesterName(IStandardRequestManager manager, IRequest<?> request) {
+    String display = resolveRequesterDisplay(manager, request);
+    if (display.isEmpty()) {
+      return "";
+    }
+    return display;
+  }
+
+  private String resolveRequesterDisplay(IStandardRequestManager manager, IRequest<?> request) {
+    if (request == null) {
+      return "";
+    }
+    try {
+      var requester = request.getRequester();
+      if (requester == null) {
+        return "";
+      }
+      var display = requester.getRequesterDisplayName(manager, request);
+      if (display == null) {
+        return "";
+      }
+      return normalizeRequesterLabel(display.getString());
+    } catch (Exception ignored) {
+      return "";
+    }
+  }
+
+  private static String normalizeRequesterLabel(String value) {
+    if (value == null) {
+      return "";
+    }
+    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+    return normalized.isEmpty() ? "" : normalized;
+  }
+
+  private static boolean isUnknownRequesterLabel(String requester) {
+    if (requester == null || requester.isEmpty()) {
+      return true;
+    }
+    return requester.equals("unknown")
+        || requester.equals("<unknown>")
+        || requester.equals("unknown requester");
+  }
+
+  record LostPackageReorderResult(int consumed, LostPackageReorderStatus status) {}
+
+  enum LostPackageReorderStatus {
+    SUCCESS,
+    INVALID_INPUT,
+    MISSING_CONTEXT,
+    NO_TRACKED_INFLIGHT,
+    NO_NETWORK_STOCK
   }
 
   private void ensureWarehouseRegistration() {
@@ -824,6 +1165,15 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             "[CreateShop] housekeeping skip tilePresent={} pickupPresent={} pendingUnreserved={}",
             tile != null,
             pickup != null,
+            cachedHasIncomingRackWork);
+      }
+      return;
+    }
+    if (hasActiveLocalDeliveryChildren(colony, pickup)) {
+      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
+      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping blocked reason=active-delivery-child pendingUnreserved={}",
             cachedHasIncomingRackWork);
       }
       return;
@@ -871,6 +1221,109 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           transferBudget,
           elapsed);
     }
+  }
+
+  private boolean hasActiveLocalDeliveryChildren(IColony colony, CreateShopBlockEntity pickup) {
+    if (colony == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
+      return false;
+    }
+    var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
+    if (assignmentStore == null) {
+      return false;
+    }
+    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
+    if (assignments == null || assignments.isEmpty()) {
+      return false;
+    }
+    var requestHandler = standard.getRequestHandler();
+    if (requestHandler == null) {
+      return false;
+    }
+    for (var assignmentEntry : assignments.entrySet()) {
+      java.util.Collection<IToken<?>> assigned = assignmentEntry.getValue();
+      if (assigned == null || assigned.isEmpty()) {
+        continue;
+      }
+      for (IToken<?> token : java.util.List.copyOf(assigned)) {
+        if (token == null) {
+          continue;
+        }
+        try {
+          IRequest<?> request = requestHandler.getRequest(token);
+          if (request == null || !(request.getRequest() instanceof Delivery delivery)) {
+            continue;
+          }
+          RequestState state = request.getState();
+          boolean activeState =
+              state == RequestState.CREATED
+                  || state == RequestState.ASSIGNED
+                  || state == RequestState.IN_PROGRESS;
+          if (!activeState) {
+            continue;
+          }
+          if (!isLocalDeliveryStart(delivery, pickup)) {
+            continue;
+          }
+          if (!isLocalCreateShopDeliveryParent(standard, request)) {
+            continue;
+          }
+          return true;
+        } catch (Exception ex) {
+          if (isDebugRequests()) {
+            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] housekeeping delivery-child check failed token={} error={}",
+                token,
+                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean isLocalCreateShopDeliveryParent(
+      IStandardRequestManager standard, IRequest<?> child) {
+    if (standard == null || child == null || !child.hasParent()) {
+      return false;
+    }
+    try {
+      IRequest<?> parent = standard.getRequestHandler().getRequest(child.getParent());
+      if (parent == null) {
+        return false;
+      }
+      IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(parent);
+      if (!(owner instanceof CreateShopRequestResolver resolver)) {
+        return false;
+      }
+      return resolver.getLocation() != null && resolver.getLocation().equals(getLocation());
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private boolean isLocalDeliveryStart(Delivery delivery, CreateShopBlockEntity pickup) {
+    if (delivery == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    var start = delivery.getStart();
+    if (start == null || start.getDimension() == null) {
+      return false;
+    }
+    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (pickup.getBlockPos().equals(startPos)) {
+      return true;
+    }
+    return hasContainerPosition(startPos);
   }
 
   private boolean shouldLogHousekeepingDebug(long now) {
@@ -1044,7 +1497,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     }
     // Ownership is authoritative for pending processing; prefer it when drift is detected.
     CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
-    if (ownershipSelected != null && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
+    if (ownershipSelected != null
+        && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver ownership priority switch {} -> {}",
