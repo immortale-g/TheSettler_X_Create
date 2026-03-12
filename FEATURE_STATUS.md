@@ -249,6 +249,9 @@ Current behavior:
 - Pending/cooldown request state writes are now centralized through
   `CreateShopRequestStateMutatorService` (ordered+pending and clear+remove), reducing split
   mutation paths across attempt/cancel/complete/timeout/terminal flows.
+- Child reconciliation now depends directly on delivery lifecycle/recovery/snapshot services
+  instead of resolver stale-recovery forwarding methods, shrinking resolver orchestration surface
+  and isolating child-recovery behavior inside dedicated components.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

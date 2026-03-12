@@ -23,12 +23,12 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
     assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAtForOps()"));
-    assertTrue(resolverSource.contains("isStaleRecoveryArmed("));
+    assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleRecoveryArmed("));
     assertTrue(
         reconcileSource.contains(
-            "if (!resolver.isStaleRecoveryArmedForOps(level, standardManager, request.getId()))"));
+            "if (!deliveryChildLifecycleService.isStaleRecoveryArmed("));
     assertTrue(
         lifecycleSource.contains("resolver.getRecheckForOps().scheduleParentChildRecheck(manager, parentToken)"));
-    assertTrue(resolverSource.contains("clearStaleRecoveryArm("));
+    assertTrue(resolverSource.contains("clearStaleRecoveryArmForOps("));
   }
 }

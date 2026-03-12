@@ -116,21 +116,29 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
       String pendingSource,
       String logTemplate)
       throws Exception {
+    Field field =
+        CreateShopRequestResolver.class.getDeclaredField("deliveryChildRecoveryService");
+    field.setAccessible(true);
+    Object recoveryService = field.get(resolver);
     Method method =
-        CreateShopRequestResolver.class.getDeclaredMethod(
-            "recoverDeliveryChild",
-            IStandardRequestManager.class,
-            Level.class,
-            IRequest.class,
-            IToken.class,
-            IRequest.class,
-            com.thesettler_x_create.minecolonies.building.BuildingCreateShop.class,
-            com.thesettler_x_create.blockentity.CreateShopBlockEntity.class,
-            String.class,
-            String.class);
+        recoveryService
+            .getClass()
+            .getDeclaredMethod(
+                "recover",
+                CreateShopRequestResolver.class,
+                IStandardRequestManager.class,
+                Level.class,
+                IRequest.class,
+                IToken.class,
+                IRequest.class,
+                com.thesettler_x_create.minecolonies.building.BuildingCreateShop.class,
+                com.thesettler_x_create.blockentity.CreateShopBlockEntity.class,
+                String.class,
+                String.class);
     method.setAccessible(true);
     return (boolean)
         method.invoke(
+            recoveryService,
             resolver,
             manager,
             level,
