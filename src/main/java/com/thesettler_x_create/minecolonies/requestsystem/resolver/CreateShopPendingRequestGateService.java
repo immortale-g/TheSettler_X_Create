@@ -11,9 +11,12 @@ import com.thesettler_x_create.TheSettlerXCreate;
 /** Evaluates ownership/cancellation gates before pending processing mutates request state. */
 final class CreateShopPendingRequestGateService {
   private final CreateShopResolverOwnership ownership;
+  private final CreateShopResolverDiagnostics diagnostics;
 
-  CreateShopPendingRequestGateService(CreateShopResolverOwnership ownership) {
+  CreateShopPendingRequestGateService(
+      CreateShopResolverOwnership ownership, CreateShopResolverDiagnostics diagnostics) {
     this.ownership = ownership;
+    this.diagnostics = diagnostics;
   }
 
   boolean shouldSkipForPendingProcessing(
@@ -32,7 +35,7 @@ final class CreateShopPendingRequestGateService {
         resolver.getCancelledRequests().remove(request.getId());
       } else {
         resolver.clearPendingTokenState(request.getId(), true);
-        resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:cancelled");
+        diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
         resolver.transitionFlow(
             manager,
             request,
@@ -65,7 +68,7 @@ final class CreateShopPendingRequestGateService {
       return true;
     }
     if (!(request.getRequest() instanceof IDeliverable)) {
-      resolver.getDiagnostics().logPendingReasonChange(token, "skip:not-deliverable");
+      diagnostics.logPendingReasonChange(token, "skip:not-deliverable");
       return true;
     }
     return false;

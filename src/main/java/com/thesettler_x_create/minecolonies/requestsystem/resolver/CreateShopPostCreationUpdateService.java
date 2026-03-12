@@ -12,12 +12,15 @@ import net.minecraft.world.level.Level;
 final class CreateShopPostCreationUpdateService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverMessaging messaging;
+  private final CreateShopResolverDiagnostics diagnostics;
 
   CreateShopPostCreationUpdateService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopResolverMessaging messaging) {
+      CreateShopResolverMessaging messaging,
+      CreateShopResolverDiagnostics diagnostics) {
     this.requestStateMutatorService = requestStateMutatorService;
     this.messaging = messaging;
+    this.diagnostics = diagnostics;
   }
 
   void apply(
@@ -56,11 +59,11 @@ final class CreateShopPostCreationUpdateService {
         CreateShopStackMetrics.describeStack(first),
         orderedCount,
         "com.thesettler_x_create.message.createshop.flow_delivery_created");
-    resolver.getDiagnostics().logPendingReasonChange(request.getId(), "create:delivery");
+    diagnostics.logPendingReasonChange(request.getId(), "create:delivery");
 
     int remainingCount = Math.max(0, creationResult.remainingCount());
     if (remainingCount != creationResult.remainingCount()) {
-      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "normalize:remaining<0");
+      diagnostics.logPendingReasonChange(request.getId(), "normalize:remaining<0");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} normalized remainingCount {} -> 0",
@@ -72,13 +75,11 @@ final class CreateShopPostCreationUpdateService {
     if (remainingCount > 0) {
       requestStateMutatorService.markOrderedWithPending(
           resolver, level, request.getId(), remainingCount);
-      resolver.getDiagnostics().recordPendingSource(request.getId(), "tickPending:partial");
+      diagnostics.recordPendingSource(request.getId(), "tickPending:partial");
     } else {
       // Keep tracking while child delivery is active; do not drop cooldown yet.
       requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), 0);
-      resolver
-          .getDiagnostics()
-          .recordPendingSource(request.getId(), "tickPending:await-child-complete");
+      diagnostics.recordPendingSource(request.getId(), "tickPending:await-child-complete");
     }
 
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
