@@ -38,7 +38,7 @@ final class CreateShopPostCreationUpdateService {
     List<ItemStack> ordered = creationResult.ordered();
     ItemStack first = ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0);
     int orderedCount = CreateShopStackMetrics.countStackList(ordered);
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
@@ -48,7 +48,7 @@ final class CreateShopPostCreationUpdateService {
         "com.thesettler_x_create.message.createshop.flow_arrived");
     messaging.sendShopChat(
         manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.DELIVERY_CREATED,

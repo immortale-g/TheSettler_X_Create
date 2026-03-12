@@ -40,7 +40,7 @@ final class CreateShopAttemptResolveService {
       IRequestManager manager,
       IRequest<? extends IDeliverable> request) {
     long now = resolver.resolveNowTickForOps(manager);
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.ELIGIBILITY_CHECK,
@@ -203,7 +203,7 @@ final class CreateShopAttemptResolveService {
     }
     boolean hasNetworkPortion = remaining > 0;
     if (!ordered.isEmpty()) {
-      resolver.transitionFlowForOps(
+      resolver.transitionFlow(
           manager,
           request,
           CreateShopFlowState.ORDERED_FROM_NETWORK,
@@ -240,7 +240,7 @@ final class CreateShopAttemptResolveService {
           }
           return Lists.newArrayList();
         }
-        resolver.transitionFlowForOps(
+        resolver.transitionFlow(
             manager,
             request,
             CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
@@ -258,7 +258,7 @@ final class CreateShopAttemptResolveService {
               created);
         }
         if (!created.isEmpty()) {
-          resolver.transitionFlowForOps(
+          resolver.transitionFlow(
               manager,
               request,
               CreateShopFlowState.DELIVERY_CREATED,

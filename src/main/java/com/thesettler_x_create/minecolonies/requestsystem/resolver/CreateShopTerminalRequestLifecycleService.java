@@ -58,7 +58,7 @@ final class CreateShopTerminalRequestLifecycleService {
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<? extends IDeliverable> request) {
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.CANCELLED,
@@ -73,7 +73,7 @@ final class CreateShopTerminalRequestLifecycleService {
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<? extends IDeliverable> request) {
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.CANCELLED,
@@ -88,7 +88,7 @@ final class CreateShopTerminalRequestLifecycleService {
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<?> request) {
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.REQUEST_COMPLETED,
@@ -103,7 +103,7 @@ final class CreateShopTerminalRequestLifecycleService {
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<?> request) {
-    resolver.transitionFlowForOps(
+    resolver.transitionFlow(
         manager,
         request,
         CreateShopFlowState.CANCELLED,
