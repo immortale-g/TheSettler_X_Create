@@ -109,6 +109,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopRetryingReassignService();
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
       new CreateShopPendingTokenCollectorService();
+  private final CreateShopPendingRequestGateService pendingRequestGateService =
+      new CreateShopPendingRequestGateService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -531,62 +533,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       try {
         request = requestHandler.getRequest(token);
       } catch (IllegalArgumentException ex) {
-        cooldown.clearRequestCooldown(token);
-        pendingTracker.remove(token);
+        clearPendingTokenStateForOps(token, false);
         continue;
       }
-      if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
-        cooldown.clearRequestCooldown(token);
-        pendingTracker.remove(token);
-        clearDeliveriesCreated(token);
-        flowStateMachine.remove(token);
-        continue;
-      }
-      if (cancelledRequests.contains(request.getId())) {
-        if (request.getState()
-            != com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-          cancelledRequests.remove(request.getId());
-        } else {
-          cooldown.clearRequestCooldown(request.getId());
-          pendingTracker.remove(request.getId());
-          clearDeliveriesCreated(request.getId());
-          diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
-          transitionFlow(
-              manager,
-              request,
-              CreateShopFlowState.CANCELLED,
-              "tickPending:cancelled",
-              "",
-              0,
-              "com.thesettler_x_create.message.createshop.flow_cancelled");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: " + request.getId() + " skip (cancelled)");
-          }
-          continue;
-        }
-      }
-      if (request.getState()
-          == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-        transitionFlow(
-            manager,
-            request,
-            CreateShopFlowState.CANCELLED,
-            "tickPending:state-cancelled",
-            "",
-            0,
-            "com.thesettler_x_create.message.createshop.flow_cancelled");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: " + request.getId() + " skip (state cancelled)");
-        }
+      if (pendingRequestGateService.shouldSkipForPendingProcessing(
+          this, manager, standardManager, request, token)) {
         continue;
       }
       if (isTerminalRequestState(request.getState())) {
-        cooldown.clearRequestCooldown(request.getId());
-        pendingTracker.remove(request.getId());
-        clearDeliveriesCreated(request.getId());
-        flowStateMachine.remove(request.getId());
+        clearPendingTokenStateForOps(request.getId(), true);
         diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
@@ -597,10 +552,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       diagnostics.logRequestStateChange(standardManager, token, "tickPending");
-      if (!(request.getRequest() instanceof IDeliverable deliverable)) {
-        diagnostics.logPendingReasonChange(token, "skip:not-deliverable");
-        continue;
-      }
+      IDeliverable deliverable = (IDeliverable) request.getRequest();
       String requestIdLog = request.getId().toString();
       UUID requestId = toRequestId(request.getId());
       int reservedForRequest = pickup.getReservedForRequest(requestId);
@@ -2045,5 +1997,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   boolean shouldLogTickPendingForOps(Level level) {
     return shouldLogTickPending(level);
+  }
+
+  void clearPendingTokenStateForOps(IToken<?> token, boolean clearFlowState) {
+    if (token == null) {
+      return;
+    }
+    cooldown.clearRequestCooldown(token);
+    pendingTracker.remove(token);
+    clearDeliveriesCreated(token);
+    if (clearFlowState) {
+      flowStateMachine.remove(token);
+    }
+  }
+
+  java.util.Set<IToken<?>> getCancelledRequestsForOps() {
+    return cancelledRequests;
   }
 }
