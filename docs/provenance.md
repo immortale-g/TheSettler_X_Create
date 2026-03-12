@@ -432,3 +432,7 @@ Implementation notes:
   inflight cleanup moved from `CreateShopRequestResolver` into
   `CreateShopReservationReleaseService`, while resolver terminal cleanup continues to call a shared
   release entrypoint.
+- Warehouse internal-count refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: MineColonies warehouse hook stock counting moved
+  from `CreateShopRequestResolver` into `CreateShopWarehouseCountService`, preserving fail-open
+  guards and network-minus-reserved semantics.
