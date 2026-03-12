@@ -9,10 +9,13 @@ import net.minecraft.world.level.Level;
 /** Decides whether pending processing can continue and normalizes pending quantity state. */
 final class CreateShopPendingStateDecisionService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopWorkerAvailabilityGate workerAvailabilityGate;
 
   CreateShopPendingStateDecisionService(
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopWorkerAvailabilityGate workerAvailabilityGate) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.workerAvailabilityGate = workerAvailabilityGate;
   }
 
   PendingDecision decide(
@@ -86,10 +89,10 @@ final class CreateShopPendingStateDecisionService {
       }
       return PendingDecision.skipped();
     }
-    if (!resolver.getWorkerAvailabilityGateForOps().shouldResumePending(workerWorking, pendingCount)) {
+    if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
       resolver.touchFlowForOps(
           request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
-      if (resolver.getWorkerAvailabilityGateForOps().shouldKeepPendingState(workerWorking, pendingCount)) {
+      if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
         requestStateMutatorService.markOrderedWithPending(
             resolver, level, request.getId(), pendingCount);
         resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:worker-unavailable");

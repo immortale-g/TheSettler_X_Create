@@ -105,9 +105,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
-      new CreateShopPendingTokenCollectorService();
+      new CreateShopPendingTokenCollectorService(ownership);
   private final CreateShopPendingRequestGateService pendingRequestGateService =
-      new CreateShopPendingRequestGateService();
+      new CreateShopPendingRequestGateService(ownership);
   private final CreateShopChildReconciliationService childReconciliationService;
   private final CreateShopPendingStateDecisionService pendingStateDecisionService;
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
@@ -136,12 +136,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.deliveryCompletionService =
         new CreateShopDeliveryCompletionService(requestStateMutatorService);
     this.pendingStateDecisionService =
-        new CreateShopPendingStateDecisionService(requestStateMutatorService);
+        new CreateShopPendingStateDecisionService(requestStateMutatorService, workerAvailabilityGate);
     this.postCreationUpdateService =
         new CreateShopPostCreationUpdateService(requestStateMutatorService);
     this.deliveryCancelService = new CreateShopDeliveryCancelService(requestStateMutatorService);
     this.deliveryChildRecoveryService =
-        new CreateShopDeliveryChildRecoveryService(requestStateMutatorService);
+        new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
     this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
     this.attemptResolveService = new CreateShopAttemptResolveService(requestStateMutatorService);
     this.terminalRequestLifecycleService =
@@ -672,10 +672,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return retryingReassignAttempts;
   }
 
-  CreateShopResolverOwnership getOwnershipForOps() {
-    return ownership;
-  }
-
   boolean shouldLogTickPendingForOps(Level level) {
     return shouldLogTickPending(level);
   }
@@ -721,10 +717,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   int computeOutstandingNeededForOps(
       IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
     return computeOutstandingNeeded(request, deliverable, reservedForRequest);
-  }
-
-  CreateShopWorkerAvailabilityGate getWorkerAvailabilityGateForOps() {
-    return workerAvailabilityGate;
   }
 
   CreateShopResolverMessaging getMessagingForOps() {

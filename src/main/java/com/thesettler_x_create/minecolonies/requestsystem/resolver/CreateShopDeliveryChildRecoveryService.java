@@ -14,10 +14,13 @@ import net.minecraft.world.level.Level;
 /** Performs guarded local-delivery child recovery and parent requeue reconciliation. */
 final class CreateShopDeliveryChildRecoveryService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverOwnership ownership;
 
   CreateShopDeliveryChildRecoveryService(
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverOwnership ownership) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.ownership = ownership;
   }
 
   boolean recover(
@@ -38,7 +41,7 @@ final class CreateShopDeliveryChildRecoveryService {
         || childToken == null) {
       return false;
     }
-    if (!resolver.getOwnershipForOps().isRequestOwnedByLocalResolver(manager, parentRequest)) {
+    if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
       resolver.clearStaleRecoveryArmForOps(parentRequest.getId());
       return false;
     }

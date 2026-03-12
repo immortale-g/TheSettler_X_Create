@@ -258,6 +258,10 @@ Current behavior:
 - Request-state mutator usage is now constructor-injected into the affected lifecycle services
   (attempt/cancel/recovery/completion/timeout/pending-decision/post-creation/reservation/terminal),
   removing the corresponding resolver ops getter dependency.
+- Ownership and worker-availability checks are now constructor-injected into pending/recovery
+  services (`CreateShopPendingRequestGateService`, `CreateShopPendingTokenCollectorService`,
+  `CreateShopDeliveryChildRecoveryService`, `CreateShopPendingStateDecisionService`), removing
+  additional resolver ops getter dependencies.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

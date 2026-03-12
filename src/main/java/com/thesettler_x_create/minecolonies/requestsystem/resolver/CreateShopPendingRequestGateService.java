@@ -10,13 +10,19 @@ import com.thesettler_x_create.TheSettlerXCreate;
 
 /** Evaluates ownership/cancellation gates before pending processing mutates request state. */
 final class CreateShopPendingRequestGateService {
+  private final CreateShopResolverOwnership ownership;
+
+  CreateShopPendingRequestGateService(CreateShopResolverOwnership ownership) {
+    this.ownership = ownership;
+  }
+
   boolean shouldSkipForPendingProcessing(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IStandardRequestManager standardManager,
       IRequest<?> request,
       IToken<?> token) {
-    if (!resolver.getOwnershipForOps().isRequestOwnedByLocalResolver(standardManager, request)) {
+    if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
       resolver.clearPendingTokenStateForOps(token, true);
       return true;
     }

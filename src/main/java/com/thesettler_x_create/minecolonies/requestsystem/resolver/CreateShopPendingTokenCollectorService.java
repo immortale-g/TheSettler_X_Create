@@ -10,6 +10,12 @@ import net.minecraft.world.level.Level;
 
 /** Collects pending request tokens from direct assignments, ownership recovery, and pending maps. */
 final class CreateShopPendingTokenCollectorService {
+  private final CreateShopResolverOwnership ownership;
+
+  CreateShopPendingTokenCollectorService(CreateShopResolverOwnership ownership) {
+    this.ownership = ownership;
+  }
+
   Set<IToken<?>> collectPendingTokens(
       CreateShopRequestResolver resolver,
       IStandardRequestManager standardManager,
@@ -21,7 +27,7 @@ final class CreateShopPendingTokenCollectorService {
       assigned.addAll(directAssigned);
     }
     java.util.Set<IToken<?>> assignedByOwner =
-        resolver.getOwnershipForOps().collectAssignedTokensByRequestResolver(standardManager, assignments);
+        ownership.collectAssignedTokensByRequestResolver(standardManager, assignments);
     if (!assignedByOwner.isEmpty()) {
       int before = assigned.size();
       assigned.addAll(assignedByOwner);
@@ -37,7 +43,7 @@ final class CreateShopPendingTokenCollectorService {
       }
     } else {
       java.util.Set<IToken<?>> recovered =
-          resolver.getOwnershipForOps().collectAssignedTokensFromLocalResolvers(standardManager, assignments);
+          ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
         assigned.addAll(recovered);
         if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
