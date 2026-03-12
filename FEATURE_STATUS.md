@@ -158,6 +158,10 @@ Current behavior:
   keeping resolver ownership-recovery behavior in a dedicated pre-processing step.
 - Cancelled-pending cleanup now avoids duplicate cooldown-clear calls on the same token in
   `tickPendingDeliveries`, reducing redundant state-mutation noise during cancellation cleanup.
+- Pending pre-gates for ownership/cancel/not-deliverable are now centralized in
+  `CreateShopPendingRequestGateService`, and `state == CANCELLED` now clears pending/cooldown/
+  delivery-created tracking immediately in tick-pending processing to prevent cancelled-token
+  tracker drift.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

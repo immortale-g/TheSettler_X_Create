@@ -457,3 +457,8 @@ Implementation notes:
 - Cancelled cleanup simplification on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
   is authored in this project scope: duplicate cooldown-clear call in tick-pending cancellation
   branch removed to keep cancellation cleanup idempotent and less mutation-noisy.
+- Pending request gate refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: ownership/cancellation/not-deliverable pre-checks moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingRequestGateService`,
+  and cancelled-state requests now clear pending/cooldown/delivery-created tracking immediately
+  during tick-pending gating.
