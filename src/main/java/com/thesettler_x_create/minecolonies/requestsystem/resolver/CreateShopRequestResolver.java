@@ -100,6 +100,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopPendingTopupService pendingTopupService;
   private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
   private final CreateShopReservationReleaseService reservationReleaseService;
+  private final CreateShopWarehouseCountService warehouseCountService =
+      new CreateShopWarehouseCountService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1446,40 +1448,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   protected int getWarehouseInternalCount(
       com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse ignored,
       IRequest<? extends IDeliverable> request) {
-    if (request == null || getLocation() == null) {
-      return 0;
-    }
-    IDeliverable deliverable = request.getRequest();
-    if (deliverable == null) {
-      return 0;
-    }
-    var colonyManager = com.minecolonies.api.colony.IColonyManager.getInstance();
-    if (colonyManager == null) {
-      return 0;
-    }
-    var colony =
-        colonyManager.getColonyByPosFromDim(
-            getLocation().getDimension(), getLocation().getInDimensionLocation());
-    if (colony == null || colony.getServerBuildingManager() == null) {
-      return 0;
-    }
-    var building =
-        colony.getServerBuildingManager().getBuilding(getLocation().getInDimensionLocation());
-    BuildingCreateShop shop = building instanceof BuildingCreateShop createShop ? createShop : null;
-    if (shop == null) {
-      return 0;
-    }
-    TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-    if (tile == null || tile.getStockNetworkId() == null) {
-      return 0;
-    }
-    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
-    if (pickup == null) {
-      return 0;
-    }
-    int available = stockResolver.getNetworkAvailable(tile, deliverable);
-    int reserved = pickup.getReservedForDeliverable(deliverable);
-    return Math.max(0, available - reserved);
+    return warehouseCountService.getWarehouseInternalCount(getLocation(), request, stockResolver);
   }
 
   private BuildingCreateShop getShop(IRequestManager manager) {
