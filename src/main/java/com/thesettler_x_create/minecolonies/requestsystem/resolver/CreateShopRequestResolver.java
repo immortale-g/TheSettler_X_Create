@@ -134,12 +134,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.flowTimeoutCleanupService =
         new CreateShopFlowTimeoutCleanupService(requestStateMutatorService);
     this.deliveryCompletionService =
-        new CreateShopDeliveryCompletionService(requestStateMutatorService);
+        new CreateShopDeliveryCompletionService(
+            requestStateMutatorService, deliveryManager, diagnostics, recheck);
     this.pendingStateDecisionService =
         new CreateShopPendingStateDecisionService(requestStateMutatorService, workerAvailabilityGate);
     this.postCreationUpdateService =
         new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging);
-    this.deliveryCancelService = new CreateShopDeliveryCancelService(requestStateMutatorService);
+    this.deliveryCancelService =
+        new CreateShopDeliveryCancelService(
+            requestStateMutatorService, diagnostics, recheck, deliveryManager);
     this.deliveryChildRecoveryService =
         new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
     this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);

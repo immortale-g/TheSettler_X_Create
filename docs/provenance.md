@@ -574,3 +574,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: Create Shop chat/requester-name messaging is now
   injected into `CreateShopAttemptResolveService` and `CreateShopPostCreationUpdateService`,
   removing resolver-level messaging getter passthrough usage.
+- Delivery callback collaborator injection refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  delivery cancel/completion services now receive delivery manager and diagnostics/recheck
+  collaborators through constructors, reducing resolver-mediated service lookup paths.

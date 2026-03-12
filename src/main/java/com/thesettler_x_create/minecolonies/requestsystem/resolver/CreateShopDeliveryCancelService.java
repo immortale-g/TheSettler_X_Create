@@ -18,9 +18,19 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 /** Handles delivery-cancel callbacks and parent requeue reconciliation for Create Shop requests. */
 final class CreateShopDeliveryCancelService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverDiagnostics diagnostics;
+  private final CreateShopResolverRecheck recheck;
+  private final CreateShopDeliveryManager deliveryManager;
 
-  CreateShopDeliveryCancelService(CreateShopRequestStateMutatorService requestStateMutatorService) {
+  CreateShopDeliveryCancelService(
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverDiagnostics diagnostics,
+      CreateShopResolverRecheck recheck,
+      CreateShopDeliveryManager deliveryManager) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.diagnostics = diagnostics;
+    this.recheck = recheck;
+    this.deliveryManager = deliveryManager;
   }
 
   void handleDeliveryCancelled(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
@@ -47,7 +57,7 @@ final class CreateShopDeliveryCancelService {
     if (level == null) {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, null, parentToken, stack.getCount());
-      resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel");
+      diagnostics.recordPendingSource(parentToken, "delivery-cancel");
       resolver.clearDeliveriesCreated(parentToken);
       return;
     }
@@ -68,7 +78,7 @@ final class CreateShopDeliveryCancelService {
       int fallbackPending = Math.max(1, stack.getCount());
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, parentToken, fallbackPending);
-      resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
+      diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
       resolver.clearDeliveriesCreated(parentToken);
       if (resolver.isDebugLoggingEnabledForOps()) {
         TheSettlerXCreate.LOGGER.info(
@@ -79,7 +89,7 @@ final class CreateShopDeliveryCancelService {
       }
       IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
       if (standard != null) {
-        resolver.getRecheckForOps().scheduleParentChildRecheck(standard, parentToken);
+        recheck.scheduleParentChildRecheck(standard, parentToken);
       }
       return;
     }
@@ -92,15 +102,13 @@ final class CreateShopDeliveryCancelService {
     pickup.release(parentRequestId);
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentToken, pendingCount);
-    resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-reserve");
+    diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
     resolver.clearDeliveriesCreated(parentToken);
 
     if (resolver.isDebugLoggingEnabledForOps()) {
       int reservedForStack = pickup.getReservedFor(stack);
       BlockPos pickupPosition = pickup.getBlockPos();
-      resolver
-          .getDeliveryManagerForOps()
-          .logDeliveryDiagnostics(
+      deliveryManager.logDeliveryDiagnostics(
               "cancel",
               manager,
               request.getId(),
@@ -120,8 +128,8 @@ final class CreateShopDeliveryCancelService {
           pickup.getBlockPos());
       IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
       if (standard != null) {
-        resolver.getDiagnosticsForOps().logParentChildrenState(standard, parentToken, "delivery-cancel");
-        resolver.getRecheckForOps().scheduleParentChildRecheck(standard, parentToken);
+        diagnostics.logParentChildrenState(standard, parentToken, "delivery-cancel");
+        recheck.scheduleParentChildRecheck(standard, parentToken);
       }
     }
   }
