@@ -62,6 +62,10 @@ Implementation notes:
   `CreateShopTerminalRequestLifecycleService` with injected cooldown/diagnostics dependencies) is
   authored in this project as a behavior-preserving internal split that reduces resolver helper
   forwarding in the resolve path.
+- Tick-pending telemetry refactor (extracting debug cadence/candidate snapshot/perf state into
+  `CreateShopTickPendingTelemetryService` and injecting it into pending token collection + tick
+  orchestration) is authored in this project as a behavior-preserving internal split that reduces
+  resolver-owned debug/perf state and forwarding.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

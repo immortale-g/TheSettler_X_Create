@@ -17,12 +17,18 @@ import net.minecraft.world.level.Level;
 final class CreateShopTickPendingService {
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService;
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
+  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
+  private final CreateShopTickPendingTelemetryService tickPendingTelemetryService;
 
   CreateShopTickPendingService(
       CreateShopPendingTokenCollectorService pendingTokenCollectorService,
-      CreateShopPendingRequestProcessorService pendingRequestProcessorService) {
+      CreateShopPendingRequestProcessorService pendingRequestProcessorService,
+      CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService,
+      CreateShopTickPendingTelemetryService tickPendingTelemetryService) {
     this.pendingTokenCollectorService = pendingTokenCollectorService;
     this.pendingRequestProcessorService = pendingRequestProcessorService;
+    this.flowTimeoutCleanupService = flowTimeoutCleanupService;
+    this.tickPendingTelemetryService = tickPendingTelemetryService;
   }
 
   void tickPendingDeliveries(CreateShopRequestResolver resolver, IRequestManager manager) {
@@ -67,7 +73,8 @@ final class CreateShopTickPendingService {
     if (pendingTokens.isEmpty()) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()
+        && tickPendingTelemetryService.shouldLogTickPending(level)) {
       int assignedCount = pendingTokens.size();
       int orderedCount = resolver.getCooldown().getOrderedCount();
       TheSettlerXCreate.LOGGER.info(
@@ -75,7 +82,7 @@ final class CreateShopTickPendingService {
           assignedCount,
           orderedCount,
           pendingTokens.size());
-      resolver.logTickPendingCandidatesForOps(requestHandler, pendingTokens);
+      tickPendingTelemetryService.logTickPendingCandidates(requestHandler, pendingTokens);
     }
     BuildingCreateShop shop = resolver.getShopForOps(standardManager);
     if (shop == null) {
@@ -83,7 +90,8 @@ final class CreateShopTickPendingService {
     }
     boolean workerWorking = shop.isWorkerWorking();
     if (!workerWorking) {
-      if (Config.DEBUG_LOGGING.getAsBoolean() && resolver.shouldLogTickPendingForOps(level)) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()
+          && tickPendingTelemetryService.shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
       }
     }
@@ -110,8 +118,7 @@ final class CreateShopTickPendingService {
           pickup,
           workerWorking);
     }
-    resolver.processTimedOutFlowsForOps(standardManager, level);
-    resolver.setLastTickPendingNanosForOps(System.nanoTime() - perfStart);
-    resolver.maybeLogPerfForOps(level);
+    flowTimeoutCleanupService.processTimedOutFlows(resolver, standardManager, level);
+    tickPendingTelemetryService.recordAndMaybeLogPerf(level, System.nanoTime() - perfStart);
   }
 }

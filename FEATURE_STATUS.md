@@ -282,6 +282,9 @@ Current behavior:
 - Terminal resolve lifecycle now owns its own skip/completion diagnostics (ordered/cooldown gate +
   post-resolve state log) with constructor-injected cooldown/diagnostics dependencies, reducing
   resolver helper forwarding in the `resolveRequest` path.
+- Tick-pending telemetry/perf state is now centralized in `CreateShopTickPendingTelemetryService`
+  (debug cadence, candidate snapshot logs, perf emission) and injected into pending token
+  collection/tick orchestration, removing additional resolver-level telemetry forwarding/state.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
