@@ -477,7 +477,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return false;
     }
     if (other == this) {
-      return true;
+      // Keep the currently handled interaction queued so a no-op response can re-arm it.
+      return false;
     }
     if (!sameStackKey(other.stackKey)) {
       return false;
