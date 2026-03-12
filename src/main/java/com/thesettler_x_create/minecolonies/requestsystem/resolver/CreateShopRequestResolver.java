@@ -133,6 +133,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopTickPendingService();
   private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
       new CreateShopDeliveryChildLifecycleService();
+  private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService =
+      new CreateShopTerminalRequestLifecycleService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -180,32 +182,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void resolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    // Do not complete requests that are still waiting on ordered goods.
-    Level level = manager.getColony().getWorld();
-    boolean ordered = cooldown.isOrdered(request.getId());
-    boolean cooldown = this.cooldown.isRequestOnCooldown(level, request.getId());
-    if (ordered || cooldown) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolveRequest skip parent={} ordered={} cooldown={}",
-            request.getId(),
-            ordered,
-            cooldown);
-      }
-      if (manager instanceof IStandardRequestManager standardManager) {
-        diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest-skip");
-      }
-      return;
-    }
-    // Use Warehouse resolver behavior to mark parent resolved once children complete.
-    super.resolveRequest(manager, request);
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] resolveRequest parent={} state={}", request.getId(), request.getState());
-    }
-    if (manager instanceof IStandardRequestManager standardManager) {
-      diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
-    }
+    terminalRequestLifecycleService.resolveRequest(this, manager, request);
   }
 
   @Override
@@ -345,57 +322,25 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    transitionFlow(
-        manager,
-        request,
-        CreateShopFlowState.CANCELLED,
-        "assigned-cancelled",
-        "",
-        0,
-        "com.thesettler_x_create.message.createshop.flow_cancelled");
-    cleanupTerminalRequest(manager, request, true);
+    terminalRequestLifecycleService.onAssignedRequestBeingCancelled(this, manager, request);
   }
 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    transitionFlow(
-        manager,
-        request,
-        CreateShopFlowState.CANCELLED,
-        "assigned-cancelled-post",
-        "",
-        0,
-        "com.thesettler_x_create.message.createshop.flow_cancelled");
-    cleanupTerminalRequest(manager, request, true);
+    terminalRequestLifecycleService.onAssignedRequestCancelled(this, manager, request);
   }
 
   @Override
   public void onRequestedRequestComplete(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    transitionFlow(
-        manager,
-        request,
-        CreateShopFlowState.REQUEST_COMPLETED,
-        "request-completed",
-        "",
-        0,
-        "com.thesettler_x_create.message.createshop.flow_request_completed");
-    cleanupTerminalRequest(manager, request, request.getRequest() instanceof IDeliverable);
+    terminalRequestLifecycleService.onRequestedRequestComplete(this, manager, request);
   }
 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    transitionFlow(
-        manager,
-        request,
-        CreateShopFlowState.CANCELLED,
-        "request-cancelled",
-        "",
-        0,
-        "com.thesettler_x_create.message.createshop.flow_cancelled");
-    cleanupTerminalRequest(manager, request, request.getRequest() instanceof IDeliverable);
+    terminalRequestLifecycleService.onRequestedRequestCancelled(this, manager, request);
   }
 
   @Override
@@ -431,20 +376,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   void releaseReservation(IRequestManager manager, IRequest<?> request) {
     reservationReleaseService.releaseReservation(manager, request, getLocation());
-  }
-
-  private void cleanupTerminalRequest(
-      IRequestManager manager, IRequest<?> request, boolean releaseReservation) {
-    if (request == null) {
-      return;
-    }
-    pendingTracker.remove(request.getId());
-    cooldown.clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
-    if (releaseReservation) {
-      releaseReservation(manager, request);
-    }
   }
 
   static UUID toRequestId(IToken<?> token) {
@@ -1044,6 +975,43 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   boolean shouldDropMissingChildForOps(Level level, IToken<?> childToken) {
     return shouldDropMissingChild(level, childToken);
+  }
+
+  boolean shouldSkipResolveForOps(
+      IRequestManager manager, IRequest<? extends IDeliverable> request) {
+    Level level = manager.getColony().getWorld();
+    boolean ordered = cooldown.isOrdered(request.getId());
+    boolean cooldown = this.cooldown.isRequestOnCooldown(level, request.getId());
+    if (ordered || cooldown) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] resolveRequest skip parent={} ordered={} cooldown={}",
+            request.getId(),
+            ordered,
+            cooldown);
+      }
+      if (manager instanceof IStandardRequestManager standardManager) {
+        diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest-skip");
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void resolveViaWarehouseForOps(
+      IRequestManager manager, IRequest<? extends IDeliverable> request) {
+    super.resolveRequest(manager, request);
+  }
+
+  void logResolveCompletionForOps(
+      IRequestManager manager, IRequest<? extends IDeliverable> request) {
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] resolveRequest parent={} state={}", request.getId(), request.getState());
+    }
+    if (manager instanceof IStandardRequestManager standardManager) {
+      diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
+    }
   }
 
   IStandardRequestManager unwrapStandardManagerForOps(IRequestManager manager) {
