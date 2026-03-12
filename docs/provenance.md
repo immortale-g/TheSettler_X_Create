@@ -44,6 +44,10 @@ Implementation notes:
 - Resolver ownership refactor (extracting local-owner locality and assignment-drift token recovery
   helpers into `CreateShopResolverOwnership`) is authored in this project as a behavior-preserving
   internal split to reduce duplicated resolver ownership checks.
+- Resolver pending rack-delivery creation refactor (extracting wait/plan/create flow from
+  `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopPendingDeliveryCreationService`) is authored in this project as a behavior-preserving
+  internal split to reduce central resolver method complexity.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
