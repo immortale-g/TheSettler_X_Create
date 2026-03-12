@@ -43,12 +43,8 @@ final class CreateShopFlowTimeoutCleanupService {
           resolver.releaseReservation(manager, request);
         }
       }
-      requestStateMutatorService.clearOrderedAndPending(resolver, token);
-      resolver.clearDeliveriesCreated(token);
-      requestStateMutatorService.clearParentDeliveryActive(resolver, token);
-      requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
+      requestStateMutatorService.clearPendingTokenState(resolver, token, true);
       resolver.clearTrackedChildrenForParent(manager, token);
-      resolver.getFlowStateMachine().remove(token);
     }
   }
 }

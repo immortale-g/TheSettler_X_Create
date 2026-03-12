@@ -679,3 +679,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: stale-recovery arm clearing now routes directly
   through `CreateShopRequestStateMutatorService` from pending/rehydrate/recovery/timeout services,
   and redundant resolver->lifecycle delegation for this write path was removed.
+- Terminal/timeout cleanup unification on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: terminal request cleanup and flow-timeout cleanup
+  now use the shared `clearPendingTokenState` mutator path (with explicit tracked-child cleanup
+  retained), reducing divergent multi-step reset variants.
