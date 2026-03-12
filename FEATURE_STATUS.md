@@ -118,6 +118,11 @@ Current behavior:
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
 - Lost-package interactions now carry a shop-local runtime epoch that is bumped during
+  live-test reset and world-load cleanup so stale dialogs cannot re-arm after tuple state was
+  already consumed/cleared in a newer runtime epoch.
+- Resolver attempt-ordering flow no longer reaches into resolver passthrough helpers for delivery
+  creation; the attempt service now receives `CreateShopDeliveryManager` directly via constructor
+  injection, reducing resolver-as-god-object coupling while keeping behavior unchanged.
   `/thesettlerxcreate reset_live_state`, so stale pre-reset dialogs cannot mutate new post-reset
   runtime state.
 - Lost-package root-request cancellation matching (item/requester/address/request scope) is now

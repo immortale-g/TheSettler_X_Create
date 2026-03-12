@@ -147,7 +147,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
     this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
     this.attemptResolveService =
-        new CreateShopAttemptResolveService(requestStateMutatorService, messaging);
+        new CreateShopAttemptResolveService(requestStateMutatorService, messaging, deliveryManager);
     this.terminalRequestLifecycleService =
         new CreateShopTerminalRequestLifecycleService(requestStateMutatorService);
     this.pendingTopupService =
@@ -654,10 +654,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getMissingChildSinceForOps() {
     return missingChildSince;
-  }
-
-  CreateShopDeliveryManager getDeliveryManagerForOps() {
-    return deliveryManager;
   }
 
   CreateShopResolverDiagnostics getDiagnosticsForOps() {

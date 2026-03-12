@@ -48,6 +48,9 @@ Implementation notes:
   `CreateShopRequestResolver.tickPendingDeliveries` into
   `CreateShopPendingDeliveryCreationService`) is authored in this project as a behavior-preserving
   internal split to reduce central resolver method complexity.
+- Resolver attempt-flow dependency refactor (injecting `CreateShopDeliveryManager` directly into
+  `CreateShopAttemptResolveService` and removing resolver passthrough accessor usage) is authored
+  in this project as a behavior-preserving internal split that reduces central resolver coupling.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.
