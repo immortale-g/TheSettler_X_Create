@@ -48,6 +48,9 @@ Implementation notes:
   `CreateShopRequestResolver.tickPendingDeliveries` into
   `CreateShopPendingDeliveryCreationService`) is authored in this project as a behavior-preserving
   internal split to reduce central resolver method complexity.
+- Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
+  diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
+  behavior-preserving internal split to reduce static callback complexity in the resolver.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
