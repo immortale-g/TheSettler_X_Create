@@ -647,21 +647,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {
-    if (token == null) {
-      return;
-    }
-    requestStateMutatorService.clearOrderedAndPending(this, token);
-    clearDeliveriesCreated(token);
-    clearParentDeliveryActive(token);
-    clearParentStaleRecoveryArm(token);
-    clearParentChildrenSnapshot(token);
-    clearChildActive(token);
-    clearMissingChildSince(token);
-    clearRootCauseTracking(token);
-    clearRetryingReassignAttempt(token);
-    if (clearFlowState) {
-      flowStateMachine.remove(token);
-    }
+    requestStateMutatorService.clearPendingTokenState(this, token, clearFlowState);
   }
 
   void touchFlow(IToken<?> requestToken, long nowTick, String detail) {

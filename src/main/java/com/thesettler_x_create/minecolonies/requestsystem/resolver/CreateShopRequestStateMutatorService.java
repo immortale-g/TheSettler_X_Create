@@ -133,4 +133,23 @@ final class CreateShopRequestStateMutatorService {
     }
     resolver.markParentChildDropLastLogTick(parentToken, nowTick);
   }
+
+  void clearPendingTokenState(
+      CreateShopRequestResolver resolver, IToken<?> token, boolean clearFlowState) {
+    if (resolver == null || token == null) {
+      return;
+    }
+    clearOrderedAndPending(resolver, token);
+    resolver.clearDeliveriesCreated(token);
+    resolver.clearParentDeliveryActive(token);
+    resolver.clearParentStaleRecoveryArm(token);
+    resolver.clearParentChildrenSnapshot(token);
+    resolver.clearChildActive(token);
+    resolver.clearMissingChildSince(token);
+    resolver.clearRootCauseTracking(token);
+    resolver.clearRetryingReassignAttempt(token);
+    if (clearFlowState) {
+      resolver.getFlowStateMachine().remove(token);
+    }
+  }
 }

@@ -671,3 +671,7 @@ Implementation notes:
   missing-child grace window/drop decision moved from `CreateShopRequestResolver` into
   `CreateShopDeliveryChildLifecycleService`, keeping child lifecycle timeout and cleanup decisions
   in one service instead of split between resolver + reconciliation.
+- Pending-token reset centralization on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: full token lifecycle reset (`clearPendingTokenState`)
+  now executes through `CreateShopRequestStateMutatorService`, with resolver delegating, to keep
+  terminal/reset multi-structure cleanup in a single write-owner path.
