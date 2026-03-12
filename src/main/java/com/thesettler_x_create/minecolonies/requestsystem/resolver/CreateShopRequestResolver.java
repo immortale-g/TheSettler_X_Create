@@ -104,6 +104,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopWarehouseCountService();
   private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService =
       new CreateShopFlowTimeoutCleanupService();
+  private final CreateShopDeliveryCompletionService deliveryCompletionService =
+      new CreateShopDeliveryCompletionService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1242,141 +1244,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-    if (request != null && request.getId() != null) {
-      deliveryChildActiveSince.remove(request.getId());
-    }
-    IToken<?> parentToken =
-        CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
-    if (parentToken == null) {
-      return;
-    }
-    parentDeliveryActiveSince.remove(parentToken);
-    clearStaleRecoveryArm(parentToken);
-    IRequest<?> parentRequest = null;
-    IStandardRequestManager standard = unwrapStandardManager(manager);
-    if (standard != null) {
-      try {
-        parentRequest = standard.getRequestHandler().getRequest(parentToken);
-      } catch (Exception ignored) {
-        // Ignore lookup failures; callbacks remain best-effort.
-      }
-    }
-    if (parentRequest != null) {
-      transitionFlow(
-          manager,
-          parentRequest,
-          CreateShopFlowState.DELIVERY_COMPLETED,
-          "delivery-complete",
-          describeStack(
-              request.getRequest() instanceof Delivery d ? d.getStack() : ItemStack.EMPTY),
-          request.getRequest() instanceof Delivery d ? d.getStack().getCount() : 0,
-          "com.thesettler_x_create.message.createshop.flow_delivery_completed");
-    }
-    if (request != null && request.getRequest() instanceof Delivery delivery) {
-      try {
-        BuildingCreateShop shop = getShop(manager);
-        CreateShopBlockEntity pickup = null;
-        if (shop != null) {
-          pickup = shop.getPickupBlockEntity();
-        }
-        Level level =
-            manager == null || manager.getColony() == null ? null : manager.getColony().getWorld();
-        ILocation start = delivery.getStart();
-        BlockPos startPos = start == null ? null : start.getInDimensionLocation();
-        if (pickup == null
-            && level != null
-            && startPos != null
-            && WorldUtil.isBlockLoaded(level, startPos)) {
-          BlockEntity startEntity = level.getBlockEntity(startPos);
-          if (startEntity instanceof CreateShopBlockEntity shopPickup) {
-            pickup = shopPickup;
-          }
-        }
-        if (pickup != null && isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
-          UUID parentRequestId = toRequestId(parentToken);
-          ItemStack stack = delivery.getStack().copy();
-          int reservedForStackBefore = pickup.getReservedFor(stack);
-          if (!stack.isEmpty()) {
-            pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
-          }
-          int reservedForStackAfter = pickup.getReservedFor(stack);
-          int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
-          if (consumedReserved > 0 && parentRequest != null) {
-            transitionFlow(
-                manager,
-                parentRequest,
-                CreateShopFlowState.RESERVED_FOR_DELIVERY,
-                "delivery-complete:reserved-consumed",
-                describeStack(stack),
-                consumedReserved,
-                "com.thesettler_x_create.message.createshop.flow_reserved");
-          }
-          if (isDebugLoggingEnabled()) {
-            int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
-            int reservedForStack = reservedForStackAfter;
-            BlockPos pickupPosition = pickup.getBlockPos();
-            deliveryManager.logDeliveryDiagnostics(
-                "complete",
-                manager,
-                request.getId(),
-                parentRequestId,
-                pickupPosition,
-                stack,
-                delivery.getTarget(),
-                reservedForRequest,
-                -1,
-                reservedForStack);
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
-                request.getId(),
-                parentToken,
-                stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
-                stack.getCount(),
-                startPos,
-                delivery.getTarget().getInDimensionLocation(),
-                consumedReserved);
-          }
-        }
-      } catch (Exception ignored) {
-        // Ignore delivery detail logging failures.
-      }
-    }
-    clearDeliveriesCreated(parentToken);
-    int pending = pendingTracker.getPendingCount(parentToken);
-    if (pending > 0) {
-      // Keep cooldown so tickPending continues creating partial deliveries.
-      if (manager != null && manager.getColony() != null) {
-        cooldown.markRequestOrdered(manager.getColony().getWorld(), parentToken);
-      }
-    } else {
-      cooldown.clearRequestCooldown(parentToken);
-      pendingTracker.remove(parentToken);
-    }
-    if (isDebugLoggingEnabled()) {
-      IStandardRequestManager debugManager = unwrapStandardManager(manager);
-      if (debugManager != null) {
-        try {
-          var handler = debugManager.getRequestHandler();
-          IRequest<?> parent = handler.getRequest(parentToken);
-          if (parent == null) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery complete parent={} missing", parentToken);
-            return;
-          }
-          String parentState = parent.getState().toString();
-          boolean hasChildren = parent.hasChildren();
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery complete parent={} state={} hasChildren={}",
-              parentToken,
-              parentState,
-              hasChildren);
-          diagnostics.logParentChildrenState(debugManager, parentToken, "delivery-complete");
-          recheck.scheduleParentChildRecheck(debugManager, parentToken);
-        } catch (Exception ignored) {
-          // Ignore lookup errors.
-        }
-      }
-    }
+    deliveryCompletionService.handleDeliveryComplete(this, manager, request);
   }
 
   @Override
@@ -2267,5 +2135,34 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       int amount,
       String messageKey) {
     transitionFlow(manager, request, state, detail, stackLabel, amount, messageKey);
+  }
+
+  java.util.Map<IToken<?>, Long> getDeliveryChildActiveSinceForOps() {
+    return deliveryChildActiveSince;
+  }
+
+  CreateShopDeliveryManager getDeliveryManagerForOps() {
+    return deliveryManager;
+  }
+
+  CreateShopResolverDiagnostics getDiagnosticsForOps() {
+    return diagnostics;
+  }
+
+  CreateShopResolverRecheck getRecheckForOps() {
+    return recheck;
+  }
+
+  boolean isDebugLoggingEnabledForOps() {
+    return isDebugLoggingEnabled();
+  }
+
+  boolean isDeliveryFromLocalShopStartForOps(
+      Delivery delivery, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
+    return isDeliveryFromLocalShopStart(delivery, shop, pickup);
+  }
+
+  String describeStackForOps(ItemStack stack) {
+    return describeStack(stack);
   }
 }

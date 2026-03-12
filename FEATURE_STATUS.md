@@ -146,6 +146,10 @@ Current behavior:
 - Flow-timeout cleanup (`collectTimedOut` + failed transition + reservation/cooldown/pending
   cleanup) is now centralized in `CreateShopFlowTimeoutCleanupService`, reducing resolver tick
   orchestration responsibility while preserving existing timeout behavior.
+- Delivery-completion reconciliation (parent-flow transition, local pickup reservation consumption,
+  pending/cooldown reconciliation, and completion diagnostics/recheck) is now centralized in
+  `CreateShopDeliveryCompletionService`, reducing callback complexity in
+  `CreateShopRequestResolver`.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
