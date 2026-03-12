@@ -113,6 +113,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPendingRequestGateService();
   private final CreateShopChildReconciliationService childReconciliationService =
       new CreateShopChildReconciliationService();
+  private final CreateShopPendingStateDecisionService pendingStateDecisionService =
+      new CreateShopPendingStateDecisionService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -636,79 +638,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             requestIdLog,
             reservedForRequest);
       }
-      int pendingCount = reservedForRequest;
-      if (pendingCount <= 0) {
-        pendingCount = pendingTracker.getPendingCount(request.getId());
-      }
-      if (pendingCount <= 0) {
-        int derivedPending = computeOutstandingNeeded(request, deliverable, reservedForRequest);
-        if (derivedPending > 0) {
-          pendingTracker.setPendingCount(request.getId(), derivedPending);
-          pendingCount = derivedPending;
-          diagnostics.recordPendingSource(request.getId(), "tickPending:derived-needed");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} derived pending from request={} (reservedForRequest={})",
-                requestIdLog,
-                derivedPending,
-                reservedForRequest);
-          }
-        }
-      }
-      if (pendingCount <= 0 && !onCooldown) {
-        diagnostics.logPendingReasonChange(
-            request.getId(),
-            "skip:no-pending reserved="
-                + reservedForRequest
-                + " pending="
-                + pendingTracker.getPendingCount(request.getId()));
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
-        }
-        continue;
-      }
-      if (pendingCount <= 0) {
-        if (onCooldown && !hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
-          cooldown.clearRequestCooldown(request.getId());
-          pendingTracker.remove(request.getId());
-          diagnostics.logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} cleared stale cooldown (no pending/no children)",
-                requestIdLog);
-          }
-          continue;
-        }
-        diagnostics.logPendingReasonChange(
-            request.getId(),
-            "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
-              requestIdLog,
+      var pendingDecision =
+          pendingStateDecisionService.decide(
+              this,
+              request,
+              level,
+              deliverable,
+              onCooldown,
               reservedForRequest,
-              pendingCount);
-        }
+              workerWorking,
+              requestIdLog);
+      if (pendingDecision.shouldSkip()) {
         continue;
       }
-      if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
-        flowStateMachine.touch(
-            request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
-        if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
-          cooldown.markRequestOrdered(level, request.getId());
-          pendingTracker.setPendingCount(request.getId(), pendingCount);
-          diagnostics.recordPendingSource(request.getId(), "tickPending:worker-unavailable");
-        }
-        diagnostics.logPendingReasonChange(request.getId(), "wait:worker-not-working");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",
-              requestIdLog,
-              pendingCount);
-        }
-        continue;
-      }
+      int pendingCount = pendingDecision.pendingCount();
       int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
       int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
       int rackAvailableForRequest =
@@ -1880,6 +1823,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Set<IToken<?>> getCancelledRequestsForOps() {
     return cancelledRequests;
+  }
+
+  int computeOutstandingNeededForOps(
+      IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
+    return computeOutstandingNeeded(request, deliverable, reservedForRequest);
+  }
+
+  CreateShopWorkerAvailabilityGate getWorkerAvailabilityGateForOps() {
+    return workerAvailabilityGate;
+  }
+
+  void touchFlowForOps(IToken<?> requestToken, long nowTick, String detail) {
+    flowStateMachine.touch(requestToken, nowTick, detail);
   }
 
   boolean shouldDropMissingChildForOps(Level level, IToken<?> childToken) {
