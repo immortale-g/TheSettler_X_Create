@@ -25,6 +25,7 @@ final class CreateShopPendingRequestProcessorService {
   private final CreateShopPendingTopupService pendingTopupService;
   private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
+  private final CreateShopResolverDiagnostics diagnostics;
 
   CreateShopPendingRequestProcessorService(
       CreateShopPendingRequestGateService pendingRequestGateService,
@@ -33,7 +34,8 @@ final class CreateShopPendingRequestProcessorService {
       CreateShopReservationSyncService reservationSyncService,
       CreateShopPendingTopupService pendingTopupService,
       CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
-      CreateShopPostCreationUpdateService postCreationUpdateService) {
+      CreateShopPostCreationUpdateService postCreationUpdateService,
+      CreateShopResolverDiagnostics diagnostics) {
     this.pendingRequestGateService = pendingRequestGateService;
     this.childReconciliationService = childReconciliationService;
     this.pendingStateDecisionService = pendingStateDecisionService;
@@ -41,6 +43,7 @@ final class CreateShopPendingRequestProcessorService {
     this.pendingTopupService = pendingTopupService;
     this.pendingDeliveryCreationService = pendingDeliveryCreationService;
     this.postCreationUpdateService = postCreationUpdateService;
+    this.diagnostics = diagnostics;
   }
 
   void processToken(
@@ -68,7 +71,7 @@ final class CreateShopPendingRequestProcessorService {
     }
     if (CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
       resolver.clearPendingTokenState(request.getId(), true);
-      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:terminal-state");
+      diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (terminal state={})",
@@ -77,14 +80,14 @@ final class CreateShopPendingRequestProcessorService {
       }
       return;
     }
-    resolver.getDiagnostics().logRequestStateChange(standardManager, token, "tickPending");
+    diagnostics.logRequestStateChange(standardManager, token, "tickPending");
     IDeliverable deliverable = (IDeliverable) request.getRequest();
     String requestIdLog = request.getId().toString();
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     boolean onCooldown = resolver.getCooldown().isRequestOnCooldown(level, request.getId());
     if (request.hasChildren()) {
-      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:has-children");
+      diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
           java.util.Objects.requireNonNull(request.getChildren(), "children");
       resolver.getParentLastKnownChildCount().put(request.getId(), children.size());
@@ -103,7 +106,7 @@ final class CreateShopPendingRequestProcessorService {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
-        resolver.getDiagnostics().logParentChildrenState(standardManager, request.getId(), "tickPending");
+        diagnostics.logParentChildrenState(standardManager, request.getId(), "tickPending");
         if (childResult.childrenEmpty()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} children list empty despite hasChildren", requestIdLog);
@@ -158,7 +161,7 @@ final class CreateShopPendingRequestProcessorService {
     resolver.getParentDeliveryActiveSince().remove(request.getId());
     resolver.clearStaleRecoveryArm(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
-      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
+      diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
       resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(

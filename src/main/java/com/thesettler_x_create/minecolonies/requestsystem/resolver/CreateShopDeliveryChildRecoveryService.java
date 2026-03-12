@@ -15,12 +15,15 @@ import net.minecraft.world.level.Level;
 final class CreateShopDeliveryChildRecoveryService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverOwnership ownership;
+  private final CreateShopResolverDiagnostics diagnostics;
 
   CreateShopDeliveryChildRecoveryService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopResolverOwnership ownership) {
+      CreateShopResolverOwnership ownership,
+      CreateShopResolverDiagnostics diagnostics) {
     this.requestStateMutatorService = requestStateMutatorService;
     this.ownership = ownership;
+    this.diagnostics = diagnostics;
   }
 
   boolean recover(
@@ -74,7 +77,7 @@ final class CreateShopDeliveryChildRecoveryService {
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
-    resolver.getDiagnostics().recordPendingSource(parentRequest.getId(), pendingSource);
+    diagnostics.recordPendingSource(parentRequest.getId(), pendingSource);
     resolver.getParentDeliveryActiveSince().put(parentRequest.getId(), level.getGameTime());
     resolver.clearStaleRecoveryArm(parentRequest.getId());
     resolver.getDeliveryChildActiveSince().put(childToken, level.getGameTime());

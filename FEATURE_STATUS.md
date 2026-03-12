@@ -308,6 +308,11 @@ Current behavior:
   `getParentLastKnownChildCount`, `getParentLastKnownChildren`, `getParentChildDropLastLogTick`,
   `getDeliveryRootCauseSnapshots`, `getDeliveryRootCauseLastLogTick`, `getMissingChildSince`)
   instead of `*ForOps` accessor aliases.
+- Diagnostics dependency is now constructor-injected into pending/recovery/post-creation/reservation
+  services (`CreateShopPendingRequestProcessorService`, `CreateShopPendingRequestGateService`,
+  `CreateShopPendingStateDecisionService`, `CreateShopDeliveryChildRecoveryService`,
+  `CreateShopPostCreationUpdateService`, `CreateShopReservationSyncService`) to reduce direct
+  resolver accessor coupling.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

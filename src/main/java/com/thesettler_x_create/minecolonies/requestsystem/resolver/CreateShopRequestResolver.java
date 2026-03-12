@@ -106,7 +106,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
       new CreateShopPendingTokenCollectorService(ownership, tickPendingTelemetryService);
   private final CreateShopPendingRequestGateService pendingRequestGateService =
-      new CreateShopPendingRequestGateService(ownership);
+      new CreateShopPendingRequestGateService(ownership, diagnostics);
   private final CreateShopChildReconciliationService childReconciliationService;
   private final CreateShopPendingStateDecisionService pendingStateDecisionService;
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
@@ -137,15 +137,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             requestStateMutatorService, deliveryManager, diagnostics, recheck);
     this.pendingStateDecisionService =
         new CreateShopPendingStateDecisionService(
-            requestStateMutatorService, workerAvailabilityGate, outstandingNeededService);
+            requestStateMutatorService,
+            workerAvailabilityGate,
+            outstandingNeededService,
+            diagnostics);
     this.postCreationUpdateService =
-        new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging);
+        new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging, diagnostics);
     this.deliveryCancelService =
         new CreateShopDeliveryCancelService(
             requestStateMutatorService, diagnostics, recheck, deliveryManager);
     this.deliveryChildRecoveryService =
-        new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
-    this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
+        new CreateShopDeliveryChildRecoveryService(
+            requestStateMutatorService, ownership, diagnostics);
+    this.reservationSyncService =
+        new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
             requestStateMutatorService, messaging, deliveryManager, outstandingNeededService);
@@ -173,7 +178,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             reservationSyncService,
             pendingTopupService,
             pendingDeliveryCreationService,
-            postCreationUpdateService);
+            postCreationUpdateService,
+            diagnostics);
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,

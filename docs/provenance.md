@@ -90,6 +90,10 @@ Implementation notes:
   services from `*ForOps` map accessors to direct accessor names and removing those alias paths) is
   authored in this project as a behavior-preserving internal simplification that further reduces
   resolver indirection.
+- Diagnostics dependency-injection refactor (injecting `CreateShopResolverDiagnostics` into
+  pending/recovery/post-creation/reservation services instead of resolving diagnostics via resolver
+  getter calls) is authored in this project as a behavior-preserving internal simplification that
+  reduces resolver-as-service-locator coupling.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

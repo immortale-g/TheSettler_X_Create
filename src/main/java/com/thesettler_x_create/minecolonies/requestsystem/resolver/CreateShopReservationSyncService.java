@@ -12,9 +12,13 @@ import net.minecraft.world.item.ItemStack;
 /** Syncs missing request reservations from currently available rack stock. */
 final class CreateShopReservationSyncService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverDiagnostics diagnostics;
 
-  CreateShopReservationSyncService(CreateShopRequestStateMutatorService requestStateMutatorService) {
+  CreateShopReservationSyncService(
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverDiagnostics diagnostics) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.diagnostics = diagnostics;
   }
 
   int syncReservationsFromRack(
@@ -67,7 +71,7 @@ final class CreateShopReservationSyncService {
     if (reservedNow > 0) {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, null, requestToken, pendingCount);
-      resolver.getDiagnostics().recordPendingSource(requestToken, "tickPending:reservation-refresh");
+      diagnostics.recordPendingSource(requestToken, "tickPending:reservation-refresh");
       resolver.touchFlow(requestToken, now, "tickPending:reservation-refresh");
     }
     return reservedNow;
