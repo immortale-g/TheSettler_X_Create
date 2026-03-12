@@ -8,6 +8,12 @@ import com.thesettler_x_create.TheSettlerXCreate;
 
 final class CreateShopResolverDiagnostics {
   private final CreateShopRequestResolver resolver;
+  private final java.util.Map<IToken<?>, String> parentChildrenSnapshots =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.Map<IToken<?>, String> requestStateSnapshots =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.Map<IToken<?>, String> pendingReasonSnapshots =
+      new java.util.concurrent.ConcurrentHashMap<>();
 
   CreateShopResolverDiagnostics(CreateShopRequestResolver resolver) {
     this.resolver = resolver;
@@ -37,7 +43,7 @@ final class CreateShopResolverDiagnostics {
       builder.append(" ").append(child).append(":").append(childState);
     }
     String snapshot = builder.toString();
-    String previous = resolver.getParentChildrenSnapshots().put(parentToken, snapshot);
+    String previous = parentChildrenSnapshots.put(parentToken, snapshot);
     if (!snapshot.equals(previous)) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] parent children {} parent={} {}", phase, parentToken, snapshot);
@@ -55,7 +61,7 @@ final class CreateShopResolverDiagnostics {
         return;
       }
       String state = request.getState().toString();
-      String previous = resolver.getRequestStateSnapshots().put(token, state);
+      String previous = requestStateSnapshots.put(token, state);
       if (state.equals(previous)) {
         return;
       }
@@ -80,7 +86,7 @@ final class CreateShopResolverDiagnostics {
     if (!Config.DEBUG_LOGGING.getAsBoolean()) {
       return;
     }
-    String previous = resolver.getPendingReasonSnapshots().put(token, reason);
+    String previous = pendingReasonSnapshots.put(token, reason);
     if (reason.equals(previous)) {
       return;
     }

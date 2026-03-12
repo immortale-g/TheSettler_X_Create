@@ -61,7 +61,7 @@ final class CreateShopResolverChain {
         parent.removeChild(childToken);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           String key = "self:" + parentToken;
-          if (resolver.getChainCycleLogged().add(key)) {
+          if (resolver.markChainCycleLogged(key)) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] removed self-cycle in request chain {}", parentToken);
           }
@@ -72,7 +72,7 @@ final class CreateShopResolverChain {
         parent.removeChild(childToken);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           String key = "cycle:" + parentToken + ":" + childToken;
-          if (resolver.getChainCycleLogged().add(key)) {
+          if (resolver.markChainCycleLogged(key)) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] removed request chain cycle parent={} child={}",
                 parentToken,

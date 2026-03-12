@@ -21,8 +21,8 @@ final class CreateShopRequestValidator {
       IRequest<? extends IDeliverable> request) {
     if (request.getState()
         == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      resolver.getCancelledRequests().add(request.getId());
-    } else if (resolver.getCancelledRequests().remove(request.getId())) {
+      resolver.markCancelledRequest(request.getId());
+    } else if (resolver.clearCancelledRequest(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] cleared cancelled flag (state={}) {}",
@@ -30,7 +30,7 @@ final class CreateShopRequestValidator {
             request.getId());
       }
     }
-    if (resolver.getCancelledRequests().contains(request.getId())) {
+    if (resolver.isCancelledRequest(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] canResolve=false (request cancelled) " + request.getId());

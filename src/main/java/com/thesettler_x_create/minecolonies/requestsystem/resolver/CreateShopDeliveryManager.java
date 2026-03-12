@@ -182,7 +182,7 @@ final class CreateShopDeliveryManager {
     resolver.markDeliveriesCreated(request.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       String key = token.toString();
-      if (resolver.getDeliveryCreateLogged().add(key)) {
+      if (resolver.markDeliveryCreateLogged(key)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create token={} requesterClass={} parentRequesterClass={} managerClass={}",
             token,

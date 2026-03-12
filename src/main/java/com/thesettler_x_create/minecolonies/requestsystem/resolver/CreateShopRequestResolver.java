@@ -39,22 +39,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final java.util.Map<IToken<?>, Long> pendingNotices =
-      new java.util.concurrent.ConcurrentHashMap<>();
   private final CreateShopLifecycleStateStore lifecycleStateStore =
       new CreateShopLifecycleStateStore();
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final java.util.Map<IToken<?>, String> parentChildrenSnapshots =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, Long> parentChildrenRecheck =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, String> requestStateSnapshots =
-      new java.util.concurrent.ConcurrentHashMap<>();
-  private final java.util.Map<IToken<?>, String> pendingReasonSnapshots =
-      new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Set<String> chainCycleLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
@@ -66,7 +56,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopResolverRecheck(this, diagnostics);
   private final CreateShopResolverCooldown cooldown = new CreateShopResolverCooldown(this);
   private final CreateShopResolverPendingState pendingState =
-      new CreateShopResolverPendingState(this);
+      new CreateShopResolverPendingState();
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
   private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
   private final CreateShopOutstandingNeededService outstandingNeededService =
@@ -399,32 +389,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return MAX_CHAIN_SANITIZE_NODES;
   }
 
-  java.util.Set<String> getChainCycleLogged() {
-    return chainCycleLogged;
+  boolean markChainCycleLogged(String key) {
+    return chainCycleLogged.add(key);
   }
 
-  java.util.Map<IToken<?>, String> getParentChildrenSnapshots() {
-    return parentChildrenSnapshots;
+  void markCancelledRequest(IToken<?> token) {
+    if (token != null) {
+      cancelledRequests.add(token);
+    }
   }
 
-  java.util.Map<IToken<?>, Long> getParentChildrenRecheck() {
-    return parentChildrenRecheck;
+  boolean clearCancelledRequest(IToken<?> token) {
+    return token != null && cancelledRequests.remove(token);
   }
 
-  java.util.Map<IToken<?>, String> getRequestStateSnapshots() {
-    return requestStateSnapshots;
-  }
-
-  java.util.Map<IToken<?>, String> getPendingReasonSnapshots() {
-    return pendingReasonSnapshots;
-  }
-
-  java.util.Map<IToken<?>, Long> getPendingNotices() {
-    return pendingNotices;
-  }
-
-  java.util.Set<IToken<?>> getCancelledRequests() {
-    return cancelledRequests;
+  boolean isCancelledRequest(IToken<?> token) {
+    return token != null && cancelledRequests.contains(token);
   }
 
   CreateShopResolverPlanning getPlanning() {
@@ -447,12 +427,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return stockResolver;
   }
 
-  java.util.Set<String> getDeliveryCreateLogged() {
-    return deliveryCreateLogged;
-  }
-
-  java.util.Set<String> getDeliveryLinkLogged() {
-    return deliveryLinkLogged;
+  boolean markDeliveryCreateLogged(String key) {
+    return deliveryCreateLogged.add(key);
   }
 
   IToken<?> getResolverToken() {
@@ -619,6 +595,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopResolverRecheck getRecheck() {
     return recheck;
+  }
+
+  void scheduleParentChildRecheckAtForTest(IToken<?> parentToken, long dueTick) {
+    recheck.scheduleParentChildRecheckAtForTest(parentToken, dueTick);
+  }
+
+  Long getParentChildRecheckDueTick(IToken<?> parentToken) {
+    return recheck.getParentChildRecheckDueTick(parentToken);
   }
 
   boolean isDebugLoggingEnabled() {

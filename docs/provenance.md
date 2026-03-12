@@ -683,3 +683,10 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: terminal request cleanup and flow-timeout cleanup
   now use the shared `clearPendingTokenState` mutator path (with explicit tracked-child cleanup
   retained), reducing divergent multi-step reset variants.
+- Resolver internal-state encapsulation refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  diagnostics snapshots (`parent children`, `request state`, `pending reason`) and parent-child
+  recheck scheduling state are now owned by their dedicated services
+  (`CreateShopResolverDiagnostics`, `CreateShopResolverRecheck`), pending notice cooldown state is
+  owned by `CreateShopResolverPendingState`, and call sites now use explicit resolver methods for
+  cancellation/logging flags instead of mutable collection getters.
