@@ -462,3 +462,7 @@ Implementation notes:
   `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingRequestGateService`,
   and cancelled-state requests now clear pending/cooldown/delivery-created tracking immediately
   during tick-pending gating.
+- Tick-pending candidate debug logging extraction on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  candidate debug emission loop is moved into a dedicated resolver helper method without behavior
+  change.
