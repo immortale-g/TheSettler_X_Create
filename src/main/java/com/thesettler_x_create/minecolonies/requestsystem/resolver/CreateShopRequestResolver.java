@@ -115,6 +115,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopChildReconciliationService();
   private final CreateShopPendingStateDecisionService pendingStateDecisionService =
       new CreateShopPendingStateDecisionService();
+  private final CreateShopPostCreationUpdateService postCreationUpdateService =
+      new CreateShopPostCreationUpdateService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -705,43 +707,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (!creationResult.created()) {
         continue;
       }
-      List<ItemStack> ordered = creationResult.ordered();
-      transitionFlow(
-          manager,
-          request,
-          CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
-          "tickPending:rack-arrived",
-          describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
-          countStackList(ordered),
-          "com.thesettler_x_create.message.createshop.flow_arrived");
-      messaging.sendShopChat(
-          manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
-      transitionFlow(
-          manager,
-          request,
-          CreateShopFlowState.DELIVERY_CREATED,
-          "tickPending:delivery-created",
-          describeStack(ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0)),
-          countStackList(ordered),
-          "com.thesettler_x_create.message.createshop.flow_delivery_created");
-      diagnostics.logPendingReasonChange(request.getId(), "create:delivery");
-      int remainingCount = creationResult.remainingCount();
-      if (remainingCount > 0) {
-        pendingTracker.setPendingCount(request.getId(), remainingCount);
-        cooldown.markRequestOrdered(level, request.getId());
-        diagnostics.recordPendingSource(request.getId(), "tickPending:partial");
-      } else {
-        // Root-cause guard: keep tracking while child delivery is active.
-        // Clearing tracker here loses deliveryStarted/deliveryCreated and allows duplicate
-        // re-order.
-        pendingTracker.setPendingCount(request.getId(), 0);
-        cooldown.markRequestOrdered(level, request.getId());
-        diagnostics.recordPendingSource(request.getId(), "tickPending:await-child-complete");
-      }
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip assignRequest (delivery created)", requestIdLog);
-      }
+      postCreationUpdateService.apply(this, manager, request, level, creationResult, requestIdLog);
     }
     processTimedOutFlows(standardManager, level);
     lastTickPendingNanos = System.nanoTime() - perfStart;
@@ -1797,6 +1763,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return describeStack(stack);
   }
 
+  int countStackListForOps(List<ItemStack> stacks) {
+    return countStackList(stacks);
+  }
+
   java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
     return retryingReassignAttempts;
   }
@@ -1832,6 +1802,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopWorkerAvailabilityGate getWorkerAvailabilityGateForOps() {
     return workerAvailabilityGate;
+  }
+
+  CreateShopResolverMessaging getMessagingForOps() {
+    return messaging;
   }
 
   void touchFlowForOps(IToken<?> requestToken, long nowTick, String detail) {
