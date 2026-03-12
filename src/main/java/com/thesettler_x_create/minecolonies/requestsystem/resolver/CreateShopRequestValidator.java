@@ -3,7 +3,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -13,6 +12,9 @@ import java.util.UUID;
 import net.minecraft.world.level.Level;
 
 final class CreateShopRequestValidator {
+  private final CreateShopOutstandingNeededService outstandingNeededService =
+      new CreateShopOutstandingNeededService();
+
   boolean canResolveRequest(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
@@ -90,15 +92,11 @@ final class CreateShopRequestValidator {
       return false;
     }
 
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
     UUID requestId = resolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    needed = Math.max(0, needed - reservedForRequest);
+    int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     if (needed <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (needed<=0)");

@@ -51,6 +51,10 @@ Implementation notes:
 - Resolver attempt-flow dependency refactor (injecting `CreateShopDeliveryManager` directly into
   `CreateShopAttemptResolveService` and removing resolver passthrough accessor usage) is authored
   in this project as a behavior-preserving internal split that reduces central resolver coupling.
+- Outstanding-needed calculation refactor (extracting `requested-leftover-reserved` math into
+  `CreateShopOutstandingNeededService` and wiring validator/attempt/pending-decision to that shared
+  service) is authored in this project as a behavior-preserving internal split that reduces
+  duplicated request-amount logic and resolver helper forwarding.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

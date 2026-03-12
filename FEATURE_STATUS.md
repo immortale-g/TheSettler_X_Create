@@ -273,6 +273,9 @@ Current behavior:
 - Delivery callback services now receive `deliveryManager`/`diagnostics`/`recheck` via constructor
   injection (`CreateShopDeliveryCancelService`, `CreateShopDeliveryCompletionService`) instead of
   resolving those collaborators through resolver ops getters.
+- Outstanding-needed calculation (`requested - leftover - reservedForRequest`) is now centralized in
+  `CreateShopOutstandingNeededService` and used by validator/attempt/pending-decision flows,
+  removing duplicated arithmetic paths that previously lived behind resolver helper forwarding.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

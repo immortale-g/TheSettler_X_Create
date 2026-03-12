@@ -22,14 +22,17 @@ final class CreateShopAttemptResolveService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverMessaging messaging;
   private final CreateShopDeliveryManager deliveryManager;
+  private final CreateShopOutstandingNeededService outstandingNeededService;
 
   CreateShopAttemptResolveService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
       CreateShopResolverMessaging messaging,
-      CreateShopDeliveryManager deliveryManager) {
+      CreateShopDeliveryManager deliveryManager,
+      CreateShopOutstandingNeededService outstandingNeededService) {
     this.requestStateMutatorService = requestStateMutatorService;
     this.messaging = messaging;
     this.deliveryManager = deliveryManager;
+    this.outstandingNeededService = outstandingNeededService;
   }
 
   List<IToken<?>> attemptResolve(
@@ -121,7 +124,7 @@ final class CreateShopAttemptResolveService {
 
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
-    int needed = resolver.computeOutstandingNeededForOps(request, deliverable, reservedForRequest);
+    int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     if (needed > 0 && resolver.getPendingTracker().hasDeliveryStarted(request.getId())) {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, request.getId(), needed);
