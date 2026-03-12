@@ -150,6 +150,9 @@ Current behavior:
   pending/cooldown reconciliation, and completion diagnostics/recheck) is now centralized in
   `CreateShopDeliveryCompletionService`, reducing callback complexity in
   `CreateShopRequestResolver`.
+- Retrying-request reassignment orchestration is now centralized in
+  `CreateShopRetryingReassignService`, reducing resolver tick-branching while preserving guarded
+  reassignment to Create Shop when requests become resolvable.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
