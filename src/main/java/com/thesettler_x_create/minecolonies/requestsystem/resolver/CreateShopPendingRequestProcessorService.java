@@ -59,7 +59,7 @@ final class CreateShopPendingRequestProcessorService {
     try {
       request = requestHandler.getRequest(token);
     } catch (IllegalArgumentException ex) {
-      resolver.clearPendingTokenStateForOps(token, false);
+      resolver.clearPendingTokenState(token, false);
       return;
     }
     if (pendingRequestGateService.shouldSkipForPendingProcessing(
@@ -67,7 +67,7 @@ final class CreateShopPendingRequestProcessorService {
       return;
     }
     if (resolver.isTerminalRequestStateForOps(request.getState())) {
-      resolver.clearPendingTokenStateForOps(request.getId(), true);
+      resolver.clearPendingTokenState(request.getId(), true);
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:terminal-state");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
@@ -159,7 +159,7 @@ final class CreateShopPendingRequestProcessorService {
     resolver.clearStaleRecoveryArmForOps(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
-      resolver.touchFlowForOps(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
+      resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",

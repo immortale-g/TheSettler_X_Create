@@ -267,7 +267,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         "[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
   }
 
-  private boolean shouldDropMissingChild(Level level, IToken<?> childToken) {
+  boolean shouldDropMissingChild(Level level, IToken<?> childToken) {
     if (level == null || childToken == null) {
       return false;
     }
@@ -688,7 +688,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     logTickPendingCandidates(requestHandler, pendingTokens);
   }
 
-  void clearPendingTokenStateForOps(IToken<?> token, boolean clearFlowState) {
+  void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {
     if (token == null) {
       return;
     }
@@ -700,16 +700,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  java.util.Set<IToken<?>> getCancelledRequestsForOps() {
-    return cancelledRequests;
-  }
-
-  void touchFlowForOps(IToken<?> requestToken, long nowTick, String detail) {
+  void touchFlow(IToken<?> requestToken, long nowTick, String detail) {
     flowStateMachine.touch(requestToken, nowTick, detail);
-  }
-
-  boolean shouldDropMissingChildForOps(Level level, IToken<?> childToken) {
-    return shouldDropMissingChild(level, childToken);
   }
 
   boolean shouldSkipResolveForOps(

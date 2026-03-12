@@ -20,18 +20,18 @@ final class CreateShopPendingRequestGateService {
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IStandardRequestManager standardManager,
-      IRequest<?> request,
+    IRequest<?> request,
       IToken<?> token) {
     if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
-      resolver.clearPendingTokenStateForOps(token, true);
+      resolver.clearPendingTokenState(token, true);
       return true;
     }
-    if (resolver.getCancelledRequestsForOps().contains(request.getId())) {
+    if (resolver.getCancelledRequests().contains(request.getId())) {
       if (request.getState()
           != com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-        resolver.getCancelledRequestsForOps().remove(request.getId());
+        resolver.getCancelledRequests().remove(request.getId());
       } else {
-        resolver.clearPendingTokenStateForOps(request.getId(), true);
+        resolver.clearPendingTokenState(request.getId(), true);
         resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:cancelled");
         resolver.transitionFlowForOps(
             manager,
@@ -49,7 +49,7 @@ final class CreateShopPendingRequestGateService {
       }
     }
     if (request.getState() == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      resolver.clearPendingTokenStateForOps(request.getId(), true);
+      resolver.clearPendingTokenState(request.getId(), true);
       resolver.transitionFlowForOps(
           manager,
           request,
