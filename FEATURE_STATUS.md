@@ -184,6 +184,10 @@ Current behavior:
 - Root-cause delivery snapshot diagnostics are now centralized in
   `CreateShopDeliveryRootCauseSnapshotService`, reducing resolver debug/forensics density while
   preserving rate-limited warehouse/courier assignment snapshot emission.
+- Delivery-child recovery mutation path (ownership revalidation, local child scope check,
+  cancel/remove/requeue mutation, and recheck scheduling) is now centralized in
+  `CreateShopDeliveryChildRecoveryService`, reducing resolver-side stale/extra-active recovery
+  branch density.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
