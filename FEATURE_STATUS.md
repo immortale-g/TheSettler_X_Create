@@ -135,6 +135,8 @@ Current behavior:
 - Delivery callback resolver/parent-token lookup and unresolved-callback diagnostics are now
   centralized in `CreateShopDeliveryResolverLocator`, reducing static callback lookup complexity
   in `CreateShopRequestResolver`.
+- Terminal request cleanup paths now share a unified resolver cleanup routine
+  (`cleanupTerminalRequest`), reducing duplicated cancel/complete cleanup branches.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
