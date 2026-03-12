@@ -8,7 +8,6 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
-import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.api.util.WorldUtil;
@@ -22,10 +21,8 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.NotNull;
@@ -671,94 +668,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         logTemplate);
   }
 
-  private boolean isLocalShopDeliveryChild(
-      IRequest<?> childRequest, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
-    if (childRequest == null || shop == null || pickup == null) {
-      return false;
-    }
-    if (!(childRequest.getRequest() instanceof Delivery delivery)) {
-      return false;
-    }
-    ILocation start = delivery.getStart();
-    Level level = pickup.getLevel();
-    if (start == null || level == null || start.getDimension() == null) {
-      return false;
-    }
-    if (!level.dimension().equals(start.getDimension())) {
-      return false;
-    }
-    BlockPos startPos = start.getInDimensionLocation();
-    if (startPos == null) {
-      return false;
-    }
-    if (pickup.getBlockPos().equals(startPos)) {
-      return true;
-    }
-    return shop.hasContainerPosition(startPos);
-  }
-
-  private boolean isDeliveryFromPickup(Delivery delivery, CreateShopBlockEntity pickup) {
-    if (delivery == null || pickup == null || pickup.getLevel() == null) {
-      return false;
-    }
-    ILocation start = delivery.getStart();
-    if (start == null || start.getDimension() == null) {
-      return false;
-    }
-    return pickup.getLevel().dimension().equals(start.getDimension())
-        && pickup.getBlockPos().equals(start.getInDimensionLocation());
-  }
-
-  private boolean isDeliveryFromLocalShopStart(
-      Delivery delivery, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
-    if (delivery == null || pickup == null || pickup.getLevel() == null) {
-      return false;
-    }
-    ILocation start = delivery.getStart();
-    if (start == null || start.getDimension() == null) {
-      return false;
-    }
-    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
-      return false;
-    }
-    BlockPos startPos = start.getInDimensionLocation();
-    if (startPos == null) {
-      return false;
-    }
-    if (isDeliveryFromPickup(delivery, pickup)) {
-      return true;
-    }
-    return shop != null && shop.hasContainerPosition(startPos);
-  }
-
   private void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
 
-  private int countStackList(List<ItemStack> stacks) {
-    if (stacks == null || stacks.isEmpty()) {
-      return 0;
-    }
-    int total = 0;
-    for (ItemStack stack : stacks) {
-      if (stack == null || stack.isEmpty()) {
-        continue;
-      }
-      total += stack.getCount();
-    }
-    return total;
-  }
-
   void reassignResolvableRetryingRequestsForOps(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
-  }
-
-  private String describeStack(ItemStack stack) {
-    if (stack == null || stack.isEmpty()) {
-      return "";
-    }
-    return stack.getHoverName().getString();
   }
 
   private void logDeliveryRootCauseSnapshot(
@@ -850,24 +766,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   boolean isDebugLoggingEnabledForOps() {
     return isDebugLoggingEnabled();
-  }
-
-  boolean isDeliveryFromLocalShopStartForOps(
-      Delivery delivery, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
-    return isDeliveryFromLocalShopStart(delivery, shop, pickup);
-  }
-
-  boolean isLocalShopDeliveryChildForOps(
-      IRequest<?> childRequest, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
-    return isLocalShopDeliveryChild(childRequest, shop, pickup);
-  }
-
-  String describeStackForOps(ItemStack stack) {
-    return describeStack(stack);
-  }
-
-  int countStackListForOps(List<ItemStack> stacks) {
-    return countStackList(stacks);
   }
 
   java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {

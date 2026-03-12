@@ -236,6 +236,9 @@ Current behavior:
 - Terminal request lifecycle handling (`resolveRequest` skip/complete path + completion/cancel
   cleanup hooks) is now centralized in `CreateShopTerminalRequestLifecycleService`, reducing
   request-end mutation duplication inside `CreateShopRequestResolver`.
+- Local delivery-origin matching and stack count/label helpers are now shared utilities
+  (`CreateShopDeliveryOriginMatcher`, `CreateShopStackMetrics`) used directly by resolver
+  services, removing duplicate helper logic and narrowing resolver surface area.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

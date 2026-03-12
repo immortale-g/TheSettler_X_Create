@@ -27,13 +27,13 @@ final class CreateShopPostCreationUpdateService {
     }
     List<ItemStack> ordered = creationResult.ordered();
     ItemStack first = ordered.isEmpty() ? ItemStack.EMPTY : ordered.get(0);
-    int orderedCount = resolver.countStackListForOps(ordered);
+    int orderedCount = CreateShopStackMetrics.countStackList(ordered);
     resolver.transitionFlowForOps(
         manager,
         request,
         CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
         "tickPending:rack-arrived",
-        resolver.describeStackForOps(first),
+        CreateShopStackMetrics.describeStack(first),
         orderedCount,
         "com.thesettler_x_create.message.createshop.flow_arrived");
     resolver.getMessagingForOps()
@@ -43,7 +43,7 @@ final class CreateShopPostCreationUpdateService {
         request,
         CreateShopFlowState.DELIVERY_CREATED,
         "tickPending:delivery-created",
-        resolver.describeStackForOps(first),
+        CreateShopStackMetrics.describeStack(first),
         orderedCount,
         "com.thesettler_x_create.message.createshop.flow_delivery_created");
     resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "create:delivery");

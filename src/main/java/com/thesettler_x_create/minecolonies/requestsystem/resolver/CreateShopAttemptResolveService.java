@@ -193,8 +193,8 @@ final class CreateShopAttemptResolveService {
           request,
           CreateShopFlowState.ORDERED_FROM_NETWORK,
           "attemptResolve:order-created",
-          resolver.describeStackForOps(ordered.get(0)),
-          resolver.countStackListForOps(ordered),
+          CreateShopStackMetrics.describeStack(ordered.get(0)),
+          CreateShopStackMetrics.countStackList(ordered),
           "com.thesettler_x_create.message.createshop.flow_ordered");
       if (hasNetworkPortion) {
         resolver.getCooldown().markRequestOrdered(level, request.getId());
@@ -232,8 +232,8 @@ final class CreateShopAttemptResolveService {
             request,
             CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
             "attemptResolve:rack-usable",
-            resolver.describeStackForOps(ordered.get(0)),
-            resolver.countStackListForOps(ordered),
+            CreateShopStackMetrics.describeStack(ordered.get(0)),
+            CreateShopStackMetrics.countStackList(ordered),
             "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
             resolver
@@ -252,7 +252,7 @@ final class CreateShopAttemptResolveService {
               request,
               CreateShopFlowState.DELIVERY_CREATED,
               "attemptResolve:delivery-created",
-              resolver.describeStackForOps(ordered.get(0)),
+              CreateShopStackMetrics.describeStack(ordered.get(0)),
               plannedCount,
               "com.thesettler_x_create.message.createshop.flow_delivery_created");
         }

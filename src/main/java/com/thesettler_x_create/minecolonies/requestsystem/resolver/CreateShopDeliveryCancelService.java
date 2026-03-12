@@ -76,7 +76,7 @@ final class CreateShopDeliveryCancelService {
       }
       return;
     }
-    if (!resolver.isDeliveryFromLocalShopStartForOps(delivery, shop, pickup)) {
+    if (!CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
       return;
     }
 
