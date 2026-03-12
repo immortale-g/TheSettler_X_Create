@@ -22,5 +22,14 @@ class CreateShopMaintenanceCommandsGuardTest {
     assertTrue(commandSource.contains("prepare_uninstall"));
     assertTrue(commandSource.contains("run_live_test"));
     assertTrue(commandSource.contains("reset_live_state"));
+    assertTrue(commandSource.contains("force_warehouse_queue"));
+    assertTrue(commandSource.contains("clearWarehouseQueues("));
+    assertTrue(commandSource.contains("cancelCreateShopOwnedRequestsGraphAware("));
+    assertTrue(commandSource.contains("cancelRequestGraphPostOrder("));
+    assertTrue(commandSource.contains("cancelSingleRequest("));
+    assertTrue(commandSource.contains("countShopsWithActiveLocalDeliveries("));
+    assertTrue(commandSource.contains("reconcileAssignmentsAndKickCouriers("));
+    assertTrue(commandSource.contains("cancelActiveLocalDeliveries("));
+    assertTrue(commandSource.contains("drainRounds"));
   }
 }

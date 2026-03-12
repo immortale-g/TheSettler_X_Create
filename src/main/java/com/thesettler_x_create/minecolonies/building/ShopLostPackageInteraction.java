@@ -6,9 +6,11 @@ import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
 import com.simibubi.create.content.logistics.box.PackageItem;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -143,6 +145,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     // Lock interaction immediately to avoid duplicate reopen windows while handling a response.
     active = false;
+    removeQueuedLostPackageInteractions(citizen);
     boolean handled = false;
     int consumed = 0;
     if (response == 0) {
@@ -416,5 +419,88 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return true;
     }
     return ItemStack.isSameItem(candidate, key);
+  }
+
+  private void removeQueuedLostPackageInteractions(ICitizenData citizen) {
+    if (citizen == null) {
+      return;
+    }
+    Field field = findField(citizen.getClass(), "citizenChatOptions");
+    if (field == null) {
+      return;
+    }
+    try {
+      field.setAccessible(true);
+      Object raw = field.get(citizen);
+      if (!(raw instanceof Map<?, ?> rawMap)) {
+        return;
+      }
+      @SuppressWarnings("unchecked")
+      Map<Object, Object> interactions = (Map<Object, Object>) rawMap;
+      int before = interactions.size();
+      interactions.entrySet().removeIf(this::isSameLostPackageInteraction);
+      int removed = Math.max(0, before - interactions.size());
+      if (removed > 0) {
+        citizen.markDirty(0);
+      }
+      if (removed > 0 && BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction immediate-remove debugId={} removed={}",
+            debugInstanceId,
+            removed);
+      }
+    } catch (Exception ex) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] lost-package interaction immediate-remove failed debugId={} err={}",
+            debugInstanceId,
+            ex.getClass().getSimpleName());
+      }
+    }
+  }
+
+  private static Field findField(Class<?> type, String name) {
+    Class<?> current = type;
+    while (current != null) {
+      try {
+        return current.getDeclaredField(name);
+      } catch (NoSuchFieldException ignored) {
+        current = current.getSuperclass();
+      }
+    }
+    return null;
+  }
+
+  private boolean isSameLostPackageInteraction(Map.Entry<Object, Object> entry) {
+    Object value = entry == null ? null : entry.getValue();
+    if (!(value instanceof ShopLostPackageInteraction other)) {
+      return false;
+    }
+    if (other == this) {
+      return true;
+    }
+    if (!sameStackKey(other.stackKey)) {
+      return false;
+    }
+    if (other.requestedAt != requestedAt) {
+      return false;
+    }
+    if (!sanitize(other.requesterName).equals(sanitize(requesterName))) {
+      return false;
+    }
+    if (!sanitize(other.address).equals(sanitize(address))) {
+      return false;
+    }
+    return true;
+  }
+
+  private boolean sameStackKey(ItemStack otherKey) {
+    if (stackKey == null || stackKey.isEmpty() || otherKey == null || otherKey.isEmpty()) {
+      return false;
+    }
+    if (ItemStack.isSameItemSameComponents(stackKey, otherKey)) {
+      return true;
+    }
+    return ItemStack.isSameItem(stackKey, otherKey);
   }
 }
