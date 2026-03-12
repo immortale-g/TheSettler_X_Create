@@ -41,6 +41,9 @@ Implementation notes:
 - Resolver pending top-up refactor (extracting network topup decision/mutation from
   `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingTopupService`) is authored
   in this project as a behavior-preserving internal split to reduce central resolver complexity.
+- Resolver ownership refactor (extracting local-owner locality and assignment-drift token recovery
+  helpers into `CreateShopResolverOwnership`) is authored in this project as a behavior-preserving
+  internal split to reduce duplicated resolver ownership checks.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token

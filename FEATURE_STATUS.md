@@ -126,6 +126,9 @@ Current behavior:
 - Pending network-topup decision logic during resolver reconciliation is now centralized in
   `CreateShopPendingTopupService`, reducing resolver tick complexity while preserving current
   topup guards (`started-order`, `wait-inflight`, `network-topup`).
+- Resolver assignment-drift/ownership locality checks are now centralized in
+  `CreateShopResolverOwnership`, reducing duplicated local-owner detection logic in
+  `CreateShopRequestResolver`.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
