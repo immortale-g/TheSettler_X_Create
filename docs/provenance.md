@@ -516,3 +516,8 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: top-level pending tick execution moved from
   `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopTickPendingService`, with
   resolver retaining only delegation and ops accessors.
+- Attempt-resolve orchestration refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopRequestResolver.attemptResolveRequest`
+  now delegates to `CreateShopAttemptResolveService`, preserving existing guards for cancelled /
+  cooldown / active-child states, network-vs-rack ordering, wrapped-manager defer behavior, and
+  reservation writes for ordered stacks.

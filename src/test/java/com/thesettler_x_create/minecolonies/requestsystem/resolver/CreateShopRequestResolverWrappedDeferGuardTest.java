@@ -12,10 +12,10 @@ class CreateShopRequestResolverWrappedDeferGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopAttemptResolveService.java"));
 
     assertTrue(source.contains("attemptResolve:defer-wrapped-manager"));
     assertTrue(source.contains("attemptResolve defer delivery creation (wrapped manager)"));
-    assertTrue(source.contains("if (unwrapStandardManager(manager) == null)"));
+    assertTrue(source.contains("if (resolver.unwrapStandardManagerForOps(manager) == null)"));
   }
 }

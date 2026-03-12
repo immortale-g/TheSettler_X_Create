@@ -224,6 +224,9 @@ Current behavior:
 - Reservation consumption timing is now delivery-completion based for local Create Shop delivery
   starts (pickup or registered rack containers), so rack housekeeping no longer pulls items into
   hut inventory before MineColonies delivery children have actually completed pickup/transport.
+- Attempt-resolve orchestration is now centralized in `CreateShopAttemptResolveService`, so
+  `CreateShopRequestResolver.attemptResolveRequest(...)` is a thin delegate and request ordering /
+  defer / delivery-creation decision flow is isolated from resolver lifecycle scaffolding.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
