@@ -18,10 +18,19 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 /** Handles delivery completion reconciliation and reservation consumption for Create Shop requests. */
 final class CreateShopDeliveryCompletionService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopDeliveryManager deliveryManager;
+  private final CreateShopResolverDiagnostics diagnostics;
+  private final CreateShopResolverRecheck recheck;
 
   CreateShopDeliveryCompletionService(
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopDeliveryManager deliveryManager,
+      CreateShopResolverDiagnostics diagnostics,
+      CreateShopResolverRecheck recheck) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.deliveryManager = deliveryManager;
+    this.diagnostics = diagnostics;
+    this.recheck = recheck;
   }
 
   void handleDeliveryComplete(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
@@ -102,9 +111,7 @@ final class CreateShopDeliveryCompletionService {
             int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
             int reservedForStack = reservedForStackAfter;
             BlockPos pickupPosition = pickup.getBlockPos();
-            resolver
-                .getDeliveryManagerForOps()
-                .logDeliveryDiagnostics(
+            deliveryManager.logDeliveryDiagnostics(
                     "complete",
                     manager,
                     request.getId(),
@@ -158,8 +165,8 @@ final class CreateShopDeliveryCompletionService {
               parentToken,
               parentState,
               hasChildren);
-          resolver.getDiagnosticsForOps().logParentChildrenState(debugManager, parentToken, "delivery-complete");
-          resolver.getRecheckForOps().scheduleParentChildRecheck(debugManager, parentToken);
+          diagnostics.logParentChildrenState(debugManager, parentToken, "delivery-complete");
+          recheck.scheduleParentChildRecheck(debugManager, parentToken);
         } catch (Exception ignored) {
           // Ignore lookup errors.
         }

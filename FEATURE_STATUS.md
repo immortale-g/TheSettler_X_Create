@@ -265,6 +265,9 @@ Current behavior:
 - Resolver messaging is now constructor-injected into attempt/post-creation services
   (`CreateShopAttemptResolveService`, `CreateShopPostCreationUpdateService`), allowing removal of
   the resolver messaging ops getter.
+- Delivery callback services now receive `deliveryManager`/`diagnostics`/`recheck` via constructor
+  injection (`CreateShopDeliveryCancelService`, `CreateShopDeliveryCompletionService`) instead of
+  resolving those collaborators through resolver ops getters.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
