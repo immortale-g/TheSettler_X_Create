@@ -14,6 +14,21 @@ import net.minecraft.world.level.Level;
 final class CreateShopRequestValidator {
   private final CreateShopOutstandingNeededService outstandingNeededService =
       new CreateShopOutstandingNeededService();
+  private final CreateShopResolverChain chain;
+  private final CreateShopStockResolver stockResolver;
+  private final CreateShopResolverPlanning planning;
+  private final CreateShopResolverCooldown cooldown;
+
+  CreateShopRequestValidator(
+      CreateShopResolverChain chain,
+      CreateShopStockResolver stockResolver,
+      CreateShopResolverPlanning planning,
+      CreateShopResolverCooldown cooldown) {
+    this.chain = chain;
+    this.stockResolver = stockResolver;
+    this.planning = planning;
+    this.cooldown = cooldown;
+  }
 
   boolean canResolveRequest(
       CreateShopRequestResolver resolver,
@@ -44,7 +59,7 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
-    if (resolver.getCooldown().isRequestOnCooldown(level, request.getId())) {
+    if (cooldown.isRequestOnCooldown(level, request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request already ordered)");
       }
@@ -68,8 +83,8 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
-    resolver.getChain().sanitizeRequestChain(manager, request);
-    if (!resolver.getChain().safeIsRequestChainValid(manager, request)) {
+    chain.sanitizeRequestChain(manager, request);
+    if (!chain.safeIsRequestChainValid(manager, request)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request chain invalid)");
       }
@@ -104,9 +119,7 @@ final class CreateShopRequestValidator {
       return false;
     }
     CreateShopStockSnapshot snapshot =
-        resolver
-            .getStockResolver()
-            .getAvailability(tile, pickup, deliverable, reservedForOthers, resolver.getPlanning());
+        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
     int available = snapshot.getAvailable();
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
