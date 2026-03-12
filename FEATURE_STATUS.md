@@ -194,6 +194,9 @@ Current behavior:
 - Rack reservation refresh reconciliation is now centralized in
   `CreateShopReservationSyncService`, isolating reservation-refresh semantics and reducing
   reservation drift fixes spread across resolver code paths.
+- Tick-pending top-level orchestration (manager/level guards, assignment snapshot collection,
+  token-loop dispatch, timeout processing, and perf logging handoff) is now centralized in
+  `CreateShopTickPendingService`, reducing `CreateShopRequestResolver` to a thin tick facade.
 - Child lookup failure handling now uses the same grace/drop lifecycle as missing children
   (instead of infinite fail-open), so repeated lookup exceptions eventually prune stale child
   links and unblock parent progress.

@@ -512,3 +512,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: repeated child lookup exceptions in
   `CreateShopChildReconciliationService` now follow the same grace/drop path as missing children,
   preventing infinite fail-open child retention on persistent lookup failures.
+- Tick-pending orchestration refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: top-level pending tick execution moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopTickPendingService`, with
+  resolver retaining only delegation and ops accessors.

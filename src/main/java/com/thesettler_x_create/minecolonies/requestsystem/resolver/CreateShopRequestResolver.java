@@ -127,6 +127,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopReservationSyncService();
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService =
       new CreateShopPendingRequestProcessorService();
+  private final CreateShopTickPendingService tickPendingService =
+      new CreateShopTickPendingService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -462,90 +464,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public void tickPendingDeliveries(IRequestManager manager) {
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] tickPending entry manager={} resolverId={}",
-          manager == null ? "<null>" : manager.getClass().getName(),
-          getId());
-    }
-    IStandardRequestManager standardManager = unwrapStandardManager(manager);
-    if (standardManager == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no standard manager)");
-      }
-      return;
-    }
-    long perfStart = System.nanoTime();
-    Level level = standardManager.getColony().getWorld();
-    if (level == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no level)");
-      }
-      return;
-    }
-    if (level.isClientSide) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (client side)");
-      }
-      return;
-    }
-    reassignResolvableRetryingRequests(standardManager, level);
-    recheck.processParentChildRechecks(standardManager, level);
-    var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
-    var requestHandler = standardManager.getRequestHandler();
-    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
-    java.util.Set<IToken<?>> pendingTokens =
-        pendingTokenCollectorService.collectPendingTokens(
-            this, standardManager, level, assignments);
-    if (pendingTokens.isEmpty()) {
-      return;
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-      int assignedCount = pendingTokens.size();
-      int orderedCount = cooldown.getOrderedCount();
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] tickPending: assigned={}, ordered={}, total={}",
-          assignedCount,
-          orderedCount,
-          pendingTokens.size());
-      logTickPendingCandidates(requestHandler, pendingTokens);
-    }
-    BuildingCreateShop shop = getShop(standardManager);
-    if (shop == null) {
-      return;
-    }
-    boolean workerWorking = shop.isWorkerWorking();
-    if (!workerWorking) {
-      if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
-      }
-    }
-    TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-    if (tile == null) {
-      return;
-    }
-    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
-    if (pickup == null) {
-      return;
-    }
-
-    for (IToken<?> token : java.util.List.copyOf(pendingTokens)) {
-      pendingRequestProcessorService.processToken(
-          this,
-          manager,
-          standardManager,
-          requestHandler,
-          assignmentStore::getAssignmentForValue,
-          token,
-          level,
-          shop,
-          tile,
-          pickup,
-          workerWorking);
-    }
-    processTimedOutFlows(standardManager, level);
-    lastTickPendingNanos = System.nanoTime() - perfStart;
-    maybeLogPerf(level);
+    tickPendingService.tickPendingDeliveries(this, manager);
   }
 
   private boolean shouldLogTickPending(Level level) {
@@ -1184,7 +1103,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return total;
   }
 
-  private void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {
+  void reassignResolvableRetryingRequestsForOps(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
 
@@ -1304,6 +1223,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return retryingReassignAttempts;
   }
 
+  CreateShopPendingTokenCollectorService getPendingTokenCollectorServiceForOps() {
+    return pendingTokenCollectorService;
+  }
+
+  CreateShopPendingRequestProcessorService getPendingRequestProcessorServiceForOps() {
+    return pendingRequestProcessorService;
+  }
+
   CreateShopPendingRequestGateService getPendingRequestGateServiceForOps() {
     return pendingRequestGateService;
   }
@@ -1342,6 +1269,24 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   boolean isTerminalRequestStateForOps(RequestState state) {
     return isTerminalRequestState(state);
+  }
+
+  void processTimedOutFlowsForOps(IStandardRequestManager manager, Level level) {
+    processTimedOutFlows(manager, level);
+  }
+
+  void setLastTickPendingNanosForOps(long nanos) {
+    lastTickPendingNanos = nanos;
+  }
+
+  void maybeLogPerfForOps(Level level) {
+    maybeLogPerf(level);
+  }
+
+  void logTickPendingCandidatesForOps(
+      com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
+      java.util.Set<IToken<?>> pendingTokens) {
+    logTickPendingCandidates(requestHandler, pendingTokens);
   }
 
   void clearPendingTokenStateForOps(IToken<?> token, boolean clearFlowState) {
