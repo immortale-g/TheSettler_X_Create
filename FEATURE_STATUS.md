@@ -168,6 +168,9 @@ Current behavior:
   grace, stale/extra-active local-delivery recovery, and local-scope child diagnostics) is now
   centralized in `CreateShopChildReconciliationService`, reducing `tickPendingDeliveries`
   branching and isolating child-lifecycle handling into one dedicated flow.
+- Tick-pending now actively recovers stale cooldown-only parents (`ordered/cooldown` set but
+  no pending count, no active child delivery, no children) by clearing stale cooldown/pending
+  tracking instead of leaving requests silently blocked in no-progress loops.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

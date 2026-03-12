@@ -669,6 +669,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         continue;
       }
       if (pendingCount <= 0) {
+        if (onCooldown && !hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
+          cooldown.clearRequestCooldown(request.getId());
+          pendingTracker.remove(request.getId());
+          diagnostics.logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} cleared stale cooldown (no pending/no children)",
+                requestIdLog);
+          }
+          continue;
+        }
         diagnostics.logPendingReasonChange(
             request.getId(),
             "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
