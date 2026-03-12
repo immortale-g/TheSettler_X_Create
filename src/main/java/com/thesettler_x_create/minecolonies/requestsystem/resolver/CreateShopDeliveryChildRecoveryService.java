@@ -13,6 +13,13 @@ import net.minecraft.world.level.Level;
 
 /** Performs guarded local-delivery child recovery and parent requeue reconciliation. */
 final class CreateShopDeliveryChildRecoveryService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopDeliveryChildRecoveryService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   boolean recover(
       CreateShopRequestResolver resolver,
       IStandardRequestManager manager,
@@ -62,10 +69,8 @@ final class CreateShopDeliveryChildRecoveryService {
     }
     resolver.clearDeliveriesCreated(parentRequest.getId());
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());
-    resolver
-        .getRequestStateMutatorForOps()
-        .markOrderedWithPendingAtLeastOne(
-            resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
+    requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+        resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
     resolver.getDiagnosticsForOps().recordPendingSource(parentRequest.getId(), pendingSource);
     resolver.getParentDeliveryActiveSinceForOps().put(parentRequest.getId(), level.getGameTime());
     resolver.clearStaleRecoveryArmForOps(parentRequest.getId());

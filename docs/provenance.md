@@ -562,3 +562,7 @@ Implementation notes:
   authored in this project scope: wrapped-manager and timeout/cleanup delegation paths now use
   direct static/service calls, with runtime/guard tests updated for reflection targets and source
   assertions after removal of obsolete resolver wrapper methods.
+- Mutator dependency injection refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: services that mutate pending/cooldown lifecycle
+  now receive `CreateShopRequestStateMutatorService` through constructors instead of pulling it via
+  resolver ops getters, and resolver wiring was updated accordingly.

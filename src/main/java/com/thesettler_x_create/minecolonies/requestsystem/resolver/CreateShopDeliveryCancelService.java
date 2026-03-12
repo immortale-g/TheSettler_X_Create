@@ -17,6 +17,12 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** Handles delivery-cancel callbacks and parent requeue reconciliation for Create Shop requests. */
 final class CreateShopDeliveryCancelService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopDeliveryCancelService(CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   void handleDeliveryCancelled(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
     if (resolver == null || manager == null || request == null) {
       return;
@@ -39,9 +45,8 @@ final class CreateShopDeliveryCancelService {
 
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
     if (level == null) {
-      resolver
-          .getRequestStateMutatorForOps()
-          .markOrderedWithPendingAtLeastOne(resolver, null, parentToken, stack.getCount());
+      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+          resolver, null, parentToken, stack.getCount());
       resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel");
       resolver.clearDeliveriesCreated(parentToken);
       return;
@@ -61,9 +66,8 @@ final class CreateShopDeliveryCancelService {
     }
     if (pickup == null) {
       int fallbackPending = Math.max(1, stack.getCount());
-      resolver
-          .getRequestStateMutatorForOps()
-          .markOrderedWithPendingAtLeastOne(resolver, level, parentToken, fallbackPending);
+      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+          resolver, level, parentToken, fallbackPending);
       resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
       resolver.clearDeliveriesCreated(parentToken);
       if (resolver.isDebugLoggingEnabledForOps()) {
@@ -86,9 +90,8 @@ final class CreateShopDeliveryCancelService {
     int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
     int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
     pickup.release(parentRequestId);
-    resolver
-        .getRequestStateMutatorForOps()
-        .markOrderedWithPendingAtLeastOne(resolver, level, parentToken, pendingCount);
+    requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+        resolver, level, parentToken, pendingCount);
     resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-reserve");
     resolver.clearDeliveriesCreated(parentToken);
 

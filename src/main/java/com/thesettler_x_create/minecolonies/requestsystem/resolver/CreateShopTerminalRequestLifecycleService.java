@@ -7,6 +7,13 @@ import org.jetbrains.annotations.NotNull;
 
 /** Handles terminal request lifecycle cleanup and resolver completion/cancel transitions. */
 final class CreateShopTerminalRequestLifecycleService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopTerminalRequestLifecycleService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   void resolveRequest(
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
@@ -86,7 +93,7 @@ final class CreateShopTerminalRequestLifecycleService {
     if (request == null) {
       return;
     }
-    resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, request.getId());
+    requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
     resolver.clearDeliveriesCreated(request.getId());
     resolver.clearTrackedChildrenForParentForOps(
         CreateShopRequestResolver.unwrapStandardManager(manager), request.getId());

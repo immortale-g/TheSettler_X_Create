@@ -17,6 +17,13 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** Handles delivery completion reconciliation and reservation consumption for Create Shop requests. */
 final class CreateShopDeliveryCompletionService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopDeliveryCompletionService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   void handleDeliveryComplete(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
     if (resolver == null) {
       return;
@@ -127,13 +134,11 @@ final class CreateShopDeliveryCompletionService {
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
     if (pending > 0) {
       if (manager != null && manager.getColony() != null) {
-        resolver
-            .getRequestStateMutatorForOps()
-            .markOrderedWithPending(
-                resolver, manager.getColony().getWorld(), parentToken, pending);
+        requestStateMutatorService.markOrderedWithPending(
+            resolver, manager.getColony().getWorld(), parentToken, pending);
       }
     } else {
-      resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, parentToken);
+      requestStateMutatorService.clearOrderedAndPending(resolver, parentToken);
     }
     if (resolver.isDebugLoggingEnabledForOps()) {
       IStandardRequestManager debugManager = CreateShopRequestResolver.unwrapStandardManager(manager);
