@@ -13,17 +13,22 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String lifecycleSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(resolverSource.contains("parentStaleRecoveryArmedAt"));
+    assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAtForOps()"));
     assertTrue(resolverSource.contains("isStaleRecoveryArmed("));
     assertTrue(
         reconcileSource.contains(
             "if (!resolver.isStaleRecoveryArmedForOps(level, standardManager, request.getId()))"));
-    assertTrue(resolverSource.contains("recheck.scheduleParentChildRecheck(manager, parentToken)"));
+    assertTrue(
+        lifecycleSource.contains("resolver.getRecheckForOps().scheduleParentChildRecheck(manager, parentToken)"));
     assertTrue(resolverSource.contains("clearStaleRecoveryArm("));
   }
 }
