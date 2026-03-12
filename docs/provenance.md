@@ -661,3 +661,8 @@ Implementation notes:
   lifecycle helpers (`markMissingChildIfAbsent`, active-child + parent-delivery snapshots) and the
   unused root-cause child-token snapshot accessor was removed, reducing lifecycle API surface and
   direct store-touch points.
+- Pending top-up single-writer hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopPendingTopupService` now routes
+  ordered+pending mutations through `CreateShopRequestStateMutatorService` instead of writing
+  cooldown/pending tracker state directly, reducing split lifecycle write paths during inflight wait
+  and network top-up ordering.

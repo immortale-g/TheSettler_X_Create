@@ -144,12 +144,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             requestStateMutatorService, cooldown, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
-            cooldown,
             lifecycleStateStore.getPendingTracker(),
             diagnostics,
             flowStateMachine,
             stockResolver,
-            messaging);
+            messaging,
+            requestStateMutatorService);
     this.pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
