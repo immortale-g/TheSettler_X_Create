@@ -856,7 +856,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   public int cancelLostPackageRequestAndInflight(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
     int clearedInflight = cancelLostPackage(stackKey, requesterName, address, requestedAt);
-    int cancelledRequests = cancelMatchingLostPackageRequests(stackKey, requesterName, address);
+    int cancelledRequests =
+        cancelMatchingLostPackageRequests(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package cancel+requests item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
@@ -873,7 +874,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   }
 
   private int cancelMatchingLostPackageRequests(
-      ItemStack stackKey, String requesterName, String address) {
+      ItemStack stackKey, String requesterName, String address, long requestedAt) {
     if (stackKey == null || stackKey.isEmpty() || getColony() == null) {
       return 0;
     }
@@ -890,6 +891,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         tokens.addAll(value);
       }
     }
+    boolean tupleScoped = requestedAt > 0L;
     int cancelled = 0;
     for (IToken<?> token : tokens) {
       try {
@@ -911,8 +913,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
         if (!matchesLostPackageRequester(standard, request, requesterName)) {
           continue;
         }
+        if (!matchesLostPackageAddress(standard, request, address)) {
+          continue;
+        }
         standard.updateRequestState(request.getId(), RequestState.CANCELLED);
         cancelled++;
+        if (tupleScoped) {
+          // requestedAt is tuple-scoped; without a stable request timestamp in MineColonies
+          // requests, cancel only a single matched root request to avoid collateral cancels.
+          break;
+        }
       } catch (Exception ex) {
         if (tryForceCleanRequest(standard, token, ex)) {
           cancelled++;
@@ -1047,7 +1057,39 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return actual.contains(expected) || expected.contains(actual);
   }
 
+  private boolean matchesLostPackageAddress(
+      IStandardRequestManager manager, IRequest<?> request, String address) {
+    String expected = normalizeRequesterLabel(address);
+    if (expected.isEmpty() || expected.equals("unknown address") || expected.equals("<unknown>")) {
+      return true;
+    }
+    String requesterDisplay = resolveRequesterDisplay(manager, request);
+    if (!requesterDisplay.isEmpty()
+        && (requesterDisplay.contains(expected) || expected.contains(requesterDisplay))) {
+      return true;
+    }
+    String shortDisplay = normalizeRequesterLabel(request == null ? "" : request.getShortDisplayString().getString());
+    if (!shortDisplay.isEmpty()
+        && (shortDisplay.contains(expected) || expected.contains(shortDisplay))) {
+      return true;
+    }
+    String longDisplay = normalizeRequesterLabel(request == null ? "" : request.getLongDisplayString().getString());
+    if (!longDisplay.isEmpty()
+        && (longDisplay.contains(expected) || expected.contains(longDisplay))) {
+      return true;
+    }
+    return false;
+  }
+
   private String resolveRequesterName(IStandardRequestManager manager, IRequest<?> request) {
+    String display = resolveRequesterDisplay(manager, request);
+    if (display.isEmpty()) {
+      return "";
+    }
+    return display;
+  }
+
+  private String resolveRequesterDisplay(IStandardRequestManager manager, IRequest<?> request) {
     if (request == null) {
       return "";
     }

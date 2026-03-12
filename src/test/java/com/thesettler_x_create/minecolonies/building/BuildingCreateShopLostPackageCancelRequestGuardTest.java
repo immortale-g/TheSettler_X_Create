@@ -15,10 +15,12 @@ class BuildingCreateShopLostPackageCancelRequestGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
     assertTrue(source.contains("cancelLostPackageRequestAndInflight("));
-    assertTrue(source.contains("cancelMatchingLostPackageRequests("));
+    assertTrue(source.contains("cancelMatchingLostPackageRequests(stackKey, requesterName, address, requestedAt)"));
     assertTrue(source.contains("matchesLostPackageRequest("));
     assertTrue(source.contains("request.getChildren()"));
     assertTrue(source.contains("instanceof Delivery"));
+    assertTrue(source.contains("matchesLostPackageAddress("));
+    assertTrue(source.contains("requestedAt > 0L"));
     assertTrue(
         source.contains("standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
   }
