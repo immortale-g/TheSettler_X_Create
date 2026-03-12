@@ -558,3 +558,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: `CreateShopChildReconciliationService` now
   calls lifecycle/recovery/root-cause services directly, and obsolete resolver stale-recovery
   forwarding methods were removed with guard/runtime tests updated to the new call sites.
+- Resolver forwarder cleanup on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: wrapped-manager and timeout/cleanup delegation paths now use
+  direct static/service calls, with runtime/guard tests updated for reflection targets and source
+  assertions after removal of obsolete resolver wrapper methods.

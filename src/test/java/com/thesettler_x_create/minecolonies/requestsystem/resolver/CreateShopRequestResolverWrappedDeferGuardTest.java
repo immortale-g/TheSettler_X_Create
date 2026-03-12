@@ -16,6 +16,6 @@ class CreateShopRequestResolverWrappedDeferGuardTest {
 
     assertTrue(source.contains("attemptResolve:defer-wrapped-manager"));
     assertTrue(source.contains("attemptResolve defer delivery creation (wrapped manager)"));
-    assertTrue(source.contains("if (resolver.unwrapStandardManagerForOps(manager) == null)"));
+    assertTrue(source.contains("if (CreateShopRequestResolver.unwrapStandardManager(manager) == null)"));
   }
 }

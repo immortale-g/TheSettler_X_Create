@@ -212,7 +212,7 @@ final class CreateShopAttemptResolveService {
             .getMessagingForOps()
             .sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       } else if (rackUsable > 0) {
-        if (resolver.unwrapStandardManagerForOps(manager) == null) {
+        if (CreateShopRequestResolver.unwrapStandardManager(manager) == null) {
           resolver
               .getRequestStateMutatorForOps()
               .markOrderedWithPendingAtLeastOne(resolver, level, request.getId(), needed);
