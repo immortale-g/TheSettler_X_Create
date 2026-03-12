@@ -310,7 +310,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return warehouseCountService.getWarehouseInternalCount(getLocation(), request, stockResolver);
   }
 
-  private BuildingCreateShop getShop(IRequestManager manager) {
+  BuildingCreateShop getShop(IRequestManager manager) {
     if (manager == null) {
       return null;
     }
@@ -458,10 +458,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopStockResolver getStockResolver() {
     return stockResolver;
-  }
-
-  BuildingCreateShop getShopForOps(IRequestManager manager) {
-    return getShop(manager);
   }
 
   java.util.Set<String> getDeliveryCreateLogged() {

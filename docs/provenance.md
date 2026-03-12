@@ -76,6 +76,9 @@ Implementation notes:
 - Flow-transition forwarding cleanup (switching resolver services from
   `transitionFlowForOps(...)` to direct shared `transitionFlow(...)`) is authored in this project
   as a behavior-preserving internal simplification that removes another resolver wrapper layer.
+- Resolver shop-lookup forwarding cleanup (switching services from `getShopForOps(...)` to direct
+  `getShop(...)` and removing the wrapper) is authored in this project as a behavior-preserving
+  internal simplification that reduces resolver facade duplication.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

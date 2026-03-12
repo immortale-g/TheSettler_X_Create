@@ -92,7 +92,7 @@ final class CreateShopAttemptResolveService {
     IDeliverable deliverable = request.getRequest();
     resolver.getChain().sanitizeRequestChain(manager, request);
 
-    BuildingCreateShop shop = resolver.getShopForOps(manager);
+    BuildingCreateShop shop = resolver.getShop(manager);
     if (shop == null) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (shop missing)");

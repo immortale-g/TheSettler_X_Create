@@ -84,7 +84,7 @@ final class CreateShopTickPendingService {
           pendingTokens.size());
       tickPendingTelemetryService.logTickPendingCandidates(requestHandler, pendingTokens);
     }
-    BuildingCreateShop shop = resolver.getShopForOps(standardManager);
+    BuildingCreateShop shop = resolver.getShop(standardManager);
     if (shop == null) {
       return;
     }

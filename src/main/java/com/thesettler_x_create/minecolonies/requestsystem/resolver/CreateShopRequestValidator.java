@@ -61,7 +61,7 @@ final class CreateShopRequestValidator {
     }
     IDeliverable deliverable = request.getRequest();
 
-    BuildingCreateShop shop = resolver.getShopForOps(manager);
+    BuildingCreateShop shop = resolver.getShop(manager);
     if (shop == null || !shop.isBuilt()) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (shop missing or not built)");

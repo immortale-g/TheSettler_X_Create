@@ -295,6 +295,8 @@ Current behavior:
 - Flow-transition entrypoints now use the shared direct resolver method `transitionFlow(...)`
   across attempt/pending/timeout/terminal/completion services, removing the last
   `transitionFlowForOps(...)` forwarding layer.
+- Resolver shop lookup now uses direct `getShop(...)` across validator/attempt/tick/delivery
+  services, removing the `getShopForOps(...)` wrapper and reducing resolver facade duplication.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
