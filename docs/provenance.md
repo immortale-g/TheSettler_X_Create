@@ -550,3 +550,7 @@ Implementation notes:
   is authored in this project scope: duplicate `getShopForValidator(...)` access path was removed
   and consumers now use `getShopForOps(...)`, reducing resolver API surface without behavior
   changes.
+- Request state mutator refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: paired pending/cooldown mutations now route through
+  `CreateShopRequestStateMutatorService` and were adopted in attempt-resolve, pending-decision,
+  reservation-refresh, delivery cancel/complete, timeout cleanup, and terminal cleanup services.

@@ -86,8 +86,7 @@ final class CreateShopTerminalRequestLifecycleService {
     if (request == null) {
       return;
     }
-    resolver.getPendingTracker().remove(request.getId());
-    resolver.getCooldown().clearRequestCooldown(request.getId());
+    resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, request.getId());
     resolver.clearDeliveriesCreated(request.getId());
     resolver.clearTrackedChildrenForParentForOps(
         CreateShopRequestResolver.unwrapStandardManager(manager), request.getId());

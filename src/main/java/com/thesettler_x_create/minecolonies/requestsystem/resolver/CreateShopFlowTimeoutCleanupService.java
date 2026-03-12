@@ -36,8 +36,7 @@ final class CreateShopFlowTimeoutCleanupService {
           resolver.releaseReservation(manager, request);
         }
       }
-      resolver.getPendingTracker().remove(token);
-      resolver.getCooldown().clearRequestCooldown(token);
+      resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, token);
       resolver.clearDeliveriesCreated(token);
       resolver.getParentDeliveryActiveSinceForOps().remove(token);
       resolver.clearStaleRecoveryArmForOps(token);

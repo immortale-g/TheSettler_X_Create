@@ -127,11 +127,13 @@ final class CreateShopDeliveryCompletionService {
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
     if (pending > 0) {
       if (manager != null && manager.getColony() != null) {
-        resolver.getCooldown().markRequestOrdered(manager.getColony().getWorld(), parentToken);
+        resolver
+            .getRequestStateMutatorForOps()
+            .markOrderedWithPending(
+                resolver, manager.getColony().getWorld(), parentToken, pending);
       }
     } else {
-      resolver.getCooldown().clearRequestCooldown(parentToken);
-      resolver.getPendingTracker().remove(parentToken);
+      resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, parentToken);
     }
     if (resolver.isDebugLoggingEnabledForOps()) {
       IStandardRequestManager debugManager = CreateShopRequestResolver.unwrapStandardManager(manager);

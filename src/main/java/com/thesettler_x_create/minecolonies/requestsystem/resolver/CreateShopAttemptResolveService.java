@@ -110,8 +110,9 @@ final class CreateShopAttemptResolveService {
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int needed = resolver.computeOutstandingNeededForOps(request, deliverable, reservedForRequest);
     if (needed > 0 && resolver.getPendingTracker().hasDeliveryStarted(request.getId())) {
-      resolver.getCooldown().markRequestOrdered(level, request.getId());
-      resolver.getPendingTracker().setPendingCount(request.getId(), Math.max(1, needed));
+      resolver
+          .getRequestStateMutatorForOps()
+          .markOrderedWithPendingAtLeastOne(resolver, level, request.getId(), needed);
       resolver
           .getDiagnosticsForOps()
           .recordPendingSource(request.getId(), "attemptResolve:block-auto-reorder-started");
@@ -157,8 +158,9 @@ final class CreateShopAttemptResolveService {
             needed,
             deliverable);
       }
-      resolver.getCooldown().markRequestOrdered(level, request.getId());
-      resolver.getPendingTracker().setPendingCount(request.getId(), needed);
+      resolver
+          .getRequestStateMutatorForOps()
+          .markOrderedWithPending(resolver, level, request.getId(), needed);
       resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "attemptResolve:insufficient");
       return Lists.newArrayList();
     }
@@ -197,8 +199,9 @@ final class CreateShopAttemptResolveService {
           CreateShopStackMetrics.countStackList(ordered),
           "com.thesettler_x_create.message.createshop.flow_ordered");
       if (hasNetworkPortion) {
-        resolver.getCooldown().markRequestOrdered(level, request.getId());
-        resolver.getPendingTracker().setPendingCount(request.getId(), Math.max(1, needed));
+        resolver
+            .getRequestStateMutatorForOps()
+            .markOrderedWithPendingAtLeastOne(resolver, level, request.getId(), needed);
         resolver
             .getDiagnosticsForOps()
             .recordPendingSource(request.getId(), "attemptResolve:defer-network-arrival");
@@ -210,8 +213,9 @@ final class CreateShopAttemptResolveService {
             .sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       } else if (rackUsable > 0) {
         if (resolver.unwrapStandardManagerForOps(manager) == null) {
-          resolver.getCooldown().markRequestOrdered(level, request.getId());
-          resolver.getPendingTracker().setPendingCount(request.getId(), Math.max(1, needed));
+          resolver
+              .getRequestStateMutatorForOps()
+              .markOrderedWithPendingAtLeastOne(resolver, level, request.getId(), needed);
           resolver
               .getDiagnosticsForOps()
               .recordPendingSource(request.getId(), "attemptResolve:defer-wrapped-manager");
@@ -258,8 +262,9 @@ final class CreateShopAttemptResolveService {
         }
         return created;
       } else {
-        resolver.getCooldown().markRequestOrdered(level, request.getId());
-        resolver.getPendingTracker().setPendingCount(request.getId(), needed);
+        resolver
+            .getRequestStateMutatorForOps()
+            .markOrderedWithPending(resolver, level, request.getId(), needed);
         resolver
             .getDiagnosticsForOps()
             .recordPendingSource(request.getId(), "attemptResolve:network-ordered");
