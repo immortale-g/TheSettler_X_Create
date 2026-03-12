@@ -397,7 +397,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  private static boolean isTerminalRequestState(RequestState state) {
+  static boolean isTerminalRequestState(RequestState state) {
     if (state == null) {
       return false;
     }
@@ -612,10 +612,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
     return retryingReassignAttempts;
-  }
-
-  boolean isTerminalRequestStateForOps(RequestState state) {
-    return isTerminalRequestState(state);
   }
 
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {

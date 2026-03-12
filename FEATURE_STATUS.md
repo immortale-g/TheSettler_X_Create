@@ -285,6 +285,9 @@ Current behavior:
 - Tick-pending telemetry/perf state is now centralized in `CreateShopTickPendingTelemetryService`
   (debug cadence, candidate snapshot logs, perf emission) and injected into pending token
   collection/tick orchestration, removing additional resolver-level telemetry forwarding/state.
+- Terminal-state gate in pending processing now uses shared static classification
+  (`CreateShopRequestResolver.isTerminalRequestState`) directly, removing one more resolver
+  forwarding alias while preserving terminal-skip behavior.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
