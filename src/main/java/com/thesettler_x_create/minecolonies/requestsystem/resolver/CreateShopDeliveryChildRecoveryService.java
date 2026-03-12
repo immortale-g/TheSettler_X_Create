@@ -74,7 +74,7 @@ final class CreateShopDeliveryChildRecoveryService {
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
-    resolver.getDiagnosticsForOps().recordPendingSource(parentRequest.getId(), pendingSource);
+    resolver.getDiagnostics().recordPendingSource(parentRequest.getId(), pendingSource);
     resolver.getParentDeliveryActiveSinceForOps().put(parentRequest.getId(), level.getGameTime());
     resolver.clearStaleRecoveryArm(parentRequest.getId());
     resolver.getDeliveryChildActiveSinceForOps().put(childToken, level.getGameTime());

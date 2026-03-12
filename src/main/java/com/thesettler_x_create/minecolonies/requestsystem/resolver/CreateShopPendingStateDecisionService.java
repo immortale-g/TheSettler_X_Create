@@ -40,7 +40,7 @@ final class CreateShopPendingStateDecisionService {
         requestStateMutatorService.markOrderedWithPending(
             resolver, null, request.getId(), derivedPending);
         pendingCount = derivedPending;
-        resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:derived-needed");
+        resolver.getDiagnostics().recordPendingSource(request.getId(), "tickPending:derived-needed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} derived pending from request={} (reservedForRequest={})",
@@ -52,7 +52,7 @@ final class CreateShopPendingStateDecisionService {
     }
     if (pendingCount <= 0 && !onCooldown) {
       resolver
-          .getDiagnosticsForOps()
+          .getDiagnostics()
           .logPendingReasonChange(
               request.getId(),
               "skip:no-pending reserved="
@@ -68,7 +68,7 @@ final class CreateShopPendingStateDecisionService {
       if (onCooldown && !resolver.hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
         requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
         resolver
-            .getDiagnosticsForOps()
+            .getDiagnostics()
             .logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
@@ -78,7 +78,7 @@ final class CreateShopPendingStateDecisionService {
         return PendingDecision.skipped();
       }
       resolver
-          .getDiagnosticsForOps()
+          .getDiagnostics()
           .logPendingReasonChange(
               request.getId(),
               "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
@@ -97,9 +97,9 @@ final class CreateShopPendingStateDecisionService {
       if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
         requestStateMutatorService.markOrderedWithPending(
             resolver, level, request.getId(), pendingCount);
-        resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:worker-unavailable");
+        resolver.getDiagnostics().recordPendingSource(request.getId(), "tickPending:worker-unavailable");
       }
-      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:worker-not-working");
+      resolver.getDiagnostics().logPendingReasonChange(request.getId(), "wait:worker-not-working");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",

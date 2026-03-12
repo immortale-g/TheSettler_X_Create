@@ -570,7 +570,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return missingChildSince;
   }
 
-  CreateShopResolverDiagnostics getDiagnosticsForOps() {
+  CreateShopResolverDiagnostics getDiagnostics() {
     return diagnostics;
   }
 
