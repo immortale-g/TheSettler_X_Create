@@ -10,6 +10,13 @@ import net.minecraft.world.level.Level;
 
 /** Applies post-delivery-creation flow transitions and pending/cooldown state updates. */
 final class CreateShopPostCreationUpdateService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopPostCreationUpdateService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   void apply(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
@@ -60,13 +67,12 @@ final class CreateShopPostCreationUpdateService {
     }
 
     if (remainingCount > 0) {
-      resolver
-          .getRequestStateMutatorForOps()
-          .markOrderedWithPending(resolver, level, request.getId(), remainingCount);
+      requestStateMutatorService.markOrderedWithPending(
+          resolver, level, request.getId(), remainingCount);
       resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:partial");
     } else {
       // Keep tracking while child delivery is active; do not drop cooldown yet.
-      resolver.getRequestStateMutatorForOps().markOrderedWithPending(resolver, level, request.getId(), 0);
+      requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), 0);
       resolver
           .getDiagnosticsForOps()
           .recordPendingSource(request.getId(), "tickPending:await-child-complete");

@@ -8,6 +8,13 @@ import net.minecraft.world.level.Level;
 
 /** Handles timeout-driven resolver cleanup for stale non-terminal flow records. */
 final class CreateShopFlowTimeoutCleanupService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopFlowTimeoutCleanupService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   void processTimedOutFlows(
       CreateShopRequestResolver resolver, IStandardRequestManager manager, Level level) {
     if (resolver == null || manager == null || level == null) {
@@ -36,7 +43,7 @@ final class CreateShopFlowTimeoutCleanupService {
           resolver.releaseReservation(manager, request);
         }
       }
-      resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, token);
+      requestStateMutatorService.clearOrderedAndPending(resolver, token);
       resolver.clearDeliveriesCreated(token);
       resolver.getParentDeliveryActiveSinceForOps().remove(token);
       resolver.clearStaleRecoveryArmForOps(token);

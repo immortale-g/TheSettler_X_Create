@@ -255,6 +255,9 @@ Current behavior:
 - Additional resolver forwarder cleanup removed obsolete internal delegation methods
   (`processTimedOutFlows`, `clearTrackedChildrenForParent`, `unwrapStandardManagerForOps`, etc.),
   with callers switched to direct service/static usage.
+- Request-state mutator usage is now constructor-injected into the affected lifecycle services
+  (attempt/cancel/recovery/completion/timeout/pending-decision/post-creation/reservation/terminal),
+  removing the corresponding resolver ops getter dependency.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

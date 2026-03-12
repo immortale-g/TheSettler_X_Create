@@ -16,6 +16,6 @@ class CreateShopRequestResolverDeliveryCancelMissingPickupGuardTest {
 
     assertTrue(source.contains("delivery-cancel-missing-pickup"));
     assertTrue(source.contains("clearDeliveriesCreated(parentToken);"));
-    assertTrue(source.contains("markOrderedWithPendingAtLeastOne(resolver, level, parentToken, fallbackPending)"));
+    assertTrue(source.contains("requestStateMutatorService.markOrderedWithPendingAtLeastOne("));
   }
 }

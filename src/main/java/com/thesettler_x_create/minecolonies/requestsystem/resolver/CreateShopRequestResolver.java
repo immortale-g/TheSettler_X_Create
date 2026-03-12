@@ -100,10 +100,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopReservationReleaseService reservationReleaseService;
   private final CreateShopWarehouseCountService warehouseCountService =
       new CreateShopWarehouseCountService();
-  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService =
-      new CreateShopFlowTimeoutCleanupService();
-  private final CreateShopDeliveryCompletionService deliveryCompletionService =
-      new CreateShopDeliveryCompletionService();
+  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
+  private final CreateShopDeliveryCompletionService deliveryCompletionService;
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
@@ -111,27 +109,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopPendingRequestGateService pendingRequestGateService =
       new CreateShopPendingRequestGateService();
   private final CreateShopChildReconciliationService childReconciliationService;
-  private final CreateShopPendingStateDecisionService pendingStateDecisionService =
-      new CreateShopPendingStateDecisionService();
-  private final CreateShopPostCreationUpdateService postCreationUpdateService =
-      new CreateShopPostCreationUpdateService();
-  private final CreateShopDeliveryCancelService deliveryCancelService =
-      new CreateShopDeliveryCancelService();
+  private final CreateShopPendingStateDecisionService pendingStateDecisionService;
+  private final CreateShopPostCreationUpdateService postCreationUpdateService;
+  private final CreateShopDeliveryCancelService deliveryCancelService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
       new CreateShopDeliveryRootCauseSnapshotService();
-  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService =
-      new CreateShopDeliveryChildRecoveryService();
+  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopRequestStateMutatorService requestStateMutatorService =
       new CreateShopRequestStateMutatorService();
-  private final CreateShopReservationSyncService reservationSyncService =
-      new CreateShopReservationSyncService();
+  private final CreateShopReservationSyncService reservationSyncService;
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
-  private final CreateShopAttemptResolveService attemptResolveService = new CreateShopAttemptResolveService();
+  private final CreateShopAttemptResolveService attemptResolveService;
   private final CreateShopTickPendingService tickPendingService;
   private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
       new CreateShopDeliveryChildLifecycleService();
-  private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService =
-      new CreateShopTerminalRequestLifecycleService();
+  private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -139,6 +131,21 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
+    this.flowTimeoutCleanupService =
+        new CreateShopFlowTimeoutCleanupService(requestStateMutatorService);
+    this.deliveryCompletionService =
+        new CreateShopDeliveryCompletionService(requestStateMutatorService);
+    this.pendingStateDecisionService =
+        new CreateShopPendingStateDecisionService(requestStateMutatorService);
+    this.postCreationUpdateService =
+        new CreateShopPostCreationUpdateService(requestStateMutatorService);
+    this.deliveryCancelService = new CreateShopDeliveryCancelService(requestStateMutatorService);
+    this.deliveryChildRecoveryService =
+        new CreateShopDeliveryChildRecoveryService(requestStateMutatorService);
+    this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
+    this.attemptResolveService = new CreateShopAttemptResolveService(requestStateMutatorService);
+    this.terminalRequestLifecycleService =
+        new CreateShopTerminalRequestLifecycleService(requestStateMutatorService);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
             cooldown, pendingTracker, diagnostics, flowStateMachine, stockResolver, messaging);
@@ -667,10 +674,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopResolverOwnership getOwnershipForOps() {
     return ownership;
-  }
-
-  CreateShopRequestStateMutatorService getRequestStateMutatorForOps() {
-    return requestStateMutatorService;
   }
 
   boolean shouldLogTickPendingForOps(Level level) {

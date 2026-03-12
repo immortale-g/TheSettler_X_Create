@@ -8,6 +8,13 @@ import net.minecraft.world.level.Level;
 
 /** Decides whether pending processing can continue and normalizes pending quantity state. */
 final class CreateShopPendingStateDecisionService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopPendingStateDecisionService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   PendingDecision decide(
       CreateShopRequestResolver resolver,
       IRequest<?> request,
@@ -25,9 +32,8 @@ final class CreateShopPendingStateDecisionService {
       int derivedPending =
           resolver.computeOutstandingNeededForOps(request, deliverable, reservedForRequest);
       if (derivedPending > 0) {
-        resolver
-            .getRequestStateMutatorForOps()
-            .markOrderedWithPending(resolver, null, request.getId(), derivedPending);
+        requestStateMutatorService.markOrderedWithPending(
+            resolver, null, request.getId(), derivedPending);
         pendingCount = derivedPending;
         resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:derived-needed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -55,7 +61,7 @@ final class CreateShopPendingStateDecisionService {
     }
     if (pendingCount <= 0) {
       if (onCooldown && !resolver.hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
-        resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, request.getId());
+        requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
         resolver
             .getDiagnosticsForOps()
             .logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
@@ -84,9 +90,8 @@ final class CreateShopPendingStateDecisionService {
       resolver.touchFlowForOps(
           request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
       if (resolver.getWorkerAvailabilityGateForOps().shouldKeepPendingState(workerWorking, pendingCount)) {
-        resolver
-            .getRequestStateMutatorForOps()
-            .markOrderedWithPending(resolver, level, request.getId(), pendingCount);
+        requestStateMutatorService.markOrderedWithPending(
+            resolver, level, request.getId(), pendingCount);
         resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:worker-unavailable");
       }
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:worker-not-working");
