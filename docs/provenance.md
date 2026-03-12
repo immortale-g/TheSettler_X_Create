@@ -436,3 +436,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: MineColonies warehouse hook stock counting moved
   from `CreateShopRequestResolver` into `CreateShopWarehouseCountService`, preserving fail-open
   guards and network-minus-reserved semantics.
+- Flow-timeout cleanup refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: timed-out flow record cleanup moved from
+  `CreateShopRequestResolver` into `CreateShopFlowTimeoutCleanupService`, preserving failed-flow
+  transition, reservation release, and pending/cooldown/child-tracking cleanup semantics.
