@@ -244,6 +244,8 @@ Current behavior:
 - Pending tick orchestration wiring now injects processor/collector dependencies directly into
   `CreateShopTickPendingService` and `CreateShopPendingRequestProcessorService` constructors,
   allowing removal of several resolver service-getter passthroughs from the ops surface.
+- Shop lookup access is now unified on `getShopForOps(...)` across validator/pending/delivery
+  services, removing the duplicate validator-specific resolver facade.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
