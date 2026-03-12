@@ -9,13 +9,17 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverAssignmentOwnershipRecoveryGuardTest {
   @Test
   void tickPendingHasRequestOwnershipFallbackWhenResolverKeyRecoveryFails() throws Exception {
-    String source =
+    String resolverSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String ownershipSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopResolverOwnership.java"));
 
-    assertTrue(source.contains("collectAssignedTokensByRequestResolver"));
-    assertTrue(source.contains("tickPending owner-sync"));
-    assertTrue(source.contains("getResolverForRequest(request)"));
+    assertTrue(resolverSource.contains("ownership.collectAssignedTokensByRequestResolver"));
+    assertTrue(resolverSource.contains("tickPending owner-sync"));
+    assertTrue(ownershipSource.contains("getResolverForRequest(request)"));
   }
 }

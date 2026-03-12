@@ -132,6 +132,9 @@ Current behavior:
 - Pending rack-delivery creation planning (wait/plan/create-failed/create-success) is now
   centralized in `CreateShopPendingDeliveryCreationService`, further reducing
   `CreateShopRequestResolver.tickPendingDeliveries` complexity.
+- Delivery callback resolver/parent-token lookup and unresolved-callback diagnostics are now
+  centralized in `CreateShopDeliveryResolverLocator`, reducing static callback lookup complexity
+  in `CreateShopRequestResolver`.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
