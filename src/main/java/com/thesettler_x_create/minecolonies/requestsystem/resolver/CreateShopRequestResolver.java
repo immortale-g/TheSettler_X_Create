@@ -122,6 +122,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopDeliveryRootCauseSnapshotService();
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService =
       new CreateShopDeliveryChildRecoveryService();
+  private final CreateShopRequestStateMutatorService requestStateMutatorService =
+      new CreateShopRequestStateMutatorService();
   private final CreateShopReservationSyncService reservationSyncService =
       new CreateShopReservationSyncService();
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
@@ -762,6 +764,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   CreateShopResolverOwnership getOwnershipForOps() {
     return ownership;
+  }
+
+  CreateShopRequestStateMutatorService getRequestStateMutatorForOps() {
+    return requestStateMutatorService;
   }
 
   boolean shouldLogTickPendingForOps(Level level) {

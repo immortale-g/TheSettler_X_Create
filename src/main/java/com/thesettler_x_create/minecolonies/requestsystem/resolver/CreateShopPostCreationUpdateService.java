@@ -60,13 +60,13 @@ final class CreateShopPostCreationUpdateService {
     }
 
     if (remainingCount > 0) {
-      resolver.getPendingTracker().setPendingCount(request.getId(), remainingCount);
-      resolver.getCooldown().markRequestOrdered(level, request.getId());
+      resolver
+          .getRequestStateMutatorForOps()
+          .markOrderedWithPending(resolver, level, request.getId(), remainingCount);
       resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:partial");
     } else {
       // Keep tracking while child delivery is active; do not drop cooldown yet.
-      resolver.getPendingTracker().setPendingCount(request.getId(), 0);
-      resolver.getCooldown().markRequestOrdered(level, request.getId());
+      resolver.getRequestStateMutatorForOps().markOrderedWithPending(resolver, level, request.getId(), 0);
       resolver
           .getDiagnosticsForOps()
           .recordPendingSource(request.getId(), "tickPending:await-child-complete");

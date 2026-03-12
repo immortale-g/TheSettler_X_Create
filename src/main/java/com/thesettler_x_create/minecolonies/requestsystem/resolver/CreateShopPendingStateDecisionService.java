@@ -25,7 +25,9 @@ final class CreateShopPendingStateDecisionService {
       int derivedPending =
           resolver.computeOutstandingNeededForOps(request, deliverable, reservedForRequest);
       if (derivedPending > 0) {
-        resolver.getPendingTracker().setPendingCount(request.getId(), derivedPending);
+        resolver
+            .getRequestStateMutatorForOps()
+            .markOrderedWithPending(resolver, null, request.getId(), derivedPending);
         pendingCount = derivedPending;
         resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:derived-needed");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -53,8 +55,7 @@ final class CreateShopPendingStateDecisionService {
     }
     if (pendingCount <= 0) {
       if (onCooldown && !resolver.hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
-        resolver.getCooldown().clearRequestCooldown(request.getId());
-        resolver.getPendingTracker().remove(request.getId());
+        resolver.getRequestStateMutatorForOps().clearOrderedAndPending(resolver, request.getId());
         resolver
             .getDiagnosticsForOps()
             .logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
@@ -83,8 +84,9 @@ final class CreateShopPendingStateDecisionService {
       resolver.touchFlowForOps(
           request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
       if (resolver.getWorkerAvailabilityGateForOps().shouldKeepPendingState(workerWorking, pendingCount)) {
-        resolver.getCooldown().markRequestOrdered(level, request.getId());
-        resolver.getPendingTracker().setPendingCount(request.getId(), pendingCount);
+        resolver
+            .getRequestStateMutatorForOps()
+            .markOrderedWithPending(resolver, level, request.getId(), pendingCount);
         resolver.getDiagnosticsForOps().recordPendingSource(request.getId(), "tickPending:worker-unavailable");
       }
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:worker-not-working");

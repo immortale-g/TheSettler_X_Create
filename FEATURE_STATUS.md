@@ -246,6 +246,9 @@ Current behavior:
   allowing removal of several resolver service-getter passthroughs from the ops surface.
 - Shop lookup access is now unified on `getShopForOps(...)` across validator/pending/delivery
   services, removing the duplicate validator-specific resolver facade.
+- Pending/cooldown request state writes are now centralized through
+  `CreateShopRequestStateMutatorService` (ordered+pending and clear+remove), reducing split
+  mutation paths across attempt/cancel/complete/timeout/terminal flows.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

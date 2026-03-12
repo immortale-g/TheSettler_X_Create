@@ -39,7 +39,9 @@ final class CreateShopDeliveryCancelService {
 
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
     if (level == null) {
-      resolver.getPendingTracker().setPendingCount(parentToken, Math.max(1, stack.getCount()));
+      resolver
+          .getRequestStateMutatorForOps()
+          .markOrderedWithPendingAtLeastOne(resolver, null, parentToken, stack.getCount());
       resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel");
       resolver.clearDeliveriesCreated(parentToken);
       return;
@@ -59,9 +61,10 @@ final class CreateShopDeliveryCancelService {
     }
     if (pickup == null) {
       int fallbackPending = Math.max(1, stack.getCount());
-      resolver.getPendingTracker().setPendingCount(parentToken, fallbackPending);
+      resolver
+          .getRequestStateMutatorForOps()
+          .markOrderedWithPendingAtLeastOne(resolver, level, parentToken, fallbackPending);
       resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
-      resolver.getCooldown().markRequestOrdered(level, parentToken);
       resolver.clearDeliveriesCreated(parentToken);
       if (resolver.isDebugLoggingEnabledForOps()) {
         TheSettlerXCreate.LOGGER.info(
@@ -83,9 +86,10 @@ final class CreateShopDeliveryCancelService {
     int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
     int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
     pickup.release(parentRequestId);
-    resolver.getPendingTracker().setPendingCount(parentToken, pendingCount);
+    resolver
+        .getRequestStateMutatorForOps()
+        .markOrderedWithPendingAtLeastOne(resolver, level, parentToken, pendingCount);
     resolver.getDiagnosticsForOps().recordPendingSource(parentToken, "delivery-cancel-reserve");
-    resolver.getCooldown().markRequestOrdered(level, parentToken);
     resolver.clearDeliveriesCreated(parentToken);
 
     if (resolver.isDebugLoggingEnabledForOps()) {
