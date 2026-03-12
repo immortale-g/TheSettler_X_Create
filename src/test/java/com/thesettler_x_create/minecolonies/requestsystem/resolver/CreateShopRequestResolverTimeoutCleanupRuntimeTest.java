@@ -105,9 +105,12 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
   @SuppressWarnings("unchecked")
   private Map<IToken<?>, Long> parentMap(String fieldName) throws Exception {
-    Field field = CreateShopRequestResolver.class.getDeclaredField(fieldName);
-    field.setAccessible(true);
-    return (Map<IToken<?>, Long>) field.get(resolver);
+    Field storeField = CreateShopRequestResolver.class.getDeclaredField("lifecycleStateStore");
+    storeField.setAccessible(true);
+    Object store = storeField.get(resolver);
+    Field mapField = store.getClass().getDeclaredField(fieldName);
+    mapField.setAccessible(true);
+    return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
   private IToken<?> token(UUID id) {

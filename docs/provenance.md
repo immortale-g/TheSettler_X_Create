@@ -103,6 +103,9 @@ Implementation notes:
 - Housekeeping protection-window alignment (`CreateShopRequestResolver.hasProtectedInventoryWindow`)
   is authored in this project to align rack housekeeping gating with request lifecycle ownership
   state under active inflight/pending work.
+- Lifecycle state-owner refactor (introducing `CreateShopLifecycleStateStore` and moving
+  pending/cooldown/child runtime maps/tracker ownership behind that store) is authored in this
+  project as a behavior-preserving internal change to reduce multi-structure drift risk.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

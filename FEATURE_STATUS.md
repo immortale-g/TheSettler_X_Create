@@ -323,6 +323,9 @@ Current behavior:
 - Resolver/housekeeping inventory ownership window is now explicit (`hasProtectedInventoryWindow`)
   and used by `BuildingCreateShop` housekeeping gates so rack cleanup and request lifecycle block on
   the same protection condition.
+- Pending/cooldown/child runtime tracking is now centralized in
+  `CreateShopLifecycleStateStore` (instead of separate resolver fields), reducing multi-structure
+  drift risk and establishing a single lifecycle state owner for runtime maps/tracker state.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
