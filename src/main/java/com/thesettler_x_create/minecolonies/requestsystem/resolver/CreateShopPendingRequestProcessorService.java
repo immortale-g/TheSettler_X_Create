@@ -223,6 +223,7 @@ final class CreateShopPendingRequestProcessorService {
                   - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
     }
     pendingTopupService.handleTopup(
+        resolver,
         manager,
         request,
         level,

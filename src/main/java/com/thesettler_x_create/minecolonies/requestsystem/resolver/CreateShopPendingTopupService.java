@@ -13,29 +13,30 @@ import net.minecraft.world.level.Level;
 
 /** Handles pending top-up ordering decisions for resolver tick reconciliation. */
 final class CreateShopPendingTopupService {
-  private final CreateShopResolverCooldown cooldown;
   private final CreateShopPendingDeliveryTracker pendingTracker;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMachine flowStateMachine;
   private final CreateShopStockResolver stockResolver;
   private final CreateShopResolverMessaging messaging;
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopPendingTopupService(
-      CreateShopResolverCooldown cooldown,
       CreateShopPendingDeliveryTracker pendingTracker,
       CreateShopResolverDiagnostics diagnostics,
       CreateShopRequestStateMachine flowStateMachine,
       CreateShopStockResolver stockResolver,
-      CreateShopResolverMessaging messaging) {
-    this.cooldown = cooldown;
+      CreateShopResolverMessaging messaging,
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.pendingTracker = pendingTracker;
     this.diagnostics = diagnostics;
     this.flowStateMachine = flowStateMachine;
     this.stockResolver = stockResolver;
     this.messaging = messaging;
+    this.requestStateMutatorService = requestStateMutatorService;
   }
 
   void handleTopup(
+      CreateShopRequestResolver resolver,
       IRequestManager manager,
       IRequest<?> request,
       Level level,
@@ -47,6 +48,9 @@ final class CreateShopPendingTopupService {
       int reservedForRequest,
       int rackAvailableForRequest,
       String requestIdLog) {
+    if (resolver == null) {
+      return;
+    }
     int topupNeeded =
         Math.max(
             0,
@@ -54,8 +58,7 @@ final class CreateShopPendingTopupService {
 
     if (workerWorking && topupNeeded > 0) {
       if (pendingTracker.hasDeliveryStarted(request.getId())) {
-        cooldown.markRequestOrdered(level, request.getId());
-        pendingTracker.setPendingCount(request.getId(), pendingCount);
+        requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
         diagnostics.recordPendingSource(request.getId(), "tickPending:block-auto-reorder-started");
         flowStateMachine.touch(
             request.getId(), level.getGameTime(), "tickPending:block-auto-reorder-started");
@@ -74,8 +77,7 @@ final class CreateShopPendingTopupService {
       int inflightRemaining =
           pickup.getInflightRemaining(deliverable.getResult(), requesterName, tile.getShopAddress());
       if (inflightRemaining > 0) {
-        cooldown.markRequestOrdered(level, request.getId());
-        pendingTracker.setPendingCount(request.getId(), pendingCount);
+        requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
         diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -106,8 +108,7 @@ final class CreateShopPendingTopupService {
         }
         pickup.reserve(request.getId(), stack.copy(), stack.getCount());
       }
-      cooldown.markRequestOrdered(level, request.getId());
-      pendingTracker.setPendingCount(request.getId(), pendingCount);
+      requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
       diagnostics.recordPendingSource(request.getId(), "tickPending:network-topup");
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:network-topup");
       messaging.sendShopChat(
