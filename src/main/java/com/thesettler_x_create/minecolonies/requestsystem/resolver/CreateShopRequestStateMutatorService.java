@@ -62,4 +62,80 @@ final class CreateShopRequestStateMutatorService {
       resolver.clearDeliveriesCreated(parentToken);
     }
   }
+
+  boolean armStaleRecoveryIfMissing(
+      CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
+    if (resolver == null || parentToken == null) {
+      return false;
+    }
+    return resolver.getParentStaleRecoveryArmedAt().putIfAbsent(parentToken, nowTick) == null;
+  }
+
+  void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    resolver.getParentStaleRecoveryArmedAt().remove(parentToken);
+  }
+
+  Long markParentDeliveryActiveIfAbsent(
+      CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
+    if (resolver == null || parentToken == null) {
+      return null;
+    }
+    return resolver.getParentDeliveryActiveSince().putIfAbsent(parentToken, nowTick);
+  }
+
+  void clearParentDeliveryActive(CreateShopRequestResolver resolver, IToken<?> parentToken) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    resolver.getParentDeliveryActiveSince().remove(parentToken);
+  }
+
+  void markChildActive(CreateShopRequestResolver resolver, IToken<?> childToken, long sinceTick) {
+    if (resolver == null || childToken == null) {
+      return;
+    }
+    resolver.getDeliveryChildActiveSince().put(childToken, sinceTick);
+  }
+
+  void clearChildActive(CreateShopRequestResolver resolver, IToken<?> childToken) {
+    if (resolver == null || childToken == null) {
+      return;
+    }
+    resolver.getDeliveryChildActiveSince().remove(childToken);
+  }
+
+  void clearMissingChild(CreateShopRequestResolver resolver, IToken<?> childToken) {
+    if (resolver == null || childToken == null) {
+      return;
+    }
+    resolver.getMissingChildSince().remove(childToken);
+  }
+
+  void setParentChildrenSnapshot(
+      CreateShopRequestResolver resolver, IToken<?> parentToken, int childCount, String childrenState) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    resolver.getParentLastKnownChildCount().put(parentToken, Math.max(0, childCount));
+    resolver.getParentLastKnownChildren().put(parentToken, childrenState == null ? "[]" : childrenState);
+  }
+
+  void clearParentChildrenSnapshot(CreateShopRequestResolver resolver, IToken<?> parentToken) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    resolver.getParentLastKnownChildCount().remove(parentToken);
+    resolver.getParentLastKnownChildren().remove(parentToken);
+    resolver.getParentChildDropLastLogTick().remove(parentToken);
+  }
+
+  void markParentChildDropLog(CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
+    if (resolver == null || parentToken == null) {
+      return;
+    }
+    resolver.getParentChildDropLastLogTick().put(parentToken, nowTick);
+  }
 }

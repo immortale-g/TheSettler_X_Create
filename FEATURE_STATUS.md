@@ -326,6 +326,14 @@ Current behavior:
 - Pending/cooldown/child runtime tracking is now centralized in
   `CreateShopLifecycleStateStore` (instead of separate resolver fields), reducing multi-structure
   drift risk and establishing a single lifecycle state owner for runtime maps/tracker state.
+- Delivery child/missing/parent snapshot writes are increasingly single-writer through
+  `CreateShopRequestStateMutatorService` (lifecycle service, child reconciliation, pending processor,
+  timeout cleanup), reducing direct map mutation fan-out across services.
+- Pending reconciliation is now derived-first: each pending tick reconciles tracked pending against
+  request-derived outstanding need (plus reservation/inflight floor), reducing stale pending drift
+  when local counters diverge from request graph state.
+- Rehydrate now expands from assignment tokens to active runtime child/parent lifecycle tokens and
+  prunes orphan child entries, improving reload recovery for persisted/inflight request graphs.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

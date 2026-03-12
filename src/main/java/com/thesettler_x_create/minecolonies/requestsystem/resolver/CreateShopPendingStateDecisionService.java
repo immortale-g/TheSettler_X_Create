@@ -33,24 +33,27 @@ final class CreateShopPendingStateDecisionService {
       int reservedForRequest,
       boolean workerWorking,
       String requestIdLog) {
-    int pendingCount = Math.max(0, reservedForRequest);
-    if (pendingCount <= 0) {
-      pendingCount = Math.max(0, resolver.getPendingTracker().getPendingCount(request.getId()));
+    int trackedPending = Math.max(0, resolver.getPendingTracker().getPendingCount(request.getId()));
+    int derivedPending = outstandingNeededService.compute(request, deliverable, reservedForRequest);
+    int pendingCount = Math.max(0, Math.max(reservedForRequest, derivedPending));
+    boolean inflightWindow =
+        request.hasChildren()
+            || resolver.hasDeliveriesCreated(request.getId())
+            || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
+    if (inflightWindow && pendingCount > 0) {
+      pendingCount = Math.max(1, Math.max(trackedPending, pendingCount));
     }
-    if (pendingCount <= 0) {
-      int derivedPending = outstandingNeededService.compute(request, deliverable, reservedForRequest);
-      if (derivedPending > 0) {
-        requestStateMutatorService.markOrderedWithPending(
-            resolver, null, request.getId(), derivedPending);
-        pendingCount = derivedPending;
-        diagnostics.recordPendingSource(request.getId(), "tickPending:derived-needed");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} derived pending from request={} (reservedForRequest={})",
-              requestIdLog,
-              derivedPending,
-              reservedForRequest);
-        }
+    if (pendingCount != trackedPending) {
+      requestStateMutatorService.markOrderedWithPending(resolver, null, request.getId(), pendingCount);
+      diagnostics.recordPendingSource(request.getId(), "tickPending:derived-reconcile");
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} reconcile pending tracked={} derived={} reserved={} -> {}",
+            requestIdLog,
+            trackedPending,
+            derivedPending,
+            reservedForRequest,
+            pendingCount);
       }
     }
     if (pendingCount <= 0 && !onCooldown) {

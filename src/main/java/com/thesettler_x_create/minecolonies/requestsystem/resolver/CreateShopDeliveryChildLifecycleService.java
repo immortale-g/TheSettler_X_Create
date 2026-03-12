@@ -8,6 +8,13 @@ import net.minecraft.world.level.Level;
 
 /** Owns stale-arm/timeout and tracked-child cleanup lifecycle for delivery children. */
 final class CreateShopDeliveryChildLifecycleService {
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
+
+  CreateShopDeliveryChildLifecycleService(
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
+    this.requestStateMutatorService = requestStateMutatorService;
+  }
+
   boolean isStaleRecoveryArmed(
       CreateShopRequestResolver resolver,
       Level level,
@@ -19,7 +26,7 @@ final class CreateShopDeliveryChildLifecycleService {
     long now = level.getGameTime();
     Long armedAt = resolver.getParentStaleRecoveryArmedAt().get(parentToken);
     if (armedAt == null) {
-      resolver.getParentStaleRecoveryArmedAt().put(parentToken, now);
+      requestStateMutatorService.armStaleRecoveryIfMissing(resolver, parentToken, now);
       resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken);
       return false;
     }
@@ -31,10 +38,7 @@ final class CreateShopDeliveryChildLifecycleService {
   }
 
   void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
-    if (parentToken == null) {
-      return;
-    }
-    resolver.getParentStaleRecoveryArmedAt().remove(parentToken);
+    requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
   }
 
   boolean isStaleDeliveryChild(
@@ -49,16 +53,16 @@ final class CreateShopDeliveryChildLifecycleService {
     boolean activeState =
         state == RequestState.CREATED || state == RequestState.ASSIGNED || state == RequestState.IN_PROGRESS;
     if (!activeState) {
-      resolver.getDeliveryChildActiveSince().remove(childToken);
+      requestStateMutatorService.clearChildActive(resolver, childToken);
       return false;
     }
     long now = level.getGameTime();
-    Long since = resolver.getParentDeliveryActiveSince().putIfAbsent(parentToken, now);
+    Long since = requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now);
     if (since == null) {
-      resolver.getDeliveryChildActiveSince().put(childToken, now);
+      requestStateMutatorService.markChildActive(resolver, childToken, now);
       return false;
     }
-    resolver.getDeliveryChildActiveSince().put(childToken, since);
+    requestStateMutatorService.markChildActive(resolver, childToken, since);
     long timeout =
         Math.max(
             CreateShopRequestResolver.getDeliveryChildStaleTimeoutFloorTicks(),
@@ -71,11 +75,9 @@ final class CreateShopDeliveryChildLifecycleService {
     if (manager == null || parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSince().remove(parentToken);
-    clearStaleRecoveryArm(resolver, parentToken);
-    resolver.getParentLastKnownChildCount().remove(parentToken);
-    resolver.getParentLastKnownChildren().remove(parentToken);
-    resolver.getParentChildDropLastLogTick().remove(parentToken);
+    requestStateMutatorService.clearParentDeliveryActive(resolver, parentToken);
+    requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
+    requestStateMutatorService.clearParentChildrenSnapshot(resolver, parentToken);
     if (resolver.getDeliveryChildActiveSince().isEmpty()) {
       return;
     }
@@ -89,10 +91,10 @@ final class CreateShopDeliveryChildLifecycleService {
         IRequest<?> child = handler.getRequest(childToken);
         IToken<?> parent = child == null ? null : child.getParent();
         if (parentToken.equals(parent)) {
-          resolver.getDeliveryChildActiveSince().remove(childToken);
+          requestStateMutatorService.clearChildActive(resolver, childToken);
         }
       } catch (Exception ignored) {
-        resolver.getDeliveryChildActiveSince().remove(childToken);
+        requestStateMutatorService.clearChildActive(resolver, childToken);
       }
     }
   }

@@ -101,8 +101,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopLifecycleRehydrateService lifecycleRehydrateService;
   private final CreateShopAttemptResolveService attemptResolveService;
   private final CreateShopTickPendingService tickPendingService;
-  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
-      new CreateShopDeliveryChildLifecycleService();
+  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
   private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
@@ -111,6 +110,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
+    this.deliveryChildLifecycleService =
+        new CreateShopDeliveryChildLifecycleService(requestStateMutatorService);
     this.flowTimeoutCleanupService =
         new CreateShopFlowTimeoutCleanupService(requestStateMutatorService);
     this.deliveryCompletionService =
@@ -158,7 +159,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             deliveryManager,
             deliveryChildLifecycleService,
             deliveryChildRecoveryService,
-            deliveryRootCauseSnapshotService);
+            deliveryRootCauseSnapshotService,
+            requestStateMutatorService);
     this.pendingRequestProcessorService =
         new CreateShopPendingRequestProcessorService(
             pendingRequestGateService,
@@ -168,7 +170,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingTopupService,
             pendingDeliveryCreationService,
             postCreationUpdateService,
-            diagnostics);
+            diagnostics,
+            requestStateMutatorService);
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,

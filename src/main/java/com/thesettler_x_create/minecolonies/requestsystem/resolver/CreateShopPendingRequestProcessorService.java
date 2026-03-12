@@ -26,6 +26,7 @@ final class CreateShopPendingRequestProcessorService {
   private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
   private final CreateShopResolverDiagnostics diagnostics;
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopPendingRequestProcessorService(
       CreateShopPendingRequestGateService pendingRequestGateService,
@@ -35,7 +36,8 @@ final class CreateShopPendingRequestProcessorService {
       CreateShopPendingTopupService pendingTopupService,
       CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
       CreateShopPostCreationUpdateService postCreationUpdateService,
-      CreateShopResolverDiagnostics diagnostics) {
+      CreateShopResolverDiagnostics diagnostics,
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.pendingRequestGateService = pendingRequestGateService;
     this.childReconciliationService = childReconciliationService;
     this.pendingStateDecisionService = pendingStateDecisionService;
@@ -44,6 +46,7 @@ final class CreateShopPendingRequestProcessorService {
     this.pendingDeliveryCreationService = pendingDeliveryCreationService;
     this.postCreationUpdateService = postCreationUpdateService;
     this.diagnostics = diagnostics;
+    this.requestStateMutatorService = requestStateMutatorService;
   }
 
   void processToken(
@@ -90,8 +93,8 @@ final class CreateShopPendingRequestProcessorService {
       diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
           java.util.Objects.requireNonNull(request.getChildren(), "children");
-      resolver.getParentLastKnownChildCount().put(request.getId(), children.size());
-      resolver.getParentLastKnownChildren().put(request.getId(), children.toString());
+      requestStateMutatorService.setParentChildrenSnapshot(
+          resolver, request.getId(), children.size(), children.toString());
       var childResult =
           childReconciliationService.reconcile(
               resolver,
@@ -128,7 +131,7 @@ final class CreateShopPendingRequestProcessorService {
         return;
       }
       if (!childResult.hasActiveChildren()) {
-        resolver.getParentDeliveryActiveSince().remove(request.getId());
+        requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
         resolver.clearStaleRecoveryArm(request.getId());
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
@@ -140,7 +143,7 @@ final class CreateShopPendingRequestProcessorService {
       long now = level.getGameTime();
       Long lastDropLog = resolver.getParentChildDropLastLogTick().get(request.getId());
       if (lastDropLog == null || now - lastDropLog >= 100L) {
-        resolver.getParentChildDropLastLogTick().put(request.getId(), now);
+        requestStateMutatorService.markParentChildDropLog(resolver, request.getId(), now);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           String previousChildren =
               resolver.getParentLastKnownChildren().getOrDefault(request.getId(), "[]");
@@ -156,9 +159,8 @@ final class CreateShopPendingRequestProcessorService {
         }
       }
     }
-    resolver.getParentLastKnownChildCount().put(request.getId(), 0);
-    resolver.getParentLastKnownChildren().put(request.getId(), "[]");
-    resolver.getParentDeliveryActiveSince().remove(request.getId());
+    requestStateMutatorService.setParentChildrenSnapshot(resolver, request.getId(), 0, "[]");
+    requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
     resolver.clearStaleRecoveryArm(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
