@@ -87,7 +87,7 @@ final class CreateShopChildReconciliationService {
               resolver.clearStaleRecoveryArmForOps(request.getId());
               continue;
             }
-            if (!resolver.isLocalShopDeliveryChildForOps(child, shop, pickup)) {
+            if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
               hasActiveChildren = true;
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(

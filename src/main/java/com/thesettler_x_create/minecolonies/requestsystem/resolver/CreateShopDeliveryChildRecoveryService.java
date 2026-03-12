@@ -35,7 +35,7 @@ final class CreateShopDeliveryChildRecoveryService {
       resolver.clearStaleRecoveryArmForOps(parentRequest.getId());
       return false;
     }
-    if (!resolver.isLocalShopDeliveryChildForOps(childRequest, shop, pickup)) {
+    if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(childRequest, shop, pickup)) {
       return false;
     }
     int childCount = 1;

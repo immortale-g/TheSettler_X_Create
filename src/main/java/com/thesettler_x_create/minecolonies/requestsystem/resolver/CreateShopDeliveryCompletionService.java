@@ -46,7 +46,7 @@ final class CreateShopDeliveryCompletionService {
           parentRequest,
           CreateShopFlowState.DELIVERY_COMPLETED,
           "delivery-complete",
-          resolver.describeStackForOps(
+          CreateShopStackMetrics.describeStack(
               request.getRequest() instanceof Delivery d ? d.getStack() : ItemStack.EMPTY),
           request.getRequest() instanceof Delivery d ? d.getStack().getCount() : 0,
           "com.thesettler_x_create.message.createshop.flow_delivery_completed");
@@ -71,7 +71,8 @@ final class CreateShopDeliveryCompletionService {
             pickup = shopPickup;
           }
         }
-        if (pickup != null && resolver.isDeliveryFromLocalShopStartForOps(delivery, shop, pickup)) {
+        if (pickup != null
+            && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
           ItemStack stack = delivery.getStack().copy();
           int reservedForStackBefore = pickup.getReservedFor(stack);
@@ -86,7 +87,7 @@ final class CreateShopDeliveryCompletionService {
                 parentRequest,
                 CreateShopFlowState.RESERVED_FOR_DELIVERY,
                 "delivery-complete:reserved-consumed",
-                resolver.describeStackForOps(stack),
+                CreateShopStackMetrics.describeStack(stack),
                 consumedReserved,
                 "com.thesettler_x_create.message.createshop.flow_reserved");
           }
