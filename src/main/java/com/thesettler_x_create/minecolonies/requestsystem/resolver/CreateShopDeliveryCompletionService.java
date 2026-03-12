@@ -38,14 +38,14 @@ final class CreateShopDeliveryCompletionService {
       return;
     }
     if (request != null && request.getId() != null) {
-      resolver.getDeliveryChildActiveSinceForOps().remove(request.getId());
+      resolver.getDeliveryChildActiveSince().remove(request.getId());
     }
     IToken<?> parentToken =
         CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
     if (parentToken == null) {
       return;
     }
-    resolver.getParentDeliveryActiveSinceForOps().remove(parentToken);
+    resolver.getParentDeliveryActiveSince().remove(parentToken);
     resolver.clearStaleRecoveryArm(parentToken);
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
@@ -174,4 +174,5 @@ final class CreateShopDeliveryCompletionService {
     }
   }
 }
+
 

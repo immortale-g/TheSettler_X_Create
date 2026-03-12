@@ -86,6 +86,10 @@ Implementation notes:
 - Resolver diagnostics-forwarding cleanup (switching service call sites from
   `getDiagnosticsForOps()` to direct `getDiagnostics()`) is authored in this project as a
   behavior-preserving internal simplification that removes another resolver facade alias.
+- Resolver map-accessor forwarding cleanup (switching delivery lifecycle/root-cause/pending
+  services from `*ForOps` map accessors to direct accessor names and removing those alias paths) is
+  authored in this project as a behavior-preserving internal simplification that further reduces
+  resolver indirection.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

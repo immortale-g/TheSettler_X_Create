@@ -525,31 +525,31 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return flowStateMachine;
   }
 
-  java.util.Map<IToken<?>, Long> getParentDeliveryActiveSinceForOps() {
+  java.util.Map<IToken<?>, Long> getParentDeliveryActiveSince() {
     return parentDeliveryActiveSince;
   }
 
-  java.util.Map<IToken<?>, Long> getParentStaleRecoveryArmedAtForOps() {
+  java.util.Map<IToken<?>, Long> getParentStaleRecoveryArmedAt() {
     return parentStaleRecoveryArmedAt;
   }
 
-  java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshotsForOps() {
+  java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshots() {
     return deliveryRootCauseSnapshots;
   }
 
-  java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTickForOps() {
+  java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTick() {
     return deliveryRootCauseLastLogTick;
   }
 
-  java.util.Map<IToken<?>, Integer> getParentLastKnownChildCountForOps() {
+  java.util.Map<IToken<?>, Integer> getParentLastKnownChildCount() {
     return parentLastKnownChildCount;
   }
 
-  java.util.Map<IToken<?>, String> getParentLastKnownChildrenForOps() {
+  java.util.Map<IToken<?>, String> getParentLastKnownChildren() {
     return parentLastKnownChildren;
   }
 
-  java.util.Map<IToken<?>, Long> getParentChildDropLastLogTickForOps() {
+  java.util.Map<IToken<?>, Long> getParentChildDropLastLogTick() {
     return parentChildDropLastLogTick;
   }
 
@@ -562,11 +562,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
 
-  java.util.Map<IToken<?>, Long> getDeliveryChildActiveSinceForOps() {
+  java.util.Map<IToken<?>, Long> getDeliveryChildActiveSince() {
     return deliveryChildActiveSince;
   }
 
-  java.util.Map<IToken<?>, Long> getMissingChildSinceForOps() {
+  java.util.Map<IToken<?>, Long> getMissingChildSince() {
     return missingChildSince;
   }
 
@@ -608,4 +608,5 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
 }
+
 

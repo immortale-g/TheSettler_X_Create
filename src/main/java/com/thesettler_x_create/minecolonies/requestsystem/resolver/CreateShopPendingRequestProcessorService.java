@@ -87,8 +87,8 @@ final class CreateShopPendingRequestProcessorService {
       resolver.getDiagnostics().logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
           java.util.Objects.requireNonNull(request.getChildren(), "children");
-      resolver.getParentLastKnownChildCountForOps().put(request.getId(), children.size());
-      resolver.getParentLastKnownChildrenForOps().put(request.getId(), children.toString());
+      resolver.getParentLastKnownChildCount().put(request.getId(), children.size());
+      resolver.getParentLastKnownChildren().put(request.getId(), children.toString());
       var childResult =
           childReconciliationService.reconcile(
               resolver,
@@ -125,22 +125,22 @@ final class CreateShopPendingRequestProcessorService {
         return;
       }
       if (!childResult.hasActiveChildren()) {
-        resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
+        resolver.getParentDeliveryActiveSince().remove(request.getId());
         resolver.clearStaleRecoveryArm(request.getId());
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
         return;
       }
     }
-    Integer previousChildCount = resolver.getParentLastKnownChildCountForOps().get(request.getId());
+    Integer previousChildCount = resolver.getParentLastKnownChildCount().get(request.getId());
     if (previousChildCount != null && previousChildCount > 0 && !request.hasChildren()) {
       long now = level.getGameTime();
-      Long lastDropLog = resolver.getParentChildDropLastLogTickForOps().get(request.getId());
+      Long lastDropLog = resolver.getParentChildDropLastLogTick().get(request.getId());
       if (lastDropLog == null || now - lastDropLog >= 100L) {
-        resolver.getParentChildDropLastLogTickForOps().put(request.getId(), now);
+        resolver.getParentChildDropLastLogTick().put(request.getId(), now);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           String previousChildren =
-              resolver.getParentLastKnownChildrenForOps().getOrDefault(request.getId(), "[]");
+              resolver.getParentLastKnownChildren().getOrDefault(request.getId(), "[]");
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] root-cause parent-child-drop parent={} state={} prevChildCount={} prevChildren={} reservedForRequest={} pending={} cooldown={}",
               request.getId(),
@@ -153,9 +153,9 @@ final class CreateShopPendingRequestProcessorService {
         }
       }
     }
-    resolver.getParentLastKnownChildCountForOps().put(request.getId(), 0);
-    resolver.getParentLastKnownChildrenForOps().put(request.getId(), "[]");
-    resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
+    resolver.getParentLastKnownChildCount().put(request.getId(), 0);
+    resolver.getParentLastKnownChildren().put(request.getId(), "[]");
+    resolver.getParentDeliveryActiveSince().remove(request.getId());
     resolver.clearStaleRecoveryArm(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       resolver.getDiagnostics().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
@@ -244,4 +244,5 @@ final class CreateShopPendingRequestProcessorService {
     postCreationUpdateService.apply(resolver, manager, request, level, creationResult, requestIdLog);
   }
 }
+
 
