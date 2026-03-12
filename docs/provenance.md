@@ -476,3 +476,7 @@ Implementation notes:
   is authored in this project scope: tick-pending now clears stale cooldown/pending tracking for
   parents with no pending quantity, no active deliveries, and no children, preventing blocked
   no-progress loops caused by orphaned cooldown state.
+- Pending-state decision refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: pending-count derivation/no-pending skip logic/stale-cooldown
+  recovery/worker-unavailable retention moved from `CreateShopRequestResolver.tickPendingDeliveries`
+  into `CreateShopPendingStateDecisionService`, while preserving existing player-visible behavior.

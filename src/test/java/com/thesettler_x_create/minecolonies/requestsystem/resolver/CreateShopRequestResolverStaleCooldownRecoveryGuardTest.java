@@ -12,10 +12,11 @@ class CreateShopRequestResolverStaleCooldownRecoveryGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingStateDecisionService.java"));
 
     assertTrue(source.contains("recover:stale-cooldown-no-pending"));
     assertTrue(source.contains("cleared stale cooldown (no pending/no children)"));
-    assertTrue(source.contains("!hasDeliveriesCreated(request.getId()) && !request.hasChildren()"));
+    assertTrue(
+        source.contains("!resolver.hasDeliveriesCreated(request.getId()) && !request.hasChildren()"));
   }
 }
