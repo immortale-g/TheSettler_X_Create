@@ -37,6 +37,19 @@ final class CreateShopDeliveryChildLifecycleService {
     return true;
   }
 
+  boolean shouldDropMissingChild(
+      CreateShopRequestResolver resolver, Level level, IToken<?> childToken) {
+    if (resolver == null || level == null || childToken == null) {
+      return false;
+    }
+    long now = level.getGameTime();
+    Long since = resolver.markMissingChildIfAbsent(childToken, now);
+    if (since == null) {
+      return false;
+    }
+    return now - since >= 40L;
+  }
+
   void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
     requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
   }

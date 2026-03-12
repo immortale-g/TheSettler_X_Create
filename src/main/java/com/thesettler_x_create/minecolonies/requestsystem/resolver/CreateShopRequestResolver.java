@@ -239,18 +239,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     tickPendingService.tickPendingDeliveries(this, manager);
   }
 
-  boolean shouldDropMissingChild(Level level, IToken<?> childToken) {
-    if (level == null || childToken == null) {
-      return false;
-    }
-    long now = level.getGameTime();
-    Long since = markMissingChildIfAbsent(childToken, now);
-    if (since == null) {
-      return false;
-    }
-    return now - since >= 40L;
-  }
-
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
     deliveryCallbackService.onDeliveryCancelled(manager, request);
   }
