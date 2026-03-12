@@ -1384,11 +1384,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         "",
         0,
         "com.thesettler_x_create.message.createshop.flow_cancelled");
-    pendingTracker.remove(request.getId());
-    releaseReservation(manager, request);
-    cooldown.clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
+    cleanupTerminalRequest(manager, request, true);
   }
 
   @Override
@@ -1402,11 +1398,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         "",
         0,
         "com.thesettler_x_create.message.createshop.flow_cancelled");
-    pendingTracker.remove(request.getId());
-    releaseReservation(manager, request);
-    cooldown.clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
+    cleanupTerminalRequest(manager, request, true);
   }
 
   @Override
@@ -1420,13 +1412,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         "",
         0,
         "com.thesettler_x_create.message.createshop.flow_request_completed");
-    cooldown.clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    pendingTracker.remove(request.getId());
-    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
-    if (request.getRequest() instanceof IDeliverable) {
-      releaseReservation(manager, request);
-    }
+    cleanupTerminalRequest(manager, request, request.getRequest() instanceof IDeliverable);
   }
 
   @Override
@@ -1440,13 +1426,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         "",
         0,
         "com.thesettler_x_create.message.createshop.flow_cancelled");
-    pendingTracker.remove(request.getId());
-    cooldown.clearRequestCooldown(request.getId());
-    clearDeliveriesCreated(request.getId());
-    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
-    if (request.getRequest() instanceof IDeliverable) {
-      releaseReservation(manager, request);
-    }
+    cleanupTerminalRequest(manager, request, request.getRequest() instanceof IDeliverable);
   }
 
   @Override
@@ -1543,6 +1523,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
               cleared);
         }
       }
+    }
+  }
+
+  private void cleanupTerminalRequest(
+      IRequestManager manager, IRequest<?> request, boolean releaseReservation) {
+    if (request == null) {
+      return;
+    }
+    pendingTracker.remove(request.getId());
+    cooldown.clearRequestCooldown(request.getId());
+    clearDeliveriesCreated(request.getId());
+    clearTrackedChildrenForParent(unwrapStandardManager(manager), request.getId());
+    if (releaseReservation) {
+      releaseReservation(manager, request);
     }
   }
 
