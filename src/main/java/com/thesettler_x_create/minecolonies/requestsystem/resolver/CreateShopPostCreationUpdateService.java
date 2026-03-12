@@ -11,10 +11,13 @@ import net.minecraft.world.level.Level;
 /** Applies post-delivery-creation flow transitions and pending/cooldown state updates. */
 final class CreateShopPostCreationUpdateService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverMessaging messaging;
 
   CreateShopPostCreationUpdateService(
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverMessaging messaging) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.messaging = messaging;
   }
 
   void apply(
@@ -43,8 +46,8 @@ final class CreateShopPostCreationUpdateService {
         CreateShopStackMetrics.describeStack(first),
         orderedCount,
         "com.thesettler_x_create.message.createshop.flow_arrived");
-    resolver.getMessagingForOps()
-        .sendShopChat(manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
+    messaging.sendShopChat(
+        manager, "com.thesettler_x_create.message.createshop.delivery_created", ordered);
     resolver.transitionFlowForOps(
         manager,
         request,

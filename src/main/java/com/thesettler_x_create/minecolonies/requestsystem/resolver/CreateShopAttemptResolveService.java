@@ -20,9 +20,13 @@ import net.minecraft.world.level.Level;
 /** Encapsulates attempt-resolve orchestration for Create Shop requests. */
 final class CreateShopAttemptResolveService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopResolverMessaging messaging;
 
-  CreateShopAttemptResolveService(CreateShopRequestStateMutatorService requestStateMutatorService) {
+  CreateShopAttemptResolveService(
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopResolverMessaging messaging) {
     this.requestStateMutatorService = requestStateMutatorService;
+    this.messaging = messaging;
   }
 
   List<IToken<?>> attemptResolve(
@@ -176,7 +180,7 @@ final class CreateShopAttemptResolveService {
     int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
     int remaining = Math.max(0, provide - plannedCount);
     if (remaining > 0 && workerWorking) {
-      String requesterName = resolver.getMessagingForOps().resolveRequesterName(manager, request);
+      String requesterName = messaging.resolveRequesterName(manager, request);
       ordered.addAll(
           resolver
               .getStockResolver()
@@ -210,9 +214,7 @@ final class CreateShopAttemptResolveService {
         resolver
             .getFlowStateMachineForOps()
             .touch(request.getId(), now, "attemptResolve:defer-network-arrival");
-        resolver
-            .getMessagingForOps()
-            .sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
+        messaging.sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       } else if (rackUsable > 0) {
         if (CreateShopRequestResolver.unwrapStandardManager(manager) == null) {
           requestStateMutatorService.markOrderedWithPendingAtLeastOne(
@@ -267,9 +269,7 @@ final class CreateShopAttemptResolveService {
         resolver
             .getDiagnosticsForOps()
             .recordPendingSource(request.getId(), "attemptResolve:network-ordered");
-        resolver
-            .getMessagingForOps()
-            .sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
+        messaging.sendShopChat(manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
       }
     }
 

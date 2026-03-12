@@ -138,12 +138,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.pendingStateDecisionService =
         new CreateShopPendingStateDecisionService(requestStateMutatorService, workerAvailabilityGate);
     this.postCreationUpdateService =
-        new CreateShopPostCreationUpdateService(requestStateMutatorService);
+        new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging);
     this.deliveryCancelService = new CreateShopDeliveryCancelService(requestStateMutatorService);
     this.deliveryChildRecoveryService =
         new CreateShopDeliveryChildRecoveryService(requestStateMutatorService, ownership);
     this.reservationSyncService = new CreateShopReservationSyncService(requestStateMutatorService);
-    this.attemptResolveService = new CreateShopAttemptResolveService(requestStateMutatorService);
+    this.attemptResolveService =
+        new CreateShopAttemptResolveService(requestStateMutatorService, messaging);
     this.terminalRequestLifecycleService =
         new CreateShopTerminalRequestLifecycleService(requestStateMutatorService);
     this.pendingTopupService =
@@ -717,10 +718,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   int computeOutstandingNeededForOps(
       IRequest<?> request, IDeliverable deliverable, int reservedForRequest) {
     return computeOutstandingNeeded(request, deliverable, reservedForRequest);
-  }
-
-  CreateShopResolverMessaging getMessagingForOps() {
-    return messaging;
   }
 
   void touchFlowForOps(IToken<?> requestToken, long nowTick, String detail) {
