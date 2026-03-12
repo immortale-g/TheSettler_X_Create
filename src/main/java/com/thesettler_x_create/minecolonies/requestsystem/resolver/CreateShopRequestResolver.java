@@ -608,10 +608,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lifecycleStateStore.getParentChildDropLastLogTick().remove(parentToken);
   }
 
-  void clearStaleRecoveryArm(IToken<?> parentToken) {
-    deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
-  }
-
   void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);

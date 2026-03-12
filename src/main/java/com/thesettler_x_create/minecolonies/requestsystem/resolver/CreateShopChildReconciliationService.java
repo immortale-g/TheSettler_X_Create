@@ -103,7 +103,7 @@ final class CreateShopChildReconciliationService {
               request.removeChild(childToken);
               requestStateMutatorService.clearChildActive(resolver, childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
-              resolver.clearStaleRecoveryArm(request.getId());
+              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
               continue;
             }
             if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
@@ -188,7 +188,7 @@ final class CreateShopChildReconciliationService {
                 continue;
               }
             } else {
-              deliveryChildLifecycleService.clearStaleRecoveryArm(resolver, request.getId());
+              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
             }
             deliveryRootCauseSnapshotService.logSnapshot(
                 resolver, standardManager, level, request, child, childToken, childAssigned);

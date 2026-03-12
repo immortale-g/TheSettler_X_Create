@@ -50,10 +50,6 @@ final class CreateShopDeliveryChildLifecycleService {
     return now - since >= 40L;
   }
 
-  void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
-    requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
-  }
-
   boolean isStaleDeliveryChild(
       CreateShopRequestResolver resolver,
       Level level,
