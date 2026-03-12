@@ -123,6 +123,9 @@ Current behavior:
 - Lost-package root-request cancellation matching (item/requester/address/request scope) is now
   isolated in a dedicated helper (`ShopLostPackageRequestCanceller`) to keep
   `BuildingCreateShop` lifecycle orchestration smaller without changing cancel semantics.
+- Pending network-topup decision logic during resolver reconciliation is now centralized in
+  `CreateShopPendingTopupService`, reducing resolver tick complexity while preserving current
+  topup guards (`started-order`, `wait-inflight`, `network-topup`).
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

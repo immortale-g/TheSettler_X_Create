@@ -9,14 +9,19 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverRackCoverageTopupGuardTest {
   @Test
   void topupComputationSubtractsRackAvailabilityBeforeOrderingFromNetwork() throws Exception {
-    String source =
+    String resolverSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String topupSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingTopupService.java"));
 
     assertTrue(
-        source.contains("int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);"));
-    assertTrue(source.contains("pendingCount"));
-    assertTrue(source.contains("- Math.max(0, rackAvailable)"));
+        resolverSource.contains(
+            "int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);"));
+    assertTrue(topupSource.contains("pendingCount"));
+    assertTrue(topupSource.contains("- Math.max(0, rackAvailableForRequest)"));
   }
 }
