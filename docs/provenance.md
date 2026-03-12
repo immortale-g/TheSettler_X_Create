@@ -525,3 +525,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: `cancelledRequests`, `pendingNotices`, and
   `retryingReassignAttempts` tracking moved from static class-level state to instance-local
   state in `CreateShopRequestResolver`, preventing cross-resolver/world stale-token bleed.
+- Delivery-child lifecycle refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: stale-recovery arm bookkeeping, parent-scoped stale timeout
+  detection, and tracked-child cleanup moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryChildLifecycleService`, with resolver methods retained as delegating facades.

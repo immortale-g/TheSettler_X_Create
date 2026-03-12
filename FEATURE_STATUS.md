@@ -230,6 +230,9 @@ Current behavior:
 - Resolver runtime trackers for cancelled/pending-notice/retrying-reassign are now instance-local
   (not static), eliminating cross-instance/world carryover risk that could resurrect stale tokens
   after reloads and amplify request drift.
+- Delivery-child stale/recovery-arm lifecycle and tracked-child cleanup are now centralized in
+  `CreateShopDeliveryChildLifecycleService`, reducing resolver state mutation fan-out and keeping
+  stale timeout ownership in one place.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

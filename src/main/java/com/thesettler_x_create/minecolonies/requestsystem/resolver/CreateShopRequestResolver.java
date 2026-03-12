@@ -131,6 +131,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopAttemptResolveService();
   private final CreateShopTickPendingService tickPendingService =
       new CreateShopTickPendingService();
+  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
+      new CreateShopDeliveryChildLifecycleService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -458,6 +460,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return manager instanceof IStandardRequestManager standard ? standard : null;
   }
 
+  static long getDeliveryChildStaleTimeoutFloorTicksForOps() {
+    return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
+  }
+
   private void logDeliveryLinkState(
       String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
     String key = stage + ":" + childToken;
@@ -646,28 +652,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private boolean isStaleRecoveryArmed(
       Level level, IStandardRequestManager manager, IToken<?> parentToken) {
-    if (level == null || manager == null || parentToken == null) {
-      return false;
-    }
-    long now = level.getGameTime();
-    Long armedAt = parentStaleRecoveryArmedAt.get(parentToken);
-    if (armedAt == null) {
-      parentStaleRecoveryArmedAt.put(parentToken, now);
-      recheck.scheduleParentChildRecheck(manager, parentToken);
-      return false;
-    }
-    long staleRecheckDelay = 20L;
-    if (now - armedAt < staleRecheckDelay) {
-      return false;
-    }
-    return true;
+    return deliveryChildLifecycleService.isStaleRecoveryArmed(this, level, manager, parentToken);
   }
 
   private void clearStaleRecoveryArm(IToken<?> parentToken) {
-    if (parentToken == null) {
-      return;
-    }
-    parentStaleRecoveryArmedAt.remove(parentToken);
+    deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
   }
 
   private boolean isStaleDeliveryChild(
@@ -675,27 +664,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IToken<?> parentToken,
       IToken<?> childToken,
       com.minecolonies.api.colony.requestsystem.request.RequestState state) {
-    if (level == null || parentToken == null || childToken == null || state == null) {
-      return false;
-    }
-    boolean activeState =
-        state == com.minecolonies.api.colony.requestsystem.request.RequestState.CREATED
-            || state == com.minecolonies.api.colony.requestsystem.request.RequestState.ASSIGNED
-            || state == com.minecolonies.api.colony.requestsystem.request.RequestState.IN_PROGRESS;
-    if (!activeState) {
-      deliveryChildActiveSince.remove(childToken);
-      return false;
-    }
-    long now = level.getGameTime();
-    Long since = parentDeliveryActiveSince.putIfAbsent(parentToken, now);
-    if (since == null) {
-      deliveryChildActiveSince.put(childToken, now);
-      return false;
-    }
-    deliveryChildActiveSince.put(childToken, since);
-    long timeout =
-        Math.max(DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, getInflightTimeoutTicksSafe());
-    return now - since >= timeout;
+    return deliveryChildLifecycleService.isStaleDeliveryChild(
+        this, level, parentToken, childToken, state);
   }
 
   private long getInflightTimeoutTicksSafe() {
@@ -832,32 +802,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
-    if (manager == null || parentToken == null) {
-      return;
-    }
-    parentDeliveryActiveSince.remove(parentToken);
-    clearStaleRecoveryArm(parentToken);
-    parentLastKnownChildCount.remove(parentToken);
-    parentLastKnownChildren.remove(parentToken);
-    parentChildDropLastLogTick.remove(parentToken);
-    if (deliveryChildActiveSince.isEmpty()) {
-      return;
-    }
-    var handler = manager.getRequestHandler();
-    if (handler == null) {
-      return;
-    }
-    for (IToken<?> childToken : java.util.List.copyOf(deliveryChildActiveSince.keySet())) {
-      try {
-        IRequest<?> child = handler.getRequest(childToken);
-        IToken<?> parent = child == null ? null : child.getParent();
-        if (parentToken.equals(parent)) {
-          deliveryChildActiveSince.remove(childToken);
-        }
-      } catch (Exception ignored) {
-        deliveryChildActiveSince.remove(childToken);
-      }
-    }
+    deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
 
   private int countStackList(List<ItemStack> stacks) {
@@ -906,6 +851,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getParentDeliveryActiveSinceForOps() {
     return parentDeliveryActiveSince;
+  }
+
+  java.util.Map<IToken<?>, Long> getParentStaleRecoveryArmedAtForOps() {
+    return parentStaleRecoveryArmedAt;
   }
 
   java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshotsForOps() {

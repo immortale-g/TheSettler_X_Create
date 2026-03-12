@@ -9,10 +9,10 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverParentScopedStaleClockGuardTest {
   @Test
   void staleClockUsesParentScopeInsteadOfChildTokenOnly() throws Exception {
-    String resolverSource =
+    String lifecycleSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
@@ -21,6 +21,8 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
     assertTrue(
         reconcileSource.contains(
             "isStaleDeliveryChildForOps(level, request.getId(), childToken, childState)"));
-    assertTrue(resolverSource.contains("parentDeliveryActiveSince.putIfAbsent(parentToken, now)"));
+    assertTrue(
+        lifecycleSource.contains(
+            "resolver.getParentDeliveryActiveSinceForOps().putIfAbsent(parentToken, now)"));
   }
 }
