@@ -188,6 +188,12 @@ Current behavior:
   cancel/remove/requeue mutation, and recheck scheduling) is now centralized in
   `CreateShopDeliveryChildRecoveryService`, reducing resolver-side stale/extra-active recovery
   branch density.
+- Per-request pending lifecycle processing is now centralized in
+  `CreateShopPendingRequestProcessorService`, so `tickPendingDeliveries` mainly orchestrates
+  context setup and token iteration.
+- Rack reservation refresh reconciliation is now centralized in
+  `CreateShopReservationSyncService`, isolating reservation-refresh semantics and reducing
+  reservation drift fixes spread across resolver code paths.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

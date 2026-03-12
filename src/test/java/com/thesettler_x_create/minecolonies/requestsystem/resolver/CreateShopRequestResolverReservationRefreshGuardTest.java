@@ -12,7 +12,7 @@ class CreateShopRequestResolverReservationRefreshGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopReservationSyncService.java"));
     assertTrue(source.contains("syncReservationsFromRack("));
     assertTrue(source.contains("tickPending:reservation-refresh"));
     assertTrue(source.contains("pickup.reserve(requestId, stack.copy(), stack.getCount())"));

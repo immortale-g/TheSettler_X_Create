@@ -499,3 +499,12 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: stale/extra-active delivery-child mutation logic
   moved from `CreateShopRequestResolver` into `CreateShopDeliveryChildRecoveryService`, preserving
   ownership revalidation, local-child mutation scope, and parent requeue/recheck behavior.
+- Pending request processor refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: the per-token pending lifecycle logic previously
+  inside `CreateShopRequestResolver.tickPendingDeliveries` moved into
+  `CreateShopPendingRequestProcessorService`, while resolver tick now focuses on context setup and
+  token orchestration.
+- Reservation sync refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: rack reservation refresh logic moved from
+  `CreateShopRequestResolver` into `CreateShopReservationSyncService`, preserving reservation
+  refresh source tagging and flow touch semantics.
