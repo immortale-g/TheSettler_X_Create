@@ -649,13 +649,28 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lifecycleStateStore.getRetryingReassignAttempts().put(token, nowTick);
   }
 
+  void clearRetryingReassignAttempt(IToken<?> token) {
+    lifecycleStateStore.getRetryingReassignAttempts().remove(token);
+  }
+
+  void clearRootCauseTracking(IToken<?> childToken) {
+    lifecycleStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
+    lifecycleStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
+  }
+
   void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {
     if (token == null) {
       return;
     }
-    cooldown.clearRequestCooldown(token);
-    lifecycleStateStore.getPendingTracker().remove(token);
+    requestStateMutatorService.clearOrderedAndPending(this, token);
     clearDeliveriesCreated(token);
+    clearParentDeliveryActive(token);
+    clearParentStaleRecoveryArm(token);
+    clearParentChildrenSnapshot(token);
+    clearChildActive(token);
+    clearMissingChildSince(token);
+    clearRootCauseTracking(token);
+    clearRetryingReassignAttempt(token);
     if (clearFlowState) {
       flowStateMachine.remove(token);
     }
