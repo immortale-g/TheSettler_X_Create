@@ -61,8 +61,8 @@ final class CreateShopDeliveryChildLifecycleService {
     resolver.getDeliveryChildActiveSinceForOps().put(childToken, since);
     long timeout =
         Math.max(
-            CreateShopRequestResolver.getDeliveryChildStaleTimeoutFloorTicksForOps(),
-            resolver.getInflightTimeoutTicksSafeForOps());
+            CreateShopRequestResolver.getDeliveryChildStaleTimeoutFloorTicks(),
+            resolver.getInflightTimeoutTicksSafe());
     return now - since >= timeout;
   }
 
@@ -97,3 +97,4 @@ final class CreateShopDeliveryChildLifecycleService {
     }
   }
 }
+

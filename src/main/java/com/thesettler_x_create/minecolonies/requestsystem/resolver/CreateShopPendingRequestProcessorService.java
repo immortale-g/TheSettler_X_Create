@@ -126,7 +126,7 @@ final class CreateShopPendingRequestProcessorService {
       }
       if (!childResult.hasActiveChildren()) {
         resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
-        resolver.clearStaleRecoveryArmForOps(request.getId());
+        resolver.clearStaleRecoveryArm(request.getId());
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
         return;
@@ -156,7 +156,7 @@ final class CreateShopPendingRequestProcessorService {
     resolver.getParentLastKnownChildCountForOps().put(request.getId(), 0);
     resolver.getParentLastKnownChildrenForOps().put(request.getId(), "[]");
     resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
-    resolver.clearStaleRecoveryArmForOps(request.getId());
+    resolver.clearStaleRecoveryArm(request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
       resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
@@ -244,3 +244,4 @@ final class CreateShopPendingRequestProcessorService {
     postCreationUpdateService.apply(resolver, manager, request, level, creationResult, requestIdLog);
   }
 }
+

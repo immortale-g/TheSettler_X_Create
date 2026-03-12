@@ -49,7 +49,7 @@ final class CreateShopDeliveryCancelService {
       return;
     }
     resolver.getParentDeliveryActiveSinceForOps().remove(parentToken);
-    resolver.clearStaleRecoveryArmForOps(parentToken);
+    resolver.clearStaleRecoveryArm(parentToken);
     UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
 
@@ -80,7 +80,7 @@ final class CreateShopDeliveryCancelService {
           resolver, level, parentToken, fallbackPending);
       diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
       resolver.clearDeliveriesCreated(parentToken);
-      if (resolver.isDebugLoggingEnabledForOps()) {
+      if (resolver.isDebugLoggingEnabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} (pickup missing, fallback requeue)",
             request.getId(),
@@ -105,7 +105,7 @@ final class CreateShopDeliveryCancelService {
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
     resolver.clearDeliveriesCreated(parentToken);
 
-    if (resolver.isDebugLoggingEnabledForOps()) {
+    if (resolver.isDebugLoggingEnabled()) {
       int reservedForStack = pickup.getReservedFor(stack);
       BlockPos pickupPosition = pickup.getBlockPos();
       deliveryManager.logDeliveryDiagnostics(
@@ -134,3 +134,4 @@ final class CreateShopDeliveryCancelService {
     }
   }
 }
+

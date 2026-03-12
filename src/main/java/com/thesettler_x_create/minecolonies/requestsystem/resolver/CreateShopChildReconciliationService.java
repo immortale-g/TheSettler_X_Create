@@ -100,7 +100,7 @@ final class CreateShopChildReconciliationService {
               request.removeChild(childToken);
               resolver.getDeliveryChildActiveSinceForOps().remove(childToken);
               resolver.getMissingChildSinceForOps().remove(childToken);
-              resolver.clearStaleRecoveryArmForOps(request.getId());
+              resolver.clearStaleRecoveryArm(request.getId());
               continue;
             }
             if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
@@ -239,3 +239,4 @@ final class CreateShopChildReconciliationService {
       boolean childrenEmpty,
       int childrenCount) {}
 }
+

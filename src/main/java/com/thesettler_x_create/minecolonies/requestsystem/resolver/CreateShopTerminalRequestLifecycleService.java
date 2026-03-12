@@ -124,10 +124,11 @@ final class CreateShopTerminalRequestLifecycleService {
     }
     requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
     resolver.clearDeliveriesCreated(request.getId());
-    resolver.clearTrackedChildrenForParentForOps(
+    resolver.clearTrackedChildrenForParent(
         CreateShopRequestResolver.unwrapStandardManager(manager), request.getId());
     if (releaseReservation) {
       resolver.releaseReservation(manager, request);
     }
   }
 }
+

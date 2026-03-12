@@ -20,7 +20,7 @@ final class CreateShopDeliveryRootCauseSnapshotService {
       IToken<?> childToken,
       IToken<?> assignedResolverToken) {
     if (resolver == null
-        || !resolver.isDebugLoggingEnabledForOps()
+        || !resolver.isDebugLoggingEnabled()
         || manager == null
         || level == null
         || parent == null
@@ -163,3 +163,4 @@ final class CreateShopDeliveryRootCauseSnapshotService {
     }
   }
 }
+

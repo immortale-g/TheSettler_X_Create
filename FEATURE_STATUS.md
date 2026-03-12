@@ -297,6 +297,10 @@ Current behavior:
   `transitionFlowForOps(...)` forwarding layer.
 - Resolver shop lookup now uses direct `getShop(...)` across validator/attempt/tick/delivery
   services, removing the `getShopForOps(...)` wrapper and reducing resolver facade duplication.
+- Resolver flow/timeout/debug/retry helper calls now use direct method names
+  (`resolveNowTick`, `getFlowStateMachine`, `getInflightTimeoutTicksSafe`,
+  `clearStaleRecoveryArm`, `clearTrackedChildrenForParent`, `isDebugLoggingEnabled`,
+  `getRetryingReassignAttempts`, `logDeliveryLinkState`) instead of `*ForOps` aliases.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

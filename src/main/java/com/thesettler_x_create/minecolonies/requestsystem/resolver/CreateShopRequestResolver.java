@@ -340,11 +340,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return manager instanceof IStandardRequestManager standard ? standard : null;
   }
 
-  static long getDeliveryChildStaleTimeoutFloorTicksForOps() {
+  static long getDeliveryChildStaleTimeoutFloorTicks() {
     return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
   }
 
-  private void logDeliveryLinkState(
+  void logDeliveryLinkState(
       String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
     String key = stage + ":" + childToken;
     if (!deliveryLinkLogged.add(key)) {
@@ -389,7 +389,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return resolver == null ? "<none>" : resolver.getClass().getSimpleName();
   }
 
-  private static boolean isDebugLoggingEnabled() {
+  private static boolean isDebugLoggingEnabledSafe() {
     try {
       return Config.DEBUG_LOGGING.getAsBoolean();
     } catch (IllegalStateException ignored) {
@@ -482,20 +482,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return flowStateMachine.hasNonTerminalWork();
   }
 
-  void logDeliveryLinkStateForOps(
-      String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
-    logDeliveryLinkState(stage, manager, parentToken, childToken);
-  }
-
-  private long resolveNowTick(IRequestManager manager) {
+  long resolveNowTick(IRequestManager manager) {
     if (manager == null || manager.getColony() == null || manager.getColony().getWorld() == null) {
       return 0L;
     }
     return manager.getColony().getWorld().getGameTime();
-  }
-
-  long resolveNowTickForOps(IRequestManager manager) {
-    return resolveNowTick(manager);
   }
 
   void transitionFlow(
@@ -518,7 +509,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  private long getInflightTimeoutTicksSafe() {
+  long getInflightTimeoutTicksSafe() {
     try {
       return Math.max(
           DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong());
@@ -530,12 +521,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
 
-  CreateShopRequestStateMachine getFlowStateMachineForOps() {
+  CreateShopRequestStateMachine getFlowStateMachine() {
     return flowStateMachine;
-  }
-
-  long getInflightTimeoutTicksSafeForOps() {
-    return getInflightTimeoutTicksSafe();
   }
 
   java.util.Map<IToken<?>, Long> getParentDeliveryActiveSinceForOps() {
@@ -566,11 +553,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return parentChildDropLastLogTick;
   }
 
-  void clearStaleRecoveryArmForOps(IToken<?> parentToken) {
+  void clearStaleRecoveryArm(IToken<?> parentToken) {
     deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
   }
 
-  void clearTrackedChildrenForParentForOps(
+  void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
@@ -591,11 +578,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return recheck;
   }
 
-  boolean isDebugLoggingEnabledForOps() {
-    return isDebugLoggingEnabled();
+  boolean isDebugLoggingEnabled() {
+    return isDebugLoggingEnabledSafe();
   }
 
-  java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
+  java.util.Map<IToken<?>, Long> getRetryingReassignAttempts() {
     return retryingReassignAttempts;
   }
 
@@ -621,3 +608,4 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
 }
+
