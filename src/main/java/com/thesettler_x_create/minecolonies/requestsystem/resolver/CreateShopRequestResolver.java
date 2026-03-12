@@ -492,22 +492,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
           assignedCount,
           orderedCount,
           pendingTokens.size());
-      int logged = 0;
-      for (IToken<?> token : java.util.List.copyOf(pendingTokens)) {
-        if (logged >= 5) {
-          break;
-        }
-        try {
-          IRequest<?> req = requestHandler.getRequest(token);
-          String type = req == null ? "<null>" : req.getRequest().getClass().getName();
-          String state = req == null ? "<null>" : req.getState().toString();
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: candidate {} type={} state={}", token, type, state);
-          logged++;
-        } catch (IllegalArgumentException ignored) {
-          // Missing request.
-        }
-      }
+      logTickPendingCandidates(requestHandler, pendingTokens);
     }
     BuildingCreateShop shop = getShop(standardManager);
     if (shop == null) {
@@ -1034,6 +1019,27 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
+  }
+
+  private void logTickPendingCandidates(
+      com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
+      java.util.Set<IToken<?>> pendingTokens) {
+    int logged = 0;
+    for (IToken<?> token : java.util.List.copyOf(pendingTokens)) {
+      if (logged >= 5) {
+        break;
+      }
+      try {
+        IRequest<?> req = requestHandler.getRequest(token);
+        String type = req == null ? "<null>" : req.getRequest().getClass().getName();
+        String state = req == null ? "<null>" : req.getState().toString();
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: candidate {} type={} state={}", token, type, state);
+        logged++;
+      } catch (IllegalArgumentException ignored) {
+        // Missing request.
+      }
+    }
   }
 
   public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
