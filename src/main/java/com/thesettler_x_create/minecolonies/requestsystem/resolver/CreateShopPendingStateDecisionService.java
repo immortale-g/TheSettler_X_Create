@@ -92,7 +92,7 @@ final class CreateShopPendingStateDecisionService {
       return PendingDecision.skipped();
     }
     if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
-      resolver.touchFlowForOps(
+      resolver.touchFlow(
           request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
       if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
         requestStateMutatorService.markOrderedWithPending(

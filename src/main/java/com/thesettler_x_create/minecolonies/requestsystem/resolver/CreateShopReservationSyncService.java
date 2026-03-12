@@ -68,7 +68,7 @@ final class CreateShopReservationSyncService {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, null, requestToken, pendingCount);
       resolver.getDiagnosticsForOps().recordPendingSource(requestToken, "tickPending:reservation-refresh");
-      resolver.touchFlowForOps(requestToken, now, "tickPending:reservation-refresh");
+      resolver.touchFlow(requestToken, now, "tickPending:reservation-refresh");
     }
     return reservedNow;
   }

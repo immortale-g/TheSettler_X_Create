@@ -55,6 +55,9 @@ Implementation notes:
   `CreateShopOutstandingNeededService` and wiring validator/attempt/pending-decision to that shared
   service) is authored in this project as a behavior-preserving internal split that reduces
   duplicated request-amount logic and resolver helper forwarding.
+- Resolver ops-surface cleanup refactor (removing selected `*ForOps` forwarding aliases and using
+  direct shared methods: `clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) is
+  authored in this project as a behavior-preserving internal simplification.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

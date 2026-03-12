@@ -276,6 +276,9 @@ Current behavior:
 - Outstanding-needed calculation (`requested - leftover - reservedForRequest`) is now centralized in
   `CreateShopOutstandingNeededService` and used by validator/attempt/pending-decision flows,
   removing duplicated arithmetic paths that previously lived behind resolver helper forwarding.
+- Pending gate/reconciliation services now call shared resolver state operations directly
+  (`clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) instead of `*ForOps`
+  forwarding aliases, reducing duplicated resolver ops surface while keeping behavior unchanged.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
