@@ -35,6 +35,9 @@ Implementation notes:
 - Lost-package recovery interactions (shopkeeper chat actions, manual package handover, restart order
   flow), inflight consumption semantics, and storage-capacity request gating are authored specifically
   for this project using MineColonies interaction handlers and Create logistics APIs.
+- Lost-package root-request cancel matching refactor (extracting tuple-aware cancellation matching
+  into `ShopLostPackageRequestCanceller` from `BuildingCreateShop`) is authored in this project and
+  is a behavior-preserving internal split to reduce orchestrator class responsibility.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token

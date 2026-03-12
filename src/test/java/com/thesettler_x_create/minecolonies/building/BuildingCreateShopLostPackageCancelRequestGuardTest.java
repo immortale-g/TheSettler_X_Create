@@ -9,19 +9,24 @@ import org.junit.jupiter.api.Test;
 class BuildingCreateShopLostPackageCancelRequestGuardTest {
   @Test
   void cancelLostPackageCanCancelMatchingCreateShopRequests() throws Exception {
-    String source =
+    String buildingSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+    String cancellerSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageRequestCanceller.java"));
 
-    assertTrue(source.contains("cancelLostPackageRequestAndInflight("));
-    assertTrue(source.contains("cancelMatchingLostPackageRequests(stackKey, requesterName, address, requestedAt)"));
-    assertTrue(source.contains("matchesLostPackageRequest("));
-    assertTrue(source.contains("request.getChildren()"));
-    assertTrue(source.contains("instanceof Delivery"));
-    assertTrue(source.contains("matchesLostPackageAddress("));
-    assertTrue(source.contains("requestedAt > 0L"));
+    assertTrue(buildingSource.contains("cancelLostPackageRequestAndInflight("));
+    assertTrue(buildingSource.contains("new ShopLostPackageRequestCanceller(this)"));
+    assertTrue(cancellerSource.contains("cancelMatchingRequests("));
+    assertTrue(cancellerSource.contains("matchesLostPackageRequest("));
+    assertTrue(cancellerSource.contains("request.getChildren()"));
+    assertTrue(cancellerSource.contains("instanceof Delivery"));
+    assertTrue(cancellerSource.contains("matchesLostPackageAddress("));
+    assertTrue(cancellerSource.contains("requestedAt > 0L"));
     assertTrue(
-        source.contains("standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
+        cancellerSource.contains("standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
   }
 }

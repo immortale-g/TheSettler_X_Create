@@ -120,6 +120,9 @@ Current behavior:
 - Lost-package interactions now carry a shop-local runtime epoch that is bumped during
   `/thesettlerxcreate reset_live_state`, so stale pre-reset dialogs cannot mutate new post-reset
   runtime state.
+- Lost-package root-request cancellation matching (item/requester/address/request scope) is now
+  isolated in a dedicated helper (`ShopLostPackageRequestCanceller`) to keep
+  `BuildingCreateShop` lifecycle orchestration smaller without changing cancel semantics.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
