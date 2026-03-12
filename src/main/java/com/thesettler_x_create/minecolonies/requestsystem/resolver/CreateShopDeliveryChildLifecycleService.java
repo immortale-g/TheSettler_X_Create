@@ -20,7 +20,7 @@ final class CreateShopDeliveryChildLifecycleService {
     Long armedAt = resolver.getParentStaleRecoveryArmedAtForOps().get(parentToken);
     if (armedAt == null) {
       resolver.getParentStaleRecoveryArmedAtForOps().put(parentToken, now);
-      resolver.getRecheckForOps().scheduleParentChildRecheck(manager, parentToken);
+      resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken);
       return false;
     }
     long staleRecheckDelay = 20L;

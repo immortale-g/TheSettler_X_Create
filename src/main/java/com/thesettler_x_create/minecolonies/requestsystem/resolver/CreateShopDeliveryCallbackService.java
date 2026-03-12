@@ -12,7 +12,7 @@ final class CreateShopDeliveryCallbackService {
       resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
     }
     if (resolver != null) {
-      resolver.handleDeliveryCancelledForOps(manager, request);
+      resolver.handleDeliveryCancelled(manager, request);
       return;
     }
     CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
@@ -25,7 +25,7 @@ final class CreateShopDeliveryCallbackService {
       resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
     }
     if (resolver != null) {
-      resolver.handleDeliveryCompleteForOps(manager, request);
+      resolver.handleDeliveryComplete(manager, request);
       return;
     }
     CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("complete", manager, request);

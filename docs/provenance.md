@@ -69,6 +69,10 @@ Implementation notes:
 - Terminal-state gate refactor (switching pending processor terminal classification to direct shared
   static `CreateShopRequestResolver.isTerminalRequestState(...)`) is authored in this project as a
   behavior-preserving internal simplification and removes one resolver forwarding alias.
+- Resolver callback/recheck/reassign naming cleanup (switching callback/tick services from
+  `handleDelivery*ForOps` / `getRecheckForOps` / `reassignResolvableRetryingRequestsForOps` to
+  direct method names) is authored in this project as a behavior-preserving internal simplification
+  that further reduces resolver ops-surface indirection.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

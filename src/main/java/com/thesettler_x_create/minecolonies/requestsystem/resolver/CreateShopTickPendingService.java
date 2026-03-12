@@ -62,8 +62,8 @@ final class CreateShopTickPendingService {
       }
       return;
     }
-    resolver.reassignResolvableRetryingRequestsForOps(standardManager, level);
-    resolver.getRecheckForOps().processParentChildRechecks(standardManager, level);
+    resolver.reassignResolvableRetryingRequests(standardManager, level);
+    resolver.getRecheck().processParentChildRechecks(standardManager, level);
     var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();

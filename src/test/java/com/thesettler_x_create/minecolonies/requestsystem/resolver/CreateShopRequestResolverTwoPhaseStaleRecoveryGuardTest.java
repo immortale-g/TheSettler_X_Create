@@ -28,7 +28,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
         reconcileSource.contains(
             "if (!deliveryChildLifecycleService.isStaleRecoveryArmed("));
     assertTrue(
-        lifecycleSource.contains("resolver.getRecheckForOps().scheduleParentChildRecheck(manager, parentToken)"));
+        lifecycleSource.contains("resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken)"));
     assertTrue(resolverSource.contains("clearStaleRecoveryArmForOps("));
   }
 }
