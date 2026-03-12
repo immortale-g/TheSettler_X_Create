@@ -485,3 +485,8 @@ Implementation notes:
   pending/cooldown updates moved from `CreateShopRequestResolver` into
   `CreateShopPostCreationUpdateService`, with non-negative normalization of `remainingCount`
   before tracker mutation.
+- Delivery-cancel callback refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: delivery-cancel callback reconciliation moved
+  from `CreateShopRequestResolver` into `CreateShopDeliveryCancelService`, preserving
+  missing-pickup fallback requeue behavior and adding null-safe delivery-start lookup before block
+  entity probing.

@@ -117,6 +117,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPendingStateDecisionService();
   private final CreateShopPostCreationUpdateService postCreationUpdateService =
       new CreateShopPostCreationUpdateService();
+  private final CreateShopDeliveryCancelService deliveryCancelService =
+      new CreateShopDeliveryCancelService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -817,100 +819,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   private void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
-    if (!(request.getRequest() instanceof Delivery delivery)) {
-      return;
-    }
-    if (request.getId() != null) {
-      deliveryChildActiveSince.remove(request.getId());
-    }
-    IToken<?> parentToken =
-        CreateShopDeliveryResolverLocator.resolveParentTokenForDelivery(manager, request);
-    if (parentToken == null) {
-      return;
-    }
-    parentDeliveryActiveSince.remove(parentToken);
-    clearStaleRecoveryArm(parentToken);
-    UUID parentRequestId = toRequestId(parentToken);
-    ItemStack stack = delivery.getStack().copy();
-
-    Level level = manager.getColony().getWorld();
-    if (level == null) {
-      pendingTracker.setPendingCount(parentToken, Math.max(1, stack.getCount()));
-      diagnostics.recordPendingSource(parentToken, "delivery-cancel");
-      clearDeliveriesCreated(parentToken);
-      return;
-    }
-    CreateShopBlockEntity pickup = null;
-    BuildingCreateShop shop = getShop(manager);
-    if (shop != null) {
-      pickup = shop.getPickupBlockEntity();
-    }
-    if (pickup == null) {
-      BlockPos start = delivery.getStart().getInDimensionLocation();
-      BlockEntity entity = level.getBlockEntity(start);
-      if (entity instanceof CreateShopBlockEntity shopPickup) {
-        pickup = shopPickup;
-      }
-    }
-    if (pickup == null) {
-      int fallbackPending = Math.max(1, stack.getCount());
-      pendingTracker.setPendingCount(parentToken, fallbackPending);
-      diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
-      cooldown.markRequestOrdered(level, parentToken);
-      clearDeliveriesCreated(parentToken);
-      if (isDebugLoggingEnabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} (pickup missing, fallback requeue)",
-            request.getId(),
-            parentToken,
-            fallbackPending);
-      }
-      IStandardRequestManager standard = unwrapStandardManager(manager);
-      if (standard != null) {
-        recheck.scheduleParentChildRecheck(standard, parentToken);
-      }
-      return;
-    }
-    if (!isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
-      return;
-    }
-
-    int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
-    int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
-    pickup.release(parentRequestId);
-    pendingTracker.setPendingCount(parentToken, pendingCount);
-    diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
-    // Keep on cooldown so tickPending can retry once stock is available.
-    cooldown.markRequestOrdered(level, parentToken);
-    clearDeliveriesCreated(parentToken);
-
-    if (isDebugLoggingEnabled()) {
-      int reservedForStack = pickup.getReservedFor(stack);
-      BlockPos pickupPosition = pickup.getBlockPos();
-      deliveryManager.logDeliveryDiagnostics(
-          "cancel",
-          manager,
-          request.getId(),
-          parentRequestId,
-          pickupPosition,
-          stack,
-          delivery.getTarget(),
-          reservedForRequest,
-          -1,
-          reservedForStack);
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} reserved={} pickup={}",
-          request.getId(),
-          parentToken,
-          pendingCount,
-          reservedForRequest,
-          pickup.getBlockPos());
-      IStandardRequestManager standard = unwrapStandardManager(manager);
-      if (standard != null) {
-        diagnostics.logParentChildrenState(standard, parentToken, "delivery-cancel");
-        recheck.scheduleParentChildRecheck(standard, parentToken);
-      }
-    }
+    deliveryCancelService.handleDeliveryCancelled(this, manager, request);
   }
 
   private void handleDeliveryComplete(IRequestManager manager, IRequest<?> request) {
