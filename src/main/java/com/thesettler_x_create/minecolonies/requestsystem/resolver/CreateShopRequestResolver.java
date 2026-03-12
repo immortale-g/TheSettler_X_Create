@@ -123,6 +123,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopDeliveryRootCauseSnapshotService();
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService =
       new CreateShopDeliveryChildRecoveryService();
+  private final CreateShopReservationSyncService reservationSyncService =
+      new CreateShopReservationSyncService();
+  private final CreateShopPendingRequestProcessorService pendingRequestProcessorService =
+      new CreateShopPendingRequestProcessorService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -526,194 +530,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
 
     for (IToken<?> token : java.util.List.copyOf(pendingTokens)) {
-      IRequest<?> request;
-      try {
-        request = requestHandler.getRequest(token);
-      } catch (IllegalArgumentException ex) {
-        clearPendingTokenStateForOps(token, false);
-        continue;
-      }
-      if (pendingRequestGateService.shouldSkipForPendingProcessing(
-          this, manager, standardManager, request, token)) {
-        continue;
-      }
-      if (isTerminalRequestState(request.getState())) {
-        clearPendingTokenStateForOps(request.getId(), true);
-        diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (terminal state={})",
-              request.getId(),
-              request.getState());
-        }
-        continue;
-      }
-      diagnostics.logRequestStateChange(standardManager, token, "tickPending");
-      IDeliverable deliverable = (IDeliverable) request.getRequest();
-      String requestIdLog = request.getId().toString();
-      UUID requestId = toRequestId(request.getId());
-      int reservedForRequest = pickup.getReservedForRequest(requestId);
-      boolean onCooldown = cooldown.isRequestOnCooldown(level, request.getId());
-      if (request.hasChildren()) {
-        diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
-        java.util.Collection<IToken<?>> children =
-            java.util.Objects.requireNonNull(request.getChildren(), "children");
-        parentLastKnownChildCount.put(request.getId(), children.size());
-        parentLastKnownChildren.put(request.getId(), children.toString());
-        var childResult =
-            childReconciliationService.reconcile(
-                this,
-                standardManager,
-                level,
-                request,
-                requestHandler,
-                assignmentStore::getAssignmentForValue,
-                shop,
-                pickup,
-                requestIdLog);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
-          diagnostics.logParentChildrenState(standardManager, request.getId(), "tickPending");
-          if (childResult.childrenEmpty()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} children list empty despite hasChildren",
-                requestIdLog);
-          } else if (childResult.missing() > 0) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} missing children={} total={}",
-                requestIdLog,
-                childResult.missing(),
-                childResult.childrenCount());
-          } else if (childResult.duplicateChildrenRemoved() > 0) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} duplicate children removed={} total={}",
-                requestIdLog,
-                childResult.duplicateChildrenRemoved(),
-                childResult.childrenCount());
-          }
-        }
-        if (childResult.missing() > 0) {
-          continue;
-        }
-        if (!childResult.hasActiveChildren()) {
-          parentDeliveryActiveSince.remove(request.getId());
-          clearStaleRecoveryArm(request.getId());
-        }
-        if (childResult.hasActiveChildren() || request.hasChildren()) {
-          continue;
-        }
-      }
-      Integer previousChildCount = parentLastKnownChildCount.get(request.getId());
-      if (previousChildCount != null && previousChildCount > 0 && !request.hasChildren()) {
-        long now = level.getGameTime();
-        Long lastDropLog = parentChildDropLastLogTick.get(request.getId());
-        if (lastDropLog == null || now - lastDropLog >= 100L) {
-          parentChildDropLastLogTick.put(request.getId(), now);
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            String previousChildren = parentLastKnownChildren.getOrDefault(request.getId(), "[]");
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] root-cause parent-child-drop parent={} state={} prevChildCount={} prevChildren={} reservedForRequest={} pending={} cooldown={}",
-                request.getId(),
-                request.getState(),
-                previousChildCount,
-                previousChildren,
-                reservedForRequest,
-                pendingTracker.getPendingCount(request.getId()),
-                cooldown.isRequestOnCooldown(level, request.getId()));
-          }
-        }
-      }
-      parentLastKnownChildCount.put(request.getId(), 0);
-      parentLastKnownChildren.put(request.getId(), "[]");
-      parentDeliveryActiveSince.remove(request.getId());
-      clearStaleRecoveryArm(request.getId());
-      if (hasDeliveriesCreated(request.getId())) {
-        diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
-        flowStateMachine.touch(
-            request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
-              requestIdLog);
-        }
-        continue;
-      }
-
-      if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
-            requestIdLog,
-            reservedForRequest);
-      }
-      var pendingDecision =
-          pendingStateDecisionService.decide(
-              this,
-              request,
-              level,
-              deliverable,
-              onCooldown,
-              reservedForRequest,
-              workerWorking,
-              requestIdLog);
-      if (pendingDecision.shouldSkip()) {
-        continue;
-      }
-      int pendingCount = pendingDecision.pendingCount();
-      int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
-      int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-      int rackAvailableForRequest =
-          Math.max(
-              0,
-              rackAvailable
-                  - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
-      int reservedSynced =
-          syncReservationsFromRack(
-              tile,
-              pickup,
-              requestId,
-              request.getId(),
-              deliverable,
-              pendingCount,
-              reservedForRequest,
-              rackAvailableForRequest,
-              level.getGameTime());
-      if (reservedSynced > 0) {
-        reservedForRequest += reservedSynced;
-        reservedForDeliverable += reservedSynced;
-        rackAvailableForRequest =
-            Math.max(
-                0,
-                rackAvailable
-                    - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
-      }
-      pendingTopupService.handleTopup(
+      pendingRequestProcessorService.processToken(
+          this,
           manager,
-          request,
+          standardManager,
+          requestHandler,
+          assignmentStore::getAssignmentForValue,
+          token,
           level,
+          shop,
           tile,
           pickup,
-          deliverable,
-          workerWorking,
-          pendingCount,
-          reservedForRequest,
-          rackAvailableForRequest,
-          requestIdLog);
-      var creationResult =
-          pendingDeliveryCreationService.process(
-              manager,
-              request,
-              level,
-              tile,
-              pickup,
-              deliverable,
-              pendingCount,
-              rackAvailableForRequest,
-              requestIdLog);
-      if (!creationResult.created()) {
-        continue;
-      }
-      postCreationUpdateService.apply(this, manager, request, level, creationResult, requestIdLog);
+          workerWorking);
     }
     processTimedOutFlows(standardManager, level);
     lastTickPendingNanos = System.nanoTime() - perfStart;
@@ -1356,57 +1184,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return total;
   }
 
-  private int syncReservationsFromRack(
-      TileEntityCreateShop tile,
-      CreateShopBlockEntity pickup,
-      UUID requestId,
-      IToken<?> requestToken,
-      IDeliverable deliverable,
-      int pendingCount,
-      int reservedForRequest,
-      int rackAvailable,
-      long now) {
-    if (tile == null
-        || pickup == null
-        || requestId == null
-        || requestToken == null
-        || deliverable == null
-        || pendingCount <= 0
-        || rackAvailable <= 0) {
-      return 0;
-    }
-    int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int rackUnreserved = Math.max(0, rackAvailable - Math.max(0, reservedForDeliverable));
-    int missingReservation = Math.max(0, pendingCount - Math.max(0, reservedForRequest));
-    int reserveTarget = Math.min(rackUnreserved, missingReservation);
-    if (reserveTarget <= 0) {
-      return 0;
-    }
-    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> reservePlan =
-        planning.planFromRacksWithPositions(tile, deliverable, Math.max(1, reserveTarget));
-    if (reservePlan.isEmpty()) {
-      return 0;
-    }
-    int reservedNow = 0;
-    for (var entry : reservePlan) {
-      if (entry == null) {
-        continue;
-      }
-      ItemStack stack = entry.getA();
-      if (stack == null || stack.isEmpty()) {
-        continue;
-      }
-      pickup.reserve(requestId, stack.copy(), stack.getCount());
-      reservedNow += stack.getCount();
-    }
-    if (reservedNow > 0) {
-      pendingTracker.setPendingCount(requestToken, Math.max(1, pendingCount));
-      diagnostics.recordPendingSource(requestToken, "tickPending:reservation-refresh");
-      flowStateMachine.touch(requestToken, now, "tickPending:reservation-refresh");
-    }
-    return reservedNow;
-  }
-
   private void reassignResolvableRetryingRequests(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
@@ -1447,6 +1224,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTickForOps() {
     return deliveryRootCauseLastLogTick;
+  }
+
+  java.util.Map<IToken<?>, Integer> getParentLastKnownChildCountForOps() {
+    return parentLastKnownChildCount;
+  }
+
+  java.util.Map<IToken<?>, String> getParentLastKnownChildrenForOps() {
+    return parentLastKnownChildren;
+  }
+
+  java.util.Map<IToken<?>, Long> getParentChildDropLastLogTickForOps() {
+    return parentChildDropLastLogTick;
   }
 
   void clearStaleRecoveryArmForOps(IToken<?> parentToken) {
@@ -1515,12 +1304,44 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return retryingReassignAttempts;
   }
 
+  CreateShopPendingRequestGateService getPendingRequestGateServiceForOps() {
+    return pendingRequestGateService;
+  }
+
+  CreateShopChildReconciliationService getChildReconciliationServiceForOps() {
+    return childReconciliationService;
+  }
+
+  CreateShopPendingStateDecisionService getPendingStateDecisionServiceForOps() {
+    return pendingStateDecisionService;
+  }
+
+  CreateShopPendingTopupService getPendingTopupServiceForOps() {
+    return pendingTopupService;
+  }
+
+  CreateShopPendingDeliveryCreationService getPendingDeliveryCreationServiceForOps() {
+    return pendingDeliveryCreationService;
+  }
+
+  CreateShopPostCreationUpdateService getPostCreationUpdateServiceForOps() {
+    return postCreationUpdateService;
+  }
+
+  CreateShopReservationSyncService getReservationSyncServiceForOps() {
+    return reservationSyncService;
+  }
+
   CreateShopResolverOwnership getOwnershipForOps() {
     return ownership;
   }
 
   boolean shouldLogTickPendingForOps(Level level) {
     return shouldLogTickPending(level);
+  }
+
+  boolean isTerminalRequestStateForOps(RequestState state) {
+    return isTerminalRequestState(state);
   }
 
   void clearPendingTokenStateForOps(IToken<?> token, boolean clearFlowState) {

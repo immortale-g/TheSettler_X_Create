@@ -1,0 +1,234 @@
+package com.thesettler_x_create.minecolonies.requestsystem.resolver;
+
+import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
+import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.Config;
+import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Function;
+import net.minecraft.world.level.Level;
+
+/** Processes one pending request token during resolver tick-pending orchestration. */
+final class CreateShopPendingRequestProcessorService {
+  void processToken(
+      CreateShopRequestResolver resolver,
+      IRequestManager manager,
+      IStandardRequestManager standardManager,
+      IRequestHandler requestHandler,
+      Function<IToken<?>, IToken<?>> assignmentLookup,
+      IToken<?> token,
+      Level level,
+      BuildingCreateShop shop,
+      TileEntityCreateShop tile,
+      CreateShopBlockEntity pickup,
+      boolean workerWorking) {
+    IRequest<?> request;
+    try {
+      request = requestHandler.getRequest(token);
+    } catch (IllegalArgumentException ex) {
+      resolver.clearPendingTokenStateForOps(token, false);
+      return;
+    }
+    if (resolver
+        .getPendingRequestGateServiceForOps()
+        .shouldSkipForPendingProcessing(resolver, manager, standardManager, request, token)) {
+      return;
+    }
+    if (resolver.isTerminalRequestStateForOps(request.getState())) {
+      resolver.clearPendingTokenStateForOps(request.getId(), true);
+      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:terminal-state");
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} skip (terminal state={})",
+            request.getId(),
+            request.getState());
+      }
+      return;
+    }
+    resolver.getDiagnosticsForOps().logRequestStateChange(standardManager, token, "tickPending");
+    IDeliverable deliverable = (IDeliverable) request.getRequest();
+    String requestIdLog = request.getId().toString();
+    UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
+    int reservedForRequest = pickup.getReservedForRequest(requestId);
+    boolean onCooldown = resolver.getCooldown().isRequestOnCooldown(level, request.getId());
+    if (request.hasChildren()) {
+      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:has-children");
+      java.util.Collection<IToken<?>> children =
+          java.util.Objects.requireNonNull(request.getChildren(), "children");
+      resolver.getParentLastKnownChildCountForOps().put(request.getId(), children.size());
+      resolver.getParentLastKnownChildrenForOps().put(request.getId(), children.toString());
+      var childResult =
+          resolver
+              .getChildReconciliationServiceForOps()
+              .reconcile(
+                  resolver,
+                  standardManager,
+                  level,
+                  request,
+                  requestHandler,
+                  assignmentLookup,
+                  shop,
+                  pickup,
+                  requestIdLog);
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
+        resolver.getDiagnosticsForOps().logParentChildrenState(standardManager, request.getId(), "tickPending");
+        if (childResult.childrenEmpty()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} children list empty despite hasChildren", requestIdLog);
+        } else if (childResult.missing() > 0) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} missing children={} total={}",
+              requestIdLog,
+              childResult.missing(),
+              childResult.childrenCount());
+        } else if (childResult.duplicateChildrenRemoved() > 0) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} duplicate children removed={} total={}",
+              requestIdLog,
+              childResult.duplicateChildrenRemoved(),
+              childResult.childrenCount());
+        }
+      }
+      if (childResult.missing() > 0) {
+        return;
+      }
+      if (!childResult.hasActiveChildren()) {
+        resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
+        resolver.clearStaleRecoveryArmForOps(request.getId());
+      }
+      if (childResult.hasActiveChildren() || request.hasChildren()) {
+        return;
+      }
+    }
+    Integer previousChildCount = resolver.getParentLastKnownChildCountForOps().get(request.getId());
+    if (previousChildCount != null && previousChildCount > 0 && !request.hasChildren()) {
+      long now = level.getGameTime();
+      Long lastDropLog = resolver.getParentChildDropLastLogTickForOps().get(request.getId());
+      if (lastDropLog == null || now - lastDropLog >= 100L) {
+        resolver.getParentChildDropLastLogTickForOps().put(request.getId(), now);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          String previousChildren =
+              resolver.getParentLastKnownChildrenForOps().getOrDefault(request.getId(), "[]");
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] root-cause parent-child-drop parent={} state={} prevChildCount={} prevChildren={} reservedForRequest={} pending={} cooldown={}",
+              request.getId(),
+              request.getState(),
+              previousChildCount,
+              previousChildren,
+              reservedForRequest,
+              resolver.getPendingTracker().getPendingCount(request.getId()),
+              resolver.getCooldown().isRequestOnCooldown(level, request.getId()));
+        }
+      }
+    }
+    resolver.getParentLastKnownChildCountForOps().put(request.getId(), 0);
+    resolver.getParentLastKnownChildrenForOps().put(request.getId(), "[]");
+    resolver.getParentDeliveryActiveSinceForOps().remove(request.getId());
+    resolver.clearStaleRecoveryArmForOps(request.getId());
+    if (resolver.hasDeliveriesCreated(request.getId())) {
+      resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
+      resolver.touchFlowForOps(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
+            requestIdLog);
+      }
+      return;
+    }
+
+    if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
+          requestIdLog,
+          reservedForRequest);
+    }
+    var pendingDecision =
+        resolver
+            .getPendingStateDecisionServiceForOps()
+            .decide(
+                resolver,
+                request,
+                level,
+                deliverable,
+                onCooldown,
+                reservedForRequest,
+                workerWorking,
+                requestIdLog);
+    if (pendingDecision.shouldSkip()) {
+      return;
+    }
+    int pendingCount = pendingDecision.pendingCount();
+    int rackAvailable = resolver.getPlanning().getAvailableFromRacks(tile, deliverable);
+    int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+    int rackAvailableForRequest =
+        Math.max(
+            0,
+            rackAvailable - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
+    int reservedSynced =
+        resolver
+            .getReservationSyncServiceForOps()
+            .syncReservationsFromRack(
+                resolver,
+                tile,
+                pickup,
+                requestId,
+                request.getId(),
+                deliverable,
+                pendingCount,
+                reservedForRequest,
+                rackAvailableForRequest,
+                level.getGameTime());
+    if (reservedSynced > 0) {
+      reservedForRequest += reservedSynced;
+      reservedForDeliverable += reservedSynced;
+      rackAvailableForRequest =
+          Math.max(
+              0,
+              rackAvailable
+                  - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
+    }
+    resolver
+        .getPendingTopupServiceForOps()
+        .handleTopup(
+            manager,
+            request,
+            level,
+            tile,
+            pickup,
+            deliverable,
+            workerWorking,
+            pendingCount,
+            reservedForRequest,
+            rackAvailableForRequest,
+            requestIdLog);
+    var creationResult =
+        resolver
+            .getPendingDeliveryCreationServiceForOps()
+            .process(
+                manager,
+                request,
+                level,
+                tile,
+                pickup,
+                deliverable,
+                pendingCount,
+                rackAvailableForRequest,
+                requestIdLog);
+    if (!creationResult.created()) {
+      return;
+    }
+    resolver
+        .getPostCreationUpdateServiceForOps()
+        .apply(resolver, manager, request, level, creationResult, requestIdLog);
+  }
+}
