@@ -90,7 +90,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
             manager,
             parentToken);
     assertFalse(firstArm);
-    assertEquals(now.get() + 20L, resolver.getParentChildrenRecheck().get(parentToken));
+    assertEquals(now.get() + 20L, resolver.getParentChildRecheckDueTick(parentToken));
 
     boolean secondBeforeDelay =
         invokeLifecycleBoolean(

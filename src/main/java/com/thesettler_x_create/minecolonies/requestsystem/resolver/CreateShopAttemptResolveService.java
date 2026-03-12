@@ -49,11 +49,11 @@ final class CreateShopAttemptResolveService {
         0,
         null);
     if (request.getState() == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      resolver.getCancelledRequests().add(request.getId());
+      resolver.markCancelledRequest(request.getId());
     } else {
-      resolver.getCancelledRequests().remove(request.getId());
+      resolver.clearCancelledRequest(request.getId());
     }
-    if (resolver.getCancelledRequests().contains(request.getId())) {
+    if (resolver.isCancelledRequest(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve skipped (request cancelled) {}", request.getId());

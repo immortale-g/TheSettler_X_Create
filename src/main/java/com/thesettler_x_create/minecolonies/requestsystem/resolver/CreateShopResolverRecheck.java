@@ -7,6 +7,8 @@ import net.minecraft.world.level.Level;
 final class CreateShopResolverRecheck {
   private final CreateShopRequestResolver resolver;
   private final CreateShopResolverDiagnostics diagnostics;
+  private final java.util.Map<IToken<?>, Long> parentChildrenRecheck =
+      new java.util.concurrent.ConcurrentHashMap<>();
 
   CreateShopResolverRecheck(
       CreateShopRequestResolver resolver, CreateShopResolverDiagnostics diagnostics) {
@@ -16,16 +18,26 @@ final class CreateShopResolverRecheck {
 
   void scheduleParentChildRecheck(IStandardRequestManager manager, IToken<?> parentToken) {
     var level = manager.getColony().getWorld();
-    resolver.getParentChildrenRecheck().put(parentToken, level.getGameTime() + 20L);
+    parentChildrenRecheck.put(parentToken, level.getGameTime() + 20L);
+  }
+
+  void scheduleParentChildRecheckAtForTest(IToken<?> parentToken, long dueTick) {
+    if (parentToken == null) {
+      return;
+    }
+    parentChildrenRecheck.put(parentToken, dueTick);
+  }
+
+  Long getParentChildRecheckDueTick(IToken<?> parentToken) {
+    return parentToken == null ? null : parentChildrenRecheck.get(parentToken);
   }
 
   void processParentChildRechecks(IStandardRequestManager manager, Level level) {
-    var recheckMap = resolver.getParentChildrenRecheck();
-    if (recheckMap.isEmpty()) {
+    if (parentChildrenRecheck.isEmpty()) {
       return;
     }
     long now = level.getGameTime();
-    var iterator = recheckMap.entrySet().iterator();
+    var iterator = parentChildrenRecheck.entrySet().iterator();
     while (iterator.hasNext()) {
       var entry = iterator.next();
       Long due = entry.getValue();

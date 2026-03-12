@@ -79,7 +79,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
     resolver.markDeliveriesCreated(parentToken);
-    resolver.getParentChildrenRecheck().put(parentToken, 10_100L);
+    resolver.scheduleParentChildRecheckAtForTest(parentToken, 10_100L);
 
     parentMap("parentDeliveryActiveSince").put(parentToken, 9_000L);
     parentMap("parentStaleRecoveryArmedAt").put(parentToken, 9_500L);
