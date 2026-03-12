@@ -33,7 +33,7 @@ final class CreateShopPendingRequestGateService {
       } else {
         resolver.clearPendingTokenState(request.getId(), true);
         resolver.getDiagnosticsForOps().logPendingReasonChange(request.getId(), "skip:cancelled");
-        resolver.transitionFlowForOps(
+        resolver.transitionFlow(
             manager,
             request,
             CreateShopFlowState.CANCELLED,
@@ -50,7 +50,7 @@ final class CreateShopPendingRequestGateService {
     }
     if (request.getState() == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
       resolver.clearPendingTokenState(request.getId(), true);
-      resolver.transitionFlowForOps(
+      resolver.transitionFlow(
           manager,
           request,
           CreateShopFlowState.CANCELLED,

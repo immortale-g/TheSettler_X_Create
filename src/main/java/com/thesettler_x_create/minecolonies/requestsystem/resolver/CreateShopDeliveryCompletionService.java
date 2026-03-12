@@ -57,7 +57,7 @@ final class CreateShopDeliveryCompletionService {
       }
     }
     if (parentRequest != null) {
-      resolver.transitionFlowForOps(
+      resolver.transitionFlow(
           manager,
           parentRequest,
           CreateShopFlowState.DELIVERY_COMPLETED,
@@ -98,7 +98,7 @@ final class CreateShopDeliveryCompletionService {
           int reservedForStackAfter = pickup.getReservedFor(stack);
           int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
           if (consumedReserved > 0 && parentRequest != null) {
-            resolver.transitionFlowForOps(
+            resolver.transitionFlow(
                 manager,
                 parentRequest,
                 CreateShopFlowState.RESERVED_FOR_DELIVERY,

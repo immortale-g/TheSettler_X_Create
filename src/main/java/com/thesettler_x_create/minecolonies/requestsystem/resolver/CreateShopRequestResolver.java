@@ -502,7 +502,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return resolveNowTick(manager);
   }
 
-  private void transitionFlow(
+  void transitionFlow(
       IRequestManager manager,
       IRequest<?> request,
       CreateShopFlowState state,
@@ -577,17 +577,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   void clearTrackedChildrenForParentForOps(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
-  }
-
-  void transitionFlowForOps(
-      IRequestManager manager,
-      IRequest<?> request,
-      CreateShopFlowState state,
-      String detail,
-      String stackLabel,
-      int amount,
-      String messageKey) {
-    transitionFlow(manager, request, state, detail, stackLabel, amount, messageKey);
   }
 
   java.util.Map<IToken<?>, Long> getDeliveryChildActiveSinceForOps() {

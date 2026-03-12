@@ -31,7 +31,7 @@ final class CreateShopFlowTimeoutCleanupService {
         // Missing requests are cleaned up below.
       }
       if (request != null) {
-        resolver.transitionFlowForOps(
+        resolver.transitionFlow(
             manager,
             request,
             CreateShopFlowState.FAILED,

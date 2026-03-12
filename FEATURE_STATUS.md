@@ -292,6 +292,9 @@ Current behavior:
   (`handleDeliveryComplete`, `handleDeliveryCancelled`, `reassignResolvableRetryingRequests`,
   `getRecheck`) instead of `*ForOps` aliases, continuing resolver ops-surface reduction without
   behavior changes.
+- Flow-transition entrypoints now use the shared direct resolver method `transitionFlow(...)`
+  across attempt/pending/timeout/terminal/completion services, removing the last
+  `transitionFlowForOps(...)` forwarding layer.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
