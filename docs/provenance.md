@@ -521,3 +521,7 @@ Implementation notes:
   now delegates to `CreateShopAttemptResolveService`, preserving existing guards for cancelled /
   cooldown / active-child states, network-vs-rack ordering, wrapped-manager defer behavior, and
   reservation writes for ordered stacks.
+- Resolver runtime-state isolation hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `cancelledRequests`, `pendingNotices`, and
+  `retryingReassignAttempts` tracking moved from static class-level state to instance-local
+  state in `CreateShopRequestResolver`, preventing cross-resolver/world stale-token bleed.

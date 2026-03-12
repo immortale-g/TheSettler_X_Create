@@ -227,6 +227,9 @@ Current behavior:
 - Attempt-resolve orchestration is now centralized in `CreateShopAttemptResolveService`, so
   `CreateShopRequestResolver.attemptResolveRequest(...)` is a thin delegate and request ordering /
   defer / delivery-creation decision flow is isolated from resolver lifecycle scaffolding.
+- Resolver runtime trackers for cancelled/pending-notice/retrying-reassign are now instance-local
+  (not static), eliminating cross-instance/world carryover risk that could resurrect stale tokens
+  after reloads and amplify request drift.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
