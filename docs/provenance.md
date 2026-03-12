@@ -554,3 +554,7 @@ Implementation notes:
   is authored in this project scope: paired pending/cooldown mutations now route through
   `CreateShopRequestStateMutatorService` and were adopted in attempt-resolve, pending-decision,
   reservation-refresh, delivery cancel/complete, timeout cleanup, and terminal cleanup services.
+- Child reconciliation dependency refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopChildReconciliationService` now
+  calls lifecycle/recovery/root-cause services directly, and obsolete resolver stale-recovery
+  forwarding methods were removed with guard/runtime tests updated to the new call sites.

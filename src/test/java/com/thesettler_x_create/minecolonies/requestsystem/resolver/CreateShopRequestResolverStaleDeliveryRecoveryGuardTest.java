@@ -9,10 +9,14 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
   @Test
   void resolverContainsStaleDeliveryRecoveryPath() throws Exception {
-    String source =
+    String resolverSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String lifecycleSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
@@ -26,14 +30,14 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryOriginMatcher.java"));
 
-    assertTrue(source.contains("isStaleDeliveryChild("));
-    assertTrue(source.contains("recoverStaleDeliveryChild("));
+    assertTrue(lifecycleSource.contains("isStaleDeliveryChild("));
+    assertTrue(reconcileSource.contains("stale-child-recovery"));
     assertTrue(originSource.contains("isLocalShopDeliveryChild("));
     assertTrue(originSource.contains("isDeliveryFromLocalShopStart("));
-    assertTrue(source.contains("parentDeliveryActiveSince"));
+    assertTrue(resolverSource.contains("parentDeliveryActiveSince"));
     assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
-    assertTrue(source.contains("stale delivery-child recovery"));
-    assertTrue(source.contains("stale-child-recovery"));
+    assertTrue(reconcileSource.contains("stale delivery-child recovery"));
+    assertTrue(reconcileSource.contains("stale-child-recovery"));
     assertTrue(recoverySource.contains("manager.updateRequestState("));
     assertTrue(
         recoverySource.contains(

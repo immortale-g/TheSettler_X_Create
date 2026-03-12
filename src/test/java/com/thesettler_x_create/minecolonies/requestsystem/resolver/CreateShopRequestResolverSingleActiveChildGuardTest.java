@@ -9,17 +9,13 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverSingleActiveChildGuardTest {
   @Test
   void tickPendingEnforcesSingleActiveLocalDeliveryChildPerParent() throws Exception {
-    String resolverSource =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
     assertTrue(reconcileSource.contains("IToken<?> activeLocalDeliveryChild = null;"));
-    assertTrue(reconcileSource.contains("recoverExtraActiveDeliveryChildForOps("));
-    assertTrue(resolverSource.contains("extra active delivery-child recovery"));
+    assertTrue(reconcileSource.contains("deliveryChildRecoveryService.recover("));
+    assertTrue(reconcileSource.contains("extra-active-child-recovery"));
   }
 }

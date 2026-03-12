@@ -110,8 +110,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPendingTokenCollectorService();
   private final CreateShopPendingRequestGateService pendingRequestGateService =
       new CreateShopPendingRequestGateService();
-  private final CreateShopChildReconciliationService childReconciliationService =
-      new CreateShopChildReconciliationService();
+  private final CreateShopChildReconciliationService childReconciliationService;
   private final CreateShopPendingStateDecisionService pendingStateDecisionService =
       new CreateShopPendingStateDecisionService();
   private final CreateShopPostCreationUpdateService postCreationUpdateService =
@@ -147,6 +146,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
     this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
+    this.childReconciliationService =
+        new CreateShopChildReconciliationService(
+            deliveryManager,
+            deliveryChildLifecycleService,
+            deliveryChildRecoveryService,
+            deliveryRootCauseSnapshotService);
     this.pendingRequestProcessorService =
         new CreateShopPendingRequestProcessorService(
             pendingRequestGateService,
@@ -568,22 +573,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     flowTimeoutCleanupService.processTimedOutFlows(this, manager, level);
   }
 
-  private boolean isStaleRecoveryArmed(
-      Level level, IStandardRequestManager manager, IToken<?> parentToken) {
-    return deliveryChildLifecycleService.isStaleRecoveryArmed(this, level, manager, parentToken);
-  }
-
   private void clearStaleRecoveryArm(IToken<?> parentToken) {
     deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
-  }
-
-  private boolean isStaleDeliveryChild(
-      Level level,
-      IToken<?> parentToken,
-      IToken<?> childToken,
-      com.minecolonies.api.colony.requestsystem.request.RequestState state) {
-    return deliveryChildLifecycleService.isStaleDeliveryChild(
-        this, level, parentToken, childToken, state);
   }
 
   private long getInflightTimeoutTicksSafe() {
@@ -595,68 +586,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  private boolean recoverStaleDeliveryChild(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      BuildingCreateShop shop,
-      CreateShopBlockEntity pickup) {
-    return recoverDeliveryChild(
-        manager,
-        level,
-        parentRequest,
-        childToken,
-        childRequest,
-        shop,
-        pickup,
-        "stale-child-recovery",
-        "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
-  }
-
-  private boolean recoverExtraActiveDeliveryChild(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      BuildingCreateShop shop,
-      CreateShopBlockEntity pickup) {
-    return recoverDeliveryChild(
-        manager,
-        level,
-        parentRequest,
-        childToken,
-        childRequest,
-        shop,
-        pickup,
-        "extra-active-child-recovery",
-        "[CreateShop] extra active delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
-  }
-
-  private boolean recoverDeliveryChild(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      BuildingCreateShop shop,
-      CreateShopBlockEntity pickup,
-      String pendingSource,
-      String logTemplate) {
-    return deliveryChildRecoveryService.recover(
-        this,
-        manager,
-        level,
-        parentRequest,
-        childToken,
-        childRequest,
-        shop,
-        pickup,
-        pendingSource,
-        logTemplate);
-  }
 
   private void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
@@ -665,17 +594,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   void reassignResolvableRetryingRequestsForOps(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
-  }
-
-  private void logDeliveryRootCauseSnapshot(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parent,
-      IRequest<?> child,
-      IToken<?> childToken,
-      IToken<?> assignedResolverToken) {
-    deliveryRootCauseSnapshotService.logSnapshot(
-        this, manager, level, parent, child, childToken, assignedResolverToken);
   }
 
   CreateShopRequestStateMachine getFlowStateMachineForOps() {
@@ -874,47 +792,4 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return unwrapStandardManager(manager);
   }
 
-  boolean recoverExtraActiveDeliveryChildForOps(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      BuildingCreateShop shop,
-      CreateShopBlockEntity pickup) {
-    return recoverExtraActiveDeliveryChild(
-        manager, level, parentRequest, childToken, childRequest, shop, pickup);
-  }
-
-  boolean recoverStaleDeliveryChildForOps(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      BuildingCreateShop shop,
-      CreateShopBlockEntity pickup) {
-    return recoverStaleDeliveryChild(
-        manager, level, parentRequest, childToken, childRequest, shop, pickup);
-  }
-
-  boolean isStaleDeliveryChildForOps(
-      Level level, IToken<?> parentToken, IToken<?> childToken, RequestState state) {
-    return isStaleDeliveryChild(level, parentToken, childToken, state);
-  }
-
-  boolean isStaleRecoveryArmedForOps(
-      Level level, IStandardRequestManager manager, IToken<?> parentToken) {
-    return isStaleRecoveryArmed(level, manager, parentToken);
-  }
-
-  void logDeliveryRootCauseSnapshotForOps(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parent,
-      IRequest<?> child,
-      IToken<?> childToken,
-      IToken<?> assignedResolverToken) {
-    logDeliveryRootCauseSnapshot(manager, level, parent, child, childToken, assignedResolverToken);
-  }
 }

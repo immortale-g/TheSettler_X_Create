@@ -20,7 +20,7 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
 
     assertTrue(
         reconcileSource.contains(
-            "isStaleDeliveryChildForOps(level, request.getId(), childToken, childState)"));
+            "deliveryChildLifecycleService.isStaleDeliveryChild("));
     assertTrue(
         lifecycleSource.contains(
             "resolver.getParentDeliveryActiveSinceForOps().putIfAbsent(parentToken, now)"));

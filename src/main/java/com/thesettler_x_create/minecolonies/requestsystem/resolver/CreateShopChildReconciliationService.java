@@ -18,6 +18,22 @@ import net.minecraft.world.level.Level;
 
 /** Reconciles parent child-request lifecycle for pending Create Shop requests. */
 final class CreateShopChildReconciliationService {
+  private final CreateShopDeliveryManager deliveryManager;
+  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
+  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
+  private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService;
+
+  CreateShopChildReconciliationService(
+      CreateShopDeliveryManager deliveryManager,
+      CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService,
+      CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService,
+      CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService) {
+    this.deliveryManager = deliveryManager;
+    this.deliveryChildLifecycleService = deliveryChildLifecycleService;
+    this.deliveryChildRecoveryService = deliveryChildRecoveryService;
+    this.deliveryRootCauseSnapshotService = deliveryRootCauseSnapshotService;
+  }
+
   ChildReconcileResult reconcile(
       CreateShopRequestResolver resolver,
       IStandardRequestManager standardManager,
@@ -116,8 +132,7 @@ final class CreateShopChildReconciliationService {
               }
             }
             if (childAssigned == null) {
-              boolean enqueued =
-                  resolver.getDeliveryManagerForOps().tryEnqueueDelivery(standardManager, childToken);
+              boolean enqueued = deliveryManager.tryEnqueueDelivery(standardManager, childToken);
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] tickPending: {} child {} unassigned delivery -> enqueue={}",
@@ -128,8 +143,17 @@ final class CreateShopChildReconciliationService {
             }
             if (activeLocalDeliveryChild != null && !activeLocalDeliveryChild.equals(childToken)) {
               boolean recovered =
-                  resolver.recoverExtraActiveDeliveryChildForOps(
-                      standardManager, level, request, childToken, child, shop, pickup);
+                  deliveryChildRecoveryService.recover(
+                      resolver,
+                      standardManager,
+                      level,
+                      request,
+                      childToken,
+                      child,
+                      shop,
+                      pickup,
+                      "extra-active-child-recovery",
+                      "[CreateShop] extra active delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
               if (recovered) {
                 missing++;
                 continue;
@@ -137,23 +161,34 @@ final class CreateShopChildReconciliationService {
             } else {
               activeLocalDeliveryChild = childToken;
             }
-            if (resolver.isStaleDeliveryChildForOps(level, request.getId(), childToken, childState)) {
-              if (!resolver.isStaleRecoveryArmedForOps(level, standardManager, request.getId())) {
+            if (deliveryChildLifecycleService.isStaleDeliveryChild(
+                resolver, level, request.getId(), childToken, childState)) {
+              if (!deliveryChildLifecycleService.isStaleRecoveryArmed(
+                  resolver, level, standardManager, request.getId())) {
                 hasActiveChildren = true;
                 continue;
               }
               boolean recovered =
-                  resolver.recoverStaleDeliveryChildForOps(
-                      standardManager, level, request, childToken, child, shop, pickup);
+                  deliveryChildRecoveryService.recover(
+                      resolver,
+                      standardManager,
+                      level,
+                      request,
+                      childToken,
+                      child,
+                      shop,
+                      pickup,
+                      "stale-child-recovery",
+                      "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
               if (recovered) {
                 missing++;
                 continue;
               }
             } else {
-              resolver.clearStaleRecoveryArmForOps(request.getId());
+              deliveryChildLifecycleService.clearStaleRecoveryArm(resolver, request.getId());
             }
-            resolver.logDeliveryRootCauseSnapshotForOps(
-                standardManager, level, request, child, childToken, childAssigned);
+            deliveryRootCauseSnapshotService.logSnapshot(
+                resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
           } else {
             resolver.getDeliveryChildActiveSinceForOps().remove(childToken);
