@@ -82,11 +82,19 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
   private void invokeProcessTimedOutFlows(IStandardRequestManager manager, Level level)
       throws Exception {
+    Field field = CreateShopRequestResolver.class.getDeclaredField("flowTimeoutCleanupService");
+    field.setAccessible(true);
+    Object service = field.get(resolver);
     Method method =
-        CreateShopRequestResolver.class.getDeclaredMethod(
-            "processTimedOutFlows", IStandardRequestManager.class, Level.class);
+        service
+            .getClass()
+            .getDeclaredMethod(
+                "processTimedOutFlows",
+                CreateShopRequestResolver.class,
+                IStandardRequestManager.class,
+                Level.class);
     method.setAccessible(true);
-    method.invoke(resolver, manager, level);
+    method.invoke(service, resolver, manager, level);
   }
 
   private Object getField(String fieldName) throws Exception {

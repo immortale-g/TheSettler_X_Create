@@ -569,14 +569,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  private void processTimedOutFlows(IStandardRequestManager manager, Level level) {
-    flowTimeoutCleanupService.processTimedOutFlows(this, manager, level);
-  }
-
-  private void clearStaleRecoveryArm(IToken<?> parentToken) {
-    deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
-  }
-
   private long getInflightTimeoutTicksSafe() {
     try {
       return Math.max(
@@ -585,13 +577,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
     }
   }
-
-
-  private void clearTrackedChildrenForParent(
-      IStandardRequestManager manager, IToken<?> parentToken) {
-    deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
-  }
-
   void reassignResolvableRetryingRequestsForOps(IStandardRequestManager manager, Level level) {
     retryingReassignService.reassignResolvableRetryingRequests(this, manager, level);
   }
@@ -633,12 +618,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   void clearStaleRecoveryArmForOps(IToken<?> parentToken) {
-    clearStaleRecoveryArm(parentToken);
+    deliveryChildLifecycleService.clearStaleRecoveryArm(this, parentToken);
   }
 
   void clearTrackedChildrenForParentForOps(
       IStandardRequestManager manager, IToken<?> parentToken) {
-    clearTrackedChildrenForParent(manager, parentToken);
+    deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
 
   void transitionFlowForOps(
@@ -697,7 +682,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   void processTimedOutFlowsForOps(IStandardRequestManager manager, Level level) {
-    processTimedOutFlows(manager, level);
+    flowTimeoutCleanupService.processTimedOutFlows(this, manager, level);
   }
 
   void setLastTickPendingNanosForOps(long nanos) {
@@ -786,10 +771,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (manager instanceof IStandardRequestManager standardManager) {
       diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
     }
-  }
-
-  IStandardRequestManager unwrapStandardManagerForOps(IRequestManager manager) {
-    return unwrapStandardManager(manager);
   }
 
 }

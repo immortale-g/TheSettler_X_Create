@@ -252,6 +252,9 @@ Current behavior:
 - Child reconciliation now depends directly on delivery lifecycle/recovery/snapshot services
   instead of resolver stale-recovery forwarding methods, shrinking resolver orchestration surface
   and isolating child-recovery behavior inside dedicated components.
+- Additional resolver forwarder cleanup removed obsolete internal delegation methods
+  (`processTimedOutFlows`, `clearTrackedChildrenForParent`, `unwrapStandardManagerForOps`, etc.),
+  with callers switched to direct service/static usage.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
