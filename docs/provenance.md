@@ -666,3 +666,8 @@ Implementation notes:
   ordered+pending mutations through `CreateShopRequestStateMutatorService` instead of writing
   cooldown/pending tracker state directly, reducing split lifecycle write paths during inflight wait
   and network top-up ordering.
+- Missing-child grace/drop lifecycle extraction on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  missing-child grace window/drop decision moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryChildLifecycleService`, keeping child lifecycle timeout and cleanup decisions
+  in one service instead of split between resolver + reconciliation.

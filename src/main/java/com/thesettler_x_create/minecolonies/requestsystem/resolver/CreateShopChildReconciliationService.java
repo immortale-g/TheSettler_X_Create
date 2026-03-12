@@ -69,7 +69,7 @@ final class CreateShopChildReconciliationService {
         try {
           IRequest<?> child = requestHandler.getRequest(childToken);
           if (child == null) {
-            if (resolver.shouldDropMissingChild(level, childToken)) {
+            if (deliveryChildLifecycleService.shouldDropMissingChild(resolver, level, childToken)) {
               request.removeChild(childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
               missing++;
@@ -207,7 +207,7 @@ final class CreateShopChildReconciliationService {
                 childState);
           }
         } catch (Exception ex) {
-          if (resolver.shouldDropMissingChild(level, childToken)) {
+          if (deliveryChildLifecycleService.shouldDropMissingChild(resolver, level, childToken)) {
             request.removeChild(childToken);
             requestStateMutatorService.clearMissingChild(resolver, childToken);
             missing++;
