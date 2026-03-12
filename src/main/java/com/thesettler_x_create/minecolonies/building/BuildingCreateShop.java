@@ -499,12 +499,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     networkNotifier.notifyMissingNetwork();
   }
 
-  public int restartLostPackage(
-      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
-    return restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)
-        .consumed();
-  }
-
   LostPackageReorderResult restartLostPackageDetailed(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
     if (isDebugRequests()) {
