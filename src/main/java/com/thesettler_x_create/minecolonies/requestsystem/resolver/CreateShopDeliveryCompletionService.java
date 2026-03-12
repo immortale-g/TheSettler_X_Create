@@ -46,7 +46,7 @@ final class CreateShopDeliveryCompletionService {
       return;
     }
     resolver.getParentDeliveryActiveSinceForOps().remove(parentToken);
-    resolver.clearStaleRecoveryArmForOps(parentToken);
+    resolver.clearStaleRecoveryArm(parentToken);
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
     if (standard != null) {
@@ -107,7 +107,7 @@ final class CreateShopDeliveryCompletionService {
                 consumedReserved,
                 "com.thesettler_x_create.message.createshop.flow_reserved");
           }
-          if (resolver.isDebugLoggingEnabledForOps()) {
+          if (resolver.isDebugLoggingEnabled()) {
             int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
             int reservedForStack = reservedForStackAfter;
             BlockPos pickupPosition = pickup.getBlockPos();
@@ -147,7 +147,7 @@ final class CreateShopDeliveryCompletionService {
     } else {
       requestStateMutatorService.clearOrderedAndPending(resolver, parentToken);
     }
-    if (resolver.isDebugLoggingEnabledForOps()) {
+    if (resolver.isDebugLoggingEnabled()) {
       IStandardRequestManager debugManager = CreateShopRequestResolver.unwrapStandardManager(manager);
       if (debugManager != null) {
         try {
@@ -174,3 +174,4 @@ final class CreateShopDeliveryCompletionService {
     }
   }
 }
+

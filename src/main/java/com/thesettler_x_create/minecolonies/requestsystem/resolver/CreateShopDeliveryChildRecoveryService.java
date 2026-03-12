@@ -42,7 +42,7 @@ final class CreateShopDeliveryChildRecoveryService {
       return false;
     }
     if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
-      resolver.clearStaleRecoveryArmForOps(parentRequest.getId());
+      resolver.clearStaleRecoveryArm(parentRequest.getId());
       return false;
     }
     if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(childRequest, shop, pickup)) {
@@ -76,7 +76,7 @@ final class CreateShopDeliveryChildRecoveryService {
         resolver, level, parentRequest.getId(), Math.max(currentPending, childCount));
     resolver.getDiagnosticsForOps().recordPendingSource(parentRequest.getId(), pendingSource);
     resolver.getParentDeliveryActiveSinceForOps().put(parentRequest.getId(), level.getGameTime());
-    resolver.clearStaleRecoveryArmForOps(parentRequest.getId());
+    resolver.clearStaleRecoveryArm(parentRequest.getId());
     resolver.getDeliveryChildActiveSinceForOps().put(childToken, level.getGameTime());
     resolver.getRecheck().scheduleParentChildRecheck(manager, parentRequest.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -86,3 +86,4 @@ final class CreateShopDeliveryChildRecoveryService {
     return true;
   }
 }
+

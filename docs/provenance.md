@@ -79,6 +79,10 @@ Implementation notes:
 - Resolver shop-lookup forwarding cleanup (switching services from `getShopForOps(...)` to direct
   `getShop(...)` and removing the wrapper) is authored in this project as a behavior-preserving
   internal simplification that reduces resolver facade duplication.
+- Resolver helper-forwarding cleanup (switching resolver services from `*ForOps` aliases to direct
+  helper names for flow/timeout/debug/retry/link-state calls and removing the alias wrappers) is
+  authored in this project as a behavior-preserving internal simplification that further reduces
+  resolver surface indirection.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

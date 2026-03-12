@@ -49,7 +49,7 @@ final class CreateShopRetryingReassignService {
         if (requestToken == null) {
           continue;
         }
-        Long last = resolver.getRetryingReassignAttemptsForOps().get(requestToken);
+        Long last = resolver.getRetryingReassignAttempts().get(requestToken);
         if (last != null && now - last < 40L) {
           continue;
         }
@@ -70,7 +70,7 @@ final class CreateShopRetryingReassignService {
         if (!resolver.canResolveRequest(manager, casted)) {
           continue;
         }
-        resolver.getRetryingReassignAttemptsForOps().put(requestToken, now);
+        resolver.getRetryingReassignAttempts().put(requestToken, now);
         try {
           IToken<?> newResolver = manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -94,3 +94,4 @@ final class CreateShopRetryingReassignService {
     }
   }
 }
+

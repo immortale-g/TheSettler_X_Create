@@ -20,9 +20,9 @@ final class CreateShopFlowTimeoutCleanupService {
     if (resolver == null || manager == null || level == null) {
       return;
     }
-    long timeout = resolver.getInflightTimeoutTicksSafeForOps();
+    long timeout = resolver.getInflightTimeoutTicksSafe();
     for (CreateShopFlowRecord record :
-        resolver.getFlowStateMachineForOps().collectTimedOut(level.getGameTime(), timeout)) {
+        resolver.getFlowStateMachine().collectTimedOut(level.getGameTime(), timeout)) {
       IToken<?> token = record.getRequestToken();
       IRequest<?> request = null;
       try {
@@ -46,9 +46,10 @@ final class CreateShopFlowTimeoutCleanupService {
       requestStateMutatorService.clearOrderedAndPending(resolver, token);
       resolver.clearDeliveriesCreated(token);
       resolver.getParentDeliveryActiveSinceForOps().remove(token);
-      resolver.clearStaleRecoveryArmForOps(token);
-      resolver.clearTrackedChildrenForParentForOps(manager, token);
-      resolver.getFlowStateMachineForOps().remove(token);
+      resolver.clearStaleRecoveryArm(token);
+      resolver.clearTrackedChildrenForParent(manager, token);
+      resolver.getFlowStateMachine().remove(token);
     }
   }
 }
+

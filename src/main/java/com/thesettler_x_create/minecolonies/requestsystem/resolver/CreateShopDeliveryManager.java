@@ -244,7 +244,7 @@ final class CreateShopDeliveryManager {
       IStandardRequestManager standardManager =
           CreateShopRequestResolver.unwrapStandardManager(manager);
       if (standardManager != null) {
-        resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
+        resolver.logDeliveryLinkState("create", standardManager, request.getId(), token);
       }
     }
     notifyDeliverymen(manager, token);
@@ -503,3 +503,4 @@ final class CreateShopDeliveryManager {
     return citizens == null ? 0 : citizens.size();
   }
 }
+
