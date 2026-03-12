@@ -651,3 +651,8 @@ Implementation notes:
   (`getRootCauseLastLogTick`, `markRetryingReassignAttempt`, child/parent snapshot accessors,
   active-child snapshots) instead of broad map getter exposure, reducing accidental multi-writer
   mutation risk and tightening state-owner boundaries.
+- Terminal token cleanup hardening on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: `clearPendingTokenState` now performs centralized cleanup for
+  pending/cooldown, delivery-created marker, parent stale/active/snapshot tracking, child-active
+  + missing-child tracking, root-cause snapshot tracking, and retrying-reassign attempts for the
+  token, reducing stale runtime residue after terminal or invalid-token transitions.
