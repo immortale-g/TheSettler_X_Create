@@ -127,6 +127,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopReservationSyncService();
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService =
       new CreateShopPendingRequestProcessorService();
+  private final CreateShopAttemptResolveService attemptResolveService =
+      new CreateShopAttemptResolveService();
   private final CreateShopTickPendingService tickPendingService =
       new CreateShopTickPendingService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
@@ -170,246 +172,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public List<IToken<?>> attemptResolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    long now = resolveNowTick(manager);
-    transitionFlow(
-        manager,
-        request,
-        CreateShopFlowState.ELIGIBILITY_CHECK,
-        "attemptResolve:start",
-        "",
-        0,
-        null);
-    if (request.getState()
-        == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      cancelledRequests.add(request.getId());
-    } else {
-      cancelledRequests.remove(request.getId());
-    }
-    if (cancelledRequests.contains(request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (request cancelled) " + request.getId());
-      }
-      return Lists.newArrayList();
-    }
-    Level level = manager.getColony().getWorld();
-    if (level.isClientSide) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (no level or client)");
-      }
-      return Lists.newArrayList();
-    }
-    if (cooldown.isRequestOnCooldown(level, request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (request already ordered)");
-      }
-      return Lists.newArrayList();
-    }
-    if (request.hasChildren()) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:has-children");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (has active children) request={}",
-            request.getId());
-      }
-      return Lists.newArrayList();
-    }
-    if (hasDeliveriesCreated(request.getId())) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:deliveries-created");
-      return Lists.newArrayList();
-    }
-    IDeliverable deliverable = request.getRequest();
-    chain.sanitizeRequestChain(manager, request);
-
-    BuildingCreateShop shop = getShop(manager);
-    if (shop == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (shop missing)");
-      }
-      return Lists.newArrayList();
-    }
-    TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-    if (tile == null || tile.getStockNetworkId() == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (missing stock network id)");
-      }
-      return Lists.newArrayList();
-    }
-    shop.ensurePickupLink();
-    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
-    if (pickup == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (pickup block missing)");
-      }
-      return Lists.newArrayList();
-    }
-    if (pickup.getLevel() == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (pickup level missing)");
-      }
-      return Lists.newArrayList();
-    }
-
-    UUID requestId = toRequestId(request.getId());
-    int reservedForRequest = pickup.getReservedForRequest(requestId);
-    int needed = computeOutstandingNeeded(request, deliverable, reservedForRequest);
-    if (needed > 0 && pendingTracker.hasDeliveryStarted(request.getId())) {
-      cooldown.markRequestOrdered(level, request.getId());
-      pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:block-auto-reorder-started");
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:block-auto-reorder-started");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve blocked auto-reorder (started-order) request={} needed={} reserved={}",
-            request.getId(),
-            needed,
-            reservedForRequest);
-      }
-      return Lists.newArrayList();
-    }
-    int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    if (needed <= 0) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (needed<=0)");
-      }
-      return Lists.newArrayList();
-    }
-    boolean workerWorking = shop.isWorkerWorking();
-
-    CreateShopStockSnapshot snapshot =
-        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
-    int rackAvailable = snapshot.getRackAvailable();
-    int rackUsable = snapshot.getRackUsable();
-    int networkAvailable = workerWorking ? snapshot.getNetworkAvailable() : 0;
-    int available = Math.max(0, networkAvailable + rackUsable);
-    int provide = Math.min(available, needed);
-    if (provide <= 0) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:insufficient");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve aborted (available={}, reserved={}, needed={}) for {}",
-            available,
-            reservedForOthers,
-            needed,
-            deliverable);
-      }
-      // Track pending requests so we can detect items arriving in racks.
-      cooldown.markRequestOrdered(level, request.getId());
-      pendingTracker.setPendingCount(request.getId(), needed);
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:insufficient");
-      return Lists.newArrayList();
-    }
-
-    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned =
-        planning.planFromRacksWithPositions(tile, deliverable, Math.min(provide, rackUsable));
-    List<ItemStack> ordered = planning.extractStacks(planned);
-    int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
-    int remaining = Math.max(0, provide - plannedCount);
-    if (remaining > 0 && workerWorking) {
-      String requesterName = messaging.resolveRequesterName(manager, request);
-      ordered.addAll(stockResolver.requestFromNetwork(tile, deliverable, remaining, requesterName));
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] attemptResolve provide={} (available={}, reserved={}, needed={}) -> ordered {} stack(s)",
-          provide,
-          available,
-          reservedForOthers,
-          needed,
-          ordered.size());
-    }
-    boolean hasNetworkPortion = remaining > 0;
-    if (!ordered.isEmpty()) {
-      transitionFlow(
-          manager,
-          request,
-          CreateShopFlowState.ORDERED_FROM_NETWORK,
-          "attemptResolve:order-created",
-          describeStack(ordered.get(0)),
-          countStackList(ordered),
-          "com.thesettler_x_create.message.createshop.flow_ordered");
-      // If any portion came from the network, defer child creation to tickPending.
-      if (hasNetworkPortion) {
-        cooldown.markRequestOrdered(level, request.getId());
-        pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
-        diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-network-arrival");
-        flowStateMachine.touch(request.getId(), now, "attemptResolve:defer-network-arrival");
-        messaging.sendShopChat(
-            manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
-      } else if (rackUsable > 0) {
-        if (unwrapStandardManager(manager) == null) {
-          cooldown.markRequestOrdered(level, request.getId());
-          pendingTracker.setPendingCount(request.getId(), Math.max(1, needed));
-          diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-wrapped-manager");
-          flowStateMachine.touch(request.getId(), now, "attemptResolve:defer-wrapped-manager");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] attemptResolve defer delivery creation (wrapped manager) request={} needed={} rackUsable={}",
-                request.getId(),
-                needed,
-                rackUsable);
-          }
-          return Lists.newArrayList();
-        }
-        transitionFlow(
-            manager,
-            request,
-            CreateShopFlowState.ARRIVED_IN_SHOP_RACK,
-            "attemptResolve:rack-usable",
-            describeStack(ordered.get(0)),
-            countStackList(ordered),
-            "com.thesettler_x_create.message.createshop.flow_arrived");
-        List<IToken<?>> created =
-            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
-              request.getId(),
-              manager.getClass().getName(),
-              created);
-        }
-        if (!created.isEmpty()) {
-          transitionFlow(
-              manager,
-              request,
-              CreateShopFlowState.DELIVERY_CREATED,
-              "attemptResolve:delivery-created",
-              describeStack(ordered.get(0)),
-              plannedCount,
-              "com.thesettler_x_create.message.createshop.flow_delivery_created");
-        }
-        return created;
-      } else {
-        // Otherwise, order from network and wait for arrival.
-        cooldown.markRequestOrdered(level, request.getId());
-        pendingTracker.setPendingCount(request.getId(), needed);
-        diagnostics.recordPendingSource(request.getId(), "attemptResolve:network-ordered");
-        messaging.sendShopChat(
-            manager, "com.thesettler_x_create.message.createshop.request_sent", ordered);
-      }
-    }
-
-    // Reserve ordered items so they count as in-progress and avoid re-ordering.
-    if (!ordered.isEmpty()) {
-      for (ItemStack stack : ordered) {
-        if (stack.isEmpty()) {
-          continue;
-        }
-        pickup.reserve(requestId, stack.copy(), stack.getCount());
-      }
-    }
-
-    // If we ordered from the network, we wait for arrival and do not create deliveries here.
-    if (hasNetworkPortion || rackUsable <= 0) {
-      return Lists.newArrayList();
-    }
-
-    // Deliveries already created above for rack items.
-    return Lists.newArrayList();
+    return attemptResolveService.attemptResolve(this, manager, request);
   }
 
   @Override
@@ -815,6 +578,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return getShop(manager);
   }
 
+  BuildingCreateShop getShopForOps(IRequestManager manager) {
+    return getShop(manager);
+  }
+
   java.util.Set<String> getDeliveryCreateLogged() {
     return deliveryCreateLogged;
   }
@@ -847,6 +614,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return 0L;
     }
     return manager.getColony().getWorld().getGameTime();
+  }
+
+  long resolveNowTickForOps(IRequestManager manager) {
+    return resolveNowTick(manager);
   }
 
   private void transitionFlow(
@@ -1324,6 +1095,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   boolean shouldDropMissingChildForOps(Level level, IToken<?> childToken) {
     return shouldDropMissingChild(level, childToken);
+  }
+
+  IStandardRequestManager unwrapStandardManagerForOps(IRequestManager manager) {
+    return unwrapStandardManager(manager);
   }
 
   boolean recoverExtraActiveDeliveryChildForOps(
