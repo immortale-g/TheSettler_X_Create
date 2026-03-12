@@ -181,6 +181,9 @@ Current behavior:
   `CreateShopDeliveryCancelService` (parent requeue/pending source/cooldown + missing-pickup
   fallback + diagnostics/recheck). Missing-pickup fallback now safely handles null delivery start
   locations before block lookup.
+- Root-cause delivery snapshot diagnostics are now centralized in
+  `CreateShopDeliveryRootCauseSnapshotService`, reducing resolver debug/forensics density while
+  preserving rate-limited warehouse/courier assignment snapshot emission.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

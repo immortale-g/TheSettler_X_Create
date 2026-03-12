@@ -490,3 +490,8 @@ Implementation notes:
   from `CreateShopRequestResolver` into `CreateShopDeliveryCancelService`, preserving
   missing-pickup fallback requeue behavior and adding null-safe delivery-start lookup before block
   entity probing.
+- Delivery root-cause snapshot refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: debug root-cause snapshot emission (warehouse
+  queue/courier details + assigned resolver snapshot) moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryRootCauseSnapshotService`, preserving rate-limit and snapshot-diff logging
+  behavior.

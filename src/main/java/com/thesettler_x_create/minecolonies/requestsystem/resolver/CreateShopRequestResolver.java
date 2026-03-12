@@ -119,6 +119,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopPostCreationUpdateService();
   private final CreateShopDeliveryCancelService deliveryCancelService =
       new CreateShopDeliveryCancelService();
+  private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
+      new CreateShopDeliveryRootCauseSnapshotService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -1456,150 +1458,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IRequest<?> child,
       IToken<?> childToken,
       IToken<?> assignedResolverToken) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()
-        || manager == null
-        || level == null
-        || parent == null
-        || child == null
-        || childToken == null) {
-      return;
-    }
-    if (!(child.getRequest() instanceof Delivery delivery)) {
-      return;
-    }
-
-    long now = level.getGameTime();
-    Long last = deliveryRootCauseLastLogTick.get(childToken);
-    if (last != null && now - last < 100L) {
-      return;
-    }
-
-    String assignedResolverClass = "<none>";
-    boolean assignedResolverDelivery = false;
-    if (assignedResolverToken != null) {
-      try {
-        Object assignedResolver = manager.getResolverHandler().getResolver(assignedResolverToken);
-        assignedResolverClass = tryDescribeResolver(assignedResolver);
-        assignedResolverDelivery =
-            assignedResolverClass.contains("DeliveryRequestResolver")
-                || assignedResolverClass.contains("WarehouseRequestResolver");
-      } catch (Exception ignored) {
-        assignedResolverClass = "<missing>";
-      }
-    }
-
-    java.util.List<String> warehouseDebug = new java.util.ArrayList<>();
-    var buildingManager =
-        manager.getColony() == null ? null : manager.getColony().getServerBuildingManager();
-    if (buildingManager != null && buildingManager.getBuildings() != null) {
-      for (var entry : buildingManager.getBuildings().entrySet()) {
-        Object building = entry.getValue();
-        if (!(building
-                instanceof
-                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
-                warehouse)
-            || building
-                instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
-          continue;
-        }
-        var queue =
-            warehouse.getModule(
-                com.minecolonies.core.colony.buildings.modules.BuildingModules
-                    .WAREHOUSE_REQUEST_QUEUE);
-        boolean queueContains =
-            queue != null
-                && queue.getMutableRequestList() != null
-                && queue.getMutableRequestList().contains(childToken);
-        var couriers =
-            warehouse.getModule(
-                com.minecolonies.core.colony.buildings.modules.BuildingModules.WAREHOUSE_COURIERS);
-        int courierCount =
-            couriers == null || couriers.getAssignedCitizen() == null
-                ? 0
-                : couriers.getAssignedCitizen().size();
-        java.util.List<String> courierInfo = new java.util.ArrayList<>();
-        if (couriers != null && couriers.getAssignedCitizen() != null) {
-          for (var citizen : couriers.getAssignedCitizen()) {
-            if (citizen == null) {
-              continue;
-            }
-            String name = citizen.getName() == null ? "<unknown>" : citizen.getName();
-            String job =
-                citizen.getJob() == null ? "<none>" : citizen.getJob().getClass().getSimpleName();
-            Object id = null;
-            Object uuid = null;
-            try {
-              id = citizen.getClass().getMethod("getId").invoke(citizen);
-            } catch (Exception ignored) {
-              id = "<na>";
-            }
-            try {
-              uuid = citizen.getClass().getMethod("getUUID").invoke(citizen);
-            } catch (Exception ignored) {
-              uuid = "<na>";
-            }
-            courierInfo.add(
-                name
-                    + "{id="
-                    + id
-                    + ",uuid="
-                    + uuid
-                    + ",job="
-                    + job
-                    + ",deliveryman="
-                    + (citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman)
-                    + "}");
-          }
-        }
-        String location = "<unknown>";
-        try {
-          Object locObj = warehouse.getClass().getMethod("getLocation").invoke(warehouse);
-          location = String.valueOf(locObj);
-        } catch (Exception ignored) {
-          // Best-effort debug only.
-        }
-        warehouseDebug.add(
-            "warehouse{loc="
-                + location
-                + ",queueContains="
-                + queueContains
-                + ",couriers="
-                + courierCount
-                + ",courierInfo="
-                + courierInfo
-                + "}");
-      }
-    }
-
-    String snapshot =
-        "parent="
-            + parent.getId()
-            + " child="
-            + childToken
-            + " childState="
-            + child.getState()
-            + " assignedResolver="
-            + (assignedResolverToken == null ? "<none>" : assignedResolverToken)
-            + " assignedResolverClass="
-            + assignedResolverClass
-            + " assignedResolverDelivery="
-            + assignedResolverDelivery
-            + " deliveryFrom="
-            + (delivery.getStart() == null
-                ? "<null>"
-                : delivery.getStart().getInDimensionLocation())
-            + " deliveryTo="
-            + (delivery.getTarget() == null
-                ? "<null>"
-                : delivery.getTarget().getInDimensionLocation())
-            + " warehouses="
-            + warehouseDebug;
-
-    String previous = deliveryRootCauseSnapshots.put(childToken, snapshot);
-    if (!snapshot.equals(previous)) {
-      TheSettlerXCreate.LOGGER.info("[CreateShop] root-cause delivery snapshot {}", snapshot);
-      deliveryRootCauseLastLogTick.put(childToken, now);
-    }
+    deliveryRootCauseSnapshotService.logSnapshot(
+        this, manager, level, parent, child, childToken, assignedResolverToken);
   }
 
   CreateShopRequestStateMachine getFlowStateMachineForOps() {
@@ -1612,6 +1472,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getParentDeliveryActiveSinceForOps() {
     return parentDeliveryActiveSince;
+  }
+
+  java.util.Map<IToken<?>, String> getDeliveryRootCauseSnapshotsForOps() {
+    return deliveryRootCauseSnapshots;
+  }
+
+  java.util.Map<IToken<?>, Long> getDeliveryRootCauseLastLogTickForOps() {
+    return deliveryRootCauseLastLogTick;
   }
 
   void clearStaleRecoveryArmForOps(IToken<?> parentToken) {
