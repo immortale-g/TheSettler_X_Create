@@ -542,3 +542,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: resolver static callback entrypoints now
   delegate resolver lookup/dispatch to `CreateShopDeliveryCallbackService`, preserving unresolved
   callback diagnostics and delivery-complete/cancel handling semantics.
+- Tick-pending dependency wiring refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopPendingRequestProcessorService` and
+  `CreateShopTickPendingService` now receive core collaborators via constructors instead of pulling
+  them through resolver ops getters, and unused resolver ops getter methods were removed.

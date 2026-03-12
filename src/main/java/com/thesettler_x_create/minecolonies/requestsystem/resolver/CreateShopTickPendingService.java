@@ -15,6 +15,16 @@ import net.minecraft.world.level.Level;
 
 /** Orchestrates tick-pending execution for Create Shop resolver state. */
 final class CreateShopTickPendingService {
+  private final CreateShopPendingTokenCollectorService pendingTokenCollectorService;
+  private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
+
+  CreateShopTickPendingService(
+      CreateShopPendingTokenCollectorService pendingTokenCollectorService,
+      CreateShopPendingRequestProcessorService pendingRequestProcessorService) {
+    this.pendingTokenCollectorService = pendingTokenCollectorService;
+    this.pendingRequestProcessorService = pendingRequestProcessorService;
+  }
+
   void tickPendingDeliveries(CreateShopRequestResolver resolver, IRequestManager manager) {
     if (resolver == null) {
       return;
@@ -52,9 +62,8 @@ final class CreateShopTickPendingService {
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
     Set<IToken<?>> pendingTokens =
-        resolver
-            .getPendingTokenCollectorServiceForOps()
-            .collectPendingTokens(resolver, standardManager, level, assignments);
+        pendingTokenCollectorService.collectPendingTokens(
+            resolver, standardManager, level, assignments);
     if (pendingTokens.isEmpty()) {
       return;
     }
@@ -88,20 +97,18 @@ final class CreateShopTickPendingService {
     }
 
     for (IToken<?> token : List.copyOf(pendingTokens)) {
-      resolver
-          .getPendingRequestProcessorServiceForOps()
-          .processToken(
-              resolver,
-              manager,
-              standardManager,
-              requestHandler,
-              assignmentStore::getAssignmentForValue,
-              token,
-              level,
-              shop,
-              tile,
-              pickup,
-              workerWorking);
+      pendingRequestProcessorService.processToken(
+          resolver,
+          manager,
+          standardManager,
+          requestHandler,
+          assignmentStore::getAssignmentForValue,
+          token,
+          level,
+          shop,
+          tile,
+          pickup,
+          workerWorking);
     }
     resolver.processTimedOutFlowsForOps(standardManager, level);
     resolver.setLastTickPendingNanosForOps(System.nanoTime() - perfStart);
