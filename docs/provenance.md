@@ -546,3 +546,7 @@ Implementation notes:
   (2026-03-12) is authored in this project scope: `CreateShopPendingRequestProcessorService` and
   `CreateShopTickPendingService` now receive core collaborators via constructors instead of pulling
   them through resolver ops getters, and unused resolver ops getter methods were removed.
+- Shop lookup facade consolidation on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: duplicate `getShopForValidator(...)` access path was removed
+  and consumers now use `getShopForOps(...)`, reducing resolver API surface without behavior
+  changes.

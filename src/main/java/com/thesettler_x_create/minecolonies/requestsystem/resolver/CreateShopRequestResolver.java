@@ -500,10 +500,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return stockResolver;
   }
 
-  BuildingCreateShop getShopForValidator(IRequestManager manager) {
-    return getShop(manager);
-  }
-
   BuildingCreateShop getShopForOps(IRequestManager manager) {
     return getShop(manager);
   }

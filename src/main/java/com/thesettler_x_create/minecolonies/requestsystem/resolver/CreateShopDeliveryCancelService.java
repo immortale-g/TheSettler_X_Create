@@ -45,7 +45,7 @@ final class CreateShopDeliveryCancelService {
       return;
     }
 
-    BuildingCreateShop shop = resolver.getShopForValidator(manager);
+    BuildingCreateShop shop = resolver.getShopForOps(manager);
     CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
     if (pickup == null) {
       ILocation start = delivery.getStart();
