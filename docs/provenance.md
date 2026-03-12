@@ -694,3 +694,8 @@ Implementation notes:
   authored in this project scope: mutator token reset now has a manager-aware variant that also
   clears tracked children for the token, and pending-gate/pending-processor/rehydrate/timeout/
   terminal cleanup paths now use that shared variant to reduce split cleanup sequencing.
+- Attempt/validator dependency injection refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  `CreateShopAttemptResolveService` and `CreateShopRequestValidator` now receive chain/cooldown/
+  planning/stock/diagnostic/flow collaborators via constructor injection instead of pulling those
+  from resolver facade getters, and corresponding unused resolver getter facades were removed.

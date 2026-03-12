@@ -58,7 +58,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopResolverPendingState pendingState =
       new CreateShopResolverPendingState();
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging(this);
-  private final CreateShopRequestValidator validator = new CreateShopRequestValidator();
+  private final CreateShopRequestValidator validator;
   private final CreateShopOutstandingNeededService outstandingNeededService =
       new CreateShopOutstandingNeededService();
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
@@ -125,12 +125,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             ownership, diagnostics, requestStateMutatorService);
     this.reservationSyncService =
         new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
+    this.validator = new CreateShopRequestValidator(chain, stockResolver, planning, cooldown);
     this.lifecycleRehydrateService =
         new CreateShopLifecycleRehydrateService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
-            requestStateMutatorService, messaging, deliveryManager, outstandingNeededService);
+            requestStateMutatorService,
+            messaging,
+            deliveryManager,
+            outstandingNeededService,
+            cooldown,
+            chain,
+            planning,
+            stockResolver,
+            diagnostics,
+            flowStateMachine);
     this.terminalRequestLifecycleService =
         new CreateShopTerminalRequestLifecycleService(
             requestStateMutatorService, cooldown, diagnostics);
@@ -413,20 +423,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return planning;
   }
 
-  CreateShopResolverChain getChain() {
-    return chain;
-  }
-
   CreateShopResolverCooldown getCooldown() {
     return cooldown;
   }
 
   CreateShopPendingDeliveryTracker getPendingTracker() {
     return lifecycleStateStore.getPendingTracker();
-  }
-
-  CreateShopStockResolver getStockResolver() {
-    return stockResolver;
   }
 
   boolean markDeliveryCreateLogged(String key) {
@@ -589,10 +591,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   void clearTrackedChildrenForParent(
       IStandardRequestManager manager, IToken<?> parentToken) {
     deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
-  }
-
-  CreateShopResolverDiagnostics getDiagnostics() {
-    return diagnostics;
   }
 
   CreateShopResolverRecheck getRecheck() {
