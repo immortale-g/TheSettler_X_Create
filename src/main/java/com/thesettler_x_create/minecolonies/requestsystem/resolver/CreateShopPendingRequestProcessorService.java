@@ -65,7 +65,7 @@ final class CreateShopPendingRequestProcessorService {
     try {
       request = requestHandler.getRequest(token);
     } catch (IllegalArgumentException ex) {
-      resolver.clearPendingTokenState(token, false);
+      requestStateMutatorService.clearPendingTokenState(resolver, standardManager, token, false);
       return;
     }
     if (pendingRequestGateService.shouldSkipForPendingProcessing(
@@ -73,7 +73,8 @@ final class CreateShopPendingRequestProcessorService {
       return;
     }
     if (CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
-      resolver.clearPendingTokenState(request.getId(), true);
+      requestStateMutatorService.clearPendingTokenState(
+          resolver, standardManager, request.getId(), true);
       diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(

@@ -690,3 +690,7 @@ Implementation notes:
   (`CreateShopResolverDiagnostics`, `CreateShopResolverRecheck`), pending notice cooldown state is
   owned by `CreateShopResolverPendingState`, and call sites now use explicit resolver methods for
   cancellation/logging flags instead of mutable collection getters.
+- Token-reset path hardening on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: mutator token reset now has a manager-aware variant that also
+  clears tracked children for the token, and pending-gate/pending-processor/rehydrate/timeout/
+  terminal cleanup paths now use that shared variant to reduce split cleanup sequencing.

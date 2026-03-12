@@ -75,8 +75,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopRetryingReassignService();
   private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
       new CreateShopPendingTokenCollectorService(ownership, tickPendingTelemetryService);
-  private final CreateShopPendingRequestGateService pendingRequestGateService =
-      new CreateShopPendingRequestGateService(ownership, diagnostics);
+  private final CreateShopPendingRequestGateService pendingRequestGateService;
   private final CreateShopChildReconciliationService childReconciliationService;
   private final CreateShopPendingStateDecisionService pendingStateDecisionService;
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
@@ -121,6 +120,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.deliveryChildRecoveryService =
         new CreateShopDeliveryChildRecoveryService(
             requestStateMutatorService, ownership, diagnostics);
+    this.pendingRequestGateService =
+        new CreateShopPendingRequestGateService(
+            ownership, diagnostics, requestStateMutatorService);
     this.reservationSyncService =
         new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
     this.lifecycleRehydrateService =
@@ -624,10 +626,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   void clearRootCauseTracking(IToken<?> childToken) {
     lifecycleStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
     lifecycleStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
-  }
-
-  void clearPendingTokenState(IToken<?> token, boolean clearFlowState) {
-    requestStateMutatorService.clearPendingTokenState(this, token, clearFlowState);
   }
 
   void touchFlow(IToken<?> requestToken, long nowTick, String detail) {

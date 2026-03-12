@@ -63,14 +63,12 @@ final class CreateShopLifecycleRehydrateService {
       try {
         request = manager.getRequestHandler().getRequest(token);
       } catch (Exception ignored) {
-        resolver.clearPendingTokenState(token, true);
-        resolver.clearTrackedChildrenForParent(manager, token);
+        requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
         requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (request == null || CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
-        resolver.clearPendingTokenState(token, true);
-        resolver.clearTrackedChildrenForParent(manager, token);
+        requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
         requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
@@ -97,8 +95,7 @@ final class CreateShopLifecycleRehydrateService {
         resolver.touchFlow(token, level.getGameTime(), "rehydrate:derived-request");
         active.add(token);
       } else {
-        resolver.clearPendingTokenState(token, false);
-        resolver.clearTrackedChildrenForParent(manager, token);
+        requestStateMutatorService.clearPendingTokenState(resolver, manager, token, false);
         requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
       }
     }
