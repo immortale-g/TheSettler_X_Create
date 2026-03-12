@@ -169,13 +169,26 @@ final class CreateShopChildReconciliationService {
                 childState);
           }
         } catch (Exception ex) {
-          hasActiveChildren = true;
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} child {} lookup failed -> keep (fail-open): {}",
-                requestIdLog,
-                childToken,
-                ex.getMessage() == null ? "<null>" : ex.getMessage());
+          if (resolver.shouldDropMissingChildForOps(level, childToken)) {
+            request.removeChild(childToken);
+            resolver.getMissingChildSinceForOps().remove(childToken);
+            missing++;
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] tickPending: {} child {} lookup failed -> dropped after grace: {}",
+                  requestIdLog,
+                  childToken,
+                  ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
+          } else {
+            hasActiveChildren = true;
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] tickPending: {} child {} lookup failed -> keep (fail-open): {}",
+                  requestIdLog,
+                  childToken,
+                  ex.getMessage() == null ? "<null>" : ex.getMessage());
+            }
           }
         }
       }
