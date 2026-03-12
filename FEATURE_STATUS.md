@@ -153,6 +153,11 @@ Current behavior:
 - Retrying-request reassignment orchestration is now centralized in
   `CreateShopRetryingReassignService`, reducing resolver tick-branching while preserving guarded
   reassignment to Create Shop when requests become resolvable.
+- Assignment/ownership pending-token collection is now centralized in
+  `CreateShopPendingTokenCollectorService`, reducing `tickPendingDeliveries` setup complexity and
+  keeping resolver ownership-recovery behavior in a dedicated pre-processing step.
+- Cancelled-pending cleanup now avoids duplicate cooldown-clear calls on the same token in
+  `tickPendingDeliveries`, reducing redundant state-mutation noise during cancellation cleanup.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.

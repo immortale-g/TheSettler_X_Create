@@ -107,6 +107,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopDeliveryCompletionService();
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
+  private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
+      new CreateShopPendingTokenCollectorService();
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -474,65 +476,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
     var requestHandler = standardManager.getRequestHandler();
     Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
-    java.util.Set<IToken<?>> assigned = new java.util.LinkedHashSet<>();
-    java.util.Collection<IToken<?>> directAssigned = assignments.get(getId());
-    if (directAssigned != null && !directAssigned.isEmpty()) {
-      assigned.addAll(directAssigned);
-    }
-    java.util.Set<IToken<?>> assignedByOwner =
-        ownership.collectAssignedTokensByRequestResolver(standardManager, assignments);
-    if (!assignedByOwner.isEmpty()) {
-      int before = assigned.size();
-      assigned.addAll(assignedByOwner);
-      if (Config.DEBUG_LOGGING.getAsBoolean()
-          && shouldLogTickPending(level)
-          && (before == 0 || assignedByOwner.size() > before)) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending owner-sync: resolverId={} directAssignments={} ownerAssignments={} effective={}",
-            getId(),
-            directAssigned == null ? 0 : directAssigned.size(),
-            assignedByOwner.size(),
-            assigned.size());
-      }
-    } else {
-      java.util.Set<IToken<?>> recovered =
-          ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
-      if (!recovered.isEmpty()) {
-        assigned.addAll(recovered);
-        if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending assignment drift recovered: resolverId={} recoveredAssignments={}",
-              getId(),
-              recovered.size());
-        }
-      }
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned.isEmpty()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
-          getId(),
-          assignments.keySet());
-    }
-    java.util.Set<IToken<?>> pendingTokens = new java.util.HashSet<>();
-    pendingTokens.addAll(assigned);
-    pendingTokens.addAll(pendingTracker.getTokens());
+    java.util.Set<IToken<?>> pendingTokens =
+        pendingTokenCollectorService.collectPendingTokens(
+            this, standardManager, level, assignments);
     if (pendingTokens.isEmpty()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        if (pendingTracker.hasEntries()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
-              cooldown.getOrderedCount(),
-              pendingTracker.size());
-        }
-      }
-      if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: no assigned or ordered requests for resolver {}", getId());
-      }
       return;
     }
     if (Config.DEBUG_LOGGING.getAsBoolean() && shouldLogTickPending(level)) {
-      int assignedCount = assigned.size();
+      int assignedCount = pendingTokens.size();
       int orderedCount = cooldown.getOrderedCount();
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: assigned={}, ordered={}, total={}",
@@ -598,7 +549,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         } else {
           cooldown.clearRequestCooldown(request.getId());
           pendingTracker.remove(request.getId());
-          cooldown.clearRequestCooldown(request.getId());
           clearDeliveriesCreated(request.getId());
           diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
           transitionFlow(
@@ -2087,5 +2037,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
     return retryingReassignAttempts;
+  }
+
+  CreateShopResolverOwnership getOwnershipForOps() {
+    return ownership;
+  }
+
+  boolean shouldLogTickPendingForOps(Level level) {
+    return shouldLogTickPending(level);
   }
 }

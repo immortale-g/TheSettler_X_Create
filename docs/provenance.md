@@ -449,3 +449,11 @@ Implementation notes:
   authored in this project scope: retrying resolver assignment scan/reassign logic moved from
   `CreateShopRequestResolver` into `CreateShopRetryingReassignService`, preserving cooldown guards,
   resolvability checks, and one-reassign-per-tick behavior.
+- Pending-token collector refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: assignment/ownership pending token aggregation
+  moved from `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopPendingTokenCollectorService`, preserving owner-sync and local-resolver drift recovery
+  behavior.
+- Cancelled cleanup simplification on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: duplicate cooldown-clear call in tick-pending cancellation
+  branch removed to keep cancellation cleanup idempotent and less mutation-noisy.
