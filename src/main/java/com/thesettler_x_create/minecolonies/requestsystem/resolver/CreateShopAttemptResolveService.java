@@ -21,12 +21,15 @@ import net.minecraft.world.level.Level;
 final class CreateShopAttemptResolveService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverMessaging messaging;
+  private final CreateShopDeliveryManager deliveryManager;
 
   CreateShopAttemptResolveService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopResolverMessaging messaging) {
+      CreateShopResolverMessaging messaging,
+      CreateShopDeliveryManager deliveryManager) {
     this.requestStateMutatorService = requestStateMutatorService;
     this.messaging = messaging;
+    this.deliveryManager = deliveryManager;
   }
 
   List<IToken<?>> attemptResolve(
@@ -243,9 +246,7 @@ final class CreateShopAttemptResolveService {
             CreateShopStackMetrics.countStackList(ordered),
             "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
-            resolver
-                .getDeliveryManagerForOps()
-                .createDeliveriesFromStacks(manager, request, planned, pickup);
+            deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
