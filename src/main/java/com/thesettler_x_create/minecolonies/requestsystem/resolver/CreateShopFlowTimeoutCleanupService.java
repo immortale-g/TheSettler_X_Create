@@ -45,7 +45,7 @@ final class CreateShopFlowTimeoutCleanupService {
       }
       requestStateMutatorService.clearOrderedAndPending(resolver, token);
       resolver.clearDeliveriesCreated(token);
-      resolver.getParentDeliveryActiveSince().remove(token);
+      requestStateMutatorService.clearParentDeliveryActive(resolver, token);
       resolver.clearStaleRecoveryArm(token);
       resolver.clearTrackedChildrenForParent(manager, token);
       resolver.getFlowStateMachine().remove(token);

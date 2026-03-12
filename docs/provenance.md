@@ -106,6 +106,15 @@ Implementation notes:
 - Lifecycle state-owner refactor (introducing `CreateShopLifecycleStateStore` and moving
   pending/cooldown/child runtime maps/tracker ownership behind that store) is authored in this
   project as a behavior-preserving internal change to reduce multi-structure drift risk.
+- Lifecycle single-writer hardening refactor (routing child/missing/parent snapshot state writes
+  through `CreateShopRequestStateMutatorService` from lifecycle/reconciliation/pending/timeout
+  services) is authored in this project to reduce direct multi-service map mutations.
+- Pending derived-state refactor (updating pending decision to reconcile tracked pending against
+  request-derived outstanding need each tick, with inflight/child floor semantics) is authored in
+  this project to reduce stale pending counter drift.
+- Rehydrate expansion refactor (extending `CreateShopLifecycleRehydrateService` to include runtime
+  child/parent lifecycle tokens and orphan child pruning) is authored in this project to improve
+  reload/request-graph consistency under inflight work.
 - Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
   diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
   behavior-preserving internal split to reduce static callback complexity in the resolver.

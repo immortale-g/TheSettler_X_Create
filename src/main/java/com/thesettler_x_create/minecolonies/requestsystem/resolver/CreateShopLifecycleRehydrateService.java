@@ -35,8 +35,27 @@ final class CreateShopLifecycleRehydrateService {
     if (resolver == null || manager == null || level == null || candidates == null || candidates.isEmpty()) {
       return java.util.Collections.emptySet();
     }
+    Set<IToken<?>> expandedCandidates = new LinkedHashSet<>(candidates);
+    expandedCandidates.addAll(resolver.getPendingTracker().getTokens());
+    expandedCandidates.addAll(resolver.getParentDeliveryActiveSince().keySet());
+    for (IToken<?> childToken : Set.copyOf(resolver.getDeliveryChildActiveSince().keySet())) {
+      IRequest<?> childRequest = null;
+      try {
+        childRequest = manager.getRequestHandler().getRequest(childToken);
+      } catch (Exception ignored) {
+        resolver.getDeliveryChildActiveSince().remove(childToken);
+      }
+      if (childRequest == null) {
+        resolver.getDeliveryChildActiveSince().remove(childToken);
+        continue;
+      }
+      IToken<?> parent = childRequest.getParent();
+      if (parent != null) {
+        expandedCandidates.add(parent);
+      }
+    }
     Set<IToken<?>> active = new LinkedHashSet<>();
-    for (IToken<?> token : Set.copyOf(candidates)) {
+    for (IToken<?> token : Set.copyOf(expandedCandidates)) {
       if (token == null) {
         continue;
       }
@@ -45,10 +64,14 @@ final class CreateShopLifecycleRehydrateService {
         request = manager.getRequestHandler().getRequest(token);
       } catch (Exception ignored) {
         resolver.clearPendingTokenState(token, true);
+        resolver.clearTrackedChildrenForParent(manager, token);
+        resolver.clearStaleRecoveryArm(token);
         continue;
       }
       if (request == null || CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
         resolver.clearPendingTokenState(token, true);
+        resolver.clearTrackedChildrenForParent(manager, token);
+        resolver.clearStaleRecoveryArm(token);
         continue;
       }
       if (!(request.getRequest() instanceof IDeliverable deliverable)) {
@@ -75,6 +98,8 @@ final class CreateShopLifecycleRehydrateService {
         active.add(token);
       } else {
         resolver.clearPendingTokenState(token, false);
+        resolver.clearTrackedChildrenForParent(manager, token);
+        resolver.clearStaleRecoveryArm(token);
       }
     }
     return active;

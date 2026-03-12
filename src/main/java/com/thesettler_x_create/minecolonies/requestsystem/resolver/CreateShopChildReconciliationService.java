@@ -22,16 +22,19 @@ final class CreateShopChildReconciliationService {
   private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService;
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopChildReconciliationService(
       CreateShopDeliveryManager deliveryManager,
       CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService,
       CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService,
-      CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService) {
+      CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService,
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.deliveryManager = deliveryManager;
     this.deliveryChildLifecycleService = deliveryChildLifecycleService;
     this.deliveryChildRecoveryService = deliveryChildRecoveryService;
     this.deliveryRootCauseSnapshotService = deliveryRootCauseSnapshotService;
+    this.requestStateMutatorService = requestStateMutatorService;
   }
 
   ChildReconcileResult reconcile(
@@ -68,7 +71,7 @@ final class CreateShopChildReconciliationService {
           if (child == null) {
             if (resolver.shouldDropMissingChild(level, childToken)) {
               request.removeChild(childToken);
-              resolver.getMissingChildSince().remove(childToken);
+              requestStateMutatorService.clearMissingChild(resolver, childToken);
               missing++;
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
@@ -87,7 +90,7 @@ final class CreateShopChildReconciliationService {
             }
             continue;
           }
-          resolver.getMissingChildSince().remove(childToken);
+          requestStateMutatorService.clearMissingChild(resolver, childToken);
           if (child.getRequest() instanceof Delivery) {
             RequestState childState = child.getState();
             boolean terminalChild =
@@ -98,8 +101,8 @@ final class CreateShopChildReconciliationService {
                     || childState == RequestState.RECEIVED;
             if (terminalChild) {
               request.removeChild(childToken);
-              resolver.getDeliveryChildActiveSince().remove(childToken);
-              resolver.getMissingChildSince().remove(childToken);
+              requestStateMutatorService.clearChildActive(resolver, childToken);
+              requestStateMutatorService.clearMissingChild(resolver, childToken);
               resolver.clearStaleRecoveryArm(request.getId());
               continue;
             }
@@ -191,7 +194,7 @@ final class CreateShopChildReconciliationService {
                 resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
           } else {
-            resolver.getDeliveryChildActiveSince().remove(childToken);
+            requestStateMutatorService.clearChildActive(resolver, childToken);
           }
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             String childType = child.getRequest().getClass().getName();
@@ -206,7 +209,7 @@ final class CreateShopChildReconciliationService {
         } catch (Exception ex) {
           if (resolver.shouldDropMissingChild(level, childToken)) {
             request.removeChild(childToken);
-            resolver.getMissingChildSince().remove(childToken);
+            requestStateMutatorService.clearMissingChild(resolver, childToken);
             missing++;
             if (Config.DEBUG_LOGGING.getAsBoolean()) {
               TheSettlerXCreate.LOGGER.info(

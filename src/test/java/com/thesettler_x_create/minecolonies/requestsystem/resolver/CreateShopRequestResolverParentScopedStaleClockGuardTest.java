@@ -23,6 +23,6 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
             "deliveryChildLifecycleService.isStaleDeliveryChild("));
     assertTrue(
         lifecycleSource.contains(
-            "resolver.getParentDeliveryActiveSince().putIfAbsent(parentToken, now)"));
+            "requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now)"));
   }
 }
