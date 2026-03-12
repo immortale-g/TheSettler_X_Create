@@ -22,7 +22,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAt()"));
+    assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAt(parentToken)"));
     assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleRecoveryArmed("));
     assertTrue(
         reconcileSource.contains(

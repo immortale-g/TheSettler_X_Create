@@ -24,7 +24,7 @@ final class CreateShopDeliveryChildLifecycleService {
       return false;
     }
     long now = level.getGameTime();
-    Long armedAt = resolver.getParentStaleRecoveryArmedAt().get(parentToken);
+    Long armedAt = resolver.getParentStaleRecoveryArmedAt(parentToken);
     if (armedAt == null) {
       requestStateMutatorService.armStaleRecoveryIfMissing(resolver, parentToken, now);
       resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken);
@@ -78,15 +78,14 @@ final class CreateShopDeliveryChildLifecycleService {
     requestStateMutatorService.clearParentDeliveryActive(resolver, parentToken);
     requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
     requestStateMutatorService.clearParentChildrenSnapshot(resolver, parentToken);
-    if (resolver.getDeliveryChildActiveSince().isEmpty()) {
+    if (!resolver.hasAnyActiveChild()) {
       return;
     }
     var handler = manager.getRequestHandler();
     if (handler == null) {
       return;
     }
-    for (IToken<?> childToken :
-        java.util.List.copyOf(resolver.getDeliveryChildActiveSince().keySet())) {
+    for (IToken<?> childToken : resolver.getActiveChildTokensSnapshot()) {
       try {
         IRequest<?> child = handler.getRequest(childToken);
         IToken<?> parent = child == null ? null : child.getParent();

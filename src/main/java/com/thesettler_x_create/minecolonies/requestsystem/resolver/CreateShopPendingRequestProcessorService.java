@@ -138,15 +138,17 @@ final class CreateShopPendingRequestProcessorService {
         return;
       }
     }
-    Integer previousChildCount = resolver.getParentLastKnownChildCount().get(request.getId());
+    Integer previousChildCount = resolver.getParentLastKnownChildCount(request.getId());
     if (previousChildCount != null && previousChildCount > 0 && !request.hasChildren()) {
       long now = level.getGameTime();
-      Long lastDropLog = resolver.getParentChildDropLastLogTick().get(request.getId());
+      Long lastDropLog = resolver.getParentChildDropLastLogTick(request.getId());
       if (lastDropLog == null || now - lastDropLog >= 100L) {
         requestStateMutatorService.markParentChildDropLog(resolver, request.getId(), now);
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          String previousChildren =
-              resolver.getParentLastKnownChildren().getOrDefault(request.getId(), "[]");
+          String previousChildren = resolver.getParentLastKnownChildren(request.getId());
+          if (previousChildren == null) {
+            previousChildren = "[]";
+          }
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] root-cause parent-child-drop parent={} state={} prevChildCount={} prevChildren={} reservedForRequest={} pending={} cooldown={}",
               request.getId(),

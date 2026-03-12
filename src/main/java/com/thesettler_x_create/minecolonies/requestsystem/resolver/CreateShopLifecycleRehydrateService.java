@@ -37,16 +37,16 @@ final class CreateShopLifecycleRehydrateService {
     }
     Set<IToken<?>> expandedCandidates = new LinkedHashSet<>(candidates);
     expandedCandidates.addAll(resolver.getPendingTracker().getTokens());
-    expandedCandidates.addAll(resolver.getParentDeliveryActiveSince().keySet());
-    for (IToken<?> childToken : Set.copyOf(resolver.getDeliveryChildActiveSince().keySet())) {
+    expandedCandidates.addAll(resolver.getParentDeliveryTokensSnapshot());
+    for (IToken<?> childToken : resolver.getActiveChildTokensSnapshot()) {
       IRequest<?> childRequest = null;
       try {
         childRequest = manager.getRequestHandler().getRequest(childToken);
       } catch (Exception ignored) {
-        resolver.getDeliveryChildActiveSince().remove(childToken);
+        resolver.clearChildActive(childToken);
       }
       if (childRequest == null) {
-        resolver.getDeliveryChildActiveSince().remove(childToken);
+        resolver.clearChildActive(childToken);
         continue;
       }
       IToken<?> parent = childRequest.getParent();

@@ -645,3 +645,9 @@ Implementation notes:
   `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
   delivery cancel/completion services now receive delivery manager and diagnostics/recheck
   collaborators through constructors, reducing resolver-mediated service lookup paths.
+- Resolver lifecycle accessor narrowing refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  lifecycle consumers now read/write runtime state through token-scoped resolver methods
+  (`getRootCauseLastLogTick`, `markRetryingReassignAttempt`, child/parent snapshot accessors,
+  active-child snapshots) instead of broad map getter exposure, reducing accidental multi-writer
+  mutation risk and tightening state-owner boundaries.
