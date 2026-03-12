@@ -12,11 +12,15 @@ import com.thesettler_x_create.TheSettlerXCreate;
 final class CreateShopPendingRequestGateService {
   private final CreateShopResolverOwnership ownership;
   private final CreateShopResolverDiagnostics diagnostics;
+  private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopPendingRequestGateService(
-      CreateShopResolverOwnership ownership, CreateShopResolverDiagnostics diagnostics) {
+      CreateShopResolverOwnership ownership,
+      CreateShopResolverDiagnostics diagnostics,
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.ownership = ownership;
     this.diagnostics = diagnostics;
+    this.requestStateMutatorService = requestStateMutatorService;
   }
 
   boolean shouldSkipForPendingProcessing(
@@ -26,7 +30,7 @@ final class CreateShopPendingRequestGateService {
       IRequest<?> request,
       IToken<?> token) {
     if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
-      resolver.clearPendingTokenState(token, true);
+      requestStateMutatorService.clearPendingTokenState(resolver, standardManager, token, true);
       return true;
     }
     if (resolver.isCancelledRequest(request.getId())) {
@@ -34,7 +38,8 @@ final class CreateShopPendingRequestGateService {
           != com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
         resolver.clearCancelledRequest(request.getId());
       } else {
-        resolver.clearPendingTokenState(request.getId(), true);
+        requestStateMutatorService.clearPendingTokenState(
+            resolver, standardManager, request.getId(), true);
         diagnostics.logPendingReasonChange(request.getId(), "skip:cancelled");
         resolver.transitionFlow(
             manager,
@@ -52,7 +57,8 @@ final class CreateShopPendingRequestGateService {
       }
     }
     if (request.getState() == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      resolver.clearPendingTokenState(request.getId(), true);
+      requestStateMutatorService.clearPendingTokenState(
+          resolver, standardManager, request.getId(), true);
       resolver.transitionFlow(
           manager,
           request,

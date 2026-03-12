@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import net.minecraft.world.level.Level;
 
 /** Centralizes request pending/cooldown state mutations to avoid split write paths. */
@@ -151,5 +152,17 @@ final class CreateShopRequestStateMutatorService {
     if (clearFlowState) {
       resolver.getFlowStateMachine().remove(token);
     }
+  }
+
+  void clearPendingTokenState(
+      CreateShopRequestResolver resolver,
+      IStandardRequestManager manager,
+      IToken<?> token,
+      boolean clearFlowState) {
+    clearPendingTokenState(resolver, token, clearFlowState);
+    if (resolver == null || manager == null || token == null) {
+      return;
+    }
+    resolver.clearTrackedChildrenForParent(manager, token);
   }
 }
