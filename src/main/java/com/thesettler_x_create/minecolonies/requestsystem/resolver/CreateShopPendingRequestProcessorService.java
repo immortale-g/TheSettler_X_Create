@@ -18,6 +18,31 @@ import net.minecraft.world.level.Level;
 
 /** Processes one pending request token during resolver tick-pending orchestration. */
 final class CreateShopPendingRequestProcessorService {
+  private final CreateShopPendingRequestGateService pendingRequestGateService;
+  private final CreateShopChildReconciliationService childReconciliationService;
+  private final CreateShopPendingStateDecisionService pendingStateDecisionService;
+  private final CreateShopReservationSyncService reservationSyncService;
+  private final CreateShopPendingTopupService pendingTopupService;
+  private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
+  private final CreateShopPostCreationUpdateService postCreationUpdateService;
+
+  CreateShopPendingRequestProcessorService(
+      CreateShopPendingRequestGateService pendingRequestGateService,
+      CreateShopChildReconciliationService childReconciliationService,
+      CreateShopPendingStateDecisionService pendingStateDecisionService,
+      CreateShopReservationSyncService reservationSyncService,
+      CreateShopPendingTopupService pendingTopupService,
+      CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
+      CreateShopPostCreationUpdateService postCreationUpdateService) {
+    this.pendingRequestGateService = pendingRequestGateService;
+    this.childReconciliationService = childReconciliationService;
+    this.pendingStateDecisionService = pendingStateDecisionService;
+    this.reservationSyncService = reservationSyncService;
+    this.pendingTopupService = pendingTopupService;
+    this.pendingDeliveryCreationService = pendingDeliveryCreationService;
+    this.postCreationUpdateService = postCreationUpdateService;
+  }
+
   void processToken(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
@@ -37,9 +62,8 @@ final class CreateShopPendingRequestProcessorService {
       resolver.clearPendingTokenStateForOps(token, false);
       return;
     }
-    if (resolver
-        .getPendingRequestGateServiceForOps()
-        .shouldSkipForPendingProcessing(resolver, manager, standardManager, request, token)) {
+    if (pendingRequestGateService.shouldSkipForPendingProcessing(
+        resolver, manager, standardManager, request, token)) {
       return;
     }
     if (resolver.isTerminalRequestStateForOps(request.getState())) {
@@ -66,18 +90,16 @@ final class CreateShopPendingRequestProcessorService {
       resolver.getParentLastKnownChildCountForOps().put(request.getId(), children.size());
       resolver.getParentLastKnownChildrenForOps().put(request.getId(), children.toString());
       var childResult =
-          resolver
-              .getChildReconciliationServiceForOps()
-              .reconcile(
-                  resolver,
-                  standardManager,
-                  level,
-                  request,
-                  requestHandler,
-                  assignmentLookup,
-                  shop,
-                  pickup,
-                  requestIdLog);
+          childReconciliationService.reconcile(
+              resolver,
+              standardManager,
+              level,
+              request,
+              requestHandler,
+              assignmentLookup,
+              shop,
+              pickup,
+              requestIdLog);
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
@@ -153,17 +175,15 @@ final class CreateShopPendingRequestProcessorService {
           reservedForRequest);
     }
     var pendingDecision =
-        resolver
-            .getPendingStateDecisionServiceForOps()
-            .decide(
-                resolver,
-                request,
-                level,
-                deliverable,
-                onCooldown,
-                reservedForRequest,
-                workerWorking,
-                requestIdLog);
+        pendingStateDecisionService.decide(
+            resolver,
+            request,
+            level,
+            deliverable,
+            onCooldown,
+            reservedForRequest,
+            workerWorking,
+            requestIdLog);
     if (pendingDecision.shouldSkip()) {
       return;
     }
@@ -175,19 +195,17 @@ final class CreateShopPendingRequestProcessorService {
             0,
             rackAvailable - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
     int reservedSynced =
-        resolver
-            .getReservationSyncServiceForOps()
-            .syncReservationsFromRack(
-                resolver,
-                tile,
-                pickup,
-                requestId,
-                request.getId(),
-                deliverable,
-                pendingCount,
-                reservedForRequest,
-                rackAvailableForRequest,
-                level.getGameTime());
+        reservationSyncService.syncReservationsFromRack(
+            resolver,
+            tile,
+            pickup,
+            requestId,
+            request.getId(),
+            deliverable,
+            pendingCount,
+            reservedForRequest,
+            rackAvailableForRequest,
+            level.getGameTime());
     if (reservedSynced > 0) {
       reservedForRequest += reservedSynced;
       reservedForDeliverable += reservedSynced;
@@ -197,38 +215,32 @@ final class CreateShopPendingRequestProcessorService {
               rackAvailable
                   - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
     }
-    resolver
-        .getPendingTopupServiceForOps()
-        .handleTopup(
+    pendingTopupService.handleTopup(
+        manager,
+        request,
+        level,
+        tile,
+        pickup,
+        deliverable,
+        workerWorking,
+        pendingCount,
+        reservedForRequest,
+        rackAvailableForRequest,
+        requestIdLog);
+    var creationResult =
+        pendingDeliveryCreationService.process(
             manager,
             request,
             level,
             tile,
             pickup,
             deliverable,
-            workerWorking,
             pendingCount,
-            reservedForRequest,
             rackAvailableForRequest,
             requestIdLog);
-    var creationResult =
-        resolver
-            .getPendingDeliveryCreationServiceForOps()
-            .process(
-                manager,
-                request,
-                level,
-                tile,
-                pickup,
-                deliverable,
-                pendingCount,
-                rackAvailableForRequest,
-                requestIdLog);
     if (!creationResult.created()) {
       return;
     }
-    resolver
-        .getPostCreationUpdateServiceForOps()
-        .apply(resolver, manager, request, level, creationResult, requestIdLog);
+    postCreationUpdateService.apply(resolver, manager, request, level, creationResult, requestIdLog);
   }
 }

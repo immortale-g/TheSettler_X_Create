@@ -241,6 +241,9 @@ Current behavior:
   services, removing duplicate helper logic and narrowing resolver surface area.
 - Delivery callback routing (`onDeliveryCancelled` / `onDeliveryComplete`) is now centralized in
   `CreateShopDeliveryCallbackService`, keeping resolver callback entrypoints as thin delegates.
+- Pending tick orchestration wiring now injects processor/collector dependencies directly into
+  `CreateShopTickPendingService` and `CreateShopPendingRequestProcessorService` constructors,
+  allowing removal of several resolver service-getter passthroughs from the ops surface.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.

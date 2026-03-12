@@ -124,12 +124,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       new CreateShopDeliveryChildRecoveryService();
   private final CreateShopReservationSyncService reservationSyncService =
       new CreateShopReservationSyncService();
-  private final CreateShopPendingRequestProcessorService pendingRequestProcessorService =
-      new CreateShopPendingRequestProcessorService();
-  private final CreateShopAttemptResolveService attemptResolveService =
-      new CreateShopAttemptResolveService();
-  private final CreateShopTickPendingService tickPendingService =
-      new CreateShopTickPendingService();
+  private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
+  private final CreateShopAttemptResolveService attemptResolveService = new CreateShopAttemptResolveService();
+  private final CreateShopTickPendingService tickPendingService;
   private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService =
       new CreateShopDeliveryChildLifecycleService();
   private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService =
@@ -148,6 +145,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
     this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
+    this.pendingRequestProcessorService =
+        new CreateShopPendingRequestProcessorService(
+            pendingRequestGateService,
+            childReconciliationService,
+            pendingStateDecisionService,
+            reservationSyncService,
+            pendingTopupService,
+            pendingDeliveryCreationService,
+            postCreationUpdateService);
+    this.tickPendingService =
+        new CreateShopTickPendingService(pendingTokenCollectorService, pendingRequestProcessorService);
   }
 
   @Override
@@ -754,42 +762,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   java.util.Map<IToken<?>, Long> getRetryingReassignAttemptsForOps() {
     return retryingReassignAttempts;
-  }
-
-  CreateShopPendingTokenCollectorService getPendingTokenCollectorServiceForOps() {
-    return pendingTokenCollectorService;
-  }
-
-  CreateShopPendingRequestProcessorService getPendingRequestProcessorServiceForOps() {
-    return pendingRequestProcessorService;
-  }
-
-  CreateShopPendingRequestGateService getPendingRequestGateServiceForOps() {
-    return pendingRequestGateService;
-  }
-
-  CreateShopChildReconciliationService getChildReconciliationServiceForOps() {
-    return childReconciliationService;
-  }
-
-  CreateShopPendingStateDecisionService getPendingStateDecisionServiceForOps() {
-    return pendingStateDecisionService;
-  }
-
-  CreateShopPendingTopupService getPendingTopupServiceForOps() {
-    return pendingTopupService;
-  }
-
-  CreateShopPendingDeliveryCreationService getPendingDeliveryCreationServiceForOps() {
-    return pendingDeliveryCreationService;
-  }
-
-  CreateShopPostCreationUpdateService getPostCreationUpdateServiceForOps() {
-    return postCreationUpdateService;
-  }
-
-  CreateShopReservationSyncService getReservationSyncServiceForOps() {
-    return reservationSyncService;
   }
 
   CreateShopResolverOwnership getOwnershipForOps() {
