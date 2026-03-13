@@ -284,6 +284,11 @@ public final class CreateShopMaintenanceCommands {
                                                             context, "amount"),
                                                         true)))))));
 
+    root.then(
+        Commands.literal("auto_test_harness_full_all")
+            .executes(
+                context -> runAutoHarnessFullAll(context.getSource(), 2, 1, 8, 8, 20 * 60, true)));
+
     dispatcher.register(root);
   }
 
@@ -669,6 +674,151 @@ public final class CreateShopMaintenanceCommands {
                 "[CreateShop] Next: let couriers run, then execute /thesettlerxcreate auto_test_harness snapshot"),
         false);
     return errorsFinal == 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessFullAll(
+      CommandSourceStack source,
+      int rounds,
+      int requestsPerRound,
+      int amount,
+      int lostAmount,
+      int lostAgeTicks,
+      boolean forceWarehouseQueue) {
+    int safeRounds = Math.max(1, rounds);
+    int createdTotal = 0;
+    int errors = 0;
+    int lostInjectOk = 0;
+    int lostReorderOk = 0;
+    int lostHandoverOk = 0;
+    int lostCancelOk = 0;
+
+    for (int i = 0; i < safeRounds; i++) {
+      ResetLiveStateResult reset = resetLiveState(forceWarehouseQueue);
+      LiveTestResult live = runLiveTest(requestsPerRound, amount);
+      createdTotal += live.created;
+      errors += reset.errors + live.errors;
+
+      if (performLostInject(lostAmount, lostAgeTicks) > 0) {
+        lostInjectOk++;
+      } else {
+        errors++;
+      }
+
+      if (performLostReorder() > 0) {
+        lostReorderOk++;
+      } else {
+        errors++;
+      }
+
+      if (performLostInject(lostAmount, lostAgeTicks) > 0) {
+        lostInjectOk++;
+      } else {
+        errors++;
+      }
+
+      if (performLostHandoverSim() > 0) {
+        lostHandoverOk++;
+      } else {
+        errors++;
+      }
+
+      if (performLostInject(lostAmount, lostAgeTicks) > 0) {
+        lostInjectOk++;
+      } else {
+        errors++;
+      }
+
+      if (performLostCancel() > 0) {
+        lostCancelOk++;
+      } else {
+        errors++;
+      }
+    }
+
+    HarnessSnapshot snapshot = collectHarnessSnapshot();
+    final int createdTotalFinal = createdTotal;
+    final int errorsFinal = errors;
+    final int lostInjectOkFinal = lostInjectOk;
+    final int lostReorderOkFinal = lostReorderOk;
+    final int lostHandoverOkFinal = lostHandoverOk;
+    final int lostCancelOkFinal = lostCancelOk;
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness full_all: rounds="
+                    + safeRounds
+                    + ", createdTotal="
+                    + createdTotalFinal
+                    + ", errors="
+                    + errorsFinal
+                    + ", lostInjectOk="
+                    + lostInjectOkFinal
+                    + ", lostReorderOk="
+                    + lostReorderOkFinal
+                    + ", lostHandoverOk="
+                    + lostHandoverOkFinal
+                    + ", lostCancelOk="
+                    + lostCancelOkFinal
+                    + ", rootsActive="
+                    + snapshot.rootsActive
+                    + ", childrenActive="
+                    + snapshot.childrenActive
+                    + ", queueEntries="
+                    + snapshot.warehouseQueueEntries),
+        true);
+    return errorsFinal == 0 ? 1 : 0;
+  }
+
+  private static int performLostInject(int amount, int ageTicks) {
+    HarnessShopContext context = findFirstHarnessShopContext();
+    if (context == null || context.pickup == null) {
+      return 0;
+    }
+    ItemStack key = selectLiveTestStack(context.tile);
+    if (key.isEmpty()) {
+      return 0;
+    }
+    return context.pickup.debugInjectInflight(
+        key, Math.max(1, amount), "AUTO_HARNESS", "AUTO_TARGET", Math.max(1, ageTicks));
+  }
+
+  private static int performLostReorder() {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      return 0;
+    }
+    return context.shop.restartLostPackage(
+        context.notice.stackKey,
+        context.notice.remaining,
+        context.notice.requesterName,
+        context.notice.address,
+        context.notice.requestedAt);
+  }
+
+  private static int performLostHandoverSim() {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      return 0;
+    }
+    return context.shop.debugSimulateLostPackageHandover(
+        context.notice.stackKey,
+        context.notice.remaining,
+        context.notice.requesterName,
+        context.notice.address,
+        context.notice.requestedAt);
+  }
+
+  private static int performLostCancel() {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      return 0;
+    }
+    return context.shop.cancelLostPackageRequestAndInflight(
+        context.notice.stackKey,
+        context.notice.remaining,
+        context.notice.requesterName,
+        context.notice.address,
+        context.notice.requestedAt);
   }
 
   private static HarnessSnapshot collectHarnessSnapshot() {
