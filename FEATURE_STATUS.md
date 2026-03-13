@@ -375,6 +375,16 @@ Known focus area:
   improving reliability of real extraction on live racks.
 - Rate-limited housekeeping diagnostics are available under debug logging to surface gate reasons,
   rack discovery, unreserved budget, cooldown waits, and moved counts during live validation.
+- Auto test harness expanded for in-game end-to-end validation:
+  - `/thesettlerxcreate auto_test_harness start|start_force_queue|snapshot|full`
+  - lost-package automation commands:
+    `lost_inject`, `lost_reorder`, `lost_handover_sim`, `lost_cancel`
+  - one-shot aggregate command:
+    `/thesettlerxcreate auto_test_harness_full_all`
+  This allows repeatable command-driven scenario runs without manual UI interaction for each step.
+- Lost-package harness support added in core runtime:
+  - `CreateShopBlockEntity` debug inflight tuple inject + oldest tuple peek helpers
+  - `BuildingCreateShop` debug wrappers for reorder and simulated handover consumption.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

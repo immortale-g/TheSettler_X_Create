@@ -699,3 +699,13 @@ Implementation notes:
   `CreateShopAttemptResolveService` and `CreateShopRequestValidator` now receive chain/cooldown/
   planning/stock/diagnostic/flow collaborators via constructor injection instead of pulling those
   from resolver facade getters, and corresponding unused resolver getter facades were removed.
+- Delivery lifecycle ledger and orphan completion hardening on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-13) is authored in this project scope:
+  delivery-child lifecycle diagnostics were extracted into dedicated ledger state/services,
+  courier-task ongoing marker patching and force-finish-at-target fallback were added for
+  MineColonies child requests that remain `IN_PROGRESS` after queue dequeue, and parent fast-orphan
+  completion now uses that lifecycle evidence to prevent duplicate reruns and resolver drift.
+- Auto harness command suite on branch `refactor/request-lifecycle-clean-core` (2026-03-13) is
+  authored in this project scope: maintenance commands now include repeatable live scenario
+  automation (`auto_test_harness` + `auto_test_harness_full_all`) including lost-package inject,
+  reorder, handover simulation, and cancel flows for command-driven in-game validation.
