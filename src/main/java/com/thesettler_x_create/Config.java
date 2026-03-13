@@ -8,7 +8,7 @@ public class Config {
   public static final ModConfigSpec.BooleanValue DEBUG_LOGGING =
       BUILDER
           .comment("Enable extra debug logging for TheSettler_x_Create")
-          .define("debugLogging", false);
+          .define("debugLogging", true);
 
   public static final ModConfigSpec.IntValue PERMA_MIN_BUILDING_LEVEL =
       BUILDER

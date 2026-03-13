@@ -44,7 +44,8 @@ final class CreateShopTickPendingService {
           manager == null ? "<null>" : manager.getClass().getName(),
           resolver.getResolverToken());
     }
-    IStandardRequestManager standardManager = CreateShopRequestResolver.unwrapStandardManager(manager);
+    IStandardRequestManager standardManager =
+        CreateShopRequestResolver.unwrapStandardManager(manager);
     if (standardManager == null) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no standard manager)");
@@ -65,6 +66,9 @@ final class CreateShopTickPendingService {
       }
       return;
     }
+    resolver
+        .getTerminalRequestLifecycleService()
+        .sweepFastOrphanPickedUpRecoveries(resolver, manager, standardManager);
     resolver.reassignResolvableRetryingRequests(standardManager, level);
     resolver.getRecheck().processParentChildRechecks(standardManager, level);
     var assignmentStore = standardManager.getRequestResolverRequestAssignmentDataStore();
@@ -74,7 +78,8 @@ final class CreateShopTickPendingService {
         pendingTokenCollectorService.collectPendingTokens(
             resolver, standardManager, level, assignments);
     pendingTokens =
-        lifecycleRehydrateService.rehydrateAndFilter(resolver, standardManager, level, pendingTokens);
+        lifecycleRehydrateService.rehydrateAndFilter(
+            resolver, standardManager, level, pendingTokens);
     if (pendingTokens.isEmpty()) {
       return;
     }

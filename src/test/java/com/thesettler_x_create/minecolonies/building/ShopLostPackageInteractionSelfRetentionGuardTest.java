@@ -14,7 +14,7 @@ class ShopLostPackageInteractionSelfRetentionGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageInteraction.java"));
 
-    assertTrue(source.contains("if (other == this) {"));
+    assertTrue(source.contains("if (!includeSelf && other == this) {"));
     assertTrue(source.contains("return false;"));
     assertTrue(source.contains("no-op response can re-arm"));
   }

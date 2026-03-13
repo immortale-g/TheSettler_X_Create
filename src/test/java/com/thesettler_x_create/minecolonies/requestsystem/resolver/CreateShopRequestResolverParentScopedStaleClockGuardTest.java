@@ -18,9 +18,7 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(
-        reconcileSource.contains(
-            "deliveryChildLifecycleService.isStaleDeliveryChild("));
+    assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleDeliveryChild("));
     assertTrue(
         lifecycleSource.contains(
             "requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now)"));

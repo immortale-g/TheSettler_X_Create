@@ -44,7 +44,8 @@ final class CreateShopPendingStateDecisionService {
       pendingCount = Math.max(1, Math.max(trackedPending, pendingCount));
     }
     if (pendingCount != trackedPending) {
-      requestStateMutatorService.markOrderedWithPending(resolver, null, request.getId(), pendingCount);
+      requestStateMutatorService.markOrderedWithPending(
+          resolver, null, request.getId(), pendingCount);
       diagnostics.recordPendingSource(request.getId(), "tickPending:derived-reconcile");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
@@ -58,18 +59,24 @@ final class CreateShopPendingStateDecisionService {
     }
     if (pendingCount <= 0 && !onCooldown) {
       diagnostics.logPendingReasonChange(
-              request.getId(),
-              "skip:no-pending reserved="
-                  + reservedForRequest
-                  + " pending="
-                  + resolver.getPendingTracker().getPendingCount(request.getId()));
+          request.getId(),
+          "skip:no-pending reserved="
+              + reservedForRequest
+              + " pending="
+              + resolver.getPendingTracker().getPendingCount(request.getId()));
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
       }
       return PendingDecision.skipped();
     }
     if (pendingCount <= 0) {
-      if (onCooldown && !resolver.hasDeliveriesCreated(request.getId()) && !request.hasChildren()) {
+      boolean parentTerminal = CreateShopRequestResolver.isTerminalRequestState(request.getState());
+      boolean deliveryWindowOpen =
+          request.hasChildren()
+              || resolver.hasDeliveriesCreated(request.getId())
+              || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
+      if (onCooldown && parentTerminal && !deliveryWindowOpen) {
         requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
         diagnostics.logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -80,8 +87,8 @@ final class CreateShopPendingStateDecisionService {
         return PendingDecision.skipped();
       }
       diagnostics.logPendingReasonChange(
-              request.getId(),
-              "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
+          request.getId(),
+          "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
@@ -92,8 +99,7 @@ final class CreateShopPendingStateDecisionService {
       return PendingDecision.skipped();
     }
     if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
-      resolver.touchFlow(
-          request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
+      resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:worker-unavailable");
       if (workerAvailabilityGate.shouldKeepPendingState(workerWorking, pendingCount)) {
         requestStateMutatorService.markOrderedWithPending(
             resolver, level, request.getId(), pendingCount);

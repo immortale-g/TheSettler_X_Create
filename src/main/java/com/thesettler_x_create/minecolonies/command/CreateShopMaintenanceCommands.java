@@ -440,6 +440,7 @@ public final class CreateShopMaintenanceCommands {
       result.drainRounds += drainRounds;
       for (int round = 0; round < drainRounds; round++) {
         cancelCreateShopOwnedRequestsGraphAware(standard, result);
+        cancelAllAssignedRequestsGraphAware(standard, result);
         cancelActiveLocalDeliveries(colony, standard, result);
         reconcileAssignmentsAndKickCouriers(standard, result);
       }
@@ -701,6 +702,75 @@ public final class CreateShopMaintenanceCommands {
           result.errors++;
           TheSettlerXCreate.LOGGER.warn(
               "[CreateShop] reset_live_state orphan scan failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+  }
+
+  /**
+   * Hard-reset pass used by live test cleanup: cancel every non-terminal assigned request graph,
+   * regardless of current owner resolver. This prevents stuck retrying roots from surviving world
+   * reloads and triggering duplicate orders in subsequent tests.
+   */
+  private static void cancelAllAssignedRequestsGraphAware(
+      IStandardRequestManager standard, ResetLiveStateResult result) {
+    if (standard == null || result == null) {
+      return;
+    }
+    java.util.Set<IToken<?>> assignedTokens = collectAssignedRequestTokens(standard);
+    if (assignedTokens.isEmpty()) {
+      return;
+    }
+
+    java.util.Set<IToken<?>> visited = new java.util.LinkedHashSet<>();
+    java.util.List<IToken<?>> roots = new java.util.ArrayList<>();
+    for (IToken<?> token : assignedTokens) {
+      if (token == null) {
+        continue;
+      }
+      try {
+        var request = standard.getRequestHandler().getRequestOrNull(token);
+        if (request == null || request.hasParent()) {
+          continue;
+        }
+        roots.add(token);
+      } catch (Exception ex) {
+        if (isStaleRequestGraphException(ex)) {
+          cleanupStaleToken(standard, token, result, "reset_live_state all root scan");
+        } else {
+          result.errors++;
+          TheSettlerXCreate.LOGGER.warn(
+              "[CreateShop] reset_live_state all root scan failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+
+    for (IToken<?> root : roots) {
+      cancelRequestGraphPostOrder(standard, root, visited, result);
+    }
+
+    for (IToken<?> token : assignedTokens) {
+      if (token == null || visited.contains(token)) {
+        continue;
+      }
+      try {
+        var request = standard.getRequestHandler().getRequestOrNull(token);
+        if (request == null) {
+          cleanupStaleToken(standard, token, result, "reset_live_state all orphan missing");
+          continue;
+        }
+        cancelSingleRequest(standard, request, result);
+      } catch (Exception ex) {
+        if (isStaleRequestGraphException(ex)) {
+          cleanupStaleToken(standard, token, result, "reset_live_state all orphan scan");
+        } else {
+          result.errors++;
+          TheSettlerXCreate.LOGGER.warn(
+              "[CreateShop] reset_live_state all orphan scan failed token={} error={}",
               token,
               ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }

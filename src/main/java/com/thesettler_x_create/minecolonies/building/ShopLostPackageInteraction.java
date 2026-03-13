@@ -145,7 +145,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     // Lock interaction immediately to avoid duplicate reopen windows while handling a response.
     active = false;
-    removeQueuedLostPackageInteractions(citizen);
+    removeQueuedLostPackageInteractions(citizen, false);
     boolean handled = false;
     int consumed = 0;
     if (response == 0) {
@@ -179,6 +179,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       remaining = Math.max(0, remaining - consumed);
       handled = remaining <= 0;
     }
+    if (response == 2) {
+      // Cancel is a terminal player decision for this dialog instance.
+      handled = true;
+      remaining = 0;
+    }
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction handled={} response={} consumed={} remaining={}",
@@ -190,6 +195,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (handled) {
       active = false;
       remaining = 0;
+      removeQueuedLostPackageInteractions(citizen, true);
     } else if (consumed <= 0) {
       // Re-arm the dialog when nothing was consumed and no dedicated fallback interaction took
       // over.
@@ -421,7 +427,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     return ItemStack.isSameItem(candidate, key);
   }
 
-  private void removeQueuedLostPackageInteractions(ICitizenData citizen) {
+  private void removeQueuedLostPackageInteractions(ICitizenData citizen, boolean includeSelf) {
     if (citizen == null) {
       return;
     }
@@ -438,7 +444,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       @SuppressWarnings("unchecked")
       Map<Object, Object> interactions = (Map<Object, Object>) rawMap;
       int before = interactions.size();
-      interactions.entrySet().removeIf(this::isSameLostPackageInteraction);
+      interactions.entrySet().removeIf(entry -> isSameLostPackageInteraction(entry, includeSelf));
       int removed = Math.max(0, before - interactions.size());
       if (removed > 0) {
         citizen.markDirty(0);
@@ -471,12 +477,13 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     return null;
   }
 
-  private boolean isSameLostPackageInteraction(Map.Entry<Object, Object> entry) {
+  private boolean isSameLostPackageInteraction(
+      Map.Entry<Object, Object> entry, boolean includeSelf) {
     Object value = entry == null ? null : entry.getValue();
     if (!(value instanceof ShopLostPackageInteraction other)) {
       return false;
     }
-    if (other == this) {
+    if (!includeSelf && other == this) {
       // Keep the currently handled interaction queued so a no-op response can re-arm it.
       return false;
     }

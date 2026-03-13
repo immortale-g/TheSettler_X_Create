@@ -11,7 +11,8 @@ import net.minecraft.world.level.Level;
 /**
  * Rehydrates lifecycle state from MineColonies request graph before tick-pending mutation starts.
  *
- * <p>This avoids relying on stale local pending/cooldown maps after reloads or resolver ownership drift.
+ * <p>This avoids relying on stale local pending/cooldown maps after reloads or resolver ownership
+ * drift.
  */
 final class CreateShopLifecycleRehydrateService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
@@ -32,7 +33,11 @@ final class CreateShopLifecycleRehydrateService {
       IStandardRequestManager manager,
       Level level,
       Set<IToken<?>> candidates) {
-    if (resolver == null || manager == null || level == null || candidates == null || candidates.isEmpty()) {
+    if (resolver == null
+        || manager == null
+        || level == null
+        || candidates == null
+        || candidates.isEmpty()) {
       return java.util.Collections.emptySet();
     }
     Set<IToken<?>> expandedCandidates = new LinkedHashSet<>(candidates);
@@ -76,12 +81,14 @@ final class CreateShopLifecycleRehydrateService {
         active.add(token);
         continue;
       }
-      if (request.hasChildren() || resolver.hasDeliveriesCreated(token)) {
+      if (request.hasChildren()
+          || resolver.hasDeliveriesCreated(token)
+          || resolver.getPendingTracker().hasDeliveryStarted(token)) {
         int currentPending = Math.max(0, resolver.getPendingTracker().getPendingCount(token));
         requestStateMutatorService.markOrderedWithPendingAtLeastOne(
             resolver, level, token, Math.max(1, currentPending));
-        diagnostics.recordPendingSource(token, "rehydrate:inflight-or-children");
-        resolver.touchFlow(token, level.getGameTime(), "rehydrate:inflight-or-children");
+        diagnostics.recordPendingSource(token, "rehydrate:inflight-or-children-or-started");
+        resolver.touchFlow(token, level.getGameTime(), "rehydrate:inflight-or-children-or-started");
         active.add(token);
         continue;
       }

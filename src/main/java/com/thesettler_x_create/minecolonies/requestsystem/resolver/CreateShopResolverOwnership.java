@@ -17,7 +17,8 @@ final class CreateShopResolverOwnership {
   }
 
   Set<IToken<?>> collectAssignedTokensFromLocalResolvers(
-      IStandardRequestManager manager, Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
+      IStandardRequestManager manager,
+      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
     Set<IToken<?>> recovered = new LinkedHashSet<>();
     if (manager == null || assignments == null || assignments.isEmpty()) {
       return recovered;
@@ -43,7 +44,8 @@ final class CreateShopResolverOwnership {
   }
 
   Set<IToken<?>> collectAssignedTokensByRequestResolver(
-      IStandardRequestManager manager, Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
+      IStandardRequestManager manager,
+      Map<IToken<?>, java.util.Collection<IToken<?>>> assignments) {
     Set<IToken<?>> recovered = new LinkedHashSet<>();
     if (manager == null || assignments == null || assignments.isEmpty()) {
       return recovered;
@@ -97,7 +99,9 @@ final class CreateShopResolverOwnership {
   }
 
   boolean isLocalShopResolver(CreateShopRequestResolver shopResolver) {
-    if (shopResolver == null || shopResolver.getLocation() == null || resolver.getLocation() == null) {
+    if (shopResolver == null
+        || shopResolver.getLocation() == null
+        || resolver.getLocation() == null) {
       return false;
     }
     return shopResolver.getLocation().getDimension().equals(resolver.getLocation().getDimension())

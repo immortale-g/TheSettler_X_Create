@@ -8,14 +8,14 @@ import org.junit.jupiter.api.Test;
 
 class CreateShopRequestResolverLookupFailureGraceDropGuardTest {
   @Test
-  void lookupFailuresUseGraceDropInsteadOfInfiniteFailOpen() throws Exception {
+  void lookupFailuresHoldChildInsteadOfDroppingWithoutTerminalProof() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(source.contains("lookup failed -> dropped after grace"));
-    assertTrue(source.contains("deliveryChildLifecycleService.shouldDropMissingChild(resolver, level, childToken)"));
-    assertTrue(source.contains("request.removeChild(childToken);"));
+    assertTrue(source.contains("lookup failed -> hold (no drop)"));
+    assertTrue(source.contains("markMissingChildIfAbsent(childToken, nowTick)"));
+    assertTrue(source.contains("markChildActive(resolver, childToken, nowTick)"));
   }
 }

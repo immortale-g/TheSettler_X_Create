@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import java.lang.reflect.Method;
@@ -52,11 +53,13 @@ class CreateShopRequestResolverCallbacksTest {
 
     resolver.markDeliveriesCreated(parentToken);
     resolver.getPendingTracker().setPendingCount(parentToken, 5);
+    resolver.markParentChildCompletedSeen(parentToken, 0L);
 
     @SuppressWarnings("unchecked")
     IRequest<IDeliverable> request = (IRequest<IDeliverable>) mock(IRequest.class);
     when(request.getId()).thenReturn(parentToken);
     when(request.getRequest()).thenReturn(mock(IDeliverable.class));
+    when(request.getState()).thenReturn(RequestState.CANCELLED);
 
     IRequestManager manager = null;
 

@@ -13,6 +13,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 import net.minecraft.world.level.Level;
 
@@ -51,6 +52,7 @@ final class CreateShopChildReconciliationService {
     int missing = 0;
     int duplicateChildrenRemoved = 0;
     boolean hasActiveChildren = false;
+    boolean recoveredParent = false;
     IToken<?> activeLocalDeliveryChild = null;
     if (!children.isEmpty()) {
       java.util.Set<IToken<?>> seenChildren = new HashSet<>();
@@ -67,26 +69,25 @@ final class CreateShopChildReconciliationService {
           continue;
         }
         try {
-          IRequest<?> child = requestHandler.getRequest(childToken);
+          IRequest<?> child = lookupChildRequest(standardManager, requestHandler, childToken);
           if (child == null) {
-            if (deliveryChildLifecycleService.shouldDropMissingChild(resolver, level, childToken)) {
-              request.removeChild(childToken);
-              requestStateMutatorService.clearMissingChild(resolver, childToken);
-              missing++;
-              if (Config.DEBUG_LOGGING.getAsBoolean()) {
-                TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] tickPending: {} child {} missing -> dropped after grace",
-                    requestIdLog,
-                    childToken);
-              }
-            } else {
-              hasActiveChildren = true;
-              if (Config.DEBUG_LOGGING.getAsBoolean()) {
-                TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] tickPending: {} child {} missing -> keep (fail-open) grace",
-                    requestIdLog,
-                    childToken);
-              }
+            long nowTick = level == null ? 0L : level.getGameTime();
+            resolver.markMissingChildIfAbsent(childToken, nowTick);
+            requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
+            resolver.observeDeliveryChildMissing(
+                level, request.getId(), childToken, "poll-missing", "handler lookup returned null");
+            hasActiveChildren = true;
+            missing++;
+            if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[CreateShop] tickPending: {} child {} missing -> hold (no drop without terminal proof)",
+                  requestIdLog,
+                  childToken);
+            }
+            if (tryImmediateMissingAfterPickupRecovery(
+                resolver, standardManager, level, request, childToken, requestIdLog)) {
+              recoveredParent = true;
+              break;
             }
             continue;
           }
@@ -104,6 +105,10 @@ final class CreateShopChildReconciliationService {
               requestStateMutatorService.clearChildActive(resolver, childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
               requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
+              requestStateMutatorService.completeDeliveryWindow(
+                  resolver, request.getId(), childToken);
+              resolver.markParentChildCompletedSeen(
+                  request.getId(), level == null ? 0L : level.getGameTime());
               continue;
             }
             if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
@@ -144,6 +149,10 @@ final class CreateShopChildReconciliationService {
                     enqueued ? "ok" : "none");
               }
             }
+            resolver.observeDeliveryChildLifecycle(
+                standardManager, level, request.getId(), childToken, child, childAssigned, "poll");
+            maybeReleaseReservationOnCourierPickup(
+                resolver, request, pickup, childToken, childState);
             if (activeLocalDeliveryChild != null && !activeLocalDeliveryChild.equals(childToken)) {
               boolean recovered =
                   deliveryChildRecoveryService.recover(
@@ -207,32 +216,39 @@ final class CreateShopChildReconciliationService {
                 childState);
           }
         } catch (Exception ex) {
-          if (deliveryChildLifecycleService.shouldDropMissingChild(resolver, level, childToken)) {
-            request.removeChild(childToken);
-            requestStateMutatorService.clearMissingChild(resolver, childToken);
-            missing++;
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] tickPending: {} child {} lookup failed -> dropped after grace: {}",
-                  requestIdLog,
-                  childToken,
-                  ex.getMessage() == null ? "<null>" : ex.getMessage());
-            }
-          } else {
-            hasActiveChildren = true;
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] tickPending: {} child {} lookup failed -> keep (fail-open): {}",
-                  requestIdLog,
-                  childToken,
-                  ex.getMessage() == null ? "<null>" : ex.getMessage());
-            }
+          long nowTick = level == null ? 0L : level.getGameTime();
+          resolver.markMissingChildIfAbsent(childToken, nowTick);
+          requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
+          resolver.observeDeliveryChildMissing(
+              level,
+              request.getId(),
+              childToken,
+              "poll-exception",
+              ex.getMessage() == null ? "<null>" : ex.getMessage());
+          hasActiveChildren = true;
+          missing++;
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} child {} lookup failed -> hold (no drop): {}",
+                requestIdLog,
+                childToken,
+                ex.getMessage() == null ? "<null>" : ex.getMessage());
+          }
+          if (tryImmediateMissingAfterPickupRecovery(
+              resolver, standardManager, level, request, childToken, requestIdLog)) {
+            recoveredParent = true;
+            break;
           }
         }
       }
     }
     return new ChildReconcileResult(
-        hasActiveChildren, missing, duplicateChildrenRemoved, children.isEmpty(), children.size());
+        hasActiveChildren,
+        missing,
+        duplicateChildrenRemoved,
+        children.isEmpty(),
+        children.size(),
+        recoveredParent);
   }
 
   record ChildReconcileResult(
@@ -240,7 +256,110 @@ final class CreateShopChildReconciliationService {
       int missing,
       int duplicateChildrenRemoved,
       boolean childrenEmpty,
-      int childrenCount) {}
+      int childrenCount,
+      boolean recoveredParent) {}
+
+  private IRequest<?> lookupChildRequest(
+      IStandardRequestManager standardManager,
+      com.minecolonies.api.colony.requestsystem.management.IRequestHandler requestHandler,
+      IToken<?> childToken) {
+    IRequest<?> child = null;
+    try {
+      child = requestHandler.getRequest(childToken);
+    } catch (Exception ignored) {
+      child = null;
+    }
+    if (child != null || standardManager == null) {
+      return child;
+    }
+    try {
+      return standardManager.getRequestForToken(childToken);
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  private void maybeReleaseReservationOnCourierPickup(
+      CreateShopRequestResolver resolver,
+      IRequest<?> parentRequest,
+      CreateShopBlockEntity pickup,
+      IToken<?> childToken,
+      RequestState childState) {
+    if (resolver == null
+        || parentRequest == null
+        || pickup == null
+        || childToken == null
+        || childState != RequestState.IN_PROGRESS) {
+      return;
+    }
+    CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
+    if (ledger == null) {
+      return;
+    }
+    // Confirm pickup via native courier task tracking; carry snapshot is best-effort telemetry
+    // only.
+    if (ledger.getLastCourierTaskMatchCount() <= 0) {
+      return;
+    }
+    UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentRequest.getId());
+    int reserved = pickup.getReservedForRequest(parentRequestId);
+    if (reserved <= 0) {
+      return;
+    }
+    pickup.release(parentRequestId);
+    if (resolver.isDebugLoggingEnabled()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] reservation release on courier pickup parent={} child={} reservedReleased={}",
+          parentRequest.getId(),
+          childToken,
+          reserved);
+    }
+  }
+
+  private boolean tryImmediateMissingAfterPickupRecovery(
+      CreateShopRequestResolver resolver,
+      IStandardRequestManager standardManager,
+      Level level,
+      IRequest<?> parentRequest,
+      IToken<?> childToken,
+      String requestIdLog) {
+    if (resolver == null
+        || standardManager == null
+        || parentRequest == null
+        || childToken == null
+        || level == null) {
+      return false;
+    }
+    CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
+    if (ledger == null
+        || ledger.getPickupConfirmedAtTick() < 0L
+        || ledger.getTerminalSeenAtTick() >= 0L) {
+      return false;
+    }
+    if (!parentRequest.getId().equals(ledger.getParentToken())) {
+      return false;
+    }
+    parentRequest.removeChild(childToken);
+    resolver.markParentChildCompletedSeen(parentRequest.getId(), level.getGameTime());
+    resolver.observeDeliveryChildCallbackTerminal(
+        level, parentRequest.getId(), childToken, "immediate-missing-after-pickup");
+    requestStateMutatorService.finalizeOrphanDeliveryChild(
+        resolver, standardManager, childToken, "immediate-missing-after-pickup");
+    requestStateMutatorService.completeDeliveryWindow(resolver, parentRequest.getId(), childToken);
+    try {
+      standardManager.updateRequestState(parentRequest.getId(), RequestState.RESOLVED);
+    } catch (Exception ignored) {
+      // Best effort; local state cleanup still prevents resolver-side reorders.
+    }
+    requestStateMutatorService.clearPendingTokenState(
+        resolver, standardManager, parentRequest.getId(), true);
+    if (resolver.isDebugLoggingEnabled()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] tickPending: {} immediate recovery (missing+pickupConfirmed) parent={} child={} -> resolved",
+          requestIdLog,
+          parentRequest.getId(),
+          childToken);
+    }
+    return true;
+  }
 }
-
-

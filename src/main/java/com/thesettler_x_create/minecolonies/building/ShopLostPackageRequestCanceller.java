@@ -41,6 +41,7 @@ final class ShopLostPackageRequestCanceller {
     }
     boolean tupleScoped = requestedAt > 0L;
     int cancelled = 0;
+    IRequest<?> fallbackTupleCandidate = null;
     for (IToken<?> token : tokens) {
       try {
         IRequest<?> request = standard.getRequestHandler().getRequest(token);
@@ -61,13 +62,17 @@ final class ShopLostPackageRequestCanceller {
         if (!matchesLostPackageRequester(standard, request, requesterName)) {
           continue;
         }
+        if (tupleScoped && fallbackTupleCandidate == null) {
+          fallbackTupleCandidate = request;
+        }
         if (!matchesLostPackageAddress(standard, request, address)) {
           continue;
         }
         standard.updateRequestState(request.getId(), RequestState.CANCELLED);
         cancelled++;
         if (tupleScoped) {
-          // requestedAt is tuple-scoped; without stable request timestamps in MineColonies requests,
+          // requestedAt is tuple-scoped; without stable request timestamps in MineColonies
+          // requests,
           // cancel only one matched root request to avoid collateral cancels.
           break;
         }
@@ -80,6 +85,24 @@ final class ShopLostPackageRequestCanceller {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package cancel request failed token={} error={}",
               token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+    }
+    if (cancelled == 0 && tupleScoped && fallbackTupleCandidate != null) {
+      try {
+        standard.updateRequestState(fallbackTupleCandidate.getId(), RequestState.CANCELLED);
+        cancelled++;
+        if (BuildingCreateShop.isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package cancel fallback matched root token={} (address-match unavailable)",
+              fallbackTupleCandidate.getId());
+        }
+      } catch (Exception ex) {
+        if (BuildingCreateShop.isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] lost-package cancel fallback failed token={} error={}",
+              fallbackTupleCandidate.getId(),
               ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }
       }
@@ -216,12 +239,14 @@ final class ShopLostPackageRequestCanceller {
         && (requesterDisplay.contains(expected) || expected.contains(requesterDisplay))) {
       return true;
     }
-    String shortDisplay = normalizeLabel(request == null ? "" : request.getShortDisplayString().getString());
+    String shortDisplay =
+        normalizeLabel(request == null ? "" : request.getShortDisplayString().getString());
     if (!shortDisplay.isEmpty()
         && (shortDisplay.contains(expected) || expected.contains(shortDisplay))) {
       return true;
     }
-    String longDisplay = normalizeLabel(request == null ? "" : request.getLongDisplayString().getString());
+    String longDisplay =
+        normalizeLabel(request == null ? "" : request.getLongDisplayString().getString());
     if (!longDisplay.isEmpty()
         && (longDisplay.contains(expected) || expected.contains(longDisplay))) {
       return true;

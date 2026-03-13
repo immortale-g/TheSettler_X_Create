@@ -22,6 +22,8 @@ class CreateShopRequestResolverPartialTopupGuardTest {
     assertTrue(
         source.contains(
             "stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName)"));
-    assertTrue(source.contains("pickup.reserve(request.getId(), stack.copy(), stack.getCount())"));
+    assertTrue(
+        source.contains(
+            "pickup.reserve(CreateShopRequestResolver.toRequestId(request.getId()), stack.copy(), stack.getCount())"));
   }
 }

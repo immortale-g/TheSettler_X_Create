@@ -14,8 +14,8 @@ class CreateShopRequestResolverLocalScopeGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(source.contains("missing -> keep (fail-open)"));
-    assertTrue(source.contains("lookup failed -> keep (fail-open)"));
+    assertTrue(source.contains("missing -> hold (no drop without terminal proof)"));
+    assertTrue(source.contains("lookup failed -> hold (no drop)"));
     assertTrue(source.contains("skip (non-local delivery child)"));
   }
 }

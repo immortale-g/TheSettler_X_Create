@@ -7,7 +7,9 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 
-/** Resolves effective Create network stock count exposed to MineColonies warehouse resolver hooks. */
+/**
+ * Resolves effective Create network stock count exposed to MineColonies warehouse resolver hooks.
+ */
 final class CreateShopWarehouseCountService {
   int getWarehouseInternalCount(
       ILocation resolverLocation,
@@ -30,7 +32,8 @@ final class CreateShopWarehouseCountService {
     if (colony == null || colony.getServerBuildingManager() == null) {
       return 0;
     }
-    var building = colony.getServerBuildingManager().getBuilding(resolverLocation.getInDimensionLocation());
+    var building =
+        colony.getServerBuildingManager().getBuilding(resolverLocation.getInDimensionLocation());
     BuildingCreateShop shop = building instanceof BuildingCreateShop createShop ? createShop : null;
     if (shop == null) {
       return 0;

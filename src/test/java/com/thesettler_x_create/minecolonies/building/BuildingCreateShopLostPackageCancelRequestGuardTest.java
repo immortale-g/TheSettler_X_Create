@@ -27,6 +27,7 @@ class BuildingCreateShopLostPackageCancelRequestGuardTest {
     assertTrue(cancellerSource.contains("matchesLostPackageAddress("));
     assertTrue(cancellerSource.contains("requestedAt > 0L"));
     assertTrue(
-        cancellerSource.contains("standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
+        cancellerSource.contains(
+            "standard.updateRequestState(request.getId(), RequestState.CANCELLED);"));
   }
 }

@@ -57,7 +57,8 @@ final class CreateShopReservationReleaseService {
   }
 
   private static BuildingCreateShop resolveShop(
-      IRequestManager manager, com.minecolonies.api.colony.requestsystem.location.ILocation resolverLocation) {
+      IRequestManager manager,
+      com.minecolonies.api.colony.requestsystem.location.ILocation resolverLocation) {
     if (manager == null || resolverLocation == null) {
       return null;
     }
@@ -65,7 +66,8 @@ final class CreateShopReservationReleaseService {
     if (colony == null || colony.getServerBuildingManager() == null) {
       return null;
     }
-    var building = colony.getServerBuildingManager().getBuilding(resolverLocation.getInDimensionLocation());
+    var building =
+        colony.getServerBuildingManager().getBuilding(resolverLocation.getInDimensionLocation());
     return building instanceof BuildingCreateShop shop ? shop : null;
   }
 

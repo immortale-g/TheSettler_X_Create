@@ -9,7 +9,9 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.Map;
 import net.minecraft.world.level.Level;
 
-/** Handles reassigning MineColonies retrying-resolver requests back to Create Shop when resolvable. */
+/**
+ * Handles reassigning MineColonies retrying-resolver requests back to Create Shop when resolvable.
+ */
 final class CreateShopRetryingReassignService {
   void reassignResolvableRetryingRequests(
       CreateShopRequestResolver resolver, IStandardRequestManager manager, Level level) {
@@ -65,20 +67,25 @@ final class CreateShopRetryingReassignService {
                 == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
           continue;
         }
+        boolean deliveryWindowHold =
+            resolver.getPendingTracker().hasDeliveryStarted(requestToken)
+                && !resolver.hasParentChildCompletedSeen(requestToken);
         @SuppressWarnings("unchecked")
         IRequest<? extends IDeliverable> casted = (IRequest<? extends IDeliverable>) request;
-        if (!resolver.canResolveRequest(manager, casted)) {
+        if (!deliveryWindowHold && !resolver.canResolveRequest(manager, casted)) {
           continue;
         }
         resolver.markRetryingReassignAttempt(requestToken, now);
         try {
-          IToken<?> newResolver = manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
+          IToken<?> newResolver =
+              manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] retrying reassign token={} from={} to={}",
+                "[CreateShop] retrying reassign token={} from={} to={} hold={}",
                 requestToken,
                 ownerToken,
-                newResolver);
+                newResolver,
+                deliveryWindowHold);
           }
           return;
         } catch (Exception ex) {
@@ -94,4 +101,3 @@ final class CreateShopRetryingReassignService {
     }
   }
 }
-

@@ -15,8 +15,7 @@ class CreateShopRequestResolverRecoveryOwnershipGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildRecoveryService.java"));
 
     assertTrue(
-        source.contains(
-            "if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest))"));
+        source.contains("if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest))"));
     assertTrue(
         source.contains(
             "requestStateMutatorService.clearStaleRecoveryArm(resolver, parentRequest.getId())"));

@@ -33,7 +33,8 @@ final class CreateShopDeliveryCancelService {
     this.deliveryManager = deliveryManager;
   }
 
-  void handleDeliveryCancelled(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryCancelled(
+      CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
     if (resolver == null || manager == null || request == null) {
       return;
     }
@@ -51,6 +52,8 @@ final class CreateShopDeliveryCancelService {
     ItemStack stack = delivery.getStack().copy();
 
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
+    resolver.observeDeliveryChildCallbackTerminal(
+        level, parentToken, childToken, "cancel-callback");
     if (level == null) {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, null, parentToken, stack.getCount());
@@ -103,16 +106,16 @@ final class CreateShopDeliveryCancelService {
       int reservedForStack = pickup.getReservedFor(stack);
       BlockPos pickupPosition = pickup.getBlockPos();
       deliveryManager.logDeliveryDiagnostics(
-              "cancel",
-              manager,
-              request.getId(),
-              parentRequestId,
-              pickupPosition,
-              stack,
-              delivery.getTarget(),
-              reservedForRequest,
-              -1,
-              reservedForStack);
+          "cancel",
+          manager,
+          request.getId(),
+          parentRequestId,
+          pickupPosition,
+          stack,
+          delivery.getTarget(),
+          reservedForRequest,
+          -1,
+          reservedForStack);
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} reserved={} pickup={}",
           request.getId(),
@@ -128,5 +131,3 @@ final class CreateShopDeliveryCancelService {
     }
   }
 }
-
-
