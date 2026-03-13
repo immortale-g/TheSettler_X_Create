@@ -38,8 +38,12 @@ final class CreateShopResolverCooldown {
         resolver.getPendingTracker().setReason(token, null);
       }
       if (source != null) {
+        String caller = resolveClearCooldownCaller();
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] pending cleared token={} source=clearCooldown prev={}", token, source);
+            "[CreateShop] pending cleared token={} source=clearCooldown prev={} caller={}",
+            token,
+            source,
+            caller);
       }
     }
   }
@@ -66,5 +70,29 @@ final class CreateShopResolverCooldown {
     } catch (IllegalStateException ignored) {
       return false;
     }
+  }
+
+  private static String resolveClearCooldownCaller() {
+    StackTraceElement[] trace = Thread.currentThread().getStackTrace();
+    boolean seenMutator = false;
+    for (StackTraceElement element : trace) {
+      if (element == null) {
+        continue;
+      }
+      String className = element.getClassName();
+      if (className == null
+          || className.equals(CreateShopResolverCooldown.class.getName())
+          || className.startsWith("java.lang.Thread")) {
+        continue;
+      }
+      if (className.equals(CreateShopRequestStateMutatorService.class.getName())) {
+        seenMutator = true;
+        continue;
+      }
+      if (seenMutator) {
+        return className + "#" + element.getMethodName() + ":" + element.getLineNumber();
+      }
+    }
+    return "<unknown>";
   }
 }

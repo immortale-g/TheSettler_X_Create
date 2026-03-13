@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.world.level.Level;
 
-/** Emits rate-limited root-cause snapshots for unresolved delivery-child assignment/drift issues. */
+/**
+ * Emits rate-limited root-cause snapshots for unresolved delivery-child assignment/drift issues.
+ */
 final class CreateShopDeliveryRootCauseSnapshotService {
   void logSnapshot(
       CreateShopRequestResolver resolver,
@@ -60,7 +62,8 @@ final class CreateShopDeliveryRootCauseSnapshotService {
         Object building = entry.getValue();
         if (!(building
                 instanceof
-                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse warehouse)
+                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
+                warehouse)
             || building
                 instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
           continue;
@@ -148,7 +151,9 @@ final class CreateShopDeliveryRootCauseSnapshotService {
             + " assignedResolverDelivery="
             + assignedResolverDelivery
             + " deliveryFrom="
-            + (delivery.getStart() == null ? "<null>" : delivery.getStart().getInDimensionLocation())
+            + (delivery.getStart() == null
+                ? "<null>"
+                : delivery.getStart().getInDimensionLocation())
             + " deliveryTo="
             + (delivery.getTarget() == null
                 ? "<null>"
@@ -163,5 +168,3 @@ final class CreateShopDeliveryRootCauseSnapshotService {
     }
   }
 }
-
-

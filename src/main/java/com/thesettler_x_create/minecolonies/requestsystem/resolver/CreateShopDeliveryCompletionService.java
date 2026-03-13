@@ -15,7 +15,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/** Handles delivery completion reconciliation and reservation consumption for Create Shop requests. */
+/**
+ * Handles delivery completion reconciliation and reservation consumption for Create Shop requests.
+ */
 final class CreateShopDeliveryCompletionService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopDeliveryManager deliveryManager;
@@ -33,7 +35,8 @@ final class CreateShopDeliveryCompletionService {
     this.recheck = recheck;
   }
 
-  void handleDeliveryComplete(CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
+  void handleDeliveryComplete(
+      CreateShopRequestResolver resolver, IRequestManager manager, IRequest<?> request) {
     if (resolver == null) {
       return;
     }
@@ -43,7 +46,12 @@ final class CreateShopDeliveryCompletionService {
     if (parentToken == null) {
       return;
     }
-    requestStateMutatorService.closeDeliveryWindow(resolver, parentToken, childToken);
+    requestStateMutatorService.completeDeliveryWindow(resolver, parentToken, childToken);
+    Level level =
+        manager == null || manager.getColony() == null ? null : manager.getColony().getWorld();
+    resolver.markParentChildCompletedSeen(parentToken, level == null ? 0L : level.getGameTime());
+    resolver.observeDeliveryChildCallbackTerminal(
+        level, parentToken, childToken, "complete-callback");
     IRequest<?> parentRequest = null;
     IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
     if (standard != null) {
@@ -71,7 +79,7 @@ final class CreateShopDeliveryCompletionService {
         if (shop != null) {
           pickup = shop.getPickupBlockEntity();
         }
-        Level level =
+        level =
             manager == null || manager.getColony() == null ? null : manager.getColony().getWorld();
         ILocation start = delivery.getStart();
         BlockPos startPos = start == null ? null : start.getInDimensionLocation();
@@ -85,7 +93,8 @@ final class CreateShopDeliveryCompletionService {
           }
         }
         if (pickup != null
-            && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(delivery, shop, pickup)) {
+            && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(
+                delivery, shop, pickup)) {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
           ItemStack stack = delivery.getStack().copy();
           int reservedForStackBefore = pickup.getReservedFor(stack);
@@ -109,16 +118,16 @@ final class CreateShopDeliveryCompletionService {
             int reservedForStack = reservedForStackAfter;
             BlockPos pickupPosition = pickup.getBlockPos();
             deliveryManager.logDeliveryDiagnostics(
-                    "complete",
-                    manager,
-                    request.getId(),
-                    parentRequestId,
-                    pickupPosition,
-                    stack,
-                    delivery.getTarget(),
-                    reservedForRequest,
-                    -1,
-                    reservedForStack);
+                "complete",
+                manager,
+                request.getId(),
+                parentRequestId,
+                pickupPosition,
+                stack,
+                delivery.getTarget(),
+                reservedForRequest,
+                -1,
+                reservedForStack);
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
                 request.getId(),
@@ -134,17 +143,28 @@ final class CreateShopDeliveryCompletionService {
         // Ignore delivery detail logging failures.
       }
     }
+    boolean parentStillNonTerminal =
+        parentRequest != null
+            && !CreateShopRequestResolver.isTerminalRequestState(parentRequest.getState());
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
-    if (pending > 0) {
-      if (manager != null && manager.getColony() != null) {
-        requestStateMutatorService.markOrderedWithPending(
-            resolver, manager.getColony().getWorld(), parentToken, pending);
-      }
+    if (parentStillNonTerminal) {
+      int heldPending = Math.max(1, pending);
+      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+          resolver, level, parentToken, heldPending);
+      diagnostics.recordPendingSource(parentToken, "delivery-complete:await-parent-terminal");
+      resolver.touchFlow(
+          parentToken,
+          level == null ? 0L : level.getGameTime(),
+          "delivery-complete:await-parent-terminal");
+    } else if (pending > 0) {
+      requestStateMutatorService.markOrderedWithPending(resolver, level, parentToken, pending);
     } else {
+      requestStateMutatorService.closeDeliveryWindow(resolver, parentToken, null);
       requestStateMutatorService.clearOrderedAndPending(resolver, parentToken);
     }
     if (resolver.isDebugLoggingEnabled()) {
-      IStandardRequestManager debugManager = CreateShopRequestResolver.unwrapStandardManager(manager);
+      IStandardRequestManager debugManager =
+          CreateShopRequestResolver.unwrapStandardManager(manager);
       if (debugManager != null) {
         try {
           var handler = debugManager.getRequestHandler();
@@ -170,5 +190,3 @@ final class CreateShopDeliveryCompletionService {
     }
   }
 }
-
-

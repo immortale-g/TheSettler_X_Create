@@ -44,7 +44,7 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
   }
 
   @Test
-  void timedOutFlowReleasesReservationAndCleansTrackedState() throws Exception {
+  void timedOutFlowSkipsCleanupWhileDeliveryWindowIsActive() throws Exception {
     UUID parentId = UUID.randomUUID();
     IToken<?> parentToken = token(parentId);
     IToken<?> childToken = token(UUID.randomUUID());
@@ -71,13 +71,43 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
     invokeProcessTimedOutFlows(manager, level);
 
+    assertFalse(resolver.reservationReleased);
+    assertEquals(3, resolver.getPendingTracker().getPendingCount(parentToken));
+    assertTrue(resolver.getCooldown().isOrdered(parentToken));
+    assertTrue(resolver.hasDeliveriesCreated(parentToken));
+    assertTrue(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
+    assertTrue(parentMap("deliveryChildActiveSince").containsKey(childToken));
+  }
+
+  @Test
+  void timedOutFlowReleasesReservationAndCleansTrackedStateWithoutActiveDeliveryWindow()
+      throws Exception {
+    UUID parentId = UUID.randomUUID();
+    IToken<?> parentToken = token(parentId);
+
+    IRequest<?> parentRequest = mock(IRequest.class);
+    when(parentRequest.getId()).thenReturn(parentToken);
+    when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
+    when(parentRequest.hasChildren()).thenReturn(false);
+    when(manager.getRequestHandler().getRequest(parentToken)).thenReturn((IRequest) parentRequest);
+
+    CreateShopRequestStateMachine flowStateMachine =
+        (CreateShopRequestStateMachine) getField("flowStateMachine");
+    flowStateMachine.transition(
+        parentToken, CreateShopFlowState.ORDERED_FROM_NETWORK, 0L, "ordered", "", 0);
+
+    resolver.getPendingTracker().setPendingCount(parentToken, 3);
+    resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
+
+    invokeProcessTimedOutFlows(manager, level);
+
     assertTrue(resolver.reservationReleased);
     assertEquals(parentToken, resolver.releasedToken);
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
     assertFalse(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
-    assertFalse(parentMap("deliveryChildActiveSince").containsKey(childToken));
+    assertFalse(parentMap("deliveryChildActiveSince").containsKey(parentToken));
   }
 
   private void invokeProcessTimedOutFlows(IStandardRequestManager manager, Level level)

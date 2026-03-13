@@ -24,13 +24,30 @@ final class CreateShopFlowTimeoutCleanupService {
     for (CreateShopFlowRecord record :
         resolver.getFlowStateMachine().collectTimedOut(level.getGameTime(), timeout)) {
       IToken<?> token = record.getRequestToken();
+      boolean runtimeDeliveryWindowOpen =
+          resolver.getParentDeliveryTokensSnapshot().contains(token)
+              || resolver.hasDeliveriesCreated(token)
+              || resolver.getPendingTracker().hasDeliveryStarted(token);
       IRequest<?> request = null;
       try {
         request = manager.getRequestHandler().getRequest(token);
       } catch (Exception ignored) {
         // Missing requests are cleaned up below.
       }
+      if (request == null && runtimeDeliveryWindowOpen) {
+        // Request graph lookups can be transiently stale; do not clear active parent lifecycle.
+        resolver.touchFlow(token, level.getGameTime(), "timeout-cleanup:skip-runtime-active");
+        continue;
+      }
       if (request != null) {
+        boolean terminal = CreateShopRequestResolver.isTerminalRequestState(request.getState());
+        boolean deliveryWindowOpen = request.hasChildren() || runtimeDeliveryWindowOpen;
+        if (!terminal && deliveryWindowOpen) {
+          // Active deliveries can outlive local flow timestamps; do not clear parent lifecycle
+          // here.
+          resolver.touchFlow(token, level.getGameTime(), "timeout-cleanup:skip-active-delivery");
+          continue;
+        }
         resolver.transitionFlow(
             manager,
             request,
@@ -47,5 +64,3 @@ final class CreateShopFlowTimeoutCleanupService {
     }
   }
 }
-
-

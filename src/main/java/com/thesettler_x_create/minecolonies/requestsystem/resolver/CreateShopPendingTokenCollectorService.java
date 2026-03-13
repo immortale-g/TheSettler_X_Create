@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.world.level.Level;
 
-/** Collects pending request tokens from direct assignments, ownership recovery, and pending maps. */
+/**
+ * Collects pending request tokens from direct assignments, ownership recovery, and pending maps.
+ */
 final class CreateShopPendingTokenCollectorService {
   private final CreateShopResolverOwnership ownership;
   private final CreateShopTickPendingTelemetryService tickPendingTelemetryService;
@@ -46,7 +48,7 @@ final class CreateShopPendingTokenCollectorService {
             assigned.size());
       }
     } else {
-        java.util.Set<IToken<?>> recovered =
+      java.util.Set<IToken<?>> recovered =
           ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
         assigned.addAll(recovered);

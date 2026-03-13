@@ -98,7 +98,8 @@ final class CreateShopPendingDeliveryCreationService {
           pendingCount,
           rackAvailableForRequest);
     }
-    List<IToken<?>> created = deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
+    List<IToken<?>> created =
+        deliveryManager.createDeliveriesFromStacks(manager, request, stacks, pickup);
     if (created.isEmpty()) {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:create-failed");
       diagnostics.logPendingReasonChange(request.getId(), "create:failed");

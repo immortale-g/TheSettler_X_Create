@@ -86,5 +86,3 @@ final class CreateShopDeliveryChildRecoveryService {
     return true;
   }
 }
-
-

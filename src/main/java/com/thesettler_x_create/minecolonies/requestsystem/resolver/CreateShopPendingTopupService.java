@@ -58,7 +58,8 @@ final class CreateShopPendingTopupService {
 
     if (workerWorking && topupNeeded > 0) {
       if (pendingTracker.hasDeliveryStarted(request.getId())) {
-        requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
+        requestStateMutatorService.markOrderedWithPending(
+            resolver, level, request.getId(), pendingCount);
         diagnostics.recordPendingSource(request.getId(), "tickPending:block-auto-reorder-started");
         flowStateMachine.touch(
             request.getId(), level.getGameTime(), "tickPending:block-auto-reorder-started");
@@ -75,16 +76,20 @@ final class CreateShopPendingTopupService {
 
       String requesterName = messaging.resolveRequesterName(manager, request);
       int inflightRemaining =
-          pickup.getInflightRemaining(deliverable.getResult(), requesterName, tile.getShopAddress());
-      if (inflightRemaining > 0) {
-        requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
+          pickup.getInflightRemaining(
+              deliverable.getResult(), requesterName, tile.getShopAddress());
+      int effectiveTopupNeeded = Math.max(0, topupNeeded - Math.max(0, inflightRemaining));
+      if (effectiveTopupNeeded <= 0) {
+        requestStateMutatorService.markOrderedWithPending(
+            resolver, level, request.getId(), pendingCount);
         diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
         flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} network topup blocked (inflightRemaining={}, pending={}, reserved={}, rack={})",
+              "[CreateShop] tickPending: {} network topup blocked (inflightRemaining={}, topupNeeded={}, pending={}, reserved={}, rack={})",
               requestIdLog,
               inflightRemaining,
+              topupNeeded,
               pendingCount,
               reservedForRequest,
               rackAvailableForRequest);
@@ -93,7 +98,7 @@ final class CreateShopPendingTopupService {
       }
 
       int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
-      int topupCount = Math.min(networkAvailable, topupNeeded);
+      int topupCount = Math.min(networkAvailable, effectiveTopupNeeded);
       if (topupCount <= 0) {
         return;
       }
@@ -106,9 +111,11 @@ final class CreateShopPendingTopupService {
         if (stack.isEmpty()) {
           continue;
         }
-        pickup.reserve(request.getId(), stack.copy(), stack.getCount());
+        pickup.reserve(
+            CreateShopRequestResolver.toRequestId(request.getId()), stack.copy(), stack.getCount());
       }
-      requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), pendingCount);
+      requestStateMutatorService.markOrderedWithPending(
+          resolver, level, request.getId(), pendingCount);
       diagnostics.recordPendingSource(request.getId(), "tickPending:network-topup");
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:network-topup");
       messaging.sendShopChat(

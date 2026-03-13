@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
@@ -11,7 +12,6 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import net.minecraft.world.level.Level;
@@ -90,6 +90,8 @@ final class CreateShopPendingRequestProcessorService {
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     boolean onCooldown = resolver.getCooldown().isRequestOnCooldown(level, request.getId());
+    boolean deliveryStarted = resolver.getPendingTracker().hasDeliveryStarted(request.getId());
+    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
     if (request.hasChildren()) {
       diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
@@ -128,6 +130,9 @@ final class CreateShopPendingRequestProcessorService {
               childResult.childrenCount());
         }
       }
+      if (childResult.recoveredParent()) {
+        return;
+      }
       if (childResult.missing() > 0) {
         return;
       }
@@ -162,18 +167,85 @@ final class CreateShopPendingRequestProcessorService {
         }
       }
     }
+    if (previousChildCount != null
+        && previousChildCount > 0
+        && !request.hasChildren()
+        && deliveryStarted
+        && !completionSeen) {
+      IToken<?> pickedUpOrphanChild = resolver.findPickedUpOrphanChildForParent(request.getId());
+      if (pickedUpOrphanChild != null) {
+        resolver.markParentChildCompletedSeen(request.getId(), level.getGameTime());
+        resolver.observeDeliveryChildCallbackTerminal(
+            level, request.getId(), pickedUpOrphanChild, "orphan-pickedup-recovery");
+        requestStateMutatorService.finalizeOrphanDeliveryChild(
+            resolver, standardManager, pickedUpOrphanChild, "orphan-pickedup-recovery");
+        requestStateMutatorService.completeDeliveryWindow(
+            resolver, request.getId(), pickedUpOrphanChild);
+        requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
+        resolver.clearDeliveriesCreated(request.getId());
+        diagnostics.logPendingReasonChange(request.getId(), "recover:orphan-pickedup-child");
+        resolver.touchFlow(
+            request.getId(), level.getGameTime(), "tickPending:recover-orphan-pickedup");
+        try {
+          standardManager.updateRequestState(request.getId(), RequestState.RESOLVED);
+        } catch (Exception ignored) {
+          // Best effort; local cleanup already prevents drift.
+        }
+        requestStateMutatorService.clearPendingTokenState(
+            resolver, standardManager, request.getId(), true);
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} recovered orphan picked-up child={} -> parent resolved",
+              requestIdLog,
+              pickedUpOrphanChild);
+        }
+        return;
+      }
+      int heldPending = Math.max(1, resolver.getPendingTracker().getPendingCount(request.getId()));
+      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+          resolver, level, request.getId(), heldPending);
+      diagnostics.logPendingReasonChange(request.getId(), "wait:child-dropped-without-callback");
+      resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:wait-child-callback");
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] tickPending: {} waiting (child dropped without callback, prevChildCount={}, pending={})",
+            requestIdLog,
+            previousChildCount,
+            heldPending);
+      }
+      return;
+    }
     requestStateMutatorService.setParentChildrenSnapshot(resolver, request.getId(), 0, "[]");
     requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
     requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
-      diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
-      resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
-            requestIdLog);
+      if (!request.hasChildren() && deliveryStarted && !completionSeen) {
+        resolver.clearDeliveriesCreated(request.getId());
+        int heldPending =
+            Math.max(1, resolver.getPendingTracker().getPendingCount(request.getId()));
+        requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+            resolver, level, request.getId(), heldPending);
+        diagnostics.logPendingReasonChange(
+            request.getId(), "recover:delivery-created-without-child");
+        resolver.touchFlow(
+            request.getId(), level.getGameTime(), "tickPending:recover-delivery-created");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} recover (deliveryCreated without child, pending={})",
+              requestIdLog,
+              heldPending);
+        }
+      } else {
+        diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
+        resolver.touchFlow(
+            request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
+              requestIdLog);
+        }
+        return;
       }
-      return;
     }
 
     if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -250,8 +322,7 @@ final class CreateShopPendingRequestProcessorService {
     if (!creationResult.created()) {
       return;
     }
-    postCreationUpdateService.apply(resolver, manager, request, level, creationResult, requestIdLog);
+    postCreationUpdateService.apply(
+        resolver, manager, request, level, creationResult, requestIdLog);
   }
 }
-
-

@@ -83,7 +83,10 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
         invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
             new Class<?>[] {
-              CreateShopRequestResolver.class, Level.class, IStandardRequestManager.class, IToken.class
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
             },
             resolver,
             level,
@@ -96,7 +99,10 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
         invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
             new Class<?>[] {
-              CreateShopRequestResolver.class, Level.class, IStandardRequestManager.class, IToken.class
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
             },
             resolver,
             level,
@@ -109,7 +115,10 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
         invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
             new Class<?>[] {
-              CreateShopRequestResolver.class, Level.class, IStandardRequestManager.class, IToken.class
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
             },
             resolver,
             level,
@@ -120,8 +129,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
 
   private boolean invokeLifecycleBoolean(String methodName, Class<?>[] signature, Object... args)
       throws Exception {
-    Field field =
-        CreateShopRequestResolver.class.getDeclaredField("deliveryChildLifecycleService");
+    Field field = CreateShopRequestResolver.class.getDeclaredField("deliveryChildLifecycleService");
     field.setAccessible(true);
     Object lifecycleService = field.get(resolver);
     Method method = lifecycleService.getClass().getDeclaredMethod(methodName, signature);

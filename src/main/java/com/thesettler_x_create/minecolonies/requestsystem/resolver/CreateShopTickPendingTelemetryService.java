@@ -62,6 +62,7 @@ final class CreateShopTickPendingTelemetryService {
       return;
     }
     lastPerfLogTime = now;
-    TheSettlerXCreate.LOGGER.info("[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
+    TheSettlerXCreate.LOGGER.info(
+        "[CreateShop] perf tickPending={}us", lastTickPendingNanos / 1000L);
   }
 }

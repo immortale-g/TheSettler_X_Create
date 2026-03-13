@@ -6,7 +6,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Centralized runtime lifecycle state for pending/cooldown/child tracking. */
 final class CreateShopLifecycleStateStore {
-  private final CreateShopPendingDeliveryTracker pendingTracker = new CreateShopPendingDeliveryTracker();
+  private final CreateShopPendingDeliveryTracker pendingTracker =
+      new CreateShopPendingDeliveryTracker();
   private final Map<IToken<?>, Long> retryingReassignAttempts = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> deliveryChildActiveSince = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> missingChildSince = new ConcurrentHashMap<>();
@@ -17,6 +18,10 @@ final class CreateShopLifecycleStateStore {
   private final Map<IToken<?>, Long> parentChildDropLastLogTick = new ConcurrentHashMap<>();
   private final Map<IToken<?>, String> deliveryRootCauseSnapshots = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> deliveryRootCauseLastLogTick = new ConcurrentHashMap<>();
+  private final Map<IToken<?>, Long> parentChildCompletedSeenAt = new ConcurrentHashMap<>();
+  private final Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> deliveryChildLedger =
+      new ConcurrentHashMap<>();
+  private final Map<IToken<?>, Long> deliveryChildLedgerLastLogTick = new ConcurrentHashMap<>();
 
   CreateShopPendingDeliveryTracker getPendingTracker() {
     return pendingTracker;
@@ -60,5 +65,17 @@ final class CreateShopLifecycleStateStore {
 
   Map<IToken<?>, Long> getDeliveryRootCauseLastLogTick() {
     return deliveryRootCauseLastLogTick;
+  }
+
+  Map<IToken<?>, Long> getParentChildCompletedSeenAt() {
+    return parentChildCompletedSeenAt;
+  }
+
+  Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> getDeliveryChildLedger() {
+    return deliveryChildLedger;
+  }
+
+  Map<IToken<?>, Long> getDeliveryChildLedgerLastLogTick() {
+    return deliveryChildLedgerLastLogTick;
   }
 }

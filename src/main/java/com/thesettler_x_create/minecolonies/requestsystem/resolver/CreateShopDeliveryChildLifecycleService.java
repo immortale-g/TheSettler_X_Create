@@ -60,13 +60,16 @@ final class CreateShopDeliveryChildLifecycleService {
       return false;
     }
     boolean activeState =
-        state == RequestState.CREATED || state == RequestState.ASSIGNED || state == RequestState.IN_PROGRESS;
+        state == RequestState.CREATED
+            || state == RequestState.ASSIGNED
+            || state == RequestState.IN_PROGRESS;
     if (!activeState) {
       requestStateMutatorService.clearChildActive(resolver, childToken);
       return false;
     }
     long now = level.getGameTime();
-    Long since = requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now);
+    Long since =
+        requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now);
     if (since == null) {
       requestStateMutatorService.markChildActive(resolver, childToken, now);
       return false;
@@ -107,5 +110,3 @@ final class CreateShopDeliveryChildLifecycleService {
     }
   }
 }
-
-
