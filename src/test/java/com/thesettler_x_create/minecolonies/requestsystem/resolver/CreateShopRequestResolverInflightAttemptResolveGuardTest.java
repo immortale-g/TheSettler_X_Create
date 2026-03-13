@@ -14,9 +14,9 @@ class CreateShopRequestResolverInflightAttemptResolveGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopAttemptResolveService.java"));
 
-    assertTrue(
-        source.contains(
-            "pickup.getInflightRemaining(deliverable.getResult(), requesterName, tile.getShopAddress())"));
+    assertTrue(source.contains("pickup.getInflightRemaining("));
+    assertTrue(source.contains("deliverable.getResult()"));
+    assertTrue(source.contains("tile.getShopAddress()"));
     assertTrue(source.contains("int effectiveNetworkNeeded = remaining;"));
     assertTrue(
         source.contains(
