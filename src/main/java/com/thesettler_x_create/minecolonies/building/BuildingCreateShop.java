@@ -567,6 +567,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);
   }
 
+  /** Debug/helper wrapper for command harness flows. */
+  public int restartLostPackage(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    return restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)
+        .consumed();
+  }
+
   public int acceptLostPackageFromPlayer(
       Player player,
       ItemStack stackKey,
@@ -865,6 +872,37 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return Math.max(Math.max(1, remaining), clearedInflight);
     }
     return 0;
+  }
+
+  /**
+   * Debug helper: simulate package handover without requiring a real package item in player
+   * inventory.
+   */
+  public int debugSimulateLostPackageHandover(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    if (stackKey == null || stackKey.isEmpty() || remaining <= 0) {
+      return 0;
+    }
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (tile == null || pickup == null) {
+      return 0;
+    }
+    ItemStack insertStack = stackKey.copy();
+    insertStack.setCount(Math.max(1, remaining));
+    java.util.List<ItemStack> leftovers = tile.insertIntoRacksOnly(java.util.List.of(insertStack));
+    int leftover = 0;
+    for (ItemStack stack : leftovers) {
+      if (stack != null && !stack.isEmpty()) {
+        leftover += stack.getCount();
+      }
+    }
+    int inserted = Math.max(0, insertStack.getCount() - leftover);
+    if (inserted <= 0) {
+      return 0;
+    }
+    int consumeTarget = Math.min(Math.max(1, remaining), inserted);
+    return pickup.consumeInflight(stackKey, consumeTarget, requesterName, address, requestedAt);
   }
 
   record LostPackageReorderResult(int consumed, LostPackageReorderStatus status) {}

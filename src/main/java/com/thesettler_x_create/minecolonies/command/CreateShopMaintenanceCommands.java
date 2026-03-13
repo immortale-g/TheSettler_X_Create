@@ -12,6 +12,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
@@ -215,6 +216,36 @@ public final class CreateShopMaintenanceCommands {
             .then(
                 Commands.literal("snapshot")
                     .executes(context -> runAutoHarnessSnapshot(context.getSource())))
+            .then(
+                Commands.literal("lost_inject")
+                    .executes(context -> runAutoHarnessLostInject(context.getSource(), 8, 20 * 60))
+                    .then(
+                        Commands.argument("amount", IntegerArgumentType.integer(1, 64))
+                            .executes(
+                                context ->
+                                    runAutoHarnessLostInject(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "amount"),
+                                        20 * 60))
+                            .then(
+                                Commands.argument(
+                                        "age_ticks", IntegerArgumentType.integer(1, 20 * 3600))
+                                    .executes(
+                                        context ->
+                                            runAutoHarnessLostInject(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "amount"),
+                                                IntegerArgumentType.getInteger(
+                                                    context, "age_ticks"))))))
+            .then(
+                Commands.literal("lost_reorder")
+                    .executes(context -> runAutoHarnessLostReorder(context.getSource())))
+            .then(
+                Commands.literal("lost_handover_sim")
+                    .executes(context -> runAutoHarnessLostHandoverSim(context.getSource())))
+            .then(
+                Commands.literal("lost_cancel")
+                    .executes(context -> runAutoHarnessLostCancel(context.getSource())))
             .then(
                 Commands.literal("full")
                     .executes(context -> runAutoHarnessFull(context.getSource(), 3, 1, 8, true))
@@ -431,6 +462,166 @@ public final class CreateShopMaintenanceCommands {
     return snapshot.errors == 0 ? 1 : 0;
   }
 
+  private static int runAutoHarnessLostInject(CommandSourceStack source, int amount, int ageTicks) {
+    HarnessShopContext context = findFirstHarnessShopContext();
+    if (context == null || context.pickup == null) {
+      source.sendFailure(
+          Component.literal("[CreateShop] AutoHarness lost_inject: no eligible shop/pickup"));
+      return 0;
+    }
+    ItemStack key = selectLiveTestStack(context.tile);
+    if (key.isEmpty()) {
+      source.sendFailure(
+          Component.literal("[CreateShop] AutoHarness lost_inject: no network stock item found"));
+      return 0;
+    }
+    int injected =
+        context.pickup.debugInjectInflight(
+            key, Math.max(1, amount), "AUTO_HARNESS", "AUTO_TARGET", Math.max(1, ageTicks));
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness lost_inject: shop="
+                    + context.shop.getLocation().getInDimensionLocation()
+                    + ", item="
+                    + key.getHoverName().getString()
+                    + ", amount="
+                    + amount
+                    + ", ageTicks="
+                    + ageTicks
+                    + ", injected="
+                    + injected),
+        true);
+    return injected > 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessLostReorder(CommandSourceStack source) {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      source.sendFailure(
+          Component.literal("[CreateShop] AutoHarness lost_reorder: no inflight tuple found"));
+      return 0;
+    }
+    int before =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int consumed =
+        context.shop.restartLostPackage(
+            context.notice.stackKey,
+            context.notice.remaining,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int after =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness lost_reorder: item="
+                    + context.notice.stackKey.getHoverName().getString()
+                    + ", requested="
+                    + context.notice.remaining
+                    + ", consumed="
+                    + consumed
+                    + ", remainingBefore="
+                    + before
+                    + ", remainingAfter="
+                    + after),
+        true);
+    return consumed > 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessLostHandoverSim(CommandSourceStack source) {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      source.sendFailure(
+          Component.literal("[CreateShop] AutoHarness lost_handover_sim: no inflight tuple found"));
+      return 0;
+    }
+    int before =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int consumed =
+        context.shop.debugSimulateLostPackageHandover(
+            context.notice.stackKey,
+            context.notice.remaining,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int after =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness lost_handover_sim: item="
+                    + context.notice.stackKey.getHoverName().getString()
+                    + ", target="
+                    + context.notice.remaining
+                    + ", consumed="
+                    + consumed
+                    + ", remainingBefore="
+                    + before
+                    + ", remainingAfter="
+                    + after),
+        true);
+    return consumed > 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessLostCancel(CommandSourceStack source) {
+    LostTupleContext context = findOldestLostTupleContext();
+    if (context == null) {
+      source.sendFailure(
+          Component.literal("[CreateShop] AutoHarness lost_cancel: no inflight tuple found"));
+      return 0;
+    }
+    int before =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int cancelled =
+        context.shop.cancelLostPackageRequestAndInflight(
+            context.notice.stackKey,
+            context.notice.remaining,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    int after =
+        context.pickup.getInflightRemaining(
+            context.notice.stackKey,
+            context.notice.requesterName,
+            context.notice.address,
+            context.notice.requestedAt);
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness lost_cancel: item="
+                    + context.notice.stackKey.getHoverName().getString()
+                    + ", cancelled="
+                    + cancelled
+                    + ", remainingBefore="
+                    + before
+                    + ", remainingAfter="
+                    + after),
+        true);
+    return cancelled > 0 ? 1 : 0;
+  }
+
   private static int runAutoHarnessFull(
       CommandSourceStack source,
       int rounds,
@@ -557,6 +748,61 @@ public final class CreateShopMaintenanceCommands {
       if (stack.getCount() > bestCount) {
         best = stack.copy();
         bestCount = stack.getCount();
+      }
+    }
+    return best;
+  }
+
+  private static HarnessShopContext findFirstHarnessShopContext() {
+    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+      var buildingManager = colony.getServerBuildingManager();
+      if (buildingManager == null || buildingManager.getBuildings() == null) {
+        continue;
+      }
+      for (var entry : buildingManager.getBuildings().entrySet()) {
+        var building = entry.getValue();
+        if (!(building instanceof BuildingCreateShop shop)) {
+          continue;
+        }
+        TileEntityCreateShop tile = shop.getCreateShopTileEntity();
+        CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+        if (tile == null || pickup == null || tile.getStockNetworkId() == null) {
+          continue;
+        }
+        return new HarnessShopContext(colony, shop, tile, pickup);
+      }
+    }
+    return null;
+  }
+
+  private static LostTupleContext findOldestLostTupleContext() {
+    LostTupleContext best = null;
+    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+      var buildingManager = colony.getServerBuildingManager();
+      if (buildingManager == null || buildingManager.getBuildings() == null) {
+        continue;
+      }
+      long now = colony.getWorld() == null ? 0L : colony.getWorld().getGameTime();
+      for (var entry : buildingManager.getBuildings().entrySet()) {
+        var building = entry.getValue();
+        if (!(building instanceof BuildingCreateShop shop)) {
+          continue;
+        }
+        CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+        if (pickup == null) {
+          continue;
+        }
+        CreateShopBlockEntity.InflightNotice notice = pickup.debugPeekOldestInflightNotice(now);
+        if (notice == null
+            || notice.stackKey == null
+            || notice.stackKey.isEmpty()
+            || notice.remaining <= 0) {
+          continue;
+        }
+        LostTupleContext candidate = new LostTupleContext(shop, pickup, notice);
+        if (best == null || candidate.notice.requestedAt < best.notice.requestedAt) {
+          best = candidate;
+        }
       }
     }
     return best;
@@ -1413,5 +1659,38 @@ public final class CreateShopMaintenanceCommands {
     int warehouseQueueEntries;
     int assignmentEntries;
     int errors;
+  }
+
+  private static final class HarnessShopContext {
+    final IColony colony;
+    final BuildingCreateShop shop;
+    final TileEntityCreateShop tile;
+    final CreateShopBlockEntity pickup;
+
+    HarnessShopContext(
+        IColony colony,
+        BuildingCreateShop shop,
+        TileEntityCreateShop tile,
+        CreateShopBlockEntity pickup) {
+      this.colony = colony;
+      this.shop = shop;
+      this.tile = tile;
+      this.pickup = pickup;
+    }
+  }
+
+  private static final class LostTupleContext {
+    final BuildingCreateShop shop;
+    final CreateShopBlockEntity pickup;
+    final CreateShopBlockEntity.InflightNotice notice;
+
+    LostTupleContext(
+        BuildingCreateShop shop,
+        CreateShopBlockEntity pickup,
+        CreateShopBlockEntity.InflightNotice notice) {
+      this.shop = shop;
+      this.pickup = pickup;
+      this.notice = notice;
+    }
   }
 }
