@@ -167,6 +167,92 @@ public final class CreateShopMaintenanceCommands {
                           return result.errors == 0 ? 1 : 0;
                         })));
 
+    root.then(
+        Commands.literal("auto_test_harness")
+            .executes(context -> runAutoHarnessStart(context.getSource(), 1, 8, false))
+            .then(
+                Commands.literal("start")
+                    .executes(context -> runAutoHarnessStart(context.getSource(), 1, 8, false))
+                    .then(
+                        Commands.argument("requests", IntegerArgumentType.integer(1, 256))
+                            .executes(
+                                context ->
+                                    runAutoHarnessStart(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "requests"),
+                                        8,
+                                        false))
+                            .then(
+                                Commands.argument("amount", IntegerArgumentType.integer(1, 64))
+                                    .executes(
+                                        context ->
+                                            runAutoHarnessStart(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "requests"),
+                                                IntegerArgumentType.getInteger(context, "amount"),
+                                                false)))))
+            .then(
+                Commands.literal("start_force_queue")
+                    .executes(context -> runAutoHarnessStart(context.getSource(), 1, 8, true))
+                    .then(
+                        Commands.argument("requests", IntegerArgumentType.integer(1, 256))
+                            .executes(
+                                context ->
+                                    runAutoHarnessStart(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "requests"),
+                                        8,
+                                        true))
+                            .then(
+                                Commands.argument("amount", IntegerArgumentType.integer(1, 64))
+                                    .executes(
+                                        context ->
+                                            runAutoHarnessStart(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "requests"),
+                                                IntegerArgumentType.getInteger(context, "amount"),
+                                                true)))))
+            .then(
+                Commands.literal("snapshot")
+                    .executes(context -> runAutoHarnessSnapshot(context.getSource())))
+            .then(
+                Commands.literal("full")
+                    .executes(context -> runAutoHarnessFull(context.getSource(), 3, 1, 8, true))
+                    .then(
+                        Commands.argument("rounds", IntegerArgumentType.integer(1, 8))
+                            .executes(
+                                context ->
+                                    runAutoHarnessFull(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "rounds"),
+                                        1,
+                                        8,
+                                        true))
+                            .then(
+                                Commands.argument("requests", IntegerArgumentType.integer(1, 256))
+                                    .executes(
+                                        context ->
+                                            runAutoHarnessFull(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "rounds"),
+                                                IntegerArgumentType.getInteger(context, "requests"),
+                                                8,
+                                                true))
+                                    .then(
+                                        Commands.argument(
+                                                "amount", IntegerArgumentType.integer(1, 64))
+                                            .executes(
+                                                context ->
+                                                    runAutoHarnessFull(
+                                                        context.getSource(),
+                                                        IntegerArgumentType.getInteger(
+                                                            context, "rounds"),
+                                                        IntegerArgumentType.getInteger(
+                                                            context, "requests"),
+                                                        IntegerArgumentType.getInteger(
+                                                            context, "amount"),
+                                                        true)))))));
+
     dispatcher.register(root);
   }
 
@@ -282,6 +368,175 @@ public final class CreateShopMaintenanceCommands {
           "No eligible Create Shop with network stock and valid target requester found.";
     }
     return result;
+  }
+
+  private static int runAutoHarnessStart(
+      CommandSourceStack source, int requests, int amount, boolean forceWarehouseQueue) {
+    ResetLiveStateResult reset = resetLiveState(forceWarehouseQueue);
+    LiveTestResult live = runLiveTest(requests, amount);
+    HarnessSnapshot snapshot = collectHarnessSnapshot();
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness start: resetErrors="
+                    + reset.errors
+                    + ", created="
+                    + live.created
+                    + ", liveErrors="
+                    + live.errors
+                    + ", colonies="
+                    + snapshot.colonies
+                    + ", shops="
+                    + snapshot.shops
+                    + ", rootsActive="
+                    + snapshot.rootsActive
+                    + ", rootsTerminal="
+                    + snapshot.rootsTerminal
+                    + ", childrenActive="
+                    + snapshot.childrenActive
+                    + ", warehouseQueueEntries="
+                    + snapshot.warehouseQueueEntries),
+        true);
+    if (!live.message.isEmpty()) {
+      source.sendSuccess(
+          () -> Component.literal("[CreateShop] AutoHarness live: " + live.message), false);
+    }
+    return live.created > 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessSnapshot(CommandSourceStack source) {
+    HarnessSnapshot snapshot = collectHarnessSnapshot();
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness snapshot: colonies="
+                    + snapshot.colonies
+                    + ", shops="
+                    + snapshot.shops
+                    + ", rootsActive="
+                    + snapshot.rootsActive
+                    + ", rootsTerminal="
+                    + snapshot.rootsTerminal
+                    + ", childrenActive="
+                    + snapshot.childrenActive
+                    + ", childrenTerminal="
+                    + snapshot.childrenTerminal
+                    + ", queueEntries="
+                    + snapshot.warehouseQueueEntries
+                    + ", assignmentEntries="
+                    + snapshot.assignmentEntries
+                    + ", errors="
+                    + snapshot.errors),
+        true);
+    return snapshot.errors == 0 ? 1 : 0;
+  }
+
+  private static int runAutoHarnessFull(
+      CommandSourceStack source,
+      int rounds,
+      int requestsPerRound,
+      int amount,
+      boolean forceWarehouseQueue) {
+    int safeRounds = Math.max(1, rounds);
+    int createdTotal = 0;
+    int errors = 0;
+    for (int i = 0; i < safeRounds; i++) {
+      ResetLiveStateResult reset = resetLiveState(forceWarehouseQueue);
+      LiveTestResult live = runLiveTest(requestsPerRound, amount);
+      createdTotal += live.created;
+      errors += reset.errors + live.errors;
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] auto_harness round={} created={} resetErrors={} liveErrors={} message={}",
+          i + 1,
+          live.created,
+          reset.errors,
+          live.errors,
+          live.message);
+    }
+    HarnessSnapshot snapshot = collectHarnessSnapshot();
+    final int createdTotalFinal = createdTotal;
+    final int errorsFinal = errors;
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] AutoHarness full: rounds="
+                    + safeRounds
+                    + ", createdTotal="
+                    + createdTotalFinal
+                    + ", errors="
+                    + errorsFinal
+                    + ", rootsActive="
+                    + snapshot.rootsActive
+                    + ", childrenActive="
+                    + snapshot.childrenActive
+                    + ", queueEntries="
+                    + snapshot.warehouseQueueEntries),
+        true);
+    source.sendSuccess(
+        () ->
+            Component.literal(
+                "[CreateShop] Next: let couriers run, then execute /thesettlerxcreate auto_test_harness snapshot"),
+        false);
+    return errorsFinal == 0 ? 1 : 0;
+  }
+
+  private static HarnessSnapshot collectHarnessSnapshot() {
+    HarnessSnapshot snapshot = new HarnessSnapshot();
+    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+      snapshot.colonies++;
+      if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
+        continue;
+      }
+      java.util.Set<IToken<?>> assigned = collectAssignedRequestTokens(standard);
+      snapshot.assignmentEntries += assigned.size();
+      for (IToken<?> token : assigned) {
+        if (token == null) {
+          continue;
+        }
+        try {
+          var request = standard.getRequestHandler().getRequestOrNull(token);
+          if (request == null || !isCreateShopOwnedRequest(standard, request)) {
+            continue;
+          }
+          if (request.hasParent()) {
+            if (isTerminalState(request.getState())) {
+              snapshot.childrenTerminal++;
+            } else {
+              snapshot.childrenActive++;
+            }
+          } else if (isTerminalState(request.getState())) {
+            snapshot.rootsTerminal++;
+          } else {
+            snapshot.rootsActive++;
+          }
+        } catch (Exception ex) {
+          snapshot.errors++;
+        }
+      }
+
+      java.util.Set<BuildingCreateShop> shops = collectCreateShops(colony);
+      snapshot.shops += shops.size();
+
+      var buildingManager = colony.getServerBuildingManager();
+      if (buildingManager == null || buildingManager.getBuildings() == null) {
+        continue;
+      }
+      for (var entry : buildingManager.getBuildings().entrySet()) {
+        var building = entry.getValue();
+        if (building == null) {
+          continue;
+        }
+        var queue =
+            building.getModule(
+                com.minecolonies.core.colony.buildings.modules.BuildingModules
+                    .WAREHOUSE_REQUEST_QUEUE);
+        if (queue == null || queue.getMutableRequestList() == null) {
+          continue;
+        }
+        snapshot.warehouseQueueEntries += queue.getMutableRequestList().size();
+      }
+    }
+    return snapshot;
   }
 
   private static ItemStack selectLiveTestStack(TileEntityCreateShop tile) {
@@ -1145,6 +1400,18 @@ public final class CreateShopMaintenanceCommands {
     int deliveryRequestsCancelled;
     int drainRounds;
     int drainResiduals;
+    int errors;
+  }
+
+  private static final class HarnessSnapshot {
+    int colonies;
+    int shops;
+    int rootsActive;
+    int rootsTerminal;
+    int childrenActive;
+    int childrenTerminal;
+    int warehouseQueueEntries;
+    int assignmentEntries;
     int errors;
   }
 }
