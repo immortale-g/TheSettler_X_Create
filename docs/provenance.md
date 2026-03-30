@@ -709,3 +709,8 @@ Implementation notes:
   authored in this project scope: maintenance commands now include repeatable live scenario
   automation (`auto_test_harness` + `auto_test_harness_full_all`) including lost-package inject,
   reorder, handover simulation, and cancel flows for command-driven in-game validation.
+- Shop request-pickup integration on branch `feature/shop-request-pickup` (2026-03-30) is authored
+  in this project scope: after Create Shop housekeeping moves unreserved items from rack to hut
+  inventory, the building now triggers MineColonies-native `createPickupRequest(...)` with building
+  pickup priority so courier pickup remains hut-handler based (rack -> hut -> warehouse) without
+  custom courier dispatch or parallel delivery structures.
