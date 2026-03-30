@@ -219,7 +219,19 @@ final class CreateShopPendingRequestProcessorService {
     requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
     requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
-      if (!request.hasChildren() && deliveryStarted && !completionSeen) {
+      if (completionSeen) {
+        resolver.clearDeliveriesCreated(request.getId());
+        diagnostics.logPendingReasonChange(
+            request.getId(), "recover:delivery-created-after-completion");
+        resolver.touchFlow(
+            request.getId(), level.getGameTime(), "tickPending:recover-delivery-after-completion");
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} recover (deliveryCreated latched after completionSeen, pending={})",
+              requestIdLog,
+              resolver.getPendingTracker().getPendingCount(request.getId()));
+        }
+      } else if (!request.hasChildren() && deliveryStarted && !completionSeen) {
         resolver.clearDeliveriesCreated(request.getId());
         int heldPending =
             Math.max(1, resolver.getPendingTracker().getPendingCount(request.getId()));
