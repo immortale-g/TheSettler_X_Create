@@ -714,3 +714,8 @@ Implementation notes:
   inventory, the building now triggers MineColonies-native `createPickupRequest(...)` with building
   pickup priority so courier pickup remains hut-handler based (rack -> hut -> warehouse) without
   custom courier dispatch or parallel delivery structures.
+- Task-tab inflight visibility on branch `feature/task-tab-inflight-visibility` (2026-03-30) is
+  authored in this project scope: Create Shop replaces the default warehouse request-queue module
+  view wiring with a custom task module/view pair that serializes additional local inflight parent
+  request tokens (owned by the local Create Shop resolver) and merges them with queue tasks in the
+  existing MineColonies task-tab UI without introducing parallel request storage.
