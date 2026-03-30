@@ -988,6 +988,22 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     if (moved > 0 || cachedHasIncomingRackWork) {
       lastHousekeepingTransferTick = now;
     }
+    if (moved > 0) {
+      int pickupPriority = getPickUpPriority();
+      if (pickupPriority > 0) {
+        boolean pickupRequested = createPickupRequest(pickupPriority);
+        if (isDebugRequests()) {
+          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] housekeeping pickup request priority={} created={} moved={}",
+              pickupPriority,
+              pickupRequested,
+              moved);
+        }
+      } else if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] housekeeping pickup request skipped (priority disabled) moved={}", moved);
+      }
+    }
     if (moved > 0 && isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] housekeeping moved unreserved rack stacks to hut count={} budget={} elapsed={}t",
