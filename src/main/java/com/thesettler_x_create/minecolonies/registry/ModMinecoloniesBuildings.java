@@ -5,7 +5,6 @@ import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry.ModuleProducer;
 import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.apiimp.CommonMinecoloniesAPIImpl;
-import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.WorkerBuildingModule;
 import com.minecolonies.core.colony.buildings.moduleviews.WorkerBuildingModuleView;
 import com.minecolonies.core.colony.buildings.views.EmptyView;
@@ -16,10 +15,12 @@ import com.thesettler_x_create.minecolonies.module.CreateShopAddressModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopOutputModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopPermaModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopStockModule;
+import com.thesettler_x_create.minecolonies.module.CreateShopTaskModule;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopPermaModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
+import com.thesettler_x_create.minecolonies.moduleview.CreateShopTaskModuleView;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -53,7 +54,11 @@ public final class ModMinecoloniesBuildings {
                                   true,
                                   building -> 1),
                           () -> WorkerBuildingModuleView::new))
-                  .addBuildingModuleProducer(BuildingModules.WAREHOUSE_REQUEST_QUEUE)
+                  .addBuildingModuleProducer(
+                      new ModuleProducer<>(
+                          "warehouse_request_queue",
+                          CreateShopTaskModule::new,
+                          () -> CreateShopTaskModuleView::new))
                   .addBuildingModuleProducer(
                       new ModuleProducer<>(
                           "createshop_address",
