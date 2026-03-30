@@ -7,7 +7,6 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
-import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
@@ -453,7 +452,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public boolean hasResolverWork() {
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    return (resolver != null && resolver.hasActiveWork()) || hasIncomingRackWork();
+    return (resolver != null && resolver.hasProtectedInventoryWindow()) || hasIncomingRackWork();
   }
 
   public boolean hasIncomingRackWork() {
@@ -497,12 +496,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
 
   public void notifyMissingNetwork() {
     networkNotifier.notifyMissingNetwork();
-  }
-
-  public int restartLostPackage(
-      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
-    return restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)
-        .consumed();
   }
 
   LostPackageReorderResult restartLostPackageDetailed(
@@ -572,6 +565,13 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           consumed);
     }
     return new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);
+  }
+
+  /** Debug/helper wrapper for command harness flows. */
+  public int restartLostPackage(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    return restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)
+        .consumed();
   }
 
   public int acceptLostPackageFromPlayer(
@@ -857,7 +857,8 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
     int clearedInflight = cancelLostPackage(stackKey, requesterName, address, requestedAt);
     int cancelledRequests =
-        cancelMatchingLostPackageRequests(stackKey, requesterName, address, requestedAt);
+        new ShopLostPackageRequestCanceller(this)
+            .cancelMatchingRequests(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package cancel+requests item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
@@ -873,256 +874,35 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return 0;
   }
 
-  private int cancelMatchingLostPackageRequests(
-      ItemStack stackKey, String requesterName, String address, long requestedAt) {
-    if (stackKey == null || stackKey.isEmpty() || getColony() == null) {
+  /**
+   * Debug helper: simulate package handover without requiring a real package item in player
+   * inventory.
+   */
+  public int debugSimulateLostPackageHandover(
+      ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    if (stackKey == null || stackKey.isEmpty() || remaining <= 0) {
       return 0;
     }
-    if (!(getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    if (tile == null || pickup == null) {
       return 0;
     }
-    var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
+    ItemStack insertStack = stackKey.copy();
+    insertStack.setCount(Math.max(1, remaining));
+    java.util.List<ItemStack> leftovers = tile.insertIntoRacksOnly(java.util.List.of(insertStack));
+    int leftover = 0;
+    for (ItemStack stack : leftovers) {
+      if (stack != null && !stack.isEmpty()) {
+        leftover += stack.getCount();
+      }
+    }
+    int inserted = Math.max(0, insertStack.getCount() - leftover);
+    if (inserted <= 0) {
       return 0;
     }
-    java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
-    for (var value : assignments.values()) {
-      if (value != null) {
-        tokens.addAll(value);
-      }
-    }
-    boolean tupleScoped = requestedAt > 0L;
-    int cancelled = 0;
-    for (IToken<?> token : tokens) {
-      try {
-        IRequest<?> request = standard.getRequestHandler().getRequest(token);
-        if (request == null || isTerminalRequestState(request.getState())) {
-          continue;
-        }
-        if (request.hasParent()) {
-          continue;
-        }
-        IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(request);
-        if (!(owner instanceof CreateShopRequestResolver shopResolver)
-            || !isLocalResolver(owner, shopResolver)) {
-          continue;
-        }
-        if (!matchesLostPackageRequest(standard, request, stackKey)) {
-          continue;
-        }
-        if (!matchesLostPackageRequester(standard, request, requesterName)) {
-          continue;
-        }
-        if (!matchesLostPackageAddress(standard, request, address)) {
-          continue;
-        }
-        standard.updateRequestState(request.getId(), RequestState.CANCELLED);
-        cancelled++;
-        if (tupleScoped) {
-          // requestedAt is tuple-scoped; without a stable request timestamp in MineColonies
-          // requests, cancel only a single matched root request to avoid collateral cancels.
-          break;
-        }
-      } catch (Exception ex) {
-        if (tryForceCleanRequest(standard, token, ex)) {
-          cancelled++;
-          continue;
-        }
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package cancel request failed token={} error={}",
-              token,
-              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        }
-      }
-    }
-    return cancelled;
-  }
-
-  private boolean tryForceCleanRequest(
-      IStandardRequestManager standard, IToken<?> token, Exception cause) {
-    if (standard == null || token == null || cause == null) {
-      return false;
-    }
-    String message = cause.getMessage();
-    if (message == null || message.isEmpty()) {
-      return false;
-    }
-    String normalized = message.toLowerCase(java.util.Locale.ROOT);
-    boolean staleGraph =
-        (normalized.contains("haschildren()") && normalized.contains("request"))
-            || normalized.contains("intvalue()");
-    if (!staleGraph) {
-      return false;
-    }
-    try {
-      standard.getRequestHandler().cleanRequestData(token);
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package cancel force-clean token={} reason={}", token, message);
-      }
-      return true;
-    } catch (Exception ignored) {
-      return false;
-    }
-  }
-
-  private boolean isLocalResolver(IRequestResolver<?> owner, CreateShopRequestResolver resolver) {
-    if (owner == null
-        || resolver == null
-        || resolver.getLocation() == null
-        || getLocation() == null) {
-      return false;
-    }
-    return resolver.getLocation().equals(getLocation());
-  }
-
-  private static boolean isTerminalRequestState(RequestState state) {
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
-  }
-
-  private static boolean matchesLostPackageDeliverable(
-      IDeliverable deliverable, ItemStack stackKey) {
-    if (deliverable == null || stackKey == null || stackKey.isEmpty()) {
-      return false;
-    }
-    ItemStack result = deliverable.getResult();
-    if (result == null || result.isEmpty()) {
-      return false;
-    }
-    if (ItemStack.isSameItemSameComponents(result, stackKey)) {
-      return true;
-    }
-    return ItemStack.isSameItem(result, stackKey);
-  }
-
-  private static boolean matchesLostPackageRequest(
-      IStandardRequestManager manager, IRequest<?> request, ItemStack stackKey) {
-    if (manager == null || request == null || stackKey == null || stackKey.isEmpty()) {
-      return false;
-    }
-    if (matchesLostPackageRequestPayload(request, stackKey)) {
-      return true;
-    }
-    if (!request.hasChildren()) {
-      return false;
-    }
-    for (IToken<?> childToken : request.getChildren()) {
-      if (childToken == null) {
-        continue;
-      }
-      IRequest<?> child = manager.getRequestHandler().getRequest(childToken);
-      if (child != null && matchesLostPackageRequestPayload(child, stackKey)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean matchesLostPackageRequestPayload(IRequest<?> request, ItemStack stackKey) {
-    if (request == null || stackKey == null || stackKey.isEmpty()) {
-      return false;
-    }
-    if (request.getRequest() instanceof IDeliverable deliverable
-        && matchesLostPackageDeliverable(deliverable, stackKey)) {
-      return true;
-    }
-    if (request.getRequest() instanceof Delivery delivery) {
-      ItemStack deliveryStack = delivery.getStack();
-      if (ItemStack.isSameItemSameComponents(deliveryStack, stackKey)
-          || ItemStack.isSameItem(deliveryStack, stackKey)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean matchesLostPackageRequester(
-      IStandardRequestManager manager, IRequest<?> request, String requesterName) {
-    String expected = normalizeRequesterLabel(requesterName);
-    if (isUnknownRequesterLabel(expected)) {
-      return true;
-    }
-    String actual = resolveRequesterName(manager, request);
-    if (actual.isEmpty()) {
-      return false;
-    }
-    if (actual.equals(expected)) {
-      return true;
-    }
-    return actual.contains(expected) || expected.contains(actual);
-  }
-
-  private boolean matchesLostPackageAddress(
-      IStandardRequestManager manager, IRequest<?> request, String address) {
-    String expected = normalizeRequesterLabel(address);
-    if (expected.isEmpty() || expected.equals("unknown address") || expected.equals("<unknown>")) {
-      return true;
-    }
-    String requesterDisplay = resolveRequesterDisplay(manager, request);
-    if (!requesterDisplay.isEmpty()
-        && (requesterDisplay.contains(expected) || expected.contains(requesterDisplay))) {
-      return true;
-    }
-    String shortDisplay = normalizeRequesterLabel(request == null ? "" : request.getShortDisplayString().getString());
-    if (!shortDisplay.isEmpty()
-        && (shortDisplay.contains(expected) || expected.contains(shortDisplay))) {
-      return true;
-    }
-    String longDisplay = normalizeRequesterLabel(request == null ? "" : request.getLongDisplayString().getString());
-    if (!longDisplay.isEmpty()
-        && (longDisplay.contains(expected) || expected.contains(longDisplay))) {
-      return true;
-    }
-    return false;
-  }
-
-  private String resolveRequesterName(IStandardRequestManager manager, IRequest<?> request) {
-    String display = resolveRequesterDisplay(manager, request);
-    if (display.isEmpty()) {
-      return "";
-    }
-    return display;
-  }
-
-  private String resolveRequesterDisplay(IStandardRequestManager manager, IRequest<?> request) {
-    if (request == null) {
-      return "";
-    }
-    try {
-      var requester = request.getRequester();
-      if (requester == null) {
-        return "";
-      }
-      var display = requester.getRequesterDisplayName(manager, request);
-      if (display == null) {
-        return "";
-      }
-      return normalizeRequesterLabel(display.getString());
-    } catch (Exception ignored) {
-      return "";
-    }
-  }
-
-  private static String normalizeRequesterLabel(String value) {
-    if (value == null) {
-      return "";
-    }
-    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
-    return normalized.isEmpty() ? "" : normalized;
-  }
-
-  private static boolean isUnknownRequesterLabel(String requester) {
-    if (requester == null || requester.isEmpty()) {
-      return true;
-    }
-    return requester.equals("unknown")
-        || requester.equals("<unknown>")
-        || requester.equals("unknown requester");
+    int consumeTarget = Math.min(Math.max(1, remaining), inserted);
+    return pickup.consumeInflight(stackKey, consumeTarget, requesterName, address, requestedAt);
   }
 
   record LostPackageReorderResult(int consumed, LostPackageReorderStatus status) {}
@@ -1179,7 +959,7 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
       return;
     }
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    if (resolver != null && resolver.hasActiveWork()) {
+    if (resolver != null && resolver.hasProtectedInventoryWindow()) {
       cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
       if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(

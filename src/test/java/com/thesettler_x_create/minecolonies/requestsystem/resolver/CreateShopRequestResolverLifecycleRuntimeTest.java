@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
@@ -79,7 +80,8 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
     resolver.markDeliveriesCreated(parentToken);
-    resolver.getParentChildrenRecheck().put(parentToken, 10_100L);
+    resolver.markParentChildCompletedSeen(parentToken, level.getGameTime());
+    resolver.scheduleParentChildRecheckAtForTest(parentToken, 10_100L);
 
     parentMap("parentDeliveryActiveSince").put(parentToken, 9_000L);
     parentMap("parentStaleRecoveryArmedAt").put(parentToken, 9_500L);
@@ -93,6 +95,9 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(parentRequest.getId()).thenReturn(parentToken);
     when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
+    when(parentRequest.getState()).thenReturn(RequestState.COMPLETED);
+    when(parentRequest.hasChildren()).thenReturn(false);
+    when(manager.getRequestHandler().getRequest(parentToken)).thenReturn((IRequest) parentRequest);
 
     resolver.onRequestedRequestComplete(manager, parentRequest);
 
@@ -116,21 +121,28 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
       String pendingSource,
       String logTemplate)
       throws Exception {
+    Field field = CreateShopRequestResolver.class.getDeclaredField("deliveryChildRecoveryService");
+    field.setAccessible(true);
+    Object recoveryService = field.get(resolver);
     Method method =
-        CreateShopRequestResolver.class.getDeclaredMethod(
-            "recoverDeliveryChild",
-            IStandardRequestManager.class,
-            Level.class,
-            IRequest.class,
-            IToken.class,
-            IRequest.class,
-            com.thesettler_x_create.minecolonies.building.BuildingCreateShop.class,
-            com.thesettler_x_create.blockentity.CreateShopBlockEntity.class,
-            String.class,
-            String.class);
+        recoveryService
+            .getClass()
+            .getDeclaredMethod(
+                "recover",
+                CreateShopRequestResolver.class,
+                IStandardRequestManager.class,
+                Level.class,
+                IRequest.class,
+                IToken.class,
+                IRequest.class,
+                com.thesettler_x_create.minecolonies.building.BuildingCreateShop.class,
+                com.thesettler_x_create.blockentity.CreateShopBlockEntity.class,
+                String.class,
+                String.class);
     method.setAccessible(true);
     return (boolean)
         method.invoke(
+            recoveryService,
             resolver,
             manager,
             level,
@@ -145,9 +157,12 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
 
   @SuppressWarnings("unchecked")
   private Map<IToken<?>, Long> parentMap(String fieldName) throws Exception {
-    Field field = CreateShopRequestResolver.class.getDeclaredField(fieldName);
-    field.setAccessible(true);
-    return (Map<IToken<?>, Long>) field.get(resolver);
+    Field storeField = CreateShopRequestResolver.class.getDeclaredField("lifecycleStateStore");
+    storeField.setAccessible(true);
+    Object store = storeField.get(resolver);
+    Field mapField = store.getClass().getDeclaredField(fieldName);
+    mapField.setAccessible(true);
+    return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
   private IToken<?> token(UUID id) {

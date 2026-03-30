@@ -23,6 +23,9 @@ import net.neoforged.neoforge.items.IItemHandler;
 /** Helper for computing availability and delivery plans for Create Shop requests. */
 final class CreateShopResolverPlanning {
   int getAvailableFromRacks(TileEntityCreateShop tile, IDeliverable deliverable) {
+    if (tile == null || tile.getBuilding() == null) {
+      return 0;
+    }
     Level level = tile.getLevel();
     if (level == null) {
       return 0;
@@ -30,7 +33,11 @@ final class CreateShopResolverPlanning {
     if (tile.getBuilding() instanceof BuildingCreateShop shop) {
       shop.ensureRackContainers();
     }
+    ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
     int total = 0;
+    int sameItemTotal = 0;
+    int rackCount = 0;
+    int containerCount = tile.getBuilding().getContainers().size();
     for (BlockPos pos : tile.getBuilding().getContainers()) {
       if (!WorldUtil.isBlockLoaded(level, pos)) {
         continue;
@@ -39,13 +46,28 @@ final class CreateShopResolverPlanning {
       if (!(entity instanceof AbstractTileEntityRack rack)) {
         continue;
       }
+      rackCount++;
       total += rack.getItemCount(deliverable::matches);
+      sameItemTotal += countSameItemInRack(rack, expected);
     }
     if (total > 0) {
       return Math.max(0, total);
     }
     // Fallback: direct scan around the shop for unregistered racks.
-    total = scanRacksAroundShop(tile, deliverable, null);
+    RackScanStats fallback = scanRacksAroundShop(tile, deliverable, expected, null);
+    total = fallback.strictCount();
+    sameItemTotal += fallback.sameItemCount();
+    rackCount += fallback.rackCount();
+    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] rack availability strict=0 expected={} containers={} racksSeen={} sameItem={} fallbackStrict={} fallbackSameItem={}",
+          expected == null || expected.isEmpty() ? "<empty>" : expected.getItem(),
+          containerCount,
+          rackCount,
+          sameItemTotal,
+          fallback.strictCount(),
+          fallback.sameItemCount());
+    }
     return Math.max(0, total);
   }
 
@@ -108,7 +130,8 @@ final class CreateShopResolverPlanning {
       remaining -= toTake;
     }
     if (planned.isEmpty()) {
-      scanRacksAroundShop(tile, deliverable, planned);
+      ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
+      RackScanStats fallback = scanRacksAroundShop(tile, deliverable, expected, planned);
       if (!planned.isEmpty()) {
         // Trim to requested amount.
         int plannedCount = countPlanned(planned);
@@ -131,6 +154,14 @@ final class CreateShopResolverPlanning {
           }
           planned = trimmed;
         }
+      } else if (Config.DEBUG_LOGGING.getAsBoolean()
+          && fallback.sameItemCount() > 0
+          && expected != null
+          && !expected.isEmpty()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] rack plan mismatch expected={} strict=0 but sameItem={} (components/metadata mismatch suspected)",
+            expected.getItem(),
+            fallback.sameItemCount());
       }
     }
     return planned;
@@ -140,13 +171,22 @@ final class CreateShopResolverPlanning {
       TileEntityCreateShop tile,
       IDeliverable deliverable,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
+    ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
+    return scanRacksAroundShop(tile, deliverable, expected, planned).strictCount();
+  }
+
+  private RackScanStats scanRacksAroundShop(
+      TileEntityCreateShop tile,
+      IDeliverable deliverable,
+      ItemStack expected,
+      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
     BuildingCreateShop shop = tile.getBuilding() instanceof BuildingCreateShop b ? b : null;
     if (shop == null) {
-      return 0;
+      return new RackScanStats(0, 0, 0);
     }
     Level level = tile.getLevel();
     if (level == null) {
-      return 0;
+      return new RackScanStats(0, 0, 0);
     }
     BlockPos origin = shop.getLocation().getInDimensionLocation();
     int radius = 16;
@@ -156,7 +196,9 @@ final class CreateShopResolverPlanning {
     int maxY = origin.getY() + 6;
     int minZ = origin.getZ() - radius;
     int maxZ = origin.getZ() + radius;
-    int total = 0;
+    int strictTotal = 0;
+    int sameItemTotal = 0;
+    int racksSeen = 0;
     for (int x = minX; x <= maxX; x++) {
       for (int y = minY; y <= maxY; y++) {
         for (int z = minZ; z <= maxZ; z++) {
@@ -168,11 +210,13 @@ final class CreateShopResolverPlanning {
           if (!(entity instanceof AbstractTileEntityRack rack)) {
             continue;
           }
+          racksSeen++;
           int count = rack.getItemCount(deliverable::matches);
+          sameItemTotal += countSameItemInRack(rack, expected);
           if (count <= 0) {
             continue;
           }
-          total += count;
+          strictTotal += count;
           if (planned != null) {
             for (ItemStack stack :
                 InventoryUtils.filterItemHandler(rack.getInventory(), deliverable::matches)) {
@@ -182,11 +226,15 @@ final class CreateShopResolverPlanning {
         }
       }
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && total > 0) {
+    if (Config.DEBUG_LOGGING.getAsBoolean() && strictTotal > 0) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] fallback rack scan found {} matching items near {}", total, origin);
+          "[CreateShop] fallback rack scan found strict={} sameItem={} racks={} near {}",
+          strictTotal,
+          sameItemTotal,
+          racksSeen,
+          origin);
     }
-    return total;
+    return new RackScanStats(strictTotal, sameItemTotal, racksSeen);
   }
 
   List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
@@ -262,4 +310,14 @@ final class CreateShopResolverPlanning {
     EquipmentTypeEntry type = tool.getEquipmentType();
     return type.getMiningLevel(stack);
   }
+
+  private int countSameItemInRack(AbstractTileEntityRack rack, ItemStack expected) {
+    if (rack == null || expected == null || expected.isEmpty()) {
+      return 0;
+    }
+    return rack.getItemCount(
+        candidate -> candidate != null && ItemStack.isSameItem(candidate, expected));
+  }
+
+  private record RackScanStats(int strictCount, int sameItemCount, int rackCount) {}
 }

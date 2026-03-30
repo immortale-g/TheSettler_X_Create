@@ -12,16 +12,19 @@ class CreateShopRequestResolverPartialTopupGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingTopupService.java"));
 
     assertTrue(source.contains("int topupNeeded ="));
     assertTrue(source.contains("pendingCount"));
     assertTrue(source.contains("- Math.max(0, reservedForRequest)"));
-    assertTrue(source.contains("- Math.max(0, rackAvailable)"));
+    assertTrue(source.contains("- Math.max(0, rackAvailableForRequest)"));
     assertTrue(source.contains("tickPending:network-topup"));
     assertTrue(
         source.contains(
             "stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName)"));
-    assertTrue(source.contains("pickup.reserve(requestId, stack.copy(), stack.getCount())"));
+    assertTrue(source.contains("pickup.reserve("));
+    assertTrue(source.contains("CreateShopRequestResolver.toRequestId(request.getId())"));
+    assertTrue(source.contains("stack.copy()"));
+    assertTrue(source.contains("stack.getCount()"));
   }
 }

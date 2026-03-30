@@ -182,7 +182,7 @@ final class CreateShopDeliveryManager {
     resolver.markDeliveriesCreated(request.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       String key = token.toString();
-      if (resolver.getDeliveryCreateLogged().add(key)) {
+      if (resolver.markDeliveryCreateLogged(key)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create token={} requesterClass={} parentRequesterClass={} managerClass={}",
             token,
@@ -244,7 +244,20 @@ final class CreateShopDeliveryManager {
       IStandardRequestManager standardManager =
           CreateShopRequestResolver.unwrapStandardManager(manager);
       if (standardManager != null) {
-        resolver.logDeliveryLinkStateForOps("create", standardManager, request.getId(), token);
+        resolver.logDeliveryLinkState("create", standardManager, request.getId(), token);
+      }
+    }
+    IStandardRequestManager standardManager =
+        CreateShopRequestResolver.unwrapStandardManager(manager);
+    if (standardManager != null) {
+      try {
+        IRequest<?> created = manager.getRequestForToken(token);
+        if (created != null) {
+          resolver.observeDeliveryChildLifecycle(
+              standardManager, pickupLevel, request.getId(), token, created, null, "create");
+        }
+      } catch (Exception ignored) {
+        // Best-effort diagnostics only.
       }
     }
     notifyDeliverymen(manager, token);

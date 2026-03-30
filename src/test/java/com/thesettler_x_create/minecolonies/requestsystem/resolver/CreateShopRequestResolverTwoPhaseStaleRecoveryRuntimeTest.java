@@ -11,6 +11,7 @@ import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,9 +45,16 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
     IToken<?> childToken = token(UUID.randomUUID());
 
     boolean initiallyStale =
-        invokeBoolean(
+        invokeLifecycleBoolean(
             "isStaleDeliveryChild",
-            new Class<?>[] {Level.class, IToken.class, IToken.class, RequestState.class},
+            new Class<?>[] {
+              CreateShopRequestResolver.class,
+              Level.class,
+              IToken.class,
+              IToken.class,
+              RequestState.class
+            },
+            resolver,
             level,
             parentToken,
             childToken,
@@ -55,9 +63,16 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
 
     now.addAndGet(200_000L);
     boolean staleAfterTimeout =
-        invokeBoolean(
+        invokeLifecycleBoolean(
             "isStaleDeliveryChild",
-            new Class<?>[] {Level.class, IToken.class, IToken.class, RequestState.class},
+            new Class<?>[] {
+              CreateShopRequestResolver.class,
+              Level.class,
+              IToken.class,
+              IToken.class,
+              RequestState.class
+            },
+            resolver,
             level,
             parentToken,
             childToken,
@@ -65,19 +80,31 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
     assertTrue(staleAfterTimeout);
 
     boolean firstArm =
-        invokeBoolean(
+        invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
-            new Class<?>[] {Level.class, IStandardRequestManager.class, IToken.class},
+            new Class<?>[] {
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
+            },
+            resolver,
             level,
             manager,
             parentToken);
     assertFalse(firstArm);
-    assertEquals(now.get() + 20L, resolver.getParentChildrenRecheck().get(parentToken));
+    assertEquals(now.get() + 20L, resolver.getParentChildRecheckDueTick(parentToken));
 
     boolean secondBeforeDelay =
-        invokeBoolean(
+        invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
-            new Class<?>[] {Level.class, IStandardRequestManager.class, IToken.class},
+            new Class<?>[] {
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
+            },
+            resolver,
             level,
             manager,
             parentToken);
@@ -85,20 +112,29 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
 
     now.addAndGet(21L);
     boolean armedAfterDelay =
-        invokeBoolean(
+        invokeLifecycleBoolean(
             "isStaleRecoveryArmed",
-            new Class<?>[] {Level.class, IStandardRequestManager.class, IToken.class},
+            new Class<?>[] {
+              CreateShopRequestResolver.class,
+              Level.class,
+              IStandardRequestManager.class,
+              IToken.class
+            },
+            resolver,
             level,
             manager,
             parentToken);
     assertTrue(armedAfterDelay);
   }
 
-  private boolean invokeBoolean(String methodName, Class<?>[] signature, Object... args)
+  private boolean invokeLifecycleBoolean(String methodName, Class<?>[] signature, Object... args)
       throws Exception {
-    Method method = CreateShopRequestResolver.class.getDeclaredMethod(methodName, signature);
+    Field field = CreateShopRequestResolver.class.getDeclaredField("deliveryChildLifecycleService");
+    field.setAccessible(true);
+    Object lifecycleService = field.get(resolver);
+    Method method = lifecycleService.getClass().getDeclaredMethod(methodName, signature);
     method.setAccessible(true);
-    return (boolean) method.invoke(resolver, args);
+    return (boolean) method.invoke(lifecycleService, args);
   }
 
   private IToken<?> token(UUID id) {

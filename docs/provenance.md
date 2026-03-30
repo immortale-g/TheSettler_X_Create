@@ -35,6 +35,92 @@ Implementation notes:
 - Lost-package recovery interactions (shopkeeper chat actions, manual package handover, restart order
   flow), inflight consumption semantics, and storage-capacity request gating are authored specifically
   for this project using MineColonies interaction handlers and Create logistics APIs.
+- Lost-package root-request cancel matching refactor (extracting tuple-aware cancellation matching
+  into `ShopLostPackageRequestCanceller` from `BuildingCreateShop`) is authored in this project and
+  is a behavior-preserving internal split to reduce orchestrator class responsibility.
+- Resolver pending top-up refactor (extracting network topup decision/mutation from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingTopupService`) is authored
+  in this project as a behavior-preserving internal split to reduce central resolver complexity.
+- Resolver ownership refactor (extracting local-owner locality and assignment-drift token recovery
+  helpers into `CreateShopResolverOwnership`) is authored in this project as a behavior-preserving
+  internal split to reduce duplicated resolver ownership checks.
+- Resolver pending rack-delivery creation refactor (extracting wait/plan/create flow from
+  `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopPendingDeliveryCreationService`) is authored in this project as a behavior-preserving
+  internal split to reduce central resolver method complexity.
+- Resolver attempt-flow dependency refactor (injecting `CreateShopDeliveryManager` directly into
+  `CreateShopAttemptResolveService` and removing resolver passthrough accessor usage) is authored
+  in this project as a behavior-preserving internal split that reduces central resolver coupling.
+- Outstanding-needed calculation refactor (extracting `requested-leftover-reserved` math into
+  `CreateShopOutstandingNeededService` and wiring validator/attempt/pending-decision to that shared
+  service) is authored in this project as a behavior-preserving internal split that reduces
+  duplicated request-amount logic and resolver helper forwarding.
+- Resolver ops-surface cleanup refactor (removing selected `*ForOps` forwarding aliases and using
+  direct shared methods: `clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) is
+  authored in this project as a behavior-preserving internal simplification.
+- Terminal resolve-lifecycle refactor (moving ordered/cooldown skip and completion diagnostics into
+  `CreateShopTerminalRequestLifecycleService` with injected cooldown/diagnostics dependencies) is
+  authored in this project as a behavior-preserving internal split that reduces resolver helper
+  forwarding in the resolve path.
+- Tick-pending telemetry refactor (extracting debug cadence/candidate snapshot/perf state into
+  `CreateShopTickPendingTelemetryService` and injecting it into pending token collection + tick
+  orchestration) is authored in this project as a behavior-preserving internal split that reduces
+  resolver-owned debug/perf state and forwarding.
+- Terminal-state gate refactor (switching pending processor terminal classification to direct shared
+  static `CreateShopRequestResolver.isTerminalRequestState(...)`) is authored in this project as a
+  behavior-preserving internal simplification and removes one resolver forwarding alias.
+- Resolver callback/recheck/reassign naming cleanup (switching callback/tick services from
+  `handleDelivery*ForOps` / `getRecheckForOps` / `reassignResolvableRetryingRequestsForOps` to
+  direct method names) is authored in this project as a behavior-preserving internal simplification
+  that further reduces resolver ops-surface indirection.
+- Flow-transition forwarding cleanup (switching resolver services from
+  `transitionFlowForOps(...)` to direct shared `transitionFlow(...)`) is authored in this project
+  as a behavior-preserving internal simplification that removes another resolver wrapper layer.
+- Resolver shop-lookup forwarding cleanup (switching services from `getShopForOps(...)` to direct
+  `getShop(...)` and removing the wrapper) is authored in this project as a behavior-preserving
+  internal simplification that reduces resolver facade duplication.
+- Resolver helper-forwarding cleanup (switching resolver services from `*ForOps` aliases to direct
+  helper names for flow/timeout/debug/retry/link-state calls and removing the alias wrappers) is
+  authored in this project as a behavior-preserving internal simplification that further reduces
+  resolver surface indirection.
+- Resolver diagnostics-forwarding cleanup (switching service call sites from
+  `getDiagnosticsForOps()` to direct `getDiagnostics()`) is authored in this project as a
+  behavior-preserving internal simplification that removes another resolver facade alias.
+- Resolver map-accessor forwarding cleanup (switching delivery lifecycle/root-cause/pending
+  services from `*ForOps` map accessors to direct accessor names and removing those alias paths) is
+  authored in this project as a behavior-preserving internal simplification that further reduces
+  resolver indirection.
+- Diagnostics dependency-injection refactor (injecting `CreateShopResolverDiagnostics` into
+  pending/recovery/post-creation/reservation services instead of resolving diagnostics via resolver
+  getter calls) is authored in this project as a behavior-preserving internal simplification that
+  reduces resolver-as-service-locator coupling.
+- Lifecycle rehydrate refactor (adding `CreateShopLifecycleRehydrateService` and invoking it at
+  tick start before pending processing) is authored in this project to rebuild pending/inflight
+  state from MineColonies request graph after reload/drift and reduce stale local-map dependence.
+- Atomic delivery lifecycle transition refactor (adding `openDeliveryWindow` / `closeDeliveryWindow`
+  to `CreateShopRequestStateMutatorService` and using them in delivery cancel/complete/recovery
+  callbacks) is authored in this project to reduce split multi-map mutation paths.
+- Housekeeping protection-window alignment (`CreateShopRequestResolver.hasProtectedInventoryWindow`)
+  is authored in this project to align rack housekeeping gating with request lifecycle ownership
+  state under active inflight/pending work.
+- Lifecycle state-owner refactor (introducing `CreateShopLifecycleStateStore` and moving
+  pending/cooldown/child runtime maps/tracker ownership behind that store) is authored in this
+  project as a behavior-preserving internal change to reduce multi-structure drift risk.
+- Lifecycle single-writer hardening refactor (routing child/missing/parent snapshot state writes
+  through `CreateShopRequestStateMutatorService` from lifecycle/reconciliation/pending/timeout
+  services) is authored in this project to reduce direct multi-service map mutations.
+- Pending derived-state refactor (updating pending decision to reconcile tracked pending against
+  request-derived outstanding need each tick, with inflight/child floor semantics) is authored in
+  this project to reduce stale pending counter drift.
+- Rehydrate expansion refactor (extending `CreateShopLifecycleRehydrateService` to include runtime
+  child/parent lifecycle tokens and orphan child pruning) is authored in this project to improve
+  reload/request-graph consistency under inflight work.
+- Delivery callback lookup refactor (extracting resolver/parent lookup and unresolved-callback
+  diagnostics into `CreateShopDeliveryResolverLocator`) is authored in this project as a
+  behavior-preserving internal split to reduce static callback complexity in the resolver.
+- Terminal request cleanup refactor (consolidating repeated assigned/requested cancel/complete
+  cleanup branches into `cleanupTerminalRequest`) is authored in this project as a
+  behavior-preserving internal simplification.
 - Resolver lifecycle hardening in v0.0.11 is authored specifically for this project:
   duplicate resolver registration prevention, registered-token-only assignment injection, and stale
   Create Shop resolver reassignment for recovering stuck IN_PROGRESS requests after resolver/token
@@ -408,3 +494,218 @@ Implementation notes:
   remainder for the exact overdue segment (`item + requester + address + requestedAt`) before
   reorder/handover/cancel routing, preventing stale dialog responses from re-opening flows after
   tuple resolution.
+- Reservation release refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: cancelled-request reservation release and matching lost-package
+  inflight cleanup moved from `CreateShopRequestResolver` into
+  `CreateShopReservationReleaseService`, while resolver terminal cleanup continues to call a shared
+  release entrypoint.
+- Warehouse internal-count refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: MineColonies warehouse hook stock counting moved
+  from `CreateShopRequestResolver` into `CreateShopWarehouseCountService`, preserving fail-open
+  guards and network-minus-reserved semantics.
+- Flow-timeout cleanup refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: timed-out flow record cleanup moved from
+  `CreateShopRequestResolver` into `CreateShopFlowTimeoutCleanupService`, preserving failed-flow
+  transition, reservation release, and pending/cooldown/child-tracking cleanup semantics.
+- Delivery-completion callback refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: delivery-complete callback reconciliation moved
+  from `CreateShopRequestResolver` into `CreateShopDeliveryCompletionService`, preserving parent
+  flow transition, local pickup reservation consumption, cooldown/pending reconciliation, and debug
+  recheck diagnostics.
+- Retrying-reassign refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: retrying resolver assignment scan/reassign logic moved from
+  `CreateShopRequestResolver` into `CreateShopRetryingReassignService`, preserving cooldown guards,
+  resolvability checks, and one-reassign-per-tick behavior.
+- Pending-token collector refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: assignment/ownership pending token aggregation
+  moved from `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopPendingTokenCollectorService`, preserving owner-sync and local-resolver drift recovery
+  behavior.
+- Cancelled cleanup simplification on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: duplicate cooldown-clear call in tick-pending cancellation
+  branch removed to keep cancellation cleanup idempotent and less mutation-noisy.
+- Pending request gate refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: ownership/cancellation/not-deliverable pre-checks moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopPendingRequestGateService`,
+  and cancelled-state requests now clear pending/cooldown/delivery-created tracking immediately
+  during tick-pending gating.
+- Tick-pending candidate debug logging extraction on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  candidate debug emission loop is moved into a dedicated resolver helper method without behavior
+  change.
+- Child-reconciliation refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: pending parent child-reconciliation loop moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into
+  `CreateShopChildReconciliationService`, preserving duplicate-child cleanup, fail-open
+  missing-child grace, local-only delivery-child mutation scope, and stale/extra-active delivery
+  recovery behavior.
+- Stale cooldown recovery hardening on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: tick-pending now clears stale cooldown/pending tracking for
+  parents with no pending quantity, no active deliveries, and no children, preventing blocked
+  no-progress loops caused by orphaned cooldown state.
+- Pending-state decision refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: pending-count derivation/no-pending skip logic/stale-cooldown
+  recovery/worker-unavailable retention moved from `CreateShopRequestResolver.tickPendingDeliveries`
+  into `CreateShopPendingStateDecisionService`, while preserving existing player-visible behavior.
+- Post-creation update refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: tick-pending post-delivery-creation flow transitions/chat and
+  pending/cooldown updates moved from `CreateShopRequestResolver` into
+  `CreateShopPostCreationUpdateService`, with non-negative normalization of `remainingCount`
+  before tracker mutation.
+- Delivery-cancel callback refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: delivery-cancel callback reconciliation moved
+  from `CreateShopRequestResolver` into `CreateShopDeliveryCancelService`, preserving
+  missing-pickup fallback requeue behavior and adding null-safe delivery-start lookup before block
+  entity probing.
+- Delivery root-cause snapshot refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: debug root-cause snapshot emission (warehouse
+  queue/courier details + assigned resolver snapshot) moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryRootCauseSnapshotService`, preserving rate-limit and snapshot-diff logging
+  behavior.
+- Delivery-child recovery refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: stale/extra-active delivery-child mutation logic
+  moved from `CreateShopRequestResolver` into `CreateShopDeliveryChildRecoveryService`, preserving
+  ownership revalidation, local-child mutation scope, and parent requeue/recheck behavior.
+- Pending request processor refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: the per-token pending lifecycle logic previously
+  inside `CreateShopRequestResolver.tickPendingDeliveries` moved into
+  `CreateShopPendingRequestProcessorService`, while resolver tick now focuses on context setup and
+  token orchestration.
+- Reservation sync refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: rack reservation refresh logic moved from
+  `CreateShopRequestResolver` into `CreateShopReservationSyncService`, preserving reservation
+  refresh source tagging and flow touch semantics.
+- Child lookup-failure lifecycle hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: repeated child lookup exceptions in
+  `CreateShopChildReconciliationService` now follow the same grace/drop path as missing children,
+  preventing infinite fail-open child retention on persistent lookup failures.
+- Tick-pending orchestration refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: top-level pending tick execution moved from
+  `CreateShopRequestResolver.tickPendingDeliveries` into `CreateShopTickPendingService`, with
+  resolver retaining only delegation and ops accessors.
+- Attempt-resolve orchestration refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopRequestResolver.attemptResolveRequest`
+  now delegates to `CreateShopAttemptResolveService`, preserving existing guards for cancelled /
+  cooldown / active-child states, network-vs-rack ordering, wrapped-manager defer behavior, and
+  reservation writes for ordered stacks.
+- Resolver runtime-state isolation hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `cancelledRequests`, `pendingNotices`, and
+  `retryingReassignAttempts` tracking moved from static class-level state to instance-local
+  state in `CreateShopRequestResolver`, preventing cross-resolver/world stale-token bleed.
+- Delivery-child lifecycle refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: stale-recovery arm bookkeeping, parent-scoped stale timeout
+  detection, and tracked-child cleanup moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryChildLifecycleService`, with resolver methods retained as delegating facades.
+- Terminal request lifecycle refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: resolve-request skip/complete orchestration and
+  assigned/requested terminal cleanup transitions moved from `CreateShopRequestResolver` into
+  `CreateShopTerminalRequestLifecycleService`, preserving cooldown/ordered skip semantics and
+  release/cleanup behavior.
+- Resolver helper utility extraction on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: local delivery-origin checks moved to
+  `CreateShopDeliveryOriginMatcher` and stack count/description helpers moved to
+  `CreateShopStackMetrics`, with dependent services updated to consume shared utilities directly.
+- Delivery callback routing refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: resolver static callback entrypoints now
+  delegate resolver lookup/dispatch to `CreateShopDeliveryCallbackService`, preserving unresolved
+  callback diagnostics and delivery-complete/cancel handling semantics.
+- Tick-pending dependency wiring refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopPendingRequestProcessorService` and
+  `CreateShopTickPendingService` now receive core collaborators via constructors instead of pulling
+  them through resolver ops getters, and unused resolver ops getter methods were removed.
+- Shop lookup facade consolidation on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: duplicate `getShopForValidator(...)` access path was removed
+  and consumers now use `getShopForOps(...)`, reducing resolver API surface without behavior
+  changes.
+- Request state mutator refactor on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: paired pending/cooldown mutations now route through
+  `CreateShopRequestStateMutatorService` and were adopted in attempt-resolve, pending-decision,
+  reservation-refresh, delivery cancel/complete, timeout cleanup, and terminal cleanup services.
+- Child reconciliation dependency refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopChildReconciliationService` now
+  calls lifecycle/recovery/root-cause services directly, and obsolete resolver stale-recovery
+  forwarding methods were removed with guard/runtime tests updated to the new call sites.
+- Resolver forwarder cleanup on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: wrapped-manager and timeout/cleanup delegation paths now use
+  direct static/service calls, with runtime/guard tests updated for reflection targets and source
+  assertions after removal of obsolete resolver wrapper methods.
+- Mutator dependency injection refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: services that mutate pending/cooldown lifecycle
+  now receive `CreateShopRequestStateMutatorService` through constructors instead of pulling it via
+  resolver ops getters, and resolver wiring was updated accordingly.
+- Ownership/worker-gate dependency injection refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  ownership checks and worker-availability policy are now injected directly into gate/collector/
+  recovery/decision services, and resolver ownership/worker getter passthroughs were removed.
+- Messaging dependency injection refactor on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: Create Shop chat/requester-name messaging is now
+  injected into `CreateShopAttemptResolveService` and `CreateShopPostCreationUpdateService`,
+  removing resolver-level messaging getter passthrough usage.
+- Delivery callback collaborator injection refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  delivery cancel/completion services now receive delivery manager and diagnostics/recheck
+  collaborators through constructors, reducing resolver-mediated service lookup paths.
+- Resolver lifecycle accessor narrowing refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  lifecycle consumers now read/write runtime state through token-scoped resolver methods
+  (`getRootCauseLastLogTick`, `markRetryingReassignAttempt`, child/parent snapshot accessors,
+  active-child snapshots) instead of broad map getter exposure, reducing accidental multi-writer
+  mutation risk and tightening state-owner boundaries.
+- Terminal token cleanup hardening on branch `refactor/request-lifecycle-clean-core` (2026-03-12)
+  is authored in this project scope: `clearPendingTokenState` now performs centralized cleanup for
+  pending/cooldown, delivery-created marker, parent stale/active/snapshot tracking, child-active
+  + missing-child tracking, root-cause snapshot tracking, and retrying-reassign attempts for the
+  token, reducing stale runtime residue after terminal or invalid-token transitions.
+- Lifecycle accessor cleanup on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: resolver pending/housekeeping paths now use token-scoped
+  lifecycle helpers (`markMissingChildIfAbsent`, active-child + parent-delivery snapshots) and the
+  unused root-cause child-token snapshot accessor was removed, reducing lifecycle API surface and
+  direct store-touch points.
+- Pending top-up single-writer hardening on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: `CreateShopPendingTopupService` now routes
+  ordered+pending mutations through `CreateShopRequestStateMutatorService` instead of writing
+  cooldown/pending tracker state directly, reducing split lifecycle write paths during inflight wait
+  and network top-up ordering.
+- Missing-child grace/drop lifecycle extraction on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  missing-child grace window/drop decision moved from `CreateShopRequestResolver` into
+  `CreateShopDeliveryChildLifecycleService`, keeping child lifecycle timeout and cleanup decisions
+  in one service instead of split between resolver + reconciliation.
+- Pending-token reset centralization on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: full token lifecycle reset (`clearPendingTokenState`)
+  now executes through `CreateShopRequestStateMutatorService`, with resolver delegating, to keep
+  terminal/reset multi-structure cleanup in a single write-owner path.
+- Stale-arm reset path simplification on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: stale-recovery arm clearing now routes directly
+  through `CreateShopRequestStateMutatorService` from pending/rehydrate/recovery/timeout services,
+  and redundant resolver->lifecycle delegation for this write path was removed.
+- Terminal/timeout cleanup unification on branch `refactor/request-lifecycle-clean-core`
+  (2026-03-12) is authored in this project scope: terminal request cleanup and flow-timeout cleanup
+  now use the shared `clearPendingTokenState` mutator path (with explicit tracked-child cleanup
+  retained), reducing divergent multi-step reset variants.
+- Resolver internal-state encapsulation refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  diagnostics snapshots (`parent children`, `request state`, `pending reason`) and parent-child
+  recheck scheduling state are now owned by their dedicated services
+  (`CreateShopResolverDiagnostics`, `CreateShopResolverRecheck`), pending notice cooldown state is
+  owned by `CreateShopResolverPendingState`, and call sites now use explicit resolver methods for
+  cancellation/logging flags instead of mutable collection getters.
+- Token-reset path hardening on branch `refactor/request-lifecycle-clean-core` (2026-03-12) is
+  authored in this project scope: mutator token reset now has a manager-aware variant that also
+  clears tracked children for the token, and pending-gate/pending-processor/rehydrate/timeout/
+  terminal cleanup paths now use that shared variant to reduce split cleanup sequencing.
+- Attempt/validator dependency injection refactor on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-12) is authored in this project scope:
+  `CreateShopAttemptResolveService` and `CreateShopRequestValidator` now receive chain/cooldown/
+  planning/stock/diagnostic/flow collaborators via constructor injection instead of pulling those
+  from resolver facade getters, and corresponding unused resolver getter facades were removed.
+- Delivery lifecycle ledger and orphan completion hardening on branch
+  `refactor/request-lifecycle-clean-core` (2026-03-13) is authored in this project scope:
+  delivery-child lifecycle diagnostics were extracted into dedicated ledger state/services,
+  courier-task ongoing marker patching and force-finish-at-target fallback were added for
+  MineColonies child requests that remain `IN_PROGRESS` after queue dequeue, and parent fast-orphan
+  completion now uses that lifecycle evidence to prevent duplicate reruns and resolver drift.
+- Auto harness command suite on branch `refactor/request-lifecycle-clean-core` (2026-03-13) is
+  authored in this project scope: maintenance commands now include repeatable live scenario
+  automation (`auto_test_harness` + `auto_test_harness_full_all`) including lost-package inject,
+  reorder, handover simulation, and cancel flows for command-driven in-game validation.

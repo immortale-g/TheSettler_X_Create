@@ -9,13 +9,18 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverParentScopedStaleClockGuardTest {
   @Test
   void staleClockUsesParentScopeInsteadOfChildTokenOnly() throws Exception {
-    String source =
+    String lifecycleSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
+    String reconcileSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
+    assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleDeliveryChild("));
     assertTrue(
-        source.contains("isStaleDeliveryChild(level, request.getId(), childToken, childState)"));
-    assertTrue(source.contains("parentDeliveryActiveSince.putIfAbsent(parentToken, now)"));
+        lifecycleSource.contains(
+            "requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now)"));
   }
 }

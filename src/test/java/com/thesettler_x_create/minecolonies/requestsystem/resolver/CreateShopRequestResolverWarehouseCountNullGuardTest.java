@@ -12,9 +12,9 @@ class CreateShopRequestResolverWarehouseCountNullGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopWarehouseCountService.java"));
 
-    assertTrue(source.contains("if (request == null || getLocation() == null) {"));
+    assertTrue(source.contains("if (request == null || resolverLocation == null) {"));
     assertTrue(source.contains("if (deliverable == null) {"));
     assertTrue(source.contains("if (colonyManager == null) {"));
     assertTrue(

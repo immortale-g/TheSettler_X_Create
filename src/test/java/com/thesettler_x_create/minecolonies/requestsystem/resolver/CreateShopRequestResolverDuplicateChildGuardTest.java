@@ -12,10 +12,9 @@ class CreateShopRequestResolverDuplicateChildGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(
-        source.contains("java.util.Set<IToken<?>> seenChildren = new java.util.HashSet<>()"));
+    assertTrue(source.contains("java.util.Set<IToken<?>> seenChildren = new HashSet<>()"));
     assertTrue(source.contains("child {} duplicate -> removed"));
   }
 }

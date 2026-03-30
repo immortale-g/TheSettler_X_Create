@@ -14,7 +14,7 @@ class BuildingCreateShopHousekeepingResolverGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("resolver != null && resolver.hasActiveWork()"));
+    assertTrue(source.contains("resolver != null && resolver.hasProtectedInventoryWindow()"));
     assertTrue(
         source.contains("housekeeping blocked reason=resolver-active-work pendingUnreserved={}"));
     assertTrue(source.contains("hasActiveLocalDeliveryChildren(colony, pickup)"));

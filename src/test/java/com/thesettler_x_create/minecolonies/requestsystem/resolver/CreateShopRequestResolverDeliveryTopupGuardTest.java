@@ -13,7 +13,7 @@ class CreateShopRequestResolverDeliveryTopupGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingRequestProcessorService.java"));
 
     assertTrue(source.contains("wait:delivery-in-progress"));
     assertTrue(source.contains("topup blocked"));

@@ -449,6 +449,63 @@ public class CreateShopBlockEntity extends BlockEntity {
     return removed;
   }
 
+  /**
+   * Debug helper: injects an artificial inflight tuple for automated lost-package harness tests.
+   */
+  public int debugInjectInflight(
+      ItemStack stackKey,
+      int amount,
+      @Nullable String requesterName,
+      @Nullable String address,
+      long ageTicks) {
+    if (!ensureServerThread("debugInjectInflight")) {
+      return 0;
+    }
+    if (stackKey == null || stackKey.isEmpty() || amount <= 0) {
+      return 0;
+    }
+    long now = getGameTimeSafe();
+    long requestedAt = Math.max(0L, now - Math.max(0L, ageTicks));
+    ItemStack key = makeKey(stackKey);
+    upsertBaseline(key, 0);
+    inflightEntries.add(
+        new InflightEntry(
+            key, Math.max(1, amount), requestedAt, sanitize(requesterName), sanitize(address)));
+    if (compactInflightEntriesForPromptStability()) {
+      // no-op; compact method mutates entries as needed
+    }
+    setChanged();
+    return amount;
+  }
+
+  /** Debug helper: returns the oldest active inflight tuple, regardless of overdue state. */
+  @Nullable
+  public InflightNotice debugPeekOldestInflightNotice(long now) {
+    if (!ensureServerThread("debugPeekOldestInflightNotice")) {
+      return null;
+    }
+    InflightEntry selected = null;
+    for (InflightEntry entry : inflightEntries) {
+      if (entry == null || entry.remaining <= 0) {
+        continue;
+      }
+      if (selected == null || entry.requestedAt < selected.requestedAt) {
+        selected = entry;
+      }
+    }
+    if (selected == null) {
+      return null;
+    }
+    long age = Math.max(0L, now - selected.requestedAt);
+    return new InflightNotice(
+        selected.stackKey.copy(),
+        selected.remaining,
+        age,
+        selected.requesterName,
+        selected.address,
+        selected.requestedAt);
+  }
+
   private int cancelInflightMatches(
       ItemStack stackKey, String requester, String destination, long requestedAt) {
     int removed = 0;

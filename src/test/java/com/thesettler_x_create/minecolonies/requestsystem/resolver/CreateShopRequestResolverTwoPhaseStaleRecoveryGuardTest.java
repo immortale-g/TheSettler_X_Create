@@ -9,16 +9,26 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
   @Test
   void staleRecoveryRequiresArmAndRecheckBeforeMutation() throws Exception {
-    String source =
+    String resolverSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+    String lifecycleSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
+    String reconcileSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(source.contains("parentStaleRecoveryArmedAt"));
-    assertTrue(source.contains("isStaleRecoveryArmed("));
+    assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAt(parentToken)"));
+    assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleRecoveryArmed("));
     assertTrue(
-        source.contains("if (!isStaleRecoveryArmed(level, standardManager, request.getId()))"));
-    assertTrue(source.contains("recheck.scheduleParentChildRecheck(manager, parentToken)"));
-    assertTrue(source.contains("clearStaleRecoveryArm("));
+        reconcileSource.contains("if (!deliveryChildLifecycleService.isStaleRecoveryArmed("));
+    assertTrue(
+        lifecycleSource.contains(
+            "resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken)"));
+    assertTrue(resolverSource.contains("clearParentStaleRecoveryArm("));
   }
 }

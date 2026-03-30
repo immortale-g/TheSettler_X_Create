@@ -3,7 +3,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.minecolonies.api.colony.requestsystem.requestable.INonExhaustiveDeliverable;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -13,14 +12,38 @@ import java.util.UUID;
 import net.minecraft.world.level.Level;
 
 final class CreateShopRequestValidator {
+  private final CreateShopOutstandingNeededService outstandingNeededService =
+      new CreateShopOutstandingNeededService();
+  private final CreateShopResolverChain chain;
+  private final CreateShopStockResolver stockResolver;
+  private final CreateShopResolverPlanning planning;
+  private final CreateShopResolverCooldown cooldown;
+
+  CreateShopRequestValidator(
+      CreateShopResolverChain chain,
+      CreateShopStockResolver stockResolver,
+      CreateShopResolverPlanning planning,
+      CreateShopResolverCooldown cooldown) {
+    this.chain = chain;
+    this.stockResolver = stockResolver;
+    this.planning = planning;
+    this.cooldown = cooldown;
+  }
+
   boolean canResolveRequest(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IRequest<? extends IDeliverable> request) {
+    boolean deliveryWindowOpen =
+        request.hasChildren()
+            || resolver.hasDeliveriesCreated(request.getId())
+            || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
+    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
+    boolean holdDeliveryWindow = deliveryWindowOpen && !completionSeen;
     if (request.getState()
         == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
-      resolver.getCancelledRequests().add(request.getId());
-    } else if (resolver.getCancelledRequests().remove(request.getId())) {
+      resolver.markCancelledRequest(request.getId());
+    } else if (resolver.clearCancelledRequest(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] cleared cancelled flag (state={}) {}",
@@ -28,7 +51,7 @@ final class CreateShopRequestValidator {
             request.getId());
       }
     }
-    if (resolver.getCancelledRequests().contains(request.getId())) {
+    if (resolver.isCancelledRequest(request.getId())) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] canResolve=false (request cancelled) " + request.getId());
@@ -42,13 +65,13 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
-    if (resolver.getCooldown().isRequestOnCooldown(level, request.getId())) {
+    if (cooldown.isRequestOnCooldown(level, request.getId()) && !holdDeliveryWindow) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request already ordered)");
       }
       return false;
     }
-    if (resolver.hasDeliveriesCreated(request.getId())) {
+    if (resolver.hasDeliveriesCreated(request.getId()) && !holdDeliveryWindow) {
       return false;
     }
     if (request.getRequester().getLocation().equals(resolver.getLocation())) {
@@ -59,15 +82,15 @@ final class CreateShopRequestValidator {
     }
     IDeliverable deliverable = request.getRequest();
 
-    BuildingCreateShop shop = resolver.getShopForValidator(manager);
+    BuildingCreateShop shop = resolver.getShop(manager);
     if (shop == null || !shop.isBuilt()) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (shop missing or not built)");
       }
       return false;
     }
-    resolver.getChain().sanitizeRequestChain(manager, request);
-    if (!resolver.getChain().safeIsRequestChainValid(manager, request)) {
+    chain.sanitizeRequestChain(manager, request);
+    if (!chain.safeIsRequestChainValid(manager, request)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request chain invalid)");
       }
@@ -90,28 +113,42 @@ final class CreateShopRequestValidator {
       return false;
     }
 
-    int needed = deliverable.getCount();
-    if (deliverable instanceof INonExhaustiveDeliverable nonExhaustive) {
-      needed -= nonExhaustive.getLeftOver();
-    }
     UUID requestId = resolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
-    needed = Math.max(0, needed - reservedForRequest);
+    int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     if (needed <= 0) {
+      if (holdDeliveryWindow) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] canResolve=true (hold delivery window, needed<=0, reserved={}, children={}, deliveryCreated={}, deliveryStarted={})",
+              reservedForRequest,
+              request.hasChildren(),
+              resolver.hasDeliveriesCreated(request.getId()),
+              resolver.getPendingTracker().hasDeliveryStarted(request.getId()));
+        }
+        return true;
+      }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (needed<=0)");
       }
       return false;
     }
     CreateShopStockSnapshot snapshot =
-        resolver
-            .getStockResolver()
-            .getAvailability(tile, pickup, deliverable, reservedForOthers, resolver.getPlanning());
+        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
     int available = snapshot.getAvailable();
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
+      if (holdDeliveryWindow) {
+        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] canResolve=true (hold delivery window, available<=0, reserved={}, needed={})",
+              reservedForOthers,
+              needed);
+        }
+        return true;
+      }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] canResolve=false (available={}, reserved={}, needed={}, min={}) for {}",

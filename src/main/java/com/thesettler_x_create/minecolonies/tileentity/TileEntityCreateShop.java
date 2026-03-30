@@ -98,6 +98,22 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   @Override
   public void tick() {
     super.tick();
+    if (level == null || level.isClientSide) {
+      return;
+    }
+    if ((level.getGameTime() % 10L) != 0L) {
+      return;
+    }
+    if (!(getBuilding() instanceof BuildingCreateShop shop)) {
+      return;
+    }
+    var resolver = shop.getShopResolver();
+    if (resolver == null
+        || shop.getColony() == null
+        || shop.getColony().getRequestManager() == null) {
+      return;
+    }
+    resolver.sweepFastOrphanRecoveries(shop.getColony().getRequestManager());
   }
 
   @Override

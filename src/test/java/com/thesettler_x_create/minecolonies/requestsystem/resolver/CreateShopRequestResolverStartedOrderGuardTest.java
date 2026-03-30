@@ -9,13 +9,17 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverStartedOrderGuardTest {
   @Test
   void blocksAutoReorderAfterFirstDeliveryStart() throws Exception {
-    String source =
+    String attemptResolveSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopAttemptResolveService.java"));
+    String topupSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingTopupService.java"));
 
-    assertTrue(source.contains("pendingTracker.hasDeliveryStarted(request.getId())"));
-    assertTrue(source.contains("attemptResolve:block-auto-reorder-started"));
-    assertTrue(source.contains("tickPending:block-auto-reorder-started"));
+    assertTrue(topupSource.contains("pendingTracker.hasDeliveryStarted(request.getId())"));
+    assertTrue(attemptResolveSource.contains("attemptResolve:block-auto-reorder-started"));
+    assertTrue(topupSource.contains("tickPending:block-auto-reorder-started"));
   }
 }
