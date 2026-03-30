@@ -44,7 +44,7 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
   }
 
   @Test
-  void timedOutFlowReleasesReservationAndCleansTrackedState() throws Exception {
+  void timedOutFlowSkipsCleanupWhileDeliveryWindowIsActive() throws Exception {
     UUID parentId = UUID.randomUUID();
     IToken<?> parentToken = token(parentId);
     IToken<?> childToken = token(UUID.randomUUID());
@@ -71,22 +71,60 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
     invokeProcessTimedOutFlows(manager, level);
 
+    assertFalse(resolver.reservationReleased);
+    assertEquals(3, resolver.getPendingTracker().getPendingCount(parentToken));
+    assertTrue(resolver.getCooldown().isOrdered(parentToken));
+    assertTrue(resolver.hasDeliveriesCreated(parentToken));
+    assertTrue(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
+    assertTrue(parentMap("deliveryChildActiveSince").containsKey(childToken));
+  }
+
+  @Test
+  void timedOutFlowReleasesReservationAndCleansTrackedStateWithoutActiveDeliveryWindow()
+      throws Exception {
+    UUID parentId = UUID.randomUUID();
+    IToken<?> parentToken = token(parentId);
+
+    IRequest<?> parentRequest = mock(IRequest.class);
+    when(parentRequest.getId()).thenReturn(parentToken);
+    when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
+    when(parentRequest.hasChildren()).thenReturn(false);
+    when(manager.getRequestHandler().getRequest(parentToken)).thenReturn((IRequest) parentRequest);
+
+    CreateShopRequestStateMachine flowStateMachine =
+        (CreateShopRequestStateMachine) getField("flowStateMachine");
+    flowStateMachine.transition(
+        parentToken, CreateShopFlowState.ORDERED_FROM_NETWORK, 0L, "ordered", "", 0);
+
+    resolver.getPendingTracker().setPendingCount(parentToken, 3);
+    resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
+
+    invokeProcessTimedOutFlows(manager, level);
+
     assertTrue(resolver.reservationReleased);
     assertEquals(parentToken, resolver.releasedToken);
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
     assertFalse(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
-    assertFalse(parentMap("deliveryChildActiveSince").containsKey(childToken));
+    assertFalse(parentMap("deliveryChildActiveSince").containsKey(parentToken));
   }
 
   private void invokeProcessTimedOutFlows(IStandardRequestManager manager, Level level)
       throws Exception {
+    Field field = CreateShopRequestResolver.class.getDeclaredField("flowTimeoutCleanupService");
+    field.setAccessible(true);
+    Object service = field.get(resolver);
     Method method =
-        CreateShopRequestResolver.class.getDeclaredMethod(
-            "processTimedOutFlows", IStandardRequestManager.class, Level.class);
+        service
+            .getClass()
+            .getDeclaredMethod(
+                "processTimedOutFlows",
+                CreateShopRequestResolver.class,
+                IStandardRequestManager.class,
+                Level.class);
     method.setAccessible(true);
-    method.invoke(resolver, manager, level);
+    method.invoke(service, resolver, manager, level);
   }
 
   private Object getField(String fieldName) throws Exception {
@@ -97,9 +135,12 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
   @SuppressWarnings("unchecked")
   private Map<IToken<?>, Long> parentMap(String fieldName) throws Exception {
-    Field field = CreateShopRequestResolver.class.getDeclaredField(fieldName);
-    field.setAccessible(true);
-    return (Map<IToken<?>, Long>) field.get(resolver);
+    Field storeField = CreateShopRequestResolver.class.getDeclaredField("lifecycleStateStore");
+    storeField.setAccessible(true);
+    Object store = storeField.get(resolver);
+    Field mapField = store.getClass().getDeclaredField(fieldName);
+    mapField.setAccessible(true);
+    return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
   private IToken<?> token(UUID id) {

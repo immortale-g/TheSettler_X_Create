@@ -25,6 +25,7 @@ class CreateShopMaintenanceCommandsGuardTest {
     assertTrue(commandSource.contains("force_warehouse_queue"));
     assertTrue(commandSource.contains("clearWarehouseQueues("));
     assertTrue(commandSource.contains("cancelCreateShopOwnedRequestsGraphAware("));
+    assertTrue(commandSource.contains("cancelAllAssignedRequestsGraphAware("));
     assertTrue(commandSource.contains("cancelRequestGraphPostOrder("));
     assertTrue(commandSource.contains("cancelSingleRequest("));
     assertTrue(commandSource.contains("countShopsWithActiveLocalDeliveries("));

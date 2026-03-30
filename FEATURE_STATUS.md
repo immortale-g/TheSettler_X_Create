@@ -118,8 +118,93 @@ Current behavior:
   restart reorder volume is bounded by currently tracked inflight remainder for the tuple to avoid
   duplicate over-ordering after world reloads.
 - Lost-package interactions now carry a shop-local runtime epoch that is bumped during
+  live-test reset and world-load cleanup so stale dialogs cannot re-arm after tuple state was
+  already consumed/cleared in a newer runtime epoch.
+- Resolver attempt-ordering flow no longer reaches into resolver passthrough helpers for delivery
+  creation; the attempt service now receives `CreateShopDeliveryManager` directly via constructor
+  injection, reducing resolver-as-god-object coupling while keeping behavior unchanged.
   `/thesettlerxcreate reset_live_state`, so stale pre-reset dialogs cannot mutate new post-reset
   runtime state.
+- Lost-package root-request cancellation matching (item/requester/address/request scope) is now
+  isolated in a dedicated helper (`ShopLostPackageRequestCanceller`) to keep
+  `BuildingCreateShop` lifecycle orchestration smaller without changing cancel semantics.
+- Pending network-topup decision logic during resolver reconciliation is now centralized in
+  `CreateShopPendingTopupService`, reducing resolver tick complexity while preserving current
+  topup guards (`started-order`, `wait-inflight`, `network-topup`).
+- Resolver assignment-drift/ownership locality checks are now centralized in
+  `CreateShopResolverOwnership`, reducing duplicated local-owner detection logic in
+  `CreateShopRequestResolver`.
+- Pending rack-delivery creation planning (wait/plan/create-failed/create-success) is now
+  centralized in `CreateShopPendingDeliveryCreationService`, further reducing
+  `CreateShopRequestResolver.tickPendingDeliveries` complexity.
+- Delivery callback resolver/parent-token lookup and unresolved-callback diagnostics are now
+  centralized in `CreateShopDeliveryResolverLocator`, reducing static callback lookup complexity
+  in `CreateShopRequestResolver`.
+- Terminal request cleanup paths now share a unified resolver cleanup routine
+  (`cleanupTerminalRequest`), reducing duplicated cancel/complete cleanup branches.
+- Reservation-release and cancelled-request lost-package inflight cleanup are now centralized in
+  `CreateShopReservationReleaseService`, reducing resolver responsibility and keeping terminal
+  cleanup wiring in one shared service.
+- Warehouse internal stock-count bridging to MineColonies is now centralized in
+  `CreateShopWarehouseCountService`, reducing resolver-side null/context guard sprawl while keeping
+  the same fail-open semantics.
+- Flow-timeout cleanup (`collectTimedOut` + failed transition + reservation/cooldown/pending
+  cleanup) is now centralized in `CreateShopFlowTimeoutCleanupService`, reducing resolver tick
+  orchestration responsibility while preserving existing timeout behavior.
+- Delivery-completion reconciliation (parent-flow transition, local pickup reservation consumption,
+  pending/cooldown reconciliation, and completion diagnostics/recheck) is now centralized in
+  `CreateShopDeliveryCompletionService`, reducing callback complexity in
+  `CreateShopRequestResolver`.
+- Retrying-request reassignment orchestration is now centralized in
+  `CreateShopRetryingReassignService`, reducing resolver tick-branching while preserving guarded
+  reassignment to Create Shop when requests become resolvable.
+- Assignment/ownership pending-token collection is now centralized in
+  `CreateShopPendingTokenCollectorService`, reducing `tickPendingDeliveries` setup complexity and
+  keeping resolver ownership-recovery behavior in a dedicated pre-processing step.
+- Cancelled-pending cleanup now avoids duplicate cooldown-clear calls on the same token in
+  `tickPendingDeliveries`, reducing redundant state-mutation noise during cancellation cleanup.
+- Pending pre-gates for ownership/cancel/not-deliverable are now centralized in
+  `CreateShopPendingRequestGateService`, and `state == CANCELLED` now clears pending/cooldown/
+  delivery-created tracking immediately in tick-pending processing to prevent cancelled-token
+  tracker drift.
+- Tick-pending candidate debug logging is now isolated in a dedicated helper method, reducing
+  top-level `tickPendingDeliveries` control-flow noise while keeping existing debug output.
+- Parent-child reconciliation for pending parents (duplicate child removal, fail-open missing-child
+  grace, stale/extra-active local-delivery recovery, and local-scope child diagnostics) is now
+  centralized in `CreateShopChildReconciliationService`, reducing `tickPendingDeliveries`
+  branching and isolating child-lifecycle handling into one dedicated flow.
+- Tick-pending now actively recovers stale cooldown-only parents (`ordered/cooldown` set but
+  no pending count, no active child delivery, no children) by clearing stale cooldown/pending
+  tracking instead of leaving requests silently blocked in no-progress loops.
+- Pending-count normalization and worker-availability gating decisions are now centralized in
+  `CreateShopPendingStateDecisionService`, reducing `tickPendingDeliveries` branching and keeping
+  derived-pending, stale-cooldown recovery, and worker-unavailable pending retention in one flow.
+- Post-delivery-creation updates (flow transitions, player chat, pending/cooldown update after
+  created child deliveries) are now centralized in `CreateShopPostCreationUpdateService`, and
+  remaining-count values are normalized to non-negative before state updates.
+- Delivery-cancel callback reconciliation is now centralized in
+  `CreateShopDeliveryCancelService` (parent requeue/pending source/cooldown + missing-pickup
+  fallback + diagnostics/recheck). Missing-pickup fallback now safely handles null delivery start
+  locations before block lookup.
+- Root-cause delivery snapshot diagnostics are now centralized in
+  `CreateShopDeliveryRootCauseSnapshotService`, reducing resolver debug/forensics density while
+  preserving rate-limited warehouse/courier assignment snapshot emission.
+- Delivery-child recovery mutation path (ownership revalidation, local child scope check,
+  cancel/remove/requeue mutation, and recheck scheduling) is now centralized in
+  `CreateShopDeliveryChildRecoveryService`, reducing resolver-side stale/extra-active recovery
+  branch density.
+- Per-request pending lifecycle processing is now centralized in
+  `CreateShopPendingRequestProcessorService`, so `tickPendingDeliveries` mainly orchestrates
+  context setup and token iteration.
+- Rack reservation refresh reconciliation is now centralized in
+  `CreateShopReservationSyncService`, isolating reservation-refresh semantics and reducing
+  reservation drift fixes spread across resolver code paths.
+- Tick-pending top-level orchestration (manager/level guards, assignment snapshot collection,
+  token-loop dispatch, timeout processing, and perf logging handoff) is now centralized in
+  `CreateShopTickPendingService`, reducing `CreateShopRequestResolver` to a thin tick facade.
+- Child lookup failure handling now uses the same grace/drop lifecycle as missing children
+  (instead of infinite fail-open), so repeated lookup exceptions eventually prune stale child
+  links and unblock parent progress.
 - Lost-package response handling now verifies tuple liveness (`stack + requester + address + requestedAt`)
   before processing, and stale dialogs self-invalidate instead of triggering empty reorders or
   phantom follow-up interactions.
@@ -144,6 +229,111 @@ Current behavior:
 - Reservation consumption timing is now delivery-completion based for local Create Shop delivery
   starts (pickup or registered rack containers), so rack housekeeping no longer pulls items into
   hut inventory before MineColonies delivery children have actually completed pickup/transport.
+- Attempt-resolve orchestration is now centralized in `CreateShopAttemptResolveService`, so
+  `CreateShopRequestResolver.attemptResolveRequest(...)` is a thin delegate and request ordering /
+  defer / delivery-creation decision flow is isolated from resolver lifecycle scaffolding.
+- Resolver runtime trackers for cancelled/pending-notice/retrying-reassign are now instance-local
+  (not static), eliminating cross-instance/world carryover risk that could resurrect stale tokens
+  after reloads and amplify request drift.
+- Delivery-child stale/recovery-arm lifecycle and tracked-child cleanup are now centralized in
+  `CreateShopDeliveryChildLifecycleService`, reducing resolver state mutation fan-out and keeping
+  stale timeout ownership in one place.
+- Terminal request lifecycle handling (`resolveRequest` skip/complete path + completion/cancel
+  cleanup hooks) is now centralized in `CreateShopTerminalRequestLifecycleService`, reducing
+  request-end mutation duplication inside `CreateShopRequestResolver`.
+- Local delivery-origin matching and stack count/label helpers are now shared utilities
+  (`CreateShopDeliveryOriginMatcher`, `CreateShopStackMetrics`) used directly by resolver
+  services, removing duplicate helper logic and narrowing resolver surface area.
+- Delivery callback routing (`onDeliveryCancelled` / `onDeliveryComplete`) is now centralized in
+  `CreateShopDeliveryCallbackService`, keeping resolver callback entrypoints as thin delegates.
+- Pending tick orchestration wiring now injects processor/collector dependencies directly into
+  `CreateShopTickPendingService` and `CreateShopPendingRequestProcessorService` constructors,
+  allowing removal of several resolver service-getter passthroughs from the ops surface.
+- Shop lookup access is now unified on `getShopForOps(...)` across validator/pending/delivery
+  services, removing the duplicate validator-specific resolver facade.
+- Pending/cooldown request state writes are now centralized through
+  `CreateShopRequestStateMutatorService` (ordered+pending and clear+remove), reducing split
+  mutation paths across attempt/cancel/complete/timeout/terminal flows.
+- Child reconciliation now depends directly on delivery lifecycle/recovery/snapshot services
+  instead of resolver stale-recovery forwarding methods, shrinking resolver orchestration surface
+  and isolating child-recovery behavior inside dedicated components.
+- Additional resolver forwarder cleanup removed obsolete internal delegation methods
+  (`processTimedOutFlows`, `clearTrackedChildrenForParent`, `unwrapStandardManagerForOps`, etc.),
+  with callers switched to direct service/static usage.
+- Request-state mutator usage is now constructor-injected into the affected lifecycle services
+  (attempt/cancel/recovery/completion/timeout/pending-decision/post-creation/reservation/terminal),
+  removing the corresponding resolver ops getter dependency.
+- Ownership and worker-availability checks are now constructor-injected into pending/recovery
+  services (`CreateShopPendingRequestGateService`, `CreateShopPendingTokenCollectorService`,
+  `CreateShopDeliveryChildRecoveryService`, `CreateShopPendingStateDecisionService`), removing
+  additional resolver ops getter dependencies.
+- Resolver messaging is now constructor-injected into attempt/post-creation services
+  (`CreateShopAttemptResolveService`, `CreateShopPostCreationUpdateService`), allowing removal of
+  the resolver messaging ops getter.
+- Delivery callback services now receive `deliveryManager`/`diagnostics`/`recheck` via constructor
+  injection (`CreateShopDeliveryCancelService`, `CreateShopDeliveryCompletionService`) instead of
+  resolving those collaborators through resolver ops getters.
+- Outstanding-needed calculation (`requested - leftover - reservedForRequest`) is now centralized in
+  `CreateShopOutstandingNeededService` and used by validator/attempt/pending-decision flows,
+  removing duplicated arithmetic paths that previously lived behind resolver helper forwarding.
+- Pending gate/reconciliation services now call shared resolver state operations directly
+  (`clearPendingTokenState`, `touchFlow`, `shouldDropMissingChild`) instead of `*ForOps`
+  forwarding aliases, reducing duplicated resolver ops surface while keeping behavior unchanged.
+- Terminal resolve lifecycle now owns its own skip/completion diagnostics (ordered/cooldown gate +
+  post-resolve state log) with constructor-injected cooldown/diagnostics dependencies, reducing
+  resolver helper forwarding in the `resolveRequest` path.
+- Tick-pending telemetry/perf state is now centralized in `CreateShopTickPendingTelemetryService`
+  (debug cadence, candidate snapshot logs, perf emission) and injected into pending token
+  collection/tick orchestration, removing additional resolver-level telemetry forwarding/state.
+- Terminal-state gate in pending processing now uses shared static classification
+  (`CreateShopRequestResolver.isTerminalRequestState`) directly, removing one more resolver
+  forwarding alias while preserving terminal-skip behavior.
+- Delivery callback and pending tick orchestration now call direct resolver methods
+  (`handleDeliveryComplete`, `handleDeliveryCancelled`, `reassignResolvableRetryingRequests`,
+  `getRecheck`) instead of `*ForOps` aliases, continuing resolver ops-surface reduction without
+  behavior changes.
+- Flow-transition entrypoints now use the shared direct resolver method `transitionFlow(...)`
+  across attempt/pending/timeout/terminal/completion services, removing the last
+  `transitionFlowForOps(...)` forwarding layer.
+- Resolver shop lookup now uses direct `getShop(...)` across validator/attempt/tick/delivery
+  services, removing the `getShopForOps(...)` wrapper and reducing resolver facade duplication.
+- Resolver flow/timeout/debug/retry helper calls now use direct method names
+  (`resolveNowTick`, `getFlowStateMachine`, `getInflightTimeoutTicksSafe`,
+  `clearStaleRecoveryArm`, `clearTrackedChildrenForParent`, `isDebugLoggingEnabled`,
+  `getRetryingReassignAttempts`, `logDeliveryLinkState`) instead of `*ForOps` aliases.
+- Resolver diagnostics access now uses direct `getDiagnostics()` across attempt/pending/recovery/
+  post-creation services, removing the `getDiagnosticsForOps()` forwarding alias.
+- Delivery lifecycle/root-cause/pending services now use direct map accessors
+  (`getDeliveryChildActiveSince`, `getParentDeliveryActiveSince`, `getParentStaleRecoveryArmedAt`,
+  `getParentLastKnownChildCount`, `getParentLastKnownChildren`, `getParentChildDropLastLogTick`,
+  `getDeliveryRootCauseSnapshots`, `getDeliveryRootCauseLastLogTick`, `getMissingChildSince`)
+  instead of `*ForOps` accessor aliases.
+- Diagnostics dependency is now constructor-injected into pending/recovery/post-creation/reservation
+  services (`CreateShopPendingRequestProcessorService`, `CreateShopPendingRequestGateService`,
+  `CreateShopPendingStateDecisionService`, `CreateShopDeliveryChildRecoveryService`,
+  `CreateShopPostCreationUpdateService`, `CreateShopReservationSyncService`) to reduce direct
+  resolver accessor coupling.
+- Tick start now performs explicit lifecycle rehydrate (`CreateShopLifecycleRehydrateService`)
+  before pending processing, deriving active pending state from MineColonies request graph
+  (assigned/pending tokens, request terminal state, children/inflight markers, requested amounts)
+  instead of trusting stale local maps after reload/drift.
+- Delivery cancel/complete/recovery now use atomic lifecycle state transitions via
+  `CreateShopRequestStateMutatorService` (`openDeliveryWindow` / `closeDeliveryWindow`) to avoid
+  split multi-map writes for parent/child inflight tracking.
+- Resolver/housekeeping inventory ownership window is now explicit (`hasProtectedInventoryWindow`)
+  and used by `BuildingCreateShop` housekeeping gates so rack cleanup and request lifecycle block on
+  the same protection condition.
+- Pending/cooldown/child runtime tracking is now centralized in
+  `CreateShopLifecycleStateStore` (instead of separate resolver fields), reducing multi-structure
+  drift risk and establishing a single lifecycle state owner for runtime maps/tracker state.
+- Delivery child/missing/parent snapshot writes are increasingly single-writer through
+  `CreateShopRequestStateMutatorService` (lifecycle service, child reconciliation, pending processor,
+  timeout cleanup), reducing direct map mutation fan-out across services.
+- Pending reconciliation is now derived-first: each pending tick reconciles tracked pending against
+  request-derived outstanding need (plus reservation/inflight floor), reducing stale pending drift
+  when local counters diverge from request graph state.
+- Rehydrate now expands from assignment tokens to active runtime child/parent lifecycle tokens and
+  prunes orphan child entries, improving reload recovery for persisted/inflight request graphs.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
@@ -185,6 +375,16 @@ Known focus area:
   improving reliability of real extraction on live racks.
 - Rate-limited housekeeping diagnostics are available under debug logging to surface gate reasons,
   rack discovery, unreserved budget, cooldown waits, and moved counts during live validation.
+- Auto test harness expanded for in-game end-to-end validation:
+  - `/thesettlerxcreate auto_test_harness start|start_force_queue|snapshot|full`
+  - lost-package automation commands:
+    `lost_inject`, `lost_reorder`, `lost_handover_sim`, `lost_cancel`
+  - one-shot aggregate command:
+    `/thesettlerxcreate auto_test_harness_full_all`
+  This allows repeatable command-driven scenario runs without manual UI interaction for each step.
+- Lost-package harness support added in core runtime:
+  - `CreateShopBlockEntity` debug inflight tuple inject + oldest tuple peek helpers
+  - `BuildingCreateShop` debug wrappers for reorder and simulated handover consumption.
 
 Out of scope for this PR:
 - `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked

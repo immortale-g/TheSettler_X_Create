@@ -14,10 +14,7 @@ class BuildingCreateShopLostPackageRestartPartialGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("public int restartLostPackage("));
-    assertTrue(
-        source.contains(
-            "restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt)"));
+    assertTrue(source.contains("LostPackageReorderResult restartLostPackageDetailed("));
     assertTrue(
         source.contains(
             "new LostPackageReorderResult(consumed, LostPackageReorderStatus.SUCCESS);"));
