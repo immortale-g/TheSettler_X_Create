@@ -208,7 +208,6 @@ public final class NativeRequestFlowDiagnostics {
     return children.isEmpty() ? "-" : String.join(",", children);
   }
 
-  @SuppressWarnings("unchecked")
   private IRequest<?> resolveRequest(Object handler, IToken<?> token) {
     if (handler == null || token == null) {
       return null;

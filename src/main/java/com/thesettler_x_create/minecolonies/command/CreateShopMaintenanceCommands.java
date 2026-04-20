@@ -1812,7 +1812,6 @@ public final class CreateShopMaintenanceCommands {
   }
 
   private static final class HarnessShopContext {
-    final IColony colony;
     final BuildingCreateShop shop;
     final TileEntityCreateShop tile;
     final CreateShopBlockEntity pickup;
@@ -1822,7 +1821,6 @@ public final class CreateShopMaintenanceCommands {
         BuildingCreateShop shop,
         TileEntityCreateShop tile,
         CreateShopBlockEntity pickup) {
-      this.colony = colony;
       this.shop = shop;
       this.tile = tile;
       this.pickup = pickup;

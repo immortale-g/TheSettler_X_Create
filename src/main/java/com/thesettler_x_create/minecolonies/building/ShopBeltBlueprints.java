@@ -576,7 +576,7 @@ final class ShopBeltBlueprints {
       }
       BlockPos rotated = rotatePos(local, transform.rotation);
       BlockPos worldPos = rotated.offset(transform.translation);
-      BlockState placed = state.rotate(transform.rotation);
+      BlockState placed = state.rotate(level, worldPos, transform.rotation);
       level.setBlockAndUpdate(worldPos, placed);
       applyTileEntityData(level, worldPos, info);
       if (min == null) {

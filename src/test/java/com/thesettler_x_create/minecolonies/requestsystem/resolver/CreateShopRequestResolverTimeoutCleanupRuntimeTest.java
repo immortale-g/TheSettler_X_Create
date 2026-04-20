@@ -44,12 +44,13 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
   }
 
   @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
   void timedOutFlowSkipsCleanupWhileDeliveryWindowIsActive() throws Exception {
     UUID parentId = UUID.randomUUID();
     IToken<?> parentToken = token(parentId);
     IToken<?> childToken = token(UUID.randomUUID());
 
-    IRequest<?> parentRequest = mock(IRequest.class);
+    IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(parentRequest.getId()).thenReturn(parentToken);
     when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
     when(manager.getRequestHandler().getRequest(parentToken)).thenReturn((IRequest) parentRequest);
@@ -80,12 +81,13 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
   }
 
   @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
   void timedOutFlowReleasesReservationAndCleansTrackedStateWithoutActiveDeliveryWindow()
       throws Exception {
     UUID parentId = UUID.randomUUID();
     IToken<?> parentToken = token(parentId);
 
-    IRequest<?> parentRequest = mock(IRequest.class);
+    IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(parentRequest.getId()).thenReturn(parentToken);
     when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
     when(parentRequest.hasChildren()).thenReturn(false);
@@ -143,8 +145,9 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
+  @SuppressWarnings("unchecked")
   private IToken<?> token(UUID id) {
-    IToken<?> token = mock(IToken.class);
+    IToken<UUID> token = (IToken<UUID>) mock(IToken.class);
     when(token.getIdentifier()).thenReturn(id);
     when(token.toString()).thenReturn("token:" + id);
     return token;

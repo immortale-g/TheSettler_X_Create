@@ -34,7 +34,8 @@ class CreateShopRequestResolverCallbacksTest {
 
     resolver.markDeliveriesCreated(parentToken);
 
-    IRequest<?> deliveryRequest = mock(IRequest.class);
+    @SuppressWarnings("unchecked")
+    IRequest<IDeliverable> deliveryRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(deliveryRequest.getId()).thenReturn(deliveryToken);
     when(deliveryRequest.getParent()).thenReturn(parentToken);
     when(deliveryRequest.getRequest()).thenReturn(mock(IDeliverable.class));

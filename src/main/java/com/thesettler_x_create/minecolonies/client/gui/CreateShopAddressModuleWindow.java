@@ -13,7 +13,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public class CreateShopAddressModuleWindow
     extends AbstractModuleWindow<CreateShopAddressModuleView> {
   private final com.minecolonies.api.colony.buildings.views.IBuildingView building;
-  private final CreateShopAddressModuleView moduleView;
   private final TextField addressInput;
 
   public CreateShopAddressModuleWindow(CreateShopAddressModuleView moduleView) {
@@ -22,7 +21,6 @@ public class CreateShopAddressModuleWindow
         ResourceLocation.fromNamespaceAndPath(
             TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_address.xml"));
     this.building = moduleView.getBuildingView();
-    this.moduleView = moduleView;
 
     Text desc = findPaneOfTypeByID("desc", Text.class);
     if (desc != null) {

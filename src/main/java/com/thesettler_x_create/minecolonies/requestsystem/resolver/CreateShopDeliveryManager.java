@@ -234,11 +234,11 @@ final class CreateShopDeliveryManager {
           "create",
           manager,
           token,
-          resolver.toRequestId(request.getId()),
+          CreateShopRequestResolver.toRequestId(request.getId()),
           startPos,
           selected.copy(),
           request.getRequester().getLocation(),
-          pickup.getReservedForRequest(resolver.toRequestId(request.getId())),
+          pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(request.getId())),
           reservedForDeliverable,
           pickup.getReservedFor(selected));
       IStandardRequestManager standardManager =

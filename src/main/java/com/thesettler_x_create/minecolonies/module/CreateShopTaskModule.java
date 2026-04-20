@@ -1,14 +1,14 @@
 package com.thesettler_x_create.minecolonies.module;
 
+import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
-import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
+import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import java.util.ArrayList;
@@ -16,7 +16,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
-/** Shop task-tab module that extends warehouse queue data with inflight Create Shop parent tokens. */
+/**
+ * Shop task-tab module that extends warehouse queue data with inflight Create Shop parent tokens.
+ */
 public class CreateShopTaskModule extends WarehouseRequestQueueModule {
   @Override
   public void serializeToView(RegistryFriendlyByteBuf buf) {

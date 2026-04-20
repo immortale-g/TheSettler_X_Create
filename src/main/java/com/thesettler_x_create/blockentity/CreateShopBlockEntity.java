@@ -897,7 +897,6 @@ public class CreateShopBlockEntity extends BlockEntity {
             ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
         int remaining = entry.getInt("remaining");
         long requestedAt = entry.getLong("requestedAt");
-        boolean notified = entry.getBoolean("notified");
         String requester = entry.getString("requester");
         String address = entry.getString("address");
         if (!stack.isEmpty() && remaining > 0) {
@@ -977,7 +976,6 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
   }
 
-  @SuppressWarnings("unused")
   public IItemHandler getItemHandler(@Nullable Direction side) {
     return itemHandler;
   }
