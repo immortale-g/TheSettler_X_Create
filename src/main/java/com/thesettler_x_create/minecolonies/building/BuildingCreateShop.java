@@ -984,24 +984,28 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
             (int) Math.max(1L, elapsed / HOUSEKEEPING_TRANSFER_INTERVAL));
     int transferBudget = Math.min(HOUSEKEEPING_MAX_CATCHUP_STACKS, dueStacks);
     int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
+    boolean hutHasItems = tile.hasHutInventoryItems();
     cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-    if (moved > 0 || cachedHasIncomingRackWork) {
+    if (moved > 0 || cachedHasIncomingRackWork || hutHasItems) {
       lastHousekeepingTransferTick = now;
     }
-    if (moved > 0) {
+    if (moved > 0 || hutHasItems) {
       int pickupPriority = getPickUpPriority();
       if (pickupPriority > 0) {
-        boolean pickupRequested = createPickupRequest(pickupPriority);
+        boolean pickupRequested = createNativeHutPickupRequest(pickupPriority);
         if (isDebugRequests()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] housekeeping pickup request priority={} created={} moved={}",
+              "[CreateShop] housekeeping pickup request priority={} created={} moved={} hutHasItems={}",
               pickupPriority,
               pickupRequested,
-              moved);
+              moved,
+              hutHasItems);
         }
       } else if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping pickup request skipped (priority disabled) moved={}", moved);
+            "[CreateShop] housekeeping pickup request skipped (priority disabled) moved={} hutHasItems={}",
+            moved,
+            hutHasItems);
       }
     }
     if (moved > 0 && isDebugRequests()) {
@@ -1017,6 +1021,16 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
           transferBudget,
           elapsed);
     }
+  }
+
+  /**
+   * Requests MineColonies' native building pickup flow for items staged in the hut.
+   *
+   * <p>The pickup requestable stores priority only; the source is the building requester's hut
+   * location.
+   */
+  private boolean createNativeHutPickupRequest(int pickupPriority) {
+    return createPickupRequest(pickupPriority);
   }
 
   private boolean hasActiveLocalDeliveryChildren(IColony colony, CreateShopBlockEntity pickup) {
