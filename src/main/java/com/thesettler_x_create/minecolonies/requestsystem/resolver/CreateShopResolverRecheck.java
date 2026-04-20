@@ -5,14 +5,12 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import net.minecraft.world.level.Level;
 
 final class CreateShopResolverRecheck {
-  private final CreateShopRequestResolver resolver;
   private final CreateShopResolverDiagnostics diagnostics;
   private final java.util.Map<IToken<?>, Long> parentChildrenRecheck =
       new java.util.concurrent.ConcurrentHashMap<>();
 
   CreateShopResolverRecheck(
       CreateShopRequestResolver resolver, CreateShopResolverDiagnostics diagnostics) {
-    this.resolver = resolver;
     this.diagnostics = diagnostics;
   }
 
