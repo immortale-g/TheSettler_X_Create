@@ -317,6 +317,23 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return false;
   }
 
+  /** Returns true when the hut-internal inventory contains items awaiting native pickup. */
+  public boolean hasHutInventoryItems() {
+    IItemHandler hut = getInventory();
+    if (hut == null) {
+      hut = getItemHandlerCap((Direction) null);
+    }
+    if (hut == null) {
+      return false;
+    }
+    for (int slot = 0; slot < hut.getSlots(); slot++) {
+      if (!hut.getStackInSlot(slot).isEmpty()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
    *
