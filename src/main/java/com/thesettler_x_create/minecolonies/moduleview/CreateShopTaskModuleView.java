@@ -1,8 +1,10 @@
 package com.thesettler_x_create.minecolonies.moduleview;
 
+import com.ldtteam.blockui.views.BOWindow;
 import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.moduleviews.RequestTaskModuleView;
+import com.thesettler_x_create.minecolonies.client.gui.CreateShopTaskModuleWindow;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -16,6 +18,11 @@ public class CreateShopTaskModuleView extends RequestTaskModuleView {
   @Override
   public List<IToken<?>> getTasks() {
     return tasks;
+  }
+
+  @Override
+  public BOWindow getWindow() {
+    return new CreateShopTaskModuleWindow(this);
   }
 
   @Override

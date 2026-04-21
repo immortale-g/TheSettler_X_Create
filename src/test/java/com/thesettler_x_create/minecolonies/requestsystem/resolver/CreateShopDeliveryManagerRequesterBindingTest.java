@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 
 class CreateShopDeliveryManagerRequesterBindingTest {
   @Test
-  void createsDeliveryChildWithNativeRequesterFallback() throws Exception {
+  void createsDeliveryChildWithCreateShopDisplayWrapperAroundNativeWarehouseRequester()
+      throws Exception {
     String source =
         Files.readString(
             Path.of(
@@ -16,10 +17,13 @@ class CreateShopDeliveryManagerRequesterBindingTest {
 
     assertTrue(
         source.contains(
-            "IRequester deliveryRequester = resolveDeliveryRequester(manager, request);"));
+            "IRequester deliveryRequester = resolveDeliveryRequester(manager, request, pickupLocation);"));
     assertTrue(source.contains("manager.createRequest(deliveryRequester, delivery)"));
+    assertTrue(source.contains("new CreateShopDeliveryRequester(requester, sourceLocation)"));
     assertTrue(source.contains("isWarehouseDeliveryResolver("));
     assertTrue(source.contains("candidate instanceof AbstractWarehouseRequestResolver"));
     assertTrue(source.contains("!(candidate instanceof CreateShopRequestResolver)"));
+    assertTrue(source.contains("getCreateShopDeliveryResolverBlacklist"));
+    assertTrue(source.contains("assignRequest(request, blacklist)"));
   }
 }

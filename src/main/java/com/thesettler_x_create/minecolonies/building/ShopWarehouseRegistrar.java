@@ -1,9 +1,8 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 
-/** Maintains Create Shop registration in the MineColonies warehouse list. */
+/** Ensures Create Shop is not treated as a courier warehouse by MineColonies. */
 final class ShopWarehouseRegistrar {
   private final BuildingCreateShop shop;
 
@@ -24,18 +23,7 @@ final class ShopWarehouseRegistrar {
     if (warehouses == null) {
       return;
     }
-    if (!hasWarehouseModules()) {
-      warehouses.remove(shop);
-      shop.warehouseRegistered = false;
-      return;
-    }
-    if (!warehouses.contains(shop)) {
-      warehouses.add(shop);
-    }
-    shop.warehouseRegistered = true;
-  }
-
-  boolean hasWarehouseModules() {
-    return shop.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE) != null;
+    warehouses.remove(shop);
+    shop.warehouseRegistered = false;
   }
 }

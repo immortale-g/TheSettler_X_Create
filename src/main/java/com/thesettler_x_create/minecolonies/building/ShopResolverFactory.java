@@ -24,8 +24,6 @@ final class ShopResolverFactory {
       ImmutableCollection<IRequestResolver<?>> baseResolvers) {
     ImmutableList.Builder<IRequestResolver<?>> builder = ImmutableList.builder();
     CreateShopRequestResolver existingShopResolver = null;
-    DeliveryRequestResolver existingDeliveryResolver = null;
-    PickupRequestResolver existingPickupResolver = null;
 
     for (IRequestResolver<?> resolver : baseResolvers) {
       if (resolver
@@ -35,12 +33,16 @@ final class ShopResolverFactory {
         // CreateShop is not a BuildingWareHouse; avoid MineColonies' warehouse resolver cast crash.
         continue;
       }
+      if (resolver instanceof DeliveryRequestResolver) {
+        // Deliverymen resolvers belong to real warehouses with courier modules.
+        continue;
+      }
       if (resolver instanceof CreateShopRequestResolver csr) {
         existingShopResolver = csr;
-      } else if (resolver instanceof DeliveryRequestResolver dr) {
-        existingDeliveryResolver = dr;
-      } else if (resolver instanceof PickupRequestResolver pr) {
-        existingPickupResolver = pr;
+      } else if (resolver instanceof PickupRequestResolver) {
+        // PickupRequestResolver also depends on warehouse couriers, so the Create Shop must not
+        // keep a local one. Real MineColonies warehouses resolve shop pickup requests natively.
+        continue;
       }
       builder.add(resolver);
     }
@@ -49,14 +51,6 @@ final class ShopResolverFactory {
     IFactoryController factory = shop.getColony().getRequestManager().getFactoryController();
 
     CreateShopRequestResolver shopResolver = existingShopResolver;
-    IToken<?> deliveryResolverToken =
-        existingDeliveryResolver != null
-            ? existingDeliveryResolver.getId()
-            : shop.getDeliveryResolverToken();
-    IToken<?> pickupResolverToken =
-        existingPickupResolver != null
-            ? existingPickupResolver.getId()
-            : shop.getPickupResolverToken();
 
     if (shopResolver == null) {
       IToken<?> token = factory.getNewInstance(TypeConstants.ITOKEN);
@@ -66,20 +60,7 @@ final class ShopResolverFactory {
       builder.add(shopResolver);
     }
 
-    if (existingDeliveryResolver == null && deliveryResolverToken == null) {
-      deliveryResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
-    }
-    if (existingPickupResolver == null && pickupResolverToken == null) {
-      pickupResolverToken = factory.getNewInstance(TypeConstants.ITOKEN);
-    }
-    if (existingDeliveryResolver == null) {
-      builder.add(new DeliveryRequestResolver(location, deliveryResolverToken));
-    }
-    if (existingPickupResolver == null) {
-      builder.add(new PickupRequestResolver(location, pickupResolverToken));
-    }
-
-    shop.setResolverState(shopResolver, deliveryResolverToken, pickupResolverToken);
+    shop.setResolverState(shopResolver, null, null);
 
     if (BuildingCreateShop.isDebugRequests()) {
       TheSettlerXCreate.LOGGER.info(
@@ -87,9 +68,7 @@ final class ShopResolverFactory {
           shop.getLocation().getInDimensionLocation(),
           builder.build().size());
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery resolver token={} pickup resolver token={}",
-          deliveryResolverToken,
-          pickupResolverToken);
+          "[CreateShop] deliverymen resolvers skipped for CreateShop; real warehouses own courier tasks");
     }
 
     return builder.build();

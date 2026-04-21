@@ -17,6 +17,7 @@ import com.thesettler_x_create.minecolonies.command.CreateShopMaintenanceCommand
 import com.thesettler_x_create.minecolonies.debug.NativeRequestFlowDiagnostics;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesBuildings;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesJobs;
+import com.thesettler_x_create.minecolonies.requestsystem.requesters.CreateShopDeliveryRequesterFactory;
 import com.thesettler_x_create.minecolonies.requestsystem.requesters.SafeRequesterFactory;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolverFactory;
 import com.thesettler_x_create.network.ModNetwork;
@@ -83,6 +84,12 @@ public class TheSettlerXCreate {
           try {
             // Legacy compatibility: keep requester factory 3001 deserializable for old saves.
             StandardFactoryController.getInstance().registerNewFactory(new SafeRequesterFactory());
+          } catch (IllegalArgumentException ignored) {
+            // Ignore duplicate factory registration across reloads.
+          }
+          try {
+            StandardFactoryController.getInstance()
+                .registerNewFactory(new CreateShopDeliveryRequesterFactory());
           } catch (IllegalArgumentException ignored) {
             // Ignore duplicate factory registration across reloads.
           }

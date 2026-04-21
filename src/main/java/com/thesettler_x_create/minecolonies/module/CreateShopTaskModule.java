@@ -76,6 +76,9 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
             || !resolverId.equals(ownerResolver.getId())) {
           continue;
         }
+        if (resolver.hasParentChildCompletedSeen(token) && !request.hasChildren()) {
+          continue;
+        }
         if (request.getState() != RequestState.IN_PROGRESS && !request.hasChildren()) {
           continue;
         }
