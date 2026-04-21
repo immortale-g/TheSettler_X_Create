@@ -719,3 +719,6 @@ Implementation notes:
   view wiring with a custom task module/view pair that serializes additional local inflight parent
   request tokens (owned by the local Create Shop resolver) and merges them with queue tasks in the
   existing MineColonies task-tab UI without introducing parallel request storage.
+- Versioning update on branch `feature/task-tab-inflight-visibility` (2026-03-30) is authored in
+  this project scope: build metadata in `gradle.properties` was bumped from `0.1.0` to `0.2.0` as
+  part of the task-tab inflight visibility + native pickup integration release line.
