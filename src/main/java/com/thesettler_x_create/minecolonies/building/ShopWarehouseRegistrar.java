@@ -23,7 +23,7 @@ final class ShopWarehouseRegistrar {
     if (warehouses == null) {
       return;
     }
-    warehouses.remove(shop);
+    warehouses.removeIf(warehouse -> warehouse == shop);
     shop.warehouseRegistered = false;
   }
 }

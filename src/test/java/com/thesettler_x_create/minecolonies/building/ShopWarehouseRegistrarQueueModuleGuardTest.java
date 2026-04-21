@@ -15,7 +15,7 @@ class ShopWarehouseRegistrarQueueModuleGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/ShopWarehouseRegistrar.java"));
 
-    assertTrue(source.contains("warehouses.remove(shop)"));
+    assertTrue(source.contains("warehouses.removeIf(warehouse -> warehouse == shop)"));
     assertTrue(source.contains("warehouseRegistered = false"));
     assertFalse(source.contains("warehouses.add(shop)"));
     assertFalse(source.contains("BuildingModules.WAREHOUSE_REQUEST_QUEUE"));

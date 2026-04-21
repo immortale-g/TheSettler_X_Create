@@ -94,7 +94,8 @@ final class CreateShopDeliveryRootCauseSnapshotService {
                 citizen.getJob() == null ? "<none>" : citizen.getJob().getClass().getSimpleName();
             String currentTask = "<none>";
             String taskQueue = "<na>";
-            if (citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman jobDeliveryman) {
+            if (citizen.getJob()
+                instanceof com.minecolonies.core.colony.jobs.JobDeliveryman jobDeliveryman) {
               try {
                 IRequest<?> task = jobDeliveryman.getCurrentTask();
                 currentTask = task == null ? "<none>" : String.valueOf(task.getId());
@@ -106,7 +107,10 @@ final class CreateShopDeliveryRootCauseSnapshotService {
                 taskQueue =
                     queueTokens == null
                         ? "<null>"
-                        : "size=" + queueTokens.size() + ",contains=" + queueTokens.contains(childToken);
+                        : "size="
+                            + queueTokens.size()
+                            + ",contains="
+                            + queueTokens.contains(childToken);
               } catch (Exception ignored) {
                 taskQueue = "<error>";
               }
