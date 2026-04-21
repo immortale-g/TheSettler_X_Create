@@ -6,7 +6,9 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
+import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Pickup;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -16,6 +18,7 @@ import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.thesettler_x_create.Config;
@@ -27,6 +30,7 @@ import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1029,7 +1033,144 @@ public class BuildingCreateShop extends AbstractBuilding {
    * location.
    */
   private boolean createNativeHutPickupRequest(int pickupPriority) {
-    return createPickupRequest(pickupPriority);
+    int effectivePriority =
+        Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false));
+    return createPickupRequest(effectivePriority);
+  }
+
+  @Override
+  public boolean createPickupRequest(int pickupPriority) {
+    if (!(getColony() != null
+        && getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
+      return super.createPickupRequest(pickupPriority);
+    }
+
+    boolean activePickupRequest = false;
+    java.util.Collection<IToken<?>> openPickupRequests =
+        getOpenRequestsByRequestableType().get(TypeConstants.PICKUP);
+    if (openPickupRequests != null && !openPickupRequests.isEmpty()) {
+      for (IToken<?> token : List.copyOf(openPickupRequests)) {
+        if (token == null) {
+          continue;
+        }
+
+        IRequest<?> request = standard.getRequestForToken(token);
+        if (request == null) {
+          pruneStalePickupRequestToken(token, "missing-request");
+          continue;
+        }
+        if (!(request.getRequest() instanceof Pickup)) {
+          pruneStalePickupRequestToken(token, "unexpected-request-type");
+          continue;
+        }
+
+        RequestState state = request.getState();
+        if (isTerminalRequestState(state)) {
+          if (state == RequestState.CANCELLED) {
+            super.onRequestedRequestCancelled(standard, request);
+          } else {
+            super.onRequestedRequestComplete(standard, request);
+          }
+          if (isDebugRequests()) {
+            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] pickup request cleanup token={} state={} reason=terminal-open-token",
+                token,
+                state);
+          }
+          continue;
+        }
+
+        activePickupRequest = true;
+        repairOpenPickupRequest(standard, token, request, state);
+      }
+    }
+
+    if (activePickupRequest) {
+      return false;
+    }
+    return super.createPickupRequest(pickupPriority);
+  }
+
+  private void repairOpenPickupRequest(
+      IStandardRequestManager manager, IToken<?> token, IRequest<?> request, RequestState state) {
+    IRequestResolver<?> resolver = null;
+    try {
+      resolver = manager.getResolverForRequest(token);
+    } catch (Exception ignored) {
+      // Reassignment path below will repair missing resolver ownership.
+    }
+
+    boolean needsAssignmentKick = state == RequestState.CREATED || state == RequestState.ASSIGNED;
+    boolean invalidResolver = resolver != null && !(resolver instanceof PickupRequestResolver);
+    boolean missingResolver = resolver == null;
+
+    if (!needsAssignmentKick && !invalidResolver && !missingResolver) {
+      return;
+    }
+
+    try {
+      if (state == RequestState.IN_PROGRESS || invalidResolver || missingResolver) {
+        manager.reassignRequest(token, Collections.emptyList());
+      } else {
+        manager.assignRequest(token);
+      }
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] pickup request repair token={} state={} resolver={} action={}",
+            token,
+            state,
+            resolver == null ? "<null>" : resolver.getClass().getSimpleName(),
+            state == RequestState.IN_PROGRESS || invalidResolver || missingResolver
+                ? "reassign"
+                : "assign");
+      }
+    } catch (Exception ex) {
+      if (isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] pickup request repair failed token={} state={} resolver={} error={}",
+            token,
+            state,
+            resolver == null ? "<null>" : resolver.getClass().getSimpleName(),
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
+    }
+  }
+
+  private void pruneStalePickupRequestToken(IToken<?> token, String reason) {
+    if (token == null) {
+      return;
+    }
+    java.util.Collection<IToken<?>> openPickupRequests =
+        getOpenRequestsByRequestableType().get(TypeConstants.PICKUP);
+    if (openPickupRequests != null) {
+      openPickupRequests.remove(token);
+      if (openPickupRequests.isEmpty()) {
+        getOpenRequestsByRequestableType().remove(TypeConstants.PICKUP);
+      }
+    }
+    java.util.Collection<IToken<?>> buildingRequests = getOpenRequestsByCitizen().get(-1);
+    if (buildingRequests != null) {
+      buildingRequests.remove(token);
+      if (buildingRequests.isEmpty()) {
+        getOpenRequestsByCitizen().remove(-1);
+      }
+    }
+    markDirty();
+    if (isDebugRequests()) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] pickup request cleanup token={} reason={}", token, reason);
+    }
+  }
+
+  private static boolean isTerminalRequestState(RequestState state) {
+    if (state == null) {
+      return false;
+    }
+    return state == RequestState.CANCELLED
+        || state == RequestState.COMPLETED
+        || state == RequestState.FAILED
+        || state == RequestState.RECEIVED
+        || state == RequestState.RESOLVED;
   }
 
   private boolean hasActiveLocalDeliveryChildren(IColony colony, CreateShopBlockEntity pickup) {
