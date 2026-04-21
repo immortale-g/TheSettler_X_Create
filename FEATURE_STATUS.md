@@ -387,6 +387,8 @@ Known focus area:
   This allows repeatable command-driven scenario runs without manual UI interaction for each step.
 - Create Shop task-tab now includes local inflight parent requests in addition to the warehouse
   queue list, so active Create Shop inflight work is visible directly in the existing task-tab UI.
+- Project version for this integration line is now `0.2.0` (`gradle.properties` `mod_version`),
+  covering native rack->hut->pickup routing and task-tab inflight visibility updates.
 - Lost-package harness support added in core runtime:
   - `CreateShopBlockEntity` debug inflight tuple inject + oldest tuple peek helpers
   - `BuildingCreateShop` debug wrappers for reorder and simulated handover consumption.
