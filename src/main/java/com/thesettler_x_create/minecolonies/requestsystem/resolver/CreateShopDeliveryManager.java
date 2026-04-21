@@ -311,8 +311,7 @@ final class CreateShopDeliveryManager {
             continue;
           }
           BlockPos resolverPos = deliveryResolver.getLocation().getInDimensionLocation();
-          var building =
-              standard.getColony().getServerBuildingManager().getBuilding(resolverPos);
+          var building = standard.getColony().getServerBuildingManager().getBuilding(resolverPos);
           if (building instanceof BuildingCreateShop) {
             blacklist.add(resolverToken);
           }

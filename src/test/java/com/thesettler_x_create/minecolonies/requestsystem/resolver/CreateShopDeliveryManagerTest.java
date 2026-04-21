@@ -47,7 +47,8 @@ class CreateShopDeliveryManagerTest {
   }
 
   @Test
-  void deliveryCreationPrefersRackPositionAsStartLocationForNormalShopDeliveries() throws Exception {
+  void deliveryCreationPrefersRackPositionAsStartLocationForNormalShopDeliveries()
+      throws Exception {
     String source =
         Files.readString(
             Path.of(
