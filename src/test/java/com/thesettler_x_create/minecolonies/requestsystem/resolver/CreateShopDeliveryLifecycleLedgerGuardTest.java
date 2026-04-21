@@ -17,6 +17,20 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     assertTrue(source.contains("MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL"));
     assertTrue(source.contains("MC_NO_TERMINAL_CALLBACK"));
     assertTrue(source.contains("MC_HANDLER_LOST_TOKEN"));
+    assertTrue(source.contains("COURIER_QUEUE_HANDOFF_REPAIRED"));
+    assertTrue(source.contains("CreateShopDeliveryManager.nudgeDeliverymen(manager, childToken)"));
     assertTrue(source.contains("delivery-child-ledger source="));
+  }
+
+  @Test
+  void rootCauseSnapshotIncludesCourierJobState() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryRootCauseSnapshotService.java"));
+
+    assertTrue(source.contains("getCurrentTask()"));
+    assertTrue(source.contains("getTaskQueue()"));
+    assertTrue(source.contains("taskQueue="));
   }
 }

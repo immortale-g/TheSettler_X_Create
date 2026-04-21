@@ -140,19 +140,19 @@ final class CreateShopChildReconciliationService {
               }
             }
             if (childAssigned == null) {
-              boolean enqueued = deliveryManager.tryEnqueueDelivery(standardManager, childToken);
+              boolean assigned = deliveryManager.assignDeliveryRequest(standardManager, childToken);
+              boolean queued = deliveryManager.isQueuedInWarehouse(standardManager, childToken);
               if (Config.DEBUG_LOGGING.getAsBoolean()) {
                 TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] tickPending: {} child {} unassigned delivery -> enqueue={}",
+                    "[CreateShop] tickPending: {} child {} unassigned delivery -> assign={} queue={}",
                     requestIdLog,
                     childToken,
-                    enqueued ? "ok" : "none");
+                    assigned ? "ok" : "none",
+                    queued ? "present" : "missing");
               }
             }
             resolver.observeDeliveryChildLifecycle(
                 standardManager, level, request.getId(), childToken, child, childAssigned, "poll");
-            maybeReleaseReservationOnCourierPickup(
-                resolver, request, pickup, childToken, childState);
             if (activeLocalDeliveryChild != null && !activeLocalDeliveryChild.equals(childToken)) {
               boolean recovered =
                   deliveryChildRecoveryService.recover(
@@ -279,43 +279,6 @@ final class CreateShopChildReconciliationService {
     }
   }
 
-  private void maybeReleaseReservationOnCourierPickup(
-      CreateShopRequestResolver resolver,
-      IRequest<?> parentRequest,
-      CreateShopBlockEntity pickup,
-      IToken<?> childToken,
-      RequestState childState) {
-    if (resolver == null
-        || parentRequest == null
-        || pickup == null
-        || childToken == null
-        || childState != RequestState.IN_PROGRESS) {
-      return;
-    }
-    CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
-    if (ledger == null) {
-      return;
-    }
-    // Confirm pickup via native courier task tracking; carry snapshot is best-effort telemetry
-    // only.
-    if (ledger.getLastCourierTaskMatchCount() <= 0) {
-      return;
-    }
-    UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentRequest.getId());
-    int reserved = pickup.getReservedForRequest(parentRequestId);
-    if (reserved <= 0) {
-      return;
-    }
-    pickup.release(parentRequestId);
-    if (resolver.isDebugLoggingEnabled()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] reservation release on courier pickup parent={} child={} reservedReleased={}",
-          parentRequest.getId(),
-          childToken,
-          reserved);
-    }
-  }
-
   private boolean tryImmediateMissingAfterPickupRecovery(
       CreateShopRequestResolver resolver,
       IStandardRequestManager standardManager,
@@ -338,6 +301,22 @@ final class CreateShopChildReconciliationService {
     }
     if (!parentRequest.getId().equals(ledger.getParentToken())) {
       return false;
+    }
+    BuildingCreateShop shop = resolver.getShop(standardManager);
+    CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
+    if (pickup != null) {
+      UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentRequest.getId());
+      int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
+      if (reservedForRequest > 0) {
+        if (resolver.isDebugLoggingEnabled()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] tickPending: {} missing child {} held by reservation={} -> no orphan recovery",
+              requestIdLog,
+              childToken,
+              reservedForRequest);
+        }
+        return false;
+      }
     }
     parentRequest.removeChild(childToken);
     resolver.markParentChildCompletedSeen(parentRequest.getId(), level.getGameTime());

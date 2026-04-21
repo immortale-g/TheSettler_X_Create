@@ -1,7 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.google.common.collect.Lists;
-import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
@@ -13,17 +12,19 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.api.util.constant.TypeConstants;
-import com.minecolonies.core.colony.buildings.modules.AbstractAssignedCitizenModule;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
-import com.minecolonies.core.colony.buildings.modules.DeliverymanAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
+import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.minecolonies.requestsystem.requesters.CreateShopDeliveryRequester;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -113,7 +114,7 @@ final class CreateShopDeliveryManager {
             targetLocation,
             selected.copy(),
             AbstractDeliverymanRequestable.getDefaultDeliveryPriority(true));
-    IRequester deliveryRequester = resolveDeliveryRequester(manager, request);
+    IRequester deliveryRequester = resolveDeliveryRequester(manager, request, pickupLocation);
     IToken<?> token;
     try {
       token = manager.createRequest(deliveryRequester, delivery);
@@ -219,12 +220,14 @@ final class CreateShopDeliveryManager {
         }
       }
     }
-    boolean enqueued = tryEnqueueDelivery(manager, token);
+    boolean assigned = assignDeliveryRequest(manager, token);
+    boolean queued = isQueuedInWarehouse(manager, token);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery native dispatch token={} viaWarehouseQueue={}",
+          "[CreateShop] delivery native dispatch token={} assign={} warehouseQueue={}",
           token,
-          enqueued ? "ok" : "none");
+          assigned ? "ok" : "none",
+          queued ? "present" : "missing");
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       IDeliverable deliverable = request.getRequest() instanceof IDeliverable typed ? typed : null;
@@ -260,16 +263,76 @@ final class CreateShopDeliveryManager {
         // Best-effort diagnostics only.
       }
     }
-    notifyDeliverymen(manager, token);
+    nudgeDeliverymen(manager, token);
     return Lists.newArrayList(token);
   }
 
-  private IRequester resolveDeliveryRequester(IRequestManager manager, IRequest<?> parentRequest) {
+  boolean assignDeliveryRequest(IRequestManager manager, IToken<?> token) {
+    if (manager == null || token == null) {
+      return false;
+    }
+    try {
+      if (manager instanceof IStandardRequestManager standard) {
+        IRequest<?> request = standard.getRequestHandler().getRequestOrNull(token);
+        Collection<IToken<?>> blacklist = getCreateShopDeliveryResolverBlacklist(standard);
+        if (request != null && !blacklist.isEmpty()) {
+          return standard.getRequestHandler().assignRequest(request, blacklist) != null;
+        }
+      }
+      manager.assignRequest(token);
+      return true;
+    } catch (Exception ex) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery assign immediate token={} result=failed error={}",
+            token,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
+      return false;
+    }
+  }
+
+  private Collection<IToken<?>> getCreateShopDeliveryResolverBlacklist(
+      IStandardRequestManager standard) {
+    java.util.List<IToken<?>> blacklist = new java.util.ArrayList<>();
+    try {
+      var typeStore = standard.getRequestableTypeRequestResolverAssignmentDataStore();
+      var assignments = typeStore == null ? null : typeStore.getAssignments();
+      var requestableResolvers =
+          assignments == null ? null : assignments.get(TypeConstants.REQUESTABLE);
+      if (requestableResolvers == null) {
+        return blacklist;
+      }
+      for (IToken<?> resolverToken : requestableResolvers) {
+        try {
+          var candidate = standard.getResolverHandler().getResolver(resolverToken);
+          if (!(candidate instanceof DeliveryRequestResolver deliveryResolver)
+              || deliveryResolver.getLocation() == null) {
+            continue;
+          }
+          BlockPos resolverPos = deliveryResolver.getLocation().getInDimensionLocation();
+          var building =
+              standard.getColony().getServerBuildingManager().getBuilding(resolverPos);
+          if (building instanceof BuildingCreateShop) {
+            blacklist.add(resolverToken);
+          }
+        } catch (Exception ignored) {
+          // Ignore stale resolver ids.
+        }
+      }
+    } catch (Exception ignored) {
+      // Best effort.
+    }
+    return blacklist;
+  }
+
+  private IRequester resolveDeliveryRequester(
+      IRequestManager manager, IRequest<?> parentRequest, ILocation sourceLocation) {
     if (manager instanceof IStandardRequestManager standard) {
       try {
         var owner = standard.getResolverHandler().getResolverForRequest(parentRequest);
         if (isWarehouseDeliveryResolver(owner) && owner instanceof IRequester requester) {
-          return requester;
+          return new CreateShopDeliveryRequester(requester, sourceLocation);
         }
       } catch (Exception ignored) {
         // Best effort.
@@ -285,7 +348,7 @@ final class CreateShopDeliveryManager {
               var candidate = standard.getResolverHandler().getResolver(resolverToken);
               if (isWarehouseDeliveryResolver(candidate)
                   && candidate instanceof IRequester requester) {
-                return requester;
+                return new CreateShopDeliveryRequester(requester, sourceLocation);
               }
             } catch (Exception ignored) {
               // Ignore stale resolver ids.
@@ -387,7 +450,7 @@ final class CreateShopDeliveryManager {
         targetBlock);
   }
 
-  boolean tryEnqueueDelivery(IRequestManager manager, IToken<?> token) {
+  boolean isQueuedInWarehouse(IRequestManager manager, IToken<?> token) {
     if (manager == null || token == null) {
       return false;
     }
@@ -396,26 +459,14 @@ final class CreateShopDeliveryManager {
       return false;
     }
     int warehousesChecked = 0;
-    int warehousesWithCouriers = 0;
     int warehousesWithQueue = 0;
     for (var entry : buildingManager.getBuildings().entrySet()) {
       if (entry.getValue() instanceof BuildingCreateShop) {
-        // The shop is IRequester/IWareHouse for MineColonies integration, but must never be used as
-        // a deliveryman source.
-        continue;
-      }
-      if (!(entry.getValue() instanceof IWareHouse warehouse)) {
         continue;
       }
       warehousesChecked++;
-      CourierAssignmentModule couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
-      int courierCount = couriers == null ? 0 : couriers.getAssignedCitizen().size();
-      if (courierCount <= 0) {
-        continue;
-      }
-      warehousesWithCouriers++;
       WarehouseRequestQueueModule queue =
-          warehouse.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
+          entry.getValue().getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
       if (queue == null) {
         continue;
       }
@@ -423,56 +474,36 @@ final class CreateShopDeliveryManager {
       if (queue.getMutableRequestList().contains(token)) {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery enqueue token={} warehouse=<known> couriers={} queued=already",
-              token,
-              courierCount);
+              "[CreateShop] delivery warehouse queue token={} queued=present", token);
         }
         return true;
       }
-      queue.addRequest(token);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        String warehouseInfo = "<unknown>";
-        try {
-          var getLocation = warehouse.getClass().getMethod("getLocation");
-          Object location = getLocation.invoke(warehouse);
-          if (location != null) {
-            warehouseInfo = location.toString();
-          }
-        } catch (Exception ignored) {
-          // Ignore reflection failures.
-        }
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery enqueue token={} warehouse={} couriers={} queued=true",
-            token,
-            warehouseInfo,
-            courierCount);
-      }
-      return true;
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery enqueue token={} queued=false warehousesChecked={} withCouriers={} withQueue={}",
+          "[CreateShop] delivery warehouse queue token={} queued=missing buildingsChecked={} withQueue={}",
           token,
           warehousesChecked,
-          warehousesWithCouriers,
           warehousesWithQueue);
     }
     return false;
   }
 
-  private int notifyDeliverymen(IRequestManager manager, IToken<?> token) {
+  static int nudgeDeliverymen(IRequestManager manager, IToken<?> token) {
     if (manager == null || token == null) {
       return 0;
     }
-    int notified = 0;
+    int alreadyQueued = 0;
     int checked = 0;
+    int kicked = 0;
+    int warehousesWithToken = 0;
     var colony = manager.getColony();
     if (colony == null) {
-      return notified;
+      return 0;
     }
     var buildingManager = colony.getServerBuildingManager();
     if (buildingManager == null) {
-      return notified;
+      return 0;
     }
     for (var entry : buildingManager.getBuildings().entrySet()) {
       var building = entry.getValue();
@@ -483,36 +514,70 @@ final class CreateShopDeliveryManager {
         // Never treat the Create Shop worker as courier.
         continue;
       }
+      WarehouseRequestQueueModule queue =
+          building.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
+      if (queue == null
+          || queue.getMutableRequestList() == null
+          || !queue.getMutableRequestList().contains(token)) {
+        continue;
+      }
+      warehousesWithToken++;
       CourierAssignmentModule warehouseCouriers =
           building.getModule(BuildingModules.WAREHOUSE_COURIERS);
-      if (warehouseCouriers != null) {
-        int count = notifyCourierModule(warehouseCouriers, token);
-        checked += count;
-        notified += count;
+      if (warehouseCouriers == null || warehouseCouriers.getAssignedCitizen() == null) {
+        continue;
       }
-      DeliverymanAssignmentModule deliverymanModule =
-          building.getModule(BuildingModules.COURIER_WORK);
-      if (deliverymanModule != null) {
-        int count = notifyCourierModule(deliverymanModule, token);
-        checked += count;
-        notified += count;
+      for (var citizen : warehouseCouriers.getAssignedCitizen()) {
+        if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
+          continue;
+        }
+        checked++;
+        if (job.getTaskQueue() != null && job.getTaskQueue().contains(token)) {
+          alreadyQueued++;
+          continue;
+        }
+
+        IRequest<?> currentTask;
+        try {
+          currentTask = job.getCurrentTask();
+        } catch (Exception ignored) {
+          currentTask = null;
+        }
+        if (job.getTaskQueue() != null && job.getTaskQueue().contains(token)) {
+          alreadyQueued++;
+          continue;
+        }
+        if (currentTask != null || !queue.getMutableRequestList().contains(token)) {
+          continue;
+        }
+
+        try {
+          job.addRequest(token, 0);
+          while (queue.getMutableRequestList().remove(token)) {
+            // Mirror MineColonies' native handoff: a courier-owned task leaves the warehouse queue.
+          }
+          queue.markDirty();
+          kicked++;
+        } catch (Exception e) {
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] delivery courier handoff failed token={} citizen={}",
+                token,
+                citizen.getId(),
+                e);
+          }
+        }
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery notify couriers token={} checked={} notified={}",
+          "[CreateShop] delivery nudge couriers token={} warehousesWithToken={} checked={} alreadyQueued={} kicked={}",
           token,
+          warehousesWithToken,
           checked,
-          notified);
+          alreadyQueued,
+          kicked);
     }
-    return notified;
-  }
-
-  private int notifyCourierModule(AbstractAssignedCitizenModule module, IToken<?> token) {
-    if (module == null) {
-      return 0;
-    }
-    var citizens = module.getAssignedCitizen();
-    return citizens == null ? 0 : citizens.size();
+    return alreadyQueued + kicked;
   }
 }

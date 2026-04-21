@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableCollection;
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
@@ -51,7 +50,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 
 /** Create Shop building integration with MineColonies request system and Create network. */
-public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
+public class BuildingCreateShop extends AbstractBuilding {
   public static final String SCHEMATIC_NAME = "createshop";
   private static final long HOUSEKEEPING_TRANSFER_INTERVAL = 20L * 3L;
   private static final long HOUSEKEEPING_DEBUG_COOLDOWN = 20L * 5L;
@@ -125,7 +124,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return 2;
   }
 
-  @Override
   public boolean canAccessWareHouse(ICitizenData citizen) {
     boolean result =
         citizen != null
@@ -233,7 +231,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     return isBuilt() && getBuildingLevel() >= Config.PERMA_MIN_BUILDING_LEVEL.getAsInt();
   }
 
-  @Override
   public boolean hasContainerPosition(BlockPos pos) {
     return containerList.contains(pos) || getLocation().getInDimensionLocation().equals(pos);
   }
@@ -354,7 +351,10 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
   @Override
   public void onDestroyed() {
     super.onDestroyed();
-    getColony().getServerBuildingManager().removeWareHouse(this);
+    var manager = getColony() == null ? null : getColony().getServerBuildingManager();
+    if (manager != null && manager.getWareHouses() != null) {
+      manager.getWareHouses().remove(this);
+    }
     warehouseRegistered = false;
   }
 
@@ -381,7 +381,6 @@ public class BuildingCreateShop extends AbstractBuilding implements IWareHouse {
     super.registerBlockPosition(block, pos, world);
   }
 
-  @Override
   public void upgradeContainers(Level level) {
     // No storage upgrades for the Create Shop yet.
   }

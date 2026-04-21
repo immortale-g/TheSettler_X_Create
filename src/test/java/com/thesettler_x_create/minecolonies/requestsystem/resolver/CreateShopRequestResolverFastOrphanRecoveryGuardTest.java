@@ -17,5 +17,7 @@ class CreateShopRequestResolverFastOrphanRecoveryGuardTest {
     assertTrue(source.contains("tryFastOrphanPickedUpRecovery(resolver, manager, request)"));
     assertTrue(source.contains("fast-orphan-pickedup-recovery"));
     assertTrue(source.contains("fast orphan picked-up recovery parent={} child={} -> resolved"));
+    assertTrue(source.contains("pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(request.getId()))"));
+    assertTrue(source.contains("fast orphan picked-up recovery skipped parent={} reservationHeld={}"));
   }
 }
