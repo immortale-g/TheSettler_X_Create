@@ -334,6 +334,10 @@ Current behavior:
   when local counters diverge from request graph state.
 - Rehydrate now expands from assignment tokens to active runtime child/parent lifecycle tokens and
   prunes orphan child entries, improving reload recovery for persisted/inflight request graphs.
+- Delivery-complete callbacks now close the original parent request when the Create Shop-created
+  delivery child is terminal and no pending remainder or active children remain. Terminal child
+  links are detached first, then the parent is marked `RESOLVED`, preventing successfully delivered
+  Postbox orders from remaining open when MineColonies finalizes only the child delivery request.
 
 Known focus area:
 - Live-world validation for long-running colonies under resolver-token drift and worker status churn.
@@ -387,6 +391,12 @@ Known focus area:
   This allows repeatable command-driven scenario runs without manual UI interaction for each step.
 - Create Shop task-tab now includes local inflight parent requests in addition to the warehouse
   queue list, so active Create Shop inflight work is visible directly in the existing task-tab UI.
+- Create Shop delivery children now use a serializable requester wrapper that delegates to the
+  native warehouse requester while exposing the Create Shop source location and routing completion/
+  cancellation callbacks back to the local resolver.
+- Delivery-child diagnostics and reservation handling have expanded guard coverage for requester
+  binding, queue-only dispatch, notify accounting, local reservation holds, and completion-ledger
+  evidence during live delivery recovery.
 - Project version for this integration line is now `0.2.0` (`gradle.properties` `mod_version`),
   covering native rack->hut->pickup routing and task-tab inflight visibility updates.
 - Lost-package harness support added in core runtime:

@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
@@ -147,7 +148,14 @@ final class CreateShopDeliveryCompletionService {
         parentRequest != null
             && !CreateShopRequestResolver.isTerminalRequestState(parentRequest.getState());
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
-    if (parentStillNonTerminal) {
+    boolean parentResolvedByDelivery =
+        parentStillNonTerminal
+            && pending <= 0
+            && completeParentAfterDeliveredChild(
+                resolver, standard, manager, parentRequest, parentToken, childToken);
+    if (parentResolvedByDelivery) {
+      requestStateMutatorService.clearPendingTokenState(resolver, standard, parentToken, true);
+    } else if (parentStillNonTerminal) {
       int heldPending = Math.max(1, pending);
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, parentToken, heldPending);
@@ -188,5 +196,83 @@ final class CreateShopDeliveryCompletionService {
         }
       }
     }
+  }
+
+  private boolean completeParentAfterDeliveredChild(
+      CreateShopRequestResolver resolver,
+      IStandardRequestManager standard,
+      IRequestManager manager,
+      IRequest<?> parentRequest,
+      IToken<?> parentToken,
+      IToken<?> childToken) {
+    if (resolver == null || standard == null || parentRequest == null || parentToken == null) {
+      return false;
+    }
+    detachCompletedChild(standard, parentRequest, childToken);
+    if (hasActiveNonTerminalChild(standard, parentRequest)) {
+      return false;
+    }
+    try {
+      standard.updateRequestState(parentToken, RequestState.RESOLVED);
+      resolver.transitionFlow(
+          manager,
+          parentRequest,
+          CreateShopFlowState.REQUEST_COMPLETED,
+          "delivery-complete:parent-resolved",
+          "",
+          0,
+          "com.thesettler_x_create.message.createshop.flow_request_completed");
+      resolver.releaseReservation(manager, parentRequest);
+      if (resolver.isDebugLoggingEnabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery complete resolved parent={} child={}", parentToken, childToken);
+      }
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private void detachCompletedChild(
+      IStandardRequestManager standard, IRequest<?> parentRequest, IToken<?> childToken) {
+    if (standard == null || parentRequest == null || childToken == null) {
+      return;
+    }
+    try {
+      IRequest<?> child = standard.getRequestHandler().getRequestOrNull(childToken);
+      if (child != null && CreateShopRequestResolver.isTerminalRequestState(child.getState())) {
+        parentRequest.removeChild(childToken);
+        child.setParent(null);
+      }
+    } catch (Exception ignored) {
+      // Best effort: parent resolution below still checks for active children.
+    }
+  }
+
+  private boolean hasActiveNonTerminalChild(
+      IStandardRequestManager standard, IRequest<?> parentRequest) {
+    if (standard == null || parentRequest == null || !parentRequest.hasChildren()) {
+      return false;
+    }
+    for (IToken<?> childToken : java.util.List.copyOf(parentRequest.getChildren())) {
+      if (childToken == null) {
+        continue;
+      }
+      try {
+        IRequest<?> child = standard.getRequestHandler().getRequestOrNull(childToken);
+        if (child == null) {
+          return true;
+        }
+        if (CreateShopRequestResolver.isTerminalRequestState(child.getState())) {
+          parentRequest.removeChild(childToken);
+          child.setParent(null);
+          continue;
+        }
+        return true;
+      } catch (Exception ignored) {
+        return true;
+      }
+    }
+    return false;
   }
 }

@@ -719,6 +719,21 @@ Implementation notes:
   view wiring with a custom task module/view pair that serializes additional local inflight parent
   request tokens (owned by the local Create Shop resolver) and merges them with queue tasks in the
   existing MineColonies task-tab UI without introducing parallel request storage.
+- Create Shop delivery requester binding on branch `feature/task-tab-inflight-visibility`
+  (2026-03-30) is authored in this project scope: Create Shop-sourced delivery children use a
+  serializable requester wrapper that keeps the native warehouse requester delegate while exposing
+  the Create Shop source location and routing delivery complete/cancel callbacks back through the
+  local resolver.
+- Delivery reservation/diagnostic hardening on branch `feature/task-tab-inflight-visibility`
+  (2026-03-30) is authored in this project scope: local delivery completion keeps reservation
+  consumption tied to terminal child delivery evidence, expands ledger/root-cause diagnostics, and
+  adds guard coverage for queue-only dispatch, requester binding, notify counts, and reservation
+  holds.
 - Versioning update on branch `feature/task-tab-inflight-visibility` (2026-03-30) is authored in
   this project scope: build metadata in `gradle.properties` was bumped from `0.1.0` to `0.2.0` as
   part of the task-tab inflight visibility + native pickup integration release line.
+- Postbox parent completion hardening (2026-04-25) is authored in this project scope: when a
+  Create Shop-created delivery child completes and no pending remainder or active child request
+  remains, `CreateShopDeliveryCompletionService` now detaches terminal delivery children and marks
+  the original parent request `RESOLVED`, preserving the native request graph while preventing
+  delivered Postbox requests from staying open when MineColonies only finalizes the delivery child.
