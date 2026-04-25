@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.Test;
@@ -42,5 +44,18 @@ class CreateShopDeliveryManagerTest {
     assertFalse(
         CreateShopDeliveryManager.isSelfLoopDeliveryTarget(pickupLevel, null, targetLocation));
     assertFalse(CreateShopDeliveryManager.isSelfLoopDeliveryTarget(pickupLevel, startPos, null));
+  }
+
+  @Test
+  void deliveryCreationPrefersRackPositionAsStartLocationForNormalShopDeliveries()
+      throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryManager.java"));
+
+    assertTrue(source.contains("BlockPos startPos = pickup.getBlockPos();"));
+    assertTrue(source.contains("if (entry.getB() != null) {"));
+    assertTrue(source.contains("startPos = entry.getB();"));
   }
 }

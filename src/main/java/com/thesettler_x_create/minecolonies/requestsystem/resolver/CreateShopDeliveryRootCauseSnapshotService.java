@@ -92,6 +92,29 @@ final class CreateShopDeliveryRootCauseSnapshotService {
             String name = citizen.getName() == null ? "<unknown>" : citizen.getName();
             String job =
                 citizen.getJob() == null ? "<none>" : citizen.getJob().getClass().getSimpleName();
+            String currentTask = "<none>";
+            String taskQueue = "<na>";
+            if (citizen.getJob()
+                instanceof com.minecolonies.core.colony.jobs.JobDeliveryman jobDeliveryman) {
+              try {
+                IRequest<?> task = jobDeliveryman.getCurrentTask();
+                currentTask = task == null ? "<none>" : String.valueOf(task.getId());
+              } catch (Exception ignored) {
+                currentTask = "<error>";
+              }
+              try {
+                var queueTokens = jobDeliveryman.getTaskQueue();
+                taskQueue =
+                    queueTokens == null
+                        ? "<null>"
+                        : "size="
+                            + queueTokens.size()
+                            + ",contains="
+                            + queueTokens.contains(childToken);
+              } catch (Exception ignored) {
+                taskQueue = "<error>";
+              }
+            }
             Object id;
             Object uuid;
             try {
@@ -114,6 +137,10 @@ final class CreateShopDeliveryRootCauseSnapshotService {
                     + job
                     + ",deliveryman="
                     + (citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman)
+                    + ",currentTask="
+                    + currentTask
+                    + ",taskQueue="
+                    + taskQueue
                     + "}");
           }
         }

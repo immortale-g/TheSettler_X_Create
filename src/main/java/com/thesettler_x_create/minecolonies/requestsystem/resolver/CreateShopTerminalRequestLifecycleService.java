@@ -8,6 +8,8 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.Collection;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
@@ -325,6 +327,21 @@ final class CreateShopTerminalRequestLifecycleService {
     var orphanChild = resolver.findPickedUpOrphanChildForParent(request.getId());
     if (orphanChild == null) {
       return false;
+    }
+    BuildingCreateShop shop = resolver.getShop(manager);
+    CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
+    if (pickup != null) {
+      int reservedForRequest =
+          pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(request.getId()));
+      if (reservedForRequest > 0) {
+        if (isDebugLoggingEnabledSafe()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] fast orphan picked-up recovery skipped parent={} reservationHeld={}",
+              request.getId(),
+              reservedForRequest);
+        }
+        return false;
+      }
     }
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
     long nowTick = level == null ? 0L : level.getGameTime();

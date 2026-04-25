@@ -113,7 +113,7 @@ final class CreateShopRequestValidator {
       return false;
     }
 
-    UUID requestId = resolver.toRequestId(request.getId());
+    UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);

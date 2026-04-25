@@ -85,6 +85,25 @@ final class CreateShopDeliveryLifecycleLedgerService {
       }
     }
     if (state == RequestState.IN_PROGRESS
+        && snapshot.queueContains()
+        && snapshot.courierCount() > 0
+        && snapshot.courierTaskMatchCount() <= 0) {
+      int nudged = CreateShopDeliveryManager.nudgeDeliverymen(manager, childToken);
+      if (nudged > 0) {
+        entry.setDiagnosisCode("COURIER_QUEUE_HANDOFF_PENDING");
+        entry.setDiagnosisDetail("warehouse queue handoff pending couriers=" + nudged);
+        snapshot =
+            inspectWarehouseSnapshot(
+                manager, childToken, deliveryStack, deliveryStart, deliveryTarget);
+        entry.setLastQueueContains(snapshot.queueContains());
+        entry.setLastCourierCount(snapshot.courierCount());
+        entry.setLastCourierTaskMatchCount(snapshot.courierTaskMatchCount());
+        entry.setLastCourierCarryMatchCount(snapshot.courierCarryMatchCount());
+        entry.setLastCourierAtSourceMatchCount(snapshot.courierAtSourceMatchCount());
+        entry.setLastCourierAtTargetMatchCount(snapshot.courierAtTargetMatchCount());
+      }
+    }
+    if (state == RequestState.IN_PROGRESS
         && !snapshot.queueContains()
         && snapshot.courierTaskMatchCount() > 0
         && snapshot.courierAtTargetMatchCount() > 0) {
