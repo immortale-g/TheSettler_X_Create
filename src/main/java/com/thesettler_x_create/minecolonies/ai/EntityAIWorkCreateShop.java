@@ -12,6 +12,7 @@ import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 
 public class EntityAIWorkCreateShop
     extends AbstractEntityAIInteract<JobCreateShop, BuildingCreateShop> {
+  @SuppressWarnings("unchecked")
   public EntityAIWorkCreateShop(JobCreateShop job) {
     super(job);
     registerTargets(

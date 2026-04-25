@@ -3,6 +3,8 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.request.RequestState;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
@@ -23,6 +25,8 @@ final class CreateShopDeliveryCompletionService {
   private final CreateShopDeliveryManager deliveryManager;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopResolverRecheck recheck;
+  private final CreateShopOutstandingNeededService outstandingNeededService =
+      new CreateShopOutstandingNeededService();
 
   CreateShopDeliveryCompletionService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
@@ -147,7 +151,13 @@ final class CreateShopDeliveryCompletionService {
         parentRequest != null
             && !CreateShopRequestResolver.isTerminalRequestState(parentRequest.getState());
     int pending = resolver.getPendingTracker().getPendingCount(parentToken);
-    if (parentStillNonTerminal) {
+    boolean parentResolvedByDelivery =
+        parentStillNonTerminal
+            && completeParentAfterDeliveredChild(
+                resolver, standard, manager, parentRequest, parentToken, childToken, pending);
+    if (parentResolvedByDelivery) {
+      requestStateMutatorService.clearPendingTokenState(resolver, standard, parentToken, true);
+    } else if (parentStillNonTerminal) {
       int heldPending = Math.max(1, pending);
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, parentToken, heldPending);
@@ -188,5 +198,110 @@ final class CreateShopDeliveryCompletionService {
         }
       }
     }
+  }
+
+  private boolean completeParentAfterDeliveredChild(
+      CreateShopRequestResolver resolver,
+      IStandardRequestManager standard,
+      IRequestManager manager,
+      IRequest<?> parentRequest,
+      IToken<?> parentToken,
+      IToken<?> childToken,
+      int trackedPending) {
+    if (resolver == null || standard == null || parentRequest == null || parentToken == null) {
+      return false;
+    }
+    detachCompletedChild(standard, parentRequest, childToken);
+    if (hasActiveNonTerminalChild(standard, parentRequest)) {
+      return false;
+    }
+    int outstanding = computeOutstandingAfterDelivery(resolver, manager, parentRequest, parentToken);
+    if (Math.max(0, Math.max(trackedPending, outstanding)) > 0) {
+      return false;
+    }
+    try {
+      standard.updateRequestState(parentToken, RequestState.RESOLVED);
+      resolver.transitionFlow(
+          manager,
+          parentRequest,
+          CreateShopFlowState.REQUEST_COMPLETED,
+          "delivery-complete:parent-resolved",
+          "",
+          0,
+          "com.thesettler_x_create.message.createshop.flow_request_completed");
+      resolver.releaseReservation(manager, parentRequest);
+      if (resolver.isDebugLoggingEnabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] delivery complete resolved parent={} child={}", parentToken, childToken);
+      }
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private int computeOutstandingAfterDelivery(
+      CreateShopRequestResolver resolver,
+      IRequestManager manager,
+      IRequest<?> parentRequest,
+      IToken<?> parentToken) {
+    if (parentRequest == null || !(parentRequest.getRequest() instanceof IDeliverable deliverable)) {
+      return 0;
+    }
+    int reservedForRequest = 0;
+    try {
+      BuildingCreateShop shop = resolver.getShop(manager);
+      CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
+      if (pickup != null) {
+        reservedForRequest =
+            pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(parentToken));
+      }
+    } catch (Exception ignored) {
+      reservedForRequest = 0;
+    }
+    return outstandingNeededService.compute(parentRequest, deliverable, reservedForRequest);
+  }
+
+  private void detachCompletedChild(
+      IStandardRequestManager standard, IRequest<?> parentRequest, IToken<?> childToken) {
+    if (standard == null || parentRequest == null || childToken == null) {
+      return;
+    }
+    try {
+      IRequest<?> child = standard.getRequestHandler().getRequestOrNull(childToken);
+      if (child != null && CreateShopRequestResolver.isTerminalRequestState(child.getState())) {
+        parentRequest.removeChild(childToken);
+        child.setParent(null);
+      }
+    } catch (Exception ignored) {
+      // Best effort: parent resolution below still checks for active children.
+    }
+  }
+
+  private boolean hasActiveNonTerminalChild(
+      IStandardRequestManager standard, IRequest<?> parentRequest) {
+    if (standard == null || parentRequest == null || !parentRequest.hasChildren()) {
+      return false;
+    }
+    for (IToken<?> childToken : java.util.List.copyOf(parentRequest.getChildren())) {
+      if (childToken == null) {
+        continue;
+      }
+      try {
+        IRequest<?> child = standard.getRequestHandler().getRequestOrNull(childToken);
+        if (child == null) {
+          return true;
+        }
+        if (CreateShopRequestResolver.isTerminalRequestState(child.getState())) {
+          parentRequest.removeChild(childToken);
+          child.setParent(null);
+          continue;
+        }
+        return true;
+      } catch (Exception ignored) {
+        return true;
+      }
+    }
+    return false;
   }
 }

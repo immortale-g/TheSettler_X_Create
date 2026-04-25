@@ -8,14 +8,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 public class CreateShopOutputModuleWindow extends AbstractModuleWindow<CreateShopOutputModuleView> {
-  private final CreateShopOutputModuleView moduleView;
-
   public CreateShopOutputModuleWindow(CreateShopOutputModuleView moduleView) {
     super(
         moduleView,
         ResourceLocation.fromNamespaceAndPath(
             TheSettlerXCreate.MODID, "gui/layouthuts/layoutcreateshop_output.xml"));
-    this.moduleView = moduleView;
 
     Text desc = findPaneOfTypeByID("desc", Text.class);
     if (desc != null) {

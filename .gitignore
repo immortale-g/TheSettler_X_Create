@@ -12,10 +12,12 @@ out
 *.iws
 *.iml
 .idea
+.vscode/
 
 # gradle
 build
 .gradle
+.gradle-user-home/
 
 # other
 eclipse
@@ -35,3 +37,4 @@ Backups/*.zip
 libs/
 FEATURE_STATUS.md
 PROJECT_TODO_LOCAL.md
+AGENTS.md

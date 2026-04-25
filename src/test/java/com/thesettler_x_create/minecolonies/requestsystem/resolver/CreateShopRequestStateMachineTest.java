@@ -72,8 +72,9 @@ class CreateShopRequestStateMachineTest {
     assertTrue(stateMachine.hasNonTerminalWork());
   }
 
+  @SuppressWarnings("unchecked")
   private IToken<?> token(String id) {
-    IToken<?> token = mock(IToken.class);
+    IToken<String> token = (IToken<String>) mock(IToken.class);
     when(token.getIdentifier()).thenReturn(id);
     when(token.toString()).thenReturn("token:" + id);
     return token;

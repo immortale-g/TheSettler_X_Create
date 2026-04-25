@@ -137,8 +137,9 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
     return (boolean) method.invoke(lifecycleService, args);
   }
 
+  @SuppressWarnings("unchecked")
   private IToken<?> token(UUID id) {
-    IToken<?> token = mock(IToken.class);
+    IToken<UUID> token = (IToken<UUID>) mock(IToken.class);
     when(token.getIdentifier()).thenReturn(id);
     when(token.toString()).thenReturn("token:" + id);
     return token;

@@ -48,6 +48,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
   }
 
   @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
   void recoverySkipsMutationWhenParentOwnershipDriftsAway() throws Exception {
     IToken<?> parentToken = token(UUID.randomUUID());
     IToken<?> childToken = token(UUID.randomUUID());
@@ -73,6 +74,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
   }
 
   @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
   void requestedCompleteCleansParentTrackingAndPendingState() throws Exception {
     IToken<?> parentToken = token(UUID.randomUUID());
     IToken<?> childToken = token(UUID.randomUUID());
@@ -91,7 +93,6 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     when(childRequest.getParent()).thenReturn(parentToken);
     when(manager.getRequestHandler().getRequest(childToken)).thenReturn((IRequest) childRequest);
 
-    @SuppressWarnings("unchecked")
     IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(parentRequest.getId()).thenReturn(parentToken);
     when(parentRequest.getRequest()).thenReturn(mock(IDeliverable.class));
@@ -165,8 +166,9 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
+  @SuppressWarnings("unchecked")
   private IToken<?> token(UUID id) {
-    IToken<?> token = mock(IToken.class);
+    IToken<UUID> token = (IToken<UUID>) mock(IToken.class);
     when(token.getIdentifier()).thenReturn(id);
     when(token.toString()).thenReturn("token:" + id);
     return token;

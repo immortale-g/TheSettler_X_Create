@@ -14,6 +14,7 @@ class TileEntityCreateShopHousekeepingGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/tileentity/TileEntityCreateShop.java"));
     assertTrue(source.contains("hasUnreservedRackItems("));
+    assertTrue(source.contains("hasHutInventoryItems("));
     assertTrue(source.contains("moveUnreservedRackStacksToHut("));
     assertTrue(source.contains("collectRackBudgets("));
     assertTrue(source.contains("simulateInsertCount("));

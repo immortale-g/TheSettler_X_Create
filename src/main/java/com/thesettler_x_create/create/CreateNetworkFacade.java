@@ -101,7 +101,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     if (stack == null || stack.isEmpty() || amount <= 0) {
       return ItemStack.EMPTY;
     }
-    // TODO: Replace with Create API call that removes items from the network.
+    // This facade only previews extractable stock; actual movement is requested via
+    // LogisticsManager.broadcastPackageRequest in requestStacks.
     int available = getAvailable(stack);
     int toExtract = Math.min(amount, available);
     if (toExtract <= 0) {

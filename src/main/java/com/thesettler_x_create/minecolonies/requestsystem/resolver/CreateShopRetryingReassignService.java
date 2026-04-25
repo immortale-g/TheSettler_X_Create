@@ -62,7 +62,7 @@ final class CreateShopRetryingReassignService {
           continue;
         }
         if (request == null
-            || !(request.getRequest() instanceof IDeliverable deliverable)
+            || !(request.getRequest() instanceof IDeliverable)
             || request.getState()
                 == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
           continue;

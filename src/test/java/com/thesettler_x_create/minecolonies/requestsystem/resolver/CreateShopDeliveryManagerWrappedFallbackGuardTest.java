@@ -8,15 +8,16 @@ import org.junit.jupiter.api.Test;
 
 class CreateShopDeliveryManagerWrappedFallbackGuardTest {
   @Test
-  void wrappedManagerPathEnqueuesWhenNoResolverAssigned() throws Exception {
+  void wrappedManagerPathUsesNativeAssignmentWhenNoResolverAssigned() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryManager.java"));
 
-    assertTrue(source.contains("delivery native dispatch token={} viaWarehouseQueue={}"));
-    assertTrue(source.contains("resolveDeliveryRequester(manager, request)"));
+    assertTrue(source.contains("delivery native dispatch token={} assign={} warehouseQueue={}"));
+    assertTrue(source.contains("resolveDeliveryRequester(manager, request, pickupLocation)"));
     assertTrue(source.contains("manager.createRequest(deliveryRequester, delivery)"));
-    assertTrue(source.contains("tryEnqueueDelivery(manager, token)"));
+    assertTrue(source.contains("assignDeliveryRequest(manager, token)"));
+    assertTrue(source.contains("isQueuedInWarehouse(manager, token)"));
   }
 }

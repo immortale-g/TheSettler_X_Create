@@ -536,7 +536,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     lifecycleStateStore.getParentChildCompletedSeenAt().put(parentToken, tick);
   }
 
-  boolean hasParentChildCompletedSeen(IToken<?> parentToken) {
+  public boolean hasParentChildCompletedSeen(IToken<?> parentToken) {
     return parentToken != null
         && lifecycleStateStore.getParentChildCompletedSeenAt().containsKey(parentToken);
   }
