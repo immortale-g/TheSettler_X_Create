@@ -1054,7 +1054,13 @@ public class BuildingCreateShop extends AbstractBuilding {
           continue;
         }
 
-        IRequest<?> request = standard.getRequestForToken(token);
+        IRequest<?> request;
+        try {
+          request = standard.getRequestForToken(token);
+        } catch (Exception ignored) {
+          pruneStalePickupRequestToken(token, "lookup-failed");
+          continue;
+        }
         if (request == null) {
           pruneStalePickupRequestToken(token, "missing-request");
           continue;

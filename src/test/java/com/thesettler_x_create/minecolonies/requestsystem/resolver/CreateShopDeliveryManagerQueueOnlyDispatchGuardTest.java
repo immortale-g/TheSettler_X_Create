@@ -18,8 +18,8 @@ class CreateShopDeliveryManagerQueueOnlyDispatchGuardTest {
     assertTrue(source.contains("assignDeliveryRequest(manager, token);"));
     assertTrue(source.contains("isQueuedInWarehouse(manager, token);"));
     assertFalse(source.contains("queue.addRequest(token)"));
-    assertTrue(source.contains("job.addRequest(token, 0);"));
-    assertTrue(source.contains("queue.getMutableRequestList().remove(token)"));
+    assertFalse(source.contains("job.addRequest(token, 0);"));
+    assertFalse(source.contains("queue.getMutableRequestList().remove(token)"));
     assertFalse(source.contains("shop.getModule(BuildingModules.WAREHOUSE_COURIERS)"));
   }
 }
