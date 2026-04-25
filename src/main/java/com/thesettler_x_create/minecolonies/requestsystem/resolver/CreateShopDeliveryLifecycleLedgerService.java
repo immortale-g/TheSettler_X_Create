@@ -90,8 +90,8 @@ final class CreateShopDeliveryLifecycleLedgerService {
         && snapshot.courierTaskMatchCount() <= 0) {
       int nudged = CreateShopDeliveryManager.nudgeDeliverymen(manager, childToken);
       if (nudged > 0) {
-        entry.setDiagnosisCode("COURIER_QUEUE_HANDOFF_REPAIRED");
-        entry.setDiagnosisDetail("warehouse queue handoff repaired count=" + nudged);
+        entry.setDiagnosisCode("COURIER_QUEUE_HANDOFF_PENDING");
+        entry.setDiagnosisDetail("warehouse queue handoff pending couriers=" + nudged);
         snapshot =
             inspectWarehouseSnapshot(
                 manager, childToken, deliveryStack, deliveryStart, deliveryTarget);

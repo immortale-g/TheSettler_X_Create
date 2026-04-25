@@ -15,7 +15,9 @@ class CreateShopDeliveryCompletionParentResolutionGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryCompletionService.java"));
 
     assertTrue(source.contains("completeParentAfterDeliveredChild("));
-    assertTrue(source.contains("pending <= 0"));
+    assertTrue(source.contains("computeOutstandingAfterDelivery("));
+    assertTrue(source.contains("outstandingNeededService.compute(parentRequest, deliverable"));
+    assertTrue(source.contains("Math.max(0, Math.max(trackedPending, outstanding)) > 0"));
     assertTrue(source.contains("standard.updateRequestState(parentToken, RequestState.RESOLVED)"));
     assertTrue(source.contains("detachCompletedChild("));
     assertTrue(source.contains("hasActiveNonTerminalChild("));

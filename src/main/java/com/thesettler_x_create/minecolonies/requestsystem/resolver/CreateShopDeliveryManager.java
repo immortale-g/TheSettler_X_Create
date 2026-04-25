@@ -15,7 +15,6 @@ import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.CourierAssignmentModule;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
-import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
@@ -492,9 +491,8 @@ final class CreateShopDeliveryManager {
     if (manager == null || token == null) {
       return 0;
     }
-    int alreadyQueued = 0;
     int checked = 0;
-    int kicked = 0;
+    int availableCouriers = 0;
     int warehousesWithToken = 0;
     var colony = manager.getColony();
     if (colony == null) {
@@ -527,56 +525,21 @@ final class CreateShopDeliveryManager {
         continue;
       }
       for (var citizen : warehouseCouriers.getAssignedCitizen()) {
-        if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
+        if (citizen == null) {
           continue;
         }
         checked++;
-        if (job.getTaskQueue() != null && job.getTaskQueue().contains(token)) {
-          alreadyQueued++;
-          continue;
-        }
-
-        IRequest<?> currentTask;
-        try {
-          currentTask = job.getCurrentTask();
-        } catch (Exception ignored) {
-          currentTask = null;
-        }
-        if (job.getTaskQueue() != null && job.getTaskQueue().contains(token)) {
-          alreadyQueued++;
-          continue;
-        }
-        if (currentTask != null || !queue.getMutableRequestList().contains(token)) {
-          continue;
-        }
-
-        try {
-          job.addRequest(token, 0);
-          while (queue.getMutableRequestList().remove(token)) {
-            // Mirror MineColonies' native handoff: a courier-owned task leaves the warehouse queue.
-          }
-          queue.markDirty();
-          kicked++;
-        } catch (Exception e) {
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.warn(
-                "[CreateShop] delivery courier handoff failed token={} citizen={}",
-                token,
-                citizen.getId(),
-                e);
-          }
-        }
+        availableCouriers++;
       }
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery nudge couriers token={} warehousesWithToken={} checked={} alreadyQueued={} kicked={}",
+          "[CreateShop] delivery nudge couriers token={} warehousesWithToken={} checked={} availableCouriers={}",
           token,
           warehousesWithToken,
           checked,
-          alreadyQueued,
-          kicked);
+          availableCouriers);
     }
-    return alreadyQueued + kicked;
+    return availableCouriers;
   }
 }

@@ -22,6 +22,7 @@ class BuildingCreateShopPickupRequestRecoveryGuardTest {
     assertTrue(source.contains("manager.reassignRequest(token, Collections.emptyList());"));
     assertTrue(source.contains("manager.assignRequest(token);"));
     assertTrue(source.contains("resolver instanceof PickupRequestResolver"));
+    assertTrue(source.contains("pruneStalePickupRequestToken(token, \"lookup-failed\")"));
     assertTrue(source.contains("pruneStalePickupRequestToken(token, \"missing-request\")"));
     assertTrue(source.contains("return super.createPickupRequest(pickupPriority);"));
   }
