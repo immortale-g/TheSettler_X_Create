@@ -355,9 +355,11 @@ Implementation notes:
 - Housekeeping duplication fix is authored in this project scope: rack->hut transfer now computes
   insertable counts with `IItemHandler.insertItem(..., true)` simulation before extracting from
   racks, removing prior pre-extract probe insertion that could duplicate moved stacks.
-- Housekeeping rack-discovery recovery is authored in this project scope: before transfer, shop
-  racks are re-synchronized from registered containers and, when that set is empty (post-reload
-  drift), a bounded local rack scan is used so unreserved transfer work still executes.
+- Blueprint-bound rack discovery hardening is authored in this project scope: prior local radius
+  scans for post-reload rack discovery were removed from rack indexing, housekeeping, and resolver
+  planning. Create Shop storage now only uses MineColonies-registered containers, so existing valid
+  blueprint racks remain compatible through persisted container data or native repair/upgrade
+  registration, while player-placed racks are ignored even inside the building bounds.
 - Housekeeping cadence catch-up is authored in this project scope: per-run transfer budget now
   scales by elapsed server ticks since the previous run (bounded cap), compensating for coarse
   MineColonies building tick cadence while preserving the intended average stack transfer rate.

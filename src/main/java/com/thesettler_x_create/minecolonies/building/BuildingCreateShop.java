@@ -199,14 +199,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     return containerList;
   }
 
-  boolean hasContainer(BlockPos pos) {
-    return containerList.contains(pos);
-  }
-
-  void addContainer(BlockPos pos) {
-    containerList.add(pos);
-  }
-
   int getContainerCount() {
     return containerList.size();
   }

@@ -1,15 +1,14 @@
 package com.thesettler_x_create.minecolonies.building;
 
-import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import java.util.Iterator;
 import java.util.List;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -38,39 +37,29 @@ final class ShopRackIndex {
       return;
     }
     lastRackScanTick = now;
-    int added = 0;
-    Tuple<BlockPos, BlockPos> corners = shop.getCorners();
-    boolean usedFallback = false;
-    if (corners != null && corners.getA() != null && corners.getB() != null) {
-      BlockPos start = corners.getA();
-      BlockPos end = corners.getB();
-      int minX = Math.min(start.getX(), end.getX());
-      int maxX = Math.max(start.getX(), end.getX());
-      int minY = Math.min(start.getY(), end.getY());
-      int maxY = Math.max(start.getY(), end.getY());
-      int minZ = Math.min(start.getZ(), end.getZ());
-      int maxZ = Math.max(start.getZ(), end.getZ());
-      if (minX != maxX && minZ != maxZ) {
-        added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
-      } else {
-        usedFallback = true;
+    int kept = 0;
+    int removed = 0;
+    Iterator<BlockPos> iterator = shop.getContainerList().iterator();
+    while (iterator.hasNext()) {
+      BlockPos pos = iterator.next();
+      if (pos == null || !WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
       }
-    } else {
-      usedFallback = true;
+      BlockEntity entity = level.getBlockEntity(pos);
+      if (entity instanceof TileEntityRack rack) {
+        onRackRegistered(level, pos, rack);
+        kept++;
+        continue;
+      }
+      iterator.remove();
+      removed++;
     }
-    if (usedFallback) {
-      BlockPos location = shop.getLocation().getInDimensionLocation();
-      int minX = location.getX() - 8;
-      int maxX = location.getX() + 8;
-      int minY = location.getY() - 8;
-      int maxY = location.getY() + 8;
-      int minZ = location.getZ() - 8;
-      int maxZ = location.getZ() + 8;
-      added += scanRackBox(level, minX, maxX, minY, maxY, minZ, maxZ);
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && added > 0) {
+    if (Config.DEBUG_LOGGING.getAsBoolean() && (kept > 0 || removed > 0)) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] ensureRackContainers added={} total={}", added, shop.getContainerCount());
+          "[CreateShop] ensureRackContainers kept={} removed={} total={}",
+          kept,
+          removed,
+          shop.getContainerCount());
     }
   }
 
@@ -169,34 +158,6 @@ final class ShopRackIndex {
       return;
     }
     rack.setInWarehouse(Boolean.TRUE);
-  }
-
-  private int scanRackBox(Level level, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
-    int added = 0;
-    for (int x = minX; x <= maxX; x++) {
-      for (int y = minY; y <= maxY; y++) {
-        for (int z = minZ; z <= maxZ; z++) {
-          BlockPos pos = new BlockPos(x, y, z);
-          if (!WorldUtil.isBlockLoaded(level, pos)) {
-            continue;
-          }
-          BlockEntity entity = level.getBlockEntity(pos);
-          if (!(entity instanceof TileEntityRack rack)) {
-            continue;
-          }
-          if (shop.hasContainer(pos)) {
-            continue;
-          }
-          if (!(level.getBlockState(pos).getBlock() instanceof AbstractBlockMinecoloniesRack)) {
-            continue;
-          }
-          shop.addContainer(pos);
-          onRackRegistered(level, pos, rack);
-          added++;
-        }
-      }
-    }
-    return added;
   }
 
   private void addCountsFromHandler(

@@ -371,8 +371,8 @@ Known focus area:
   unavailable citizen states (for example sleep/eat/sick/mourning/raided) and resumes afterward.
 - Housekeeping transfer insert-capacity checks are now simulation-only before extraction, preventing
   pre-extract ghost inserts and eliminating rack->hut item duplication.
-- Housekeeping rack discovery now refreshes registered rack containers and falls back to a local
-  rack scan around the shop when container registrations are temporarily empty after reload.
+- Shop rack discovery is blueprint-bound again: cleanup, stock planning, and rack indexing only use
+  MineColonies-registered containers, so player-placed racks are ignored even inside building bounds.
 - Housekeeping now includes cadence catch-up budgeting: when MineColonies building ticks are sparse,
   each run can move multiple due stacks (capped) to approximate the configured one-stack-per-interval
   behavior over wall-clock time.
