@@ -12,9 +12,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
@@ -747,27 +745,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (getBuilding() instanceof BuildingCreateShop shop) {
       shop.ensureRackContainers();
     }
-    Set<BlockPos> rackPositions = new LinkedHashSet<>(getBuilding().getContainers());
-    boolean fallbackScan = false;
-    if (rackPositions.isEmpty() && getBuilding() instanceof BuildingCreateShop shop) {
-      fallbackScan = true;
-      BlockPos origin = shop.getLocation().getInDimensionLocation();
-      int radius = 16;
-      int minX = origin.getX() - radius;
-      int maxX = origin.getX() + radius;
-      int minY = origin.getY() - 6;
-      int maxY = origin.getY() + 6;
-      int minZ = origin.getZ() - radius;
-      int maxZ = origin.getZ() + radius;
-      for (int x = minX; x <= maxX; x++) {
-        for (int y = minY; y <= maxY; y++) {
-          for (int z = minZ; z <= maxZ; z++) {
-            rackPositions.add(new BlockPos(x, y, z));
-          }
-        }
-      }
-    }
-    for (BlockPos pos : rackPositions) {
+    for (BlockPos pos : getBuilding().getContainers()) {
       if (!WorldUtil.isBlockLoaded(level, pos)) {
         continue;
       }
@@ -775,10 +753,6 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       if (entity instanceof AbstractTileEntityRack rack) {
         racks.add(rack);
       }
-    }
-    if (fallbackScan && com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping rack fallback scan active around {}", worldPosition);
     }
     return racks;
   }
