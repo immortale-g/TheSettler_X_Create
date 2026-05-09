@@ -402,7 +402,7 @@ Known focus area:
 - Lost-package harness support added in core runtime:
   - `CreateShopBlockEntity` debug inflight tuple inject + oldest tuple peek helpers
   - `BuildingCreateShop` debug wrappers for reorder and simulated handover consumption.
-
-Out of scope for this PR:
-- `CreateNetworkFacade.extract(...)` still uses availability-based placeholder logic and is tracked
-  as a follow-up TODO for dedicated Create API extraction wiring.
+- The unused `CreateNetworkFacade.extract(...)` preview API was removed; Create-network movement stays
+  on the package-request path (`requestItems` / `requestStacks`).
+- During rack-to-hut housekeeping cleanup, the shopkeeper briefly displays the first moved stack in
+  their main hand so live cleanup activity is visible in-world.

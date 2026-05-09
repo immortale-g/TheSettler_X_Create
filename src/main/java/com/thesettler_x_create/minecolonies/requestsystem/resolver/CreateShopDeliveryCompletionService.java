@@ -215,7 +215,8 @@ final class CreateShopDeliveryCompletionService {
     if (hasActiveNonTerminalChild(standard, parentRequest)) {
       return false;
     }
-    int outstanding = computeOutstandingAfterDelivery(resolver, manager, parentRequest, parentToken);
+    int outstanding =
+        computeOutstandingAfterDelivery(resolver, manager, parentRequest, parentToken);
     if (Math.max(0, Math.max(trackedPending, outstanding)) > 0) {
       return false;
     }
@@ -245,7 +246,8 @@ final class CreateShopDeliveryCompletionService {
       IRequestManager manager,
       IRequest<?> parentRequest,
       IToken<?> parentToken) {
-    if (parentRequest == null || !(parentRequest.getRequest() instanceof IDeliverable deliverable)) {
+    if (parentRequest == null
+        || !(parentRequest.getRequest() instanceof IDeliverable deliverable)) {
       return 0;
     }
     int reservedForRequest = 0;

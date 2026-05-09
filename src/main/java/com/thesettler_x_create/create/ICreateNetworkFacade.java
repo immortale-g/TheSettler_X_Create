@@ -15,9 +15,6 @@ public interface ICreateNetworkFacade {
   /** Returns a snapshot list of available stacks in the network. */
   List<ItemStack> getAvailableStacks();
 
-  /** Returns an extracted stack preview (no network mutation yet). */
-  ItemStack extract(ItemStack stack, int amount, boolean simulate);
-
   /** Plans the network order stacks needed to satisfy a deliverable amount. */
   List<ItemStack> planItems(IDeliverable deliverable, int amount);
 

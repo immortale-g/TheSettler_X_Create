@@ -58,6 +58,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   public static final String SCHEMATIC_NAME = "createshop";
   private static final long HOUSEKEEPING_TRANSFER_INTERVAL = 20L * 3L;
   private static final long HOUSEKEEPING_DEBUG_COOLDOWN = 20L * 5L;
+  private static final long HOUSEKEEPING_HAND_DISPLAY_TICKS = 20L * 4L;
   private static final int HOUSEKEEPING_MAX_CATCHUP_STACKS = 16;
   private static final int HOUSEKEEPING_TRANSFER_STACKS = 1;
 
@@ -94,7 +95,9 @@ public class BuildingCreateShop extends AbstractBuilding {
   private long lastHousekeepingTransferTick = -1L;
   private long lastHousekeepingWorkCheckTick = -1L;
   private long lastHousekeepingDebugTick = -1L;
+  private long housekeepingHandDisplayUntilTick = -1L;
   private long lostPackageInteractionEpoch;
+  private ItemStack housekeepingHandDisplayStack = ItemStack.EMPTY;
   private boolean cachedHasIncomingRackWork;
   private boolean legacyCourierMigrationAttempted;
 
@@ -486,6 +489,18 @@ public class BuildingCreateShop extends AbstractBuilding {
   public boolean hasCapacityStall() {
     TileEntityCreateShop tile = getCreateShopTileEntity();
     return tile != null && tile.hasCapacityStall();
+  }
+
+  public ItemStack getHousekeepingHandDisplayStack() {
+    Level level = getColony() == null ? null : getColony().getWorld();
+    if (level == null
+        || housekeepingHandDisplayStack.isEmpty()
+        || level.getGameTime() > housekeepingHandDisplayUntilTick) {
+      return ItemStack.EMPTY;
+    }
+    ItemStack display = housekeepingHandDisplayStack.copy();
+    display.setCount(1);
+    return display;
   }
 
   @Nullable
@@ -987,6 +1002,9 @@ public class BuildingCreateShop extends AbstractBuilding {
             (int) Math.max(1L, elapsed / HOUSEKEEPING_TRANSFER_INTERVAL));
     int transferBudget = Math.min(HOUSEKEEPING_MAX_CATCHUP_STACKS, dueStacks);
     int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
+    if (moved > 0) {
+      noteHousekeepingHandDisplay(tile.getLastHousekeepingMovedStack(), now);
+    }
     boolean hutHasItems = tile.hasHutInventoryItems();
     cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
     if (moved > 0 || cachedHasIncomingRackWork || hutHasItems) {
@@ -1036,6 +1054,15 @@ public class BuildingCreateShop extends AbstractBuilding {
     int effectivePriority =
         Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false));
     return createPickupRequest(effectivePriority);
+  }
+
+  private void noteHousekeepingHandDisplay(ItemStack stack, long now) {
+    if (stack == null || stack.isEmpty()) {
+      return;
+    }
+    housekeepingHandDisplayStack = stack.copy();
+    housekeepingHandDisplayStack.setCount(1);
+    housekeepingHandDisplayUntilTick = now + HOUSEKEEPING_HAND_DISPLAY_TICKS;
   }
 
   @Override

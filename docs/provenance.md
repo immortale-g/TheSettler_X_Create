@@ -283,10 +283,13 @@ Implementation notes:
   reassignment scanning now snapshots assignment entries/tokens before mutation and limits to one
   successful reassignment per tick, preventing `ConcurrentModificationException` during colony tick
   and reducing assignment churn after late stock updates.
-- PR-scope boundary note on the strict branch is authored in this project: Create network
-  extraction implementation in `CreateNetworkFacade.extract(...)` remains intentionally out of
-  scope for this PR and is tracked as a local follow-up TODO, while current resolver flow continues
-  to use existing network-order pathways.
+- Create network extraction boundary on the strict branch is authored in this project: a dedicated
+  extraction implementation was intentionally not added, the unused `CreateNetworkFacade.extract(...)`
+  preview API was removed, and current resolver flow continues to use existing network-order
+  pathways.
+- Shopkeeper cleanup hand-display behavior is authored in this project: rack-to-hut housekeeping
+  records the first moved stack and the shopkeeper briefly displays that item in the main hand while
+  cleanup is active, without changing the native MineColonies pickup request flow.
 - Hotfix 0.0.13 legacy-save compatibility support is authored in this project: requester factory
   `3001` (`SafeRequesterFactory`) and wrapper type (`SafeRequester`) were reintroduced as a
   compatibility-only deserialization path for worlds created before removal, while current request

@@ -21,6 +21,8 @@ class TileEntityCreateShopHousekeepingGuardTest {
     assertTrue(source.contains("IItemHandler hut = getInventory();"));
     assertTrue(source.contains("hut = getItemHandlerCap((Direction) null);"));
     assertTrue(source.contains("handler = rack.getItemHandlerCap();"));
+    assertTrue(source.contains("lastHousekeepingMovedStack = ItemStack.EMPTY;"));
+    assertTrue(source.contains("getLastHousekeepingMovedStack()"));
     assertTrue(!source.contains("probe.copy(), hut"));
   }
 }

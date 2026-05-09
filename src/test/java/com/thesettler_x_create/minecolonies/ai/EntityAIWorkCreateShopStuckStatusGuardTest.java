@@ -27,4 +27,15 @@ class EntityAIWorkCreateShopStuckStatusGuardTest {
     assertTrue(source.contains("shouldWorkNow()"));
     assertTrue(source.contains("currentBuilding.hasUrgentWork()"));
   }
+
+  @Test
+  void workerShowsCleanupItemInMainHand() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/ai/EntityAIWorkCreateShop.java"));
+    assertTrue(source.contains("getHousekeepingHandDisplayStack()"));
+    assertTrue(source.contains("worker.setItemInHand(InteractionHand.MAIN_HAND, displayStack)"));
+    assertTrue(source.contains("worker.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY)"));
+  }
 }

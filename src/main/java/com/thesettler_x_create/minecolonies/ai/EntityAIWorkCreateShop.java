@@ -9,9 +9,13 @@ import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.entity.ai.workers.AbstractEntityAIInteract;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 
 public class EntityAIWorkCreateShop
     extends AbstractEntityAIInteract<JobCreateShop, BuildingCreateShop> {
+  private boolean showingHousekeepingHeldItem;
+
   @SuppressWarnings("unchecked")
   public EntityAIWorkCreateShop(JobCreateShop job) {
     super(job);
@@ -106,6 +110,7 @@ public class EntityAIWorkCreateShop
     if (worker == null || worker.getCitizenData() == null) {
       return;
     }
+    updateHousekeepingHeldItem();
     if (building != null && building.hasCapacityStall()) {
       worker.getCitizenData().setJobStatus(JobStatus.STUCK);
       worker.getCitizenData().setVisibleStatus(VisibleCitizenStatus.WORKING);
@@ -119,6 +124,26 @@ public class EntityAIWorkCreateShop
     if (worker == null || worker.getCitizenData() == null) {
       return;
     }
+    clearHousekeepingHeldItem();
     worker.getCitizenData().setJobStatus(JobStatus.IDLE);
+  }
+
+  private void updateHousekeepingHeldItem() {
+    ItemStack displayStack =
+        building == null ? ItemStack.EMPTY : building.getHousekeepingHandDisplayStack();
+    if (displayStack.isEmpty()) {
+      clearHousekeepingHeldItem();
+      return;
+    }
+    showingHousekeepingHeldItem = true;
+    worker.setItemInHand(InteractionHand.MAIN_HAND, displayStack);
+  }
+
+  private void clearHousekeepingHeldItem() {
+    if (!showingHousekeepingHeldItem) {
+      return;
+    }
+    worker.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+    showingHousekeepingHeldItem = false;
   }
 }

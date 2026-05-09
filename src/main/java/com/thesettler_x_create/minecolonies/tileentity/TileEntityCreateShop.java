@@ -41,6 +41,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private long capacityStallUntil;
   private long capacityStallLastNotice;
   private ItemStack capacityStallStack = ItemStack.EMPTY;
+  private ItemStack lastHousekeepingMovedStack = ItemStack.EMPTY;
   private int capacityStallRequested;
   private int capacityStallAccepted;
 
@@ -340,6 +341,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
    * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
    */
   public int moveUnreservedRackStacksToHut(@Nullable CreateShopBlockEntity pickup, int maxStacks) {
+    lastHousekeepingMovedStack = ItemStack.EMPTY;
     if (pickup == null || maxStacks <= 0 || getBuilding() == null || getLevel() == null) {
       return 0;
     }
@@ -417,6 +419,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         if (inserted <= 0) {
           continue;
         }
+        if (lastHousekeepingMovedStack.isEmpty()) {
+          lastHousekeepingMovedStack = extracted.copy();
+          lastHousekeepingMovedStack.setCount(Math.min(inserted, extracted.getCount()));
+        }
         budget.remaining -= inserted;
         movedStacks++;
       }
@@ -426,6 +432,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
     logHousekeepingDebug("done:moved=" + movedStacks);
     return movedStacks;
+  }
+
+  public ItemStack getLastHousekeepingMovedStack() {
+    return lastHousekeepingMovedStack.copy();
   }
 
   /**

@@ -97,23 +97,6 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   @Override
-  public ItemStack extract(ItemStack stack, int amount, boolean simulate) {
-    if (stack == null || stack.isEmpty() || amount <= 0) {
-      return ItemStack.EMPTY;
-    }
-    // This facade only previews extractable stock; actual movement is requested via
-    // LogisticsManager.broadcastPackageRequest in requestStacks.
-    int available = getAvailable(stack);
-    int toExtract = Math.min(amount, available);
-    if (toExtract <= 0) {
-      return ItemStack.EMPTY;
-    }
-    ItemStack result = stack.copy();
-    result.setCount(toExtract);
-    return result;
-  }
-
-  @Override
   public List<ItemStack> planItems(IDeliverable deliverable, int amount) {
     if (!hasNetwork() || amount <= 0) {
       return Collections.emptyList();

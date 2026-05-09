@@ -30,4 +30,18 @@ class BuildingCreateShopHousekeepingPickupRequestGuardTest {
     assertTrue(source.contains("source is the building requester's hut"));
     assertFalse(source.contains("createHutInventoryPickupRequest"));
   }
+
+  @Test
+  void housekeepingRecordsMovedStackForWorkerHandDisplay() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+
+    assertTrue(source.contains("HOUSEKEEPING_HAND_DISPLAY_TICKS"));
+    assertTrue(
+        source.contains("noteHousekeepingHandDisplay(tile.getLastHousekeepingMovedStack(), now)"));
+    assertTrue(source.contains("getHousekeepingHandDisplayStack()"));
+    assertTrue(source.contains("housekeepingHandDisplayUntilTick"));
+  }
 }
