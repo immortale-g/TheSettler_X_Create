@@ -748,3 +748,32 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return null;
   }
 }
+
+/** Routes MineColonies delivery callbacks to the matching local Create Shop resolver instance. */
+final class CreateShopDeliveryCallbackService {
+  void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
+    CreateShopRequestResolver resolver =
+        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
+    if (resolver == null) {
+      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
+    }
+    if (resolver != null) {
+      resolver.handleDeliveryCancelled(manager, request);
+      return;
+    }
+    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
+  }
+
+  void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+    CreateShopRequestResolver resolver =
+        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
+    if (resolver == null) {
+      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
+    }
+    if (resolver != null) {
+      resolver.handleDeliveryComplete(manager, request);
+      return;
+    }
+    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("complete", manager, request);
+  }
+}
