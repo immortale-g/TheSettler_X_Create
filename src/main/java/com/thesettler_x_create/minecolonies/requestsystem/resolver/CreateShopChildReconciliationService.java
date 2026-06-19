@@ -295,11 +295,11 @@ final class CreateShopChildReconciliationService {
     }
     CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
     if (ledger == null
-        || ledger.getPickupConfirmedAtTick() < 0L
-        || ledger.getTerminalSeenAtTick() >= 0L) {
+        || ledger.pickupConfirmedAtTick < 0L
+        || ledger.terminalSeenAtTick >= 0L) {
       return false;
     }
-    if (!parentRequest.getId().equals(ledger.getParentToken())) {
+    if (!parentRequest.getId().equals(ledger.parentToken)) {
       return false;
     }
     BuildingCreateShop shop = resolver.getShop(standardManager);
