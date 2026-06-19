@@ -10,24 +10,29 @@ import org.junit.jupiter.api.Test;
 class BuildingCreateShopHousekeepingPickupRequestGuardTest {
   @Test
   void housekeepingCreatesNativePickupRequestForMovedOrExistingHutItems() throws Exception {
-    String source =
+    String orchestratorSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopHousekeepingOrchestrator.java"));
+    String buildingSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(source.contains("boolean hutHasItems = tile.hasHutInventoryItems();"));
-    assertTrue(source.contains("if (moved > 0 || hutHasItems) {"));
-    assertTrue(source.contains("int pickupPriority = getPickUpPriority();"));
+    assertTrue(orchestratorSource.contains("boolean hutHasItems = tile.hasHutInventoryItems();"));
+    assertTrue(orchestratorSource.contains("if (moved > 0 || hutHasItems) {"));
+    assertTrue(orchestratorSource.contains("int pickupPriority = shop.getPickUpPriority();"));
     assertTrue(
-        source.contains("boolean pickupRequested = createNativeHutPickupRequest(pickupPriority);"));
+        orchestratorSource.contains(
+            "boolean pickupRequested = shop.createNativeHutPickupRequest(pickupPriority);"));
     assertTrue(
-        source.contains(
+        buildingSource.contains(
             "Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false))"));
-    assertTrue(source.contains("return createPickupRequest(effectivePriority);"));
+    assertTrue(buildingSource.contains("return createPickupRequest(effectivePriority);"));
     assertTrue(
-        source.contains(
+        orchestratorSource.contains(
             "housekeeping pickup request priority={} created={} moved={} hutHasItems={}"));
-    assertTrue(source.contains("source is the building requester's hut"));
-    assertFalse(source.contains("createHutInventoryPickupRequest"));
+    assertTrue(buildingSource.contains("source is the building requester's hut"));
+    assertFalse(buildingSource.contains("createHutInventoryPickupRequest"));
   }
 }

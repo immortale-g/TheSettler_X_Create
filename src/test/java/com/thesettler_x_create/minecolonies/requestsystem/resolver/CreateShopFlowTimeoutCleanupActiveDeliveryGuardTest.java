@@ -12,7 +12,7 @@ class CreateShopFlowTimeoutCleanupActiveDeliveryGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopFlowTimeoutCleanupService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopTickPendingService.java"));
 
     assertTrue(source.contains("timeout-cleanup:skip-active-delivery"));
     assertTrue(source.contains("timeout-cleanup:skip-runtime-active"));

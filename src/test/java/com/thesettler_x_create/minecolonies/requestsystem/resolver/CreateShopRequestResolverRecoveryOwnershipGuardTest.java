@@ -12,7 +12,7 @@ class CreateShopRequestResolverRecoveryOwnershipGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildRecoveryService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
 
     assertTrue(
         source.contains("if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest))"));
