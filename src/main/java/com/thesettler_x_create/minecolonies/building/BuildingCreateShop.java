@@ -56,10 +56,6 @@ import org.jetbrains.annotations.Nullable;
 /** Create Shop building integration with MineColonies request system and Create network. */
 public class BuildingCreateShop extends AbstractBuilding {
   public static final String SCHEMATIC_NAME = "createshop";
-  private static final long HOUSEKEEPING_TRANSFER_INTERVAL = 20L * 3L;
-  private static final long HOUSEKEEPING_DEBUG_COOLDOWN = 20L * 5L;
-  private static final int HOUSEKEEPING_MAX_CATCHUP_STACKS = 16;
-  private static final int HOUSEKEEPING_TRANSFER_STACKS = 1;
 
   static boolean isDebugRequests() {
     return Config.DEBUG_LOGGING.getAsBoolean();
@@ -90,12 +86,9 @@ public class BuildingCreateShop extends AbstractBuilding {
   private final ShopWorkerStatus workerStatus;
   private final ShopNetworkNotifier networkNotifier;
   private final ShopResolverFactory resolverFactory;
-  private long lastResolverHealthcheckTick = -1L;
-  private long lastHousekeepingTransferTick = -1L;
-  private long lastHousekeepingWorkCheckTick = -1L;
-  private long lastHousekeepingDebugTick = -1L;
+  private final ShopResolverHealthCheck resolverHealthCheck;
+  private final ShopHousekeepingOrchestrator housekeepingOrchestrator;
   private long lostPackageInteractionEpoch;
-  private boolean cachedHasIncomingRackWork;
   private boolean legacyCourierMigrationAttempted;
 
   public BuildingCreateShop(IColony colony, BlockPos location) {
@@ -114,6 +107,8 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
     this.resolverFactory = new ShopResolverFactory(this);
+    this.resolverHealthCheck = new ShopResolverHealthCheck(this);
+    this.housekeepingOrchestrator = new ShopHousekeepingOrchestrator(this);
     this.lostPackageInteractionEpoch = 0L;
     this.legacyCourierMigrationAttempted = false;
   }
@@ -281,11 +276,11 @@ public class BuildingCreateShop extends AbstractBuilding {
     migrateLegacyShopCourierAssignments();
     ensureWarehouseRegistration();
     ensurePickupLink();
-    ensureResolverRegistrationHealthy(colony);
+    resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
     beltManager.tick();
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
-      CreateShopRequestResolver resolver = resolveTickResolver(colony);
+      CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
       if (isDebugRequests() && resolver == null) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tick: resolver missing for shop {}",
@@ -294,7 +289,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }
-      tickIncomingRackHousekeeping(colony);
+      housekeepingOrchestrator.tick(colony);
       inflightTracker.tick(colony);
       courierDiagnostics.debugCourierAssignments(colony);
     }
@@ -451,24 +446,11 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   public boolean hasIncomingRackWork() {
-    Level level = getColony() == null ? null : getColony().getWorld();
-    if (level == null || level.isClientSide) {
-      return false;
-    }
-    long now = level.getGameTime();
-    if (lastHousekeepingWorkCheckTick == now) {
-      return cachedHasIncomingRackWork;
-    }
-    lastHousekeepingWorkCheckTick = now;
-    TileEntityCreateShop tile = getCreateShopTileEntity();
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
-    return cachedHasIncomingRackWork;
+    return housekeepingOrchestrator.hasIncomingRackWork();
   }
 
   public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    return hasActiveLocalDeliveryChildren(colony, pickup);
+    return housekeepingOrchestrator.hasActiveLocalDeliveryChildren(colony, getPickupBlockEntity());
   }
 
   public boolean hasUrgentWork() {
@@ -913,118 +895,13 @@ public class BuildingCreateShop extends AbstractBuilding {
   private void ensureWarehouseRegistration() {
     warehouseRegistrar.ensureWarehouseRegistration();
   }
-
-  private void tickIncomingRackHousekeeping(IColony colony) {
-    if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
-      return;
-    }
-    long now = colony.getWorld().getGameTime();
-    long elapsed =
-        lastHousekeepingTransferTick < 0L
-            ? HOUSEKEEPING_TRANSFER_INTERVAL
-            : now - lastHousekeepingTransferTick;
-    if (elapsed < HOUSEKEEPING_TRANSFER_INTERVAL) {
-      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping wait cooldown remaining={}t",
-            HOUSEKEEPING_TRANSFER_INTERVAL - elapsed);
-      }
-      return;
-    }
-    TileEntityCreateShop tile = getCreateShopTileEntity();
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (tile == null || pickup == null) {
-      cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
-      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping skip tilePresent={} pickupPresent={} pendingUnreserved={}",
-            tile != null,
-            pickup != null,
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    if (hasActiveLocalDeliveryChildren(colony, pickup)) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason=active-delivery-child pendingUnreserved={}",
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    CreateShopRequestResolver resolver = getOrCreateShopResolver();
-    if (resolver != null && resolver.hasProtectedInventoryWindow()) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason=resolver-active-work pendingUnreserved={}",
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    if (!hasHousekeepingAvailableWorker()) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-      if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason={} pendingUnreserved={}",
-            describeHousekeepingBlockReason(),
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    int dueStacks =
-        Math.max(
-            HOUSEKEEPING_TRANSFER_STACKS,
-            (int) Math.max(1L, elapsed / HOUSEKEEPING_TRANSFER_INTERVAL));
-    int transferBudget = Math.min(HOUSEKEEPING_MAX_CATCHUP_STACKS, dueStacks);
-    int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
-    boolean hutHasItems = tile.hasHutInventoryItems();
-    cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-    if (moved > 0 || cachedHasIncomingRackWork || hutHasItems) {
-      lastHousekeepingTransferTick = now;
-    }
-    if (moved > 0 || hutHasItems) {
-      int pickupPriority = getPickUpPriority();
-      if (pickupPriority > 0) {
-        boolean pickupRequested = createNativeHutPickupRequest(pickupPriority);
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] housekeeping pickup request priority={} created={} moved={} hutHasItems={}",
-              pickupPriority,
-              pickupRequested,
-              moved,
-              hutHasItems);
-        }
-      } else if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping pickup request skipped (priority disabled) moved={} hutHasItems={}",
-            moved,
-            hutHasItems);
-      }
-    }
-    if (moved > 0 && isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping moved unreserved rack stacks to hut count={} budget={} elapsed={}t",
-          moved,
-          transferBudget,
-          elapsed);
-    } else if (isDebugRequests() && shouldLogHousekeepingDebug(now)) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping ran but moved=0 pendingUnreserved={} budget={} elapsed={}t",
-          cachedHasIncomingRackWork,
-          transferBudget,
-          elapsed);
-    }
-  }
-
   /**
    * Requests MineColonies' native building pickup flow for items staged in the hut.
    *
    * <p>The pickup requestable stores priority only; the source is the building requester's hut
    * location.
    */
-  private boolean createNativeHutPickupRequest(int pickupPriority) {
+  boolean createNativeHutPickupRequest(int pickupPriority) {
     int effectivePriority =
         Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false));
     return createPickupRequest(effectivePriority);
@@ -1170,463 +1047,11 @@ public class BuildingCreateShop extends AbstractBuilding {
         || state == RequestState.RECEIVED
         || state == RequestState.RESOLVED;
   }
-
-  private boolean hasActiveLocalDeliveryChildren(IColony colony, CreateShopBlockEntity pickup) {
-    if (colony == null || pickup == null || pickup.getLevel() == null) {
-      return false;
-    }
-    if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
-      return false;
-    }
-    var assignmentStore = standard.getRequestResolverRequestAssignmentDataStore();
-    if (assignmentStore == null) {
-      return false;
-    }
-    Map<IToken<?>, java.util.Collection<IToken<?>>> assignments = assignmentStore.getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return false;
-    }
-    var requestHandler = standard.getRequestHandler();
-    if (requestHandler == null) {
-      return false;
-    }
-    for (var assignmentEntry : assignments.entrySet()) {
-      java.util.Collection<IToken<?>> assigned = assignmentEntry.getValue();
-      if (assigned == null || assigned.isEmpty()) {
-        continue;
-      }
-      for (IToken<?> token : java.util.List.copyOf(assigned)) {
-        if (token == null) {
-          continue;
-        }
-        try {
-          IRequest<?> request = requestHandler.getRequest(token);
-          if (request == null || !(request.getRequest() instanceof Delivery delivery)) {
-            continue;
-          }
-          RequestState state = request.getState();
-          boolean activeState =
-              state == RequestState.CREATED
-                  || state == RequestState.ASSIGNED
-                  || state == RequestState.IN_PROGRESS;
-          if (!activeState) {
-            continue;
-          }
-          if (!isLocalDeliveryStart(delivery, pickup)) {
-            continue;
-          }
-          if (!isLocalCreateShopDeliveryParent(standard, request)) {
-            continue;
-          }
-          return true;
-        } catch (Exception ex) {
-          if (isDebugRequests()) {
-            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] housekeeping delivery-child check failed token={} error={}",
-                token,
-                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-          }
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  private boolean isLocalCreateShopDeliveryParent(
-      IStandardRequestManager standard, IRequest<?> child) {
-    if (standard == null || child == null || !child.hasParent()) {
-      return false;
-    }
-    try {
-      IRequest<?> parent = standard.getRequestHandler().getRequest(child.getParent());
-      if (parent == null) {
-        return false;
-      }
-      IRequestResolver<?> owner = standard.getResolverHandler().getResolverForRequest(parent);
-      if (!(owner instanceof CreateShopRequestResolver resolver)) {
-        return false;
-      }
-      return resolver.getLocation() != null && resolver.getLocation().equals(getLocation());
-    } catch (Exception ignored) {
-      return false;
-    }
-  }
-
-  private boolean isLocalDeliveryStart(Delivery delivery, CreateShopBlockEntity pickup) {
-    if (delivery == null || pickup == null || pickup.getLevel() == null) {
-      return false;
-    }
-    var start = delivery.getStart();
-    if (start == null || start.getDimension() == null) {
-      return false;
-    }
-    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
-      return false;
-    }
-    BlockPos startPos = start.getInDimensionLocation();
-    if (startPos == null) {
-      return false;
-    }
-    if (pickup.getBlockPos().equals(startPos)) {
-      return true;
-    }
-    return hasContainerPosition(startPos);
-  }
-
-  private boolean shouldLogHousekeepingDebug(long now) {
-    if (lastHousekeepingDebugTick >= 0L
-        && now - lastHousekeepingDebugTick < HOUSEKEEPING_DEBUG_COOLDOWN) {
-      return false;
-    }
-    lastHousekeepingDebugTick = now;
-    return true;
-  }
-
-  private void ensureResolverRegistrationHealthy(IColony colony) {
-    if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
-      return;
-    }
-    long now = colony.getWorld().getGameTime();
-    if (lastResolverHealthcheckTick >= 0L && now - lastResolverHealthcheckTick < 100L) {
-      return;
-    }
-    lastResolverHealthcheckTick = now;
-
-    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
-      return;
-    }
-    CreateShopRequestResolver resolver = resolveLiveShopResolver(manager);
-    if (resolver == null) {
-      resolver = getOrCreateShopResolver();
-      if (resolver == null) {
-        return;
-      }
-    }
-    if (shopResolver == null || !shopResolver.getId().equals(resolver.getId())) {
-      setResolverState(resolver, deliveryResolverToken, pickupResolverToken);
-    }
-    IToken<?> resolverId = resolver.getId();
-    boolean resolverKnown = false;
-    try {
-      manager.getResolverHandler().getResolver(resolverId);
-      resolverKnown = true;
-    } catch (IllegalArgumentException ignored) {
-      // Health-check handles this.
-    }
-
-    boolean providerContains =
-        manager.getProviderHandler().getRegisteredResolvers(this).contains(resolverId);
-    var deliverableAssignments =
-        manager
-            .getRequestableTypeRequestResolverAssignmentDataStore()
-            .getAssignments()
-            .get(TypeConstants.DELIVERABLE);
-    boolean typeContains =
-        deliverableAssignments != null && deliverableAssignments.contains(resolverId);
-
-    boolean hasAnyLocalProviderResolver = hasAnyLocalProviderResolver(manager);
-    boolean hasAnyLocalDeliverableResolver =
-        hasAnyLocalDeliverableResolver(manager, deliverableAssignments);
-
-    if (resolverKnown
-        && (providerContains || hasAnyLocalProviderResolver)
-        && (typeContains || hasAnyLocalDeliverableResolver)) {
-      return;
-    }
-
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] resolver health mismatch: resolverKnown={} providerContains={} typeContains={} resolver={}",
-          resolverKnown,
-          providerContains,
-          typeContains,
-          resolverId);
-    }
-    try {
-      colony.getRequestManager().onProviderRemovedFromColony(this);
-    } catch (Exception ignored) {
-      // Best effort cleanup before re-register.
-    }
-    try {
-      colony.getRequestManager().onProviderAddedToColony(this);
-    } catch (Exception ex) {
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolver provider repair failed: {}",
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
-      return;
-    }
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] resolver provider repair triggered for {}", resolverId);
-    }
-  }
-
   @Nullable
-  private CreateShopRequestResolver resolveTickResolver(IColony colony) {
-    if (colony == null || colony.getRequestManager() == null) {
-      return getOrCreateShopResolver();
-    }
-    if (!(colony.getRequestManager() instanceof IStandardRequestManager manager)) {
-      return getOrCreateShopResolver();
-    }
-    CreateShopRequestResolver current = getOrCreateShopResolver();
-    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
-    if (providerResolvers == null || providerResolvers.isEmpty()) {
-      CreateShopRequestResolver fallback = resolveLiveShopResolver(manager);
-      if (fallback != null) {
-        if (current == null || !current.getId().equals(fallback.getId())) {
-          setResolverState(fallback, deliveryResolverToken, pickupResolverToken);
-        }
-        return fallback;
-      }
-      return current;
-    }
-
-    var deliverableAssignments =
-        manager
-            .getRequestableTypeRequestResolverAssignmentDataStore()
-            .getAssignments()
-            .get(TypeConstants.DELIVERABLE);
-    Set<IToken<?>> prioritized = new LinkedHashSet<>();
-    if (deliverableAssignments != null) {
-      for (IToken<?> token : deliverableAssignments) {
-        if (providerResolvers.contains(token)) {
-          prioritized.add(token);
-        }
-      }
-    }
-    prioritized.addAll(providerResolvers);
-
-    CreateShopRequestResolver selected = null;
-    for (IToken<?> token : prioritized) {
-      try {
-        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
-        if (resolver instanceof CreateShopRequestResolver csr) {
-          selected = csr;
-          break;
-        }
-      } catch (IllegalArgumentException ignored) {
-        // Ignore stale ids; health-check will repair registration.
-      }
-    }
-
-    if (selected == null) {
-      selected = resolveLiveShopResolver(manager);
-    } else {
-      // Prefer assignment-backed resolver when provider-prioritized resolver has no work.
-      if (!hasAssignedRequestsForResolver(manager, selected.getId())) {
-        CreateShopRequestResolver assignmentSelected = findResolverFromAssignments(manager);
-        if (assignmentSelected != null
-            && !assignmentSelected.getId().equals(selected.getId())
-            && hasAssignedRequestsForResolver(manager, assignmentSelected.getId())) {
-          if (isDebugRequests()) {
-            com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] resolver assignment drift detected: switching {} -> {}",
-                selected.getId(),
-                assignmentSelected.getId());
-          }
-          selected = assignmentSelected;
-        } else {
-          CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
-          if (ownershipSelected != null && !ownershipSelected.getId().equals(selected.getId())) {
-            if (isDebugRequests()) {
-              com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] resolver ownership drift detected: switching {} -> {}",
-                  selected.getId(),
-                  ownershipSelected.getId());
-            }
-            selected = ownershipSelected;
-          }
-        }
-      }
-    }
-    // Ownership is authoritative for pending processing; prefer it when drift is detected.
-    CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
-    if (ownershipSelected != null
-        && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolver ownership priority switch {} -> {}",
-            selected == null ? "<null>" : selected.getId(),
-            ownershipSelected.getId());
-      }
-      selected = ownershipSelected;
-    }
-    if (selected == null) {
-      return current;
-    }
-    if (current == null || !current.getId().equals(selected.getId())) {
-      setResolverState(selected, deliveryResolverToken, pickupResolverToken);
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolver synced to registered token {} (previous={})",
-            selected.getId(),
-            current == null ? "<null>" : current.getId());
-      }
-    }
-    return selected;
-  }
-
   @Nullable
-  private CreateShopRequestResolver findResolverFromAssignments(IStandardRequestManager manager) {
-    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return null;
-    }
-    for (IToken<?> resolverToken : assignments.keySet()) {
-      try {
-        IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(resolverToken);
-        if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
-          return shop;
-        }
-      } catch (IllegalArgumentException ignored) {
-        // Ignore stale tokens; health-check and reassignment paths handle cleanup.
-      }
-    }
-    return null;
-  }
-
   @Nullable
-  private CreateShopRequestResolver findResolverFromRequestOwnership(
-      IStandardRequestManager manager) {
-    if (manager == null || manager.getRequestHandler() == null) {
-      return null;
-    }
-    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return null;
-    }
-    java.util.Map<IToken<?>, Integer> ownershipCounts = new java.util.HashMap<>();
-    java.util.Map<IToken<?>, CreateShopRequestResolver> resolversById = new java.util.HashMap<>();
-    for (java.util.Collection<IToken<?>> requestTokens : assignments.values()) {
-      if (requestTokens == null || requestTokens.isEmpty()) {
-        continue;
-      }
-      for (IToken<?> requestToken : requestTokens) {
-        try {
-          var request = manager.getRequestHandler().getRequest(requestToken);
-          if (request == null) {
-            continue;
-          }
-          IRequestResolver<?> owner = manager.getResolverHandler().getResolverForRequest(request);
-          if (owner instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
-            IToken<?> ownerId = shop.getId();
-            ownershipCounts.merge(ownerId, 1, Integer::sum);
-            resolversById.putIfAbsent(ownerId, shop);
-          }
-        } catch (Exception ignored) {
-          // Ignore stale request/resolver links.
-        }
-      }
-    }
-    if (ownershipCounts.isEmpty()) {
-      return null;
-    }
-    IToken<?> dominantOwner = null;
-    int dominantCount = 0;
-    for (var entry : ownershipCounts.entrySet()) {
-      if (entry.getValue() > dominantCount) {
-        dominantOwner = entry.getKey();
-        dominantCount = entry.getValue();
-      }
-    }
-    return dominantOwner == null ? null : resolversById.get(dominantOwner);
-  }
-
   @Nullable
-  private CreateShopRequestResolver resolveLiveShopResolver(IStandardRequestManager manager) {
-    if (manager == null) {
-      return null;
-    }
-    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
-    if (providerResolvers != null && !providerResolvers.isEmpty()) {
-      for (IToken<?> token : providerResolvers) {
-        CreateShopRequestResolver local = resolveLocalShopResolver(manager, token);
-        if (local != null) {
-          return local;
-        }
-      }
-    }
-    CreateShopRequestResolver byAssignments = findResolverFromAssignments(manager);
-    if (byAssignments != null) {
-      return byAssignments;
-    }
-    return findResolverFromRequestOwnership(manager);
-  }
-
-  private boolean hasAnyLocalProviderResolver(IStandardRequestManager manager) {
-    if (manager == null) {
-      return false;
-    }
-    var providerResolvers = manager.getProviderHandler().getRegisteredResolvers(this);
-    if (providerResolvers == null || providerResolvers.isEmpty()) {
-      return false;
-    }
-    for (IToken<?> token : providerResolvers) {
-      if (resolveLocalShopResolver(manager, token) != null) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean hasAnyLocalDeliverableResolver(
-      IStandardRequestManager manager, java.util.Collection<IToken<?>> deliverableAssignments) {
-    if (manager == null || deliverableAssignments == null || deliverableAssignments.isEmpty()) {
-      return false;
-    }
-    for (IToken<?> token : deliverableAssignments) {
-      if (resolveLocalShopResolver(manager, token) != null) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   @Nullable
-  private CreateShopRequestResolver resolveLocalShopResolver(
-      IStandardRequestManager manager, IToken<?> token) {
-    if (manager == null || token == null) {
-      return null;
-    }
-    try {
-      IRequestResolver<?> resolver = manager.getResolverHandler().getResolver(token);
-      if (resolver instanceof CreateShopRequestResolver shop && isLocalShopResolver(shop)) {
-        return shop;
-      }
-    } catch (Exception ignored) {
-      // Ignore stale token links.
-    }
-    return null;
-  }
-
-  private boolean hasAssignedRequestsForResolver(
-      IStandardRequestManager manager, IToken<?> resolverToken) {
-    if (manager == null || resolverToken == null) {
-      return false;
-    }
-    var assignments = manager.getRequestResolverRequestAssignmentDataStore().getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return false;
-    }
-    var resolverAssignments = assignments.get(resolverToken);
-    return resolverAssignments != null && !resolverAssignments.isEmpty();
-  }
-
-  private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
-    if (resolver == null || resolver.getLocation() == null || getLocation() == null) {
-      return false;
-    }
-    return resolver.getLocation().getDimension().equals(getLocation().getDimension())
-        && resolver
-            .getLocation()
-            .getInDimensionLocation()
-            .equals(getLocation().getInDimensionLocation());
-  }
-
   public void ensureRackContainers() {
     rackIndex.ensureRackContainers();
   }
@@ -1795,3 +1220,4 @@ public class BuildingCreateShop extends AbstractBuilding {
     return tag;
   }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
