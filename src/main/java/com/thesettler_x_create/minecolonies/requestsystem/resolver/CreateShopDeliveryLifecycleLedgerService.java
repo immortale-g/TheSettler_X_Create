@@ -37,24 +37,24 @@ final class CreateShopDeliveryLifecycleLedgerService {
     CreateShopDeliveryChildLedgerEntry entry =
         map.computeIfAbsent(childToken, CreateShopDeliveryChildLedgerEntry::new);
     long now = level.getGameTime();
-    if (entry.getFirstSeenAtTick() < 0L) {
-      entry.setFirstSeenAtTick(now);
+    if (entry.firstSeenAtTick < 0L) {
+      entry.firstSeenAtTick = now;
     }
-    entry.setParentToken(parentToken);
+    entry.parentToken = parentToken;
     RequestState state = child.getState();
     String stateLabel = state == null ? "<null>" : state.toString();
-    entry.setLastSeenState(stateLabel);
-    entry.setLastSeenAtTick(now);
-    entry.setLastOwnerResolver(
-        assignedResolverToken == null ? "<none>" : assignedResolverToken.toString());
-    if (state == RequestState.CREATED && entry.getCreatedSeenAtTick() < 0L) {
-      entry.setCreatedSeenAtTick(now);
+    entry.lastSeenState = stateLabel;
+    entry.lastSeenAtTick = now;
+    entry.lastOwnerResolver =
+        assignedResolverToken == null ? "<none>" : assignedResolverToken.toString();
+    if (state == RequestState.CREATED && entry.createdSeenAtTick < 0L) {
+      entry.createdSeenAtTick = now;
     }
-    if (state == RequestState.ASSIGNED && entry.getAssignedSeenAtTick() < 0L) {
-      entry.setAssignedSeenAtTick(now);
+    if (state == RequestState.ASSIGNED && entry.assignedSeenAtTick < 0L) {
+      entry.assignedSeenAtTick = now;
     }
-    if (state == RequestState.IN_PROGRESS && entry.getInProgressSeenAtTick() < 0L) {
-      entry.setInProgressSeenAtTick(now);
+    if (state == RequestState.IN_PROGRESS && entry.inProgressSeenAtTick < 0L) {
+      entry.inProgressSeenAtTick = now;
     }
     ItemStack deliveryStack =
         child.getRequest() instanceof Delivery delivery
@@ -70,18 +70,18 @@ final class CreateShopDeliveryLifecycleLedgerService {
             : null;
     WarehouseSnapshot snapshot =
         inspectWarehouseSnapshot(manager, childToken, deliveryStack, deliveryStart, deliveryTarget);
-    entry.setLastQueueContains(snapshot.queueContains());
-    entry.setLastCourierCount(snapshot.courierCount());
-    entry.setLastCourierTaskMatchCount(snapshot.courierTaskMatchCount());
-    entry.setLastCourierCarryMatchCount(snapshot.courierCarryMatchCount());
-    entry.setLastCourierAtSourceMatchCount(snapshot.courierAtSourceMatchCount());
-    entry.setLastCourierAtTargetMatchCount(snapshot.courierAtTargetMatchCount());
+    entry.lastQueueContains = snapshot.queueContains();
+    entry.lastCourierCount = snapshot.courierCount();
+    entry.lastCourierTaskMatchCount = snapshot.courierTaskMatchCount();
+    entry.lastCourierCarryMatchCount = snapshot.courierCarryMatchCount();
+    entry.lastCourierAtSourceMatchCount = snapshot.courierAtSourceMatchCount();
+    entry.lastCourierAtTargetMatchCount = snapshot.courierAtTargetMatchCount();
     if (state == RequestState.IN_PROGRESS && snapshot.courierTaskMatchCount() > 0) {
       int patched = ensureOngoingDeliveryMarker(manager, childToken);
       if (patched > 0) {
-        entry.setDiagnosisCode("ONGOING_MARKER_PATCHED");
-        entry.setDiagnosisDetail(
-            "courier-task matched, ongoing delivery marker ensured count=" + patched);
+        entry.diagnosisCode = "ONGOING_MARKER_PATCHED";
+        entry.diagnosisDetail =
+            "courier-task matched, ongoing delivery marker ensured count=" + patched;
       }
     }
     if (state == RequestState.IN_PROGRESS
@@ -90,17 +90,17 @@ final class CreateShopDeliveryLifecycleLedgerService {
         && snapshot.courierTaskMatchCount() <= 0) {
       int nudged = CreateShopDeliveryManager.nudgeDeliverymen(manager, childToken);
       if (nudged > 0) {
-        entry.setDiagnosisCode("COURIER_QUEUE_HANDOFF_PENDING");
-        entry.setDiagnosisDetail("warehouse queue handoff pending couriers=" + nudged);
+        entry.diagnosisCode = "COURIER_QUEUE_HANDOFF_PENDING";
+        entry.diagnosisDetail = "warehouse queue handoff pending couriers=" + nudged;
         snapshot =
             inspectWarehouseSnapshot(
                 manager, childToken, deliveryStack, deliveryStart, deliveryTarget);
-        entry.setLastQueueContains(snapshot.queueContains());
-        entry.setLastCourierCount(snapshot.courierCount());
-        entry.setLastCourierTaskMatchCount(snapshot.courierTaskMatchCount());
-        entry.setLastCourierCarryMatchCount(snapshot.courierCarryMatchCount());
-        entry.setLastCourierAtSourceMatchCount(snapshot.courierAtSourceMatchCount());
-        entry.setLastCourierAtTargetMatchCount(snapshot.courierAtTargetMatchCount());
+        entry.lastQueueContains = snapshot.queueContains();
+        entry.lastCourierCount = snapshot.courierCount();
+        entry.lastCourierTaskMatchCount = snapshot.courierTaskMatchCount();
+        entry.lastCourierCarryMatchCount = snapshot.courierCarryMatchCount();
+        entry.lastCourierAtSourceMatchCount = snapshot.courierAtSourceMatchCount();
+        entry.lastCourierAtTargetMatchCount = snapshot.courierAtTargetMatchCount();
       }
     }
     if (state == RequestState.IN_PROGRESS
@@ -109,49 +109,49 @@ final class CreateShopDeliveryLifecycleLedgerService {
         && snapshot.courierAtTargetMatchCount() > 0) {
       int forced = forceFinishMatchingCourierTasks(manager, childToken);
       if (forced > 0) {
-        entry.setDiagnosisCode("FORCE_FINISH_AT_TARGET");
-        entry.setDiagnosisDetail("force-finished stuck courier task count=" + forced);
+        entry.diagnosisCode = "FORCE_FINISH_AT_TARGET";
+        entry.diagnosisDetail = "force-finished stuck courier task count=" + forced;
       }
     }
-    if (snapshot.courierTaskMatchCount() > 0 && entry.getPickupConfirmedAtTick() < 0L) {
-      entry.setPickupConfirmedAtTick(now);
-      entry.setDiagnosisCode("COURIER_PICKUP_CONFIRMED");
-      entry.setDiagnosisDetail(
+    if (snapshot.courierTaskMatchCount() > 0 && entry.pickupConfirmedAtTick < 0L) {
+      entry.pickupConfirmedAtTick = now;
+      entry.diagnosisCode = "COURIER_PICKUP_CONFIRMED";
+      entry.diagnosisDetail =
           "pickup confirmed by courier task match (carryMatches="
               + snapshot.courierCarryMatchCount()
-              + ")");
+              + ")";
     }
 
     if (CreateShopRequestResolver.isTerminalRequestState(state)) {
-      if (entry.getTerminalSeenAtTick() < 0L) {
-        entry.setTerminalSeenAtTick(now);
+      if (entry.terminalSeenAtTick < 0L) {
+        entry.terminalSeenAtTick = now;
       }
-      entry.setTerminalSource(source == null ? "poll" : source);
-      entry.setDiagnosisCode("TERMINAL_SEEN");
-      entry.setDiagnosisDetail("child reached terminal state via " + entry.getTerminalSource());
+      entry.terminalSource = source == null ? "poll" : source;
+      entry.diagnosisCode = "TERMINAL_SEEN";
+      entry.diagnosisDetail = "child reached terminal state via " + entry.terminalSource;
       logLedger(resolver, entry, now, "terminal");
       return;
     }
 
     // Diagnose stalled non-terminal children.
-    if (state == RequestState.IN_PROGRESS && entry.getInProgressSeenAtTick() > 0L) {
-      long inProgressAge = now - entry.getInProgressSeenAtTick();
+    if (state == RequestState.IN_PROGRESS && entry.inProgressSeenAtTick > 0L) {
+      long inProgressAge = now - entry.inProgressSeenAtTick;
       if (!snapshot.queueContains() && inProgressAge >= 100L) {
-        entry.setDiagnosisCode("MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL");
-        entry.setDiagnosisDetail(
+        entry.diagnosisCode = "MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL";
+        entry.diagnosisDetail =
             "inProgressAge="
                 + inProgressAge
                 + " queueContains=false couriers="
-                + snapshot.courierCount());
+                + snapshot.courierCount();
       } else if (inProgressAge >= Math.max(100L, resolver.getInflightTimeoutTicksSafe())) {
-        entry.setDiagnosisCode("MC_NO_TERMINAL_CALLBACK");
-        entry.setDiagnosisDetail(
+        entry.diagnosisCode = "MC_NO_TERMINAL_CALLBACK";
+        entry.diagnosisDetail =
             "inProgressAge="
                 + inProgressAge
                 + " queueContains="
                 + snapshot.queueContains()
                 + " couriers="
-                + snapshot.courierCount());
+                + snapshot.courierCount();
       }
     }
     logLedger(resolver, entry, now, "poll");
@@ -171,14 +171,14 @@ final class CreateShopDeliveryLifecycleLedgerService {
     CreateShopDeliveryChildLedgerEntry entry =
         map.computeIfAbsent(childToken, CreateShopDeliveryChildLedgerEntry::new);
     long now = level.getGameTime();
-    if (entry.getFirstSeenAtTick() < 0L) {
-      entry.setFirstSeenAtTick(now);
+    if (entry.firstSeenAtTick < 0L) {
+      entry.firstSeenAtTick = now;
     }
-    entry.setParentToken(parentToken);
-    entry.setLastSeenAtTick(now);
-    entry.setDiagnosisCode("MC_HANDLER_LOST_TOKEN");
-    entry.setDiagnosisDetail(
-        (source == null ? "missing" : source) + " " + (detail == null ? "" : detail));
+    entry.parentToken = parentToken;
+    entry.lastSeenAtTick = now;
+    entry.diagnosisCode = "MC_HANDLER_LOST_TOKEN";
+    entry.diagnosisDetail =
+        (source == null ? "missing" : source) + " " + (detail == null ? "" : detail);
     logLedger(resolver, entry, now, "missing");
   }
 
@@ -195,15 +195,15 @@ final class CreateShopDeliveryLifecycleLedgerService {
     CreateShopDeliveryChildLedgerEntry entry =
         map.computeIfAbsent(childToken, CreateShopDeliveryChildLedgerEntry::new);
     long now = level.getGameTime();
-    if (entry.getFirstSeenAtTick() < 0L) {
-      entry.setFirstSeenAtTick(now);
+    if (entry.firstSeenAtTick < 0L) {
+      entry.firstSeenAtTick = now;
     }
-    entry.setParentToken(parentToken);
-    entry.setLastSeenAtTick(now);
-    entry.setTerminalSeenAtTick(now);
-    entry.setTerminalSource(callbackType == null ? "callback" : callbackType);
-    entry.setDiagnosisCode("TERMINAL_CALLBACK");
-    entry.setDiagnosisDetail("terminal callback received");
+    entry.parentToken = parentToken;
+    entry.lastSeenAtTick = now;
+    entry.terminalSeenAtTick = now;
+    entry.terminalSource = callbackType == null ? "callback" : callbackType;
+    entry.diagnosisCode = "TERMINAL_CALLBACK";
+    entry.diagnosisDetail = "terminal callback received";
     logLedger(resolver, entry, now, "callback");
   }
 
@@ -431,33 +431,33 @@ final class CreateShopDeliveryLifecycleLedgerService {
     if (!resolver.isDebugLoggingEnabled()) {
       return;
     }
-    Long last = resolver.getDeliveryLedgerLastLogTick(entry.getChildToken());
+    Long last = resolver.getDeliveryLedgerLastLogTick(entry.childToken);
     if (last != null && now - last < 40L) {
       return;
     }
-    resolver.markDeliveryLedgerLastLogTick(entry.getChildToken(), now);
+    resolver.markDeliveryLedgerLastLogTick(entry.childToken, now);
     TheSettlerXCreate.LOGGER.info(
         "[CreateShop] delivery-child-ledger source={} child={} parent={} state={} owner={} queueContains={} couriers={} courierTaskMatches={} courierCarryMatches={} courierAtSourceMatches={} courierAtTargetMatches={} pickupConfirmedAt={} firstSeen={} createdAt={} assignedAt={} inProgressAt={} terminalAt={} terminalSource={} diagnosis={} detail={}",
         source,
-        entry.getChildToken(),
-        entry.getParentToken(),
-        entry.getLastSeenState(),
-        entry.getLastOwnerResolver(),
-        entry.isLastQueueContains(),
-        entry.getLastCourierCount(),
-        entry.getLastCourierTaskMatchCount(),
-        entry.getLastCourierCarryMatchCount(),
-        entry.getLastCourierAtSourceMatchCount(),
-        entry.getLastCourierAtTargetMatchCount(),
-        entry.getPickupConfirmedAtTick(),
-        entry.getFirstSeenAtTick(),
-        entry.getCreatedSeenAtTick(),
-        entry.getAssignedSeenAtTick(),
-        entry.getInProgressSeenAtTick(),
-        entry.getTerminalSeenAtTick(),
-        entry.getTerminalSource(),
-        entry.getDiagnosisCode(),
-        entry.getDiagnosisDetail());
+        entry.childToken,
+        entry.parentToken,
+        entry.lastSeenState,
+        entry.lastOwnerResolver,
+        entry.lastQueueContains,
+        entry.lastCourierCount,
+        entry.lastCourierTaskMatchCount,
+        entry.lastCourierCarryMatchCount,
+        entry.lastCourierAtSourceMatchCount,
+        entry.lastCourierAtTargetMatchCount,
+        entry.pickupConfirmedAtTick,
+        entry.firstSeenAtTick,
+        entry.createdSeenAtTick,
+        entry.assignedSeenAtTick,
+        entry.inProgressSeenAtTick,
+        entry.terminalSeenAtTick,
+        entry.terminalSource,
+        entry.diagnosisCode,
+        entry.diagnosisDetail);
   }
 
   record WarehouseSnapshot(

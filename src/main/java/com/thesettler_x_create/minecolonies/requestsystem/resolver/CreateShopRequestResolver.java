@@ -663,7 +663,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     for (var entry :
         java.util.List.copyOf(lifecycleStateStore.getDeliveryChildLedger().entrySet())) {
       CreateShopDeliveryChildLedgerEntry ledger = entry.getValue();
-      if (ledger == null || !parentToken.equals(ledger.getParentToken())) {
+      if (ledger == null || !parentToken.equals(ledger.parentToken)) {
         continue;
       }
       IToken<?> childToken = entry.getKey();
@@ -734,13 +734,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (ledger == null) {
         continue;
       }
-      if (!parentToken.equals(ledger.getParentToken())) {
+      if (!parentToken.equals(ledger.parentToken)) {
         continue;
       }
-      if (ledger.getPickupConfirmedAtTick() < 0L) {
+      if (ledger.pickupConfirmedAtTick < 0L) {
         continue;
       }
-      if (ledger.getTerminalSeenAtTick() >= 0L) {
+      if (ledger.terminalSeenAtTick >= 0L) {
         continue;
       }
       return entry.getKey();
