@@ -35,6 +35,8 @@ repo
 Backups/
 Backups/*.zip
 libs/
-FEATURE_STATUS.md
-PROJECT_TODO_LOCAL.md
+
+# AI Agent files (lokal, nicht für git)
+docs/agent/
 AGENTS.md
+FEATURE_STATUS.md
