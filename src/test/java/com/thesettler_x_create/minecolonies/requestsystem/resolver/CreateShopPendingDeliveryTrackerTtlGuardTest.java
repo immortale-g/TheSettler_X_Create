@@ -54,9 +54,10 @@ class CreateShopPendingDeliveryTrackerTtlGuardTest {
     // until the full delivery window closes so inflight tracking survives partial state updates.
     assertTrue(source.contains("state.setDeliveryCreated(false)"));
     // The clear method must NOT call setDeliveryStarted — only markDeliveryCreated sets it to true.
-    String clearSection = source.substring(
-        source.indexOf("void clearDeliveryCreated("),
-        source.indexOf("void clearDeliveryCreated(") + 200);
+    String clearSection =
+        source.substring(
+            source.indexOf("void clearDeliveryCreated("),
+            source.indexOf("void clearDeliveryCreated(") + 200);
     assertTrue(!clearSection.contains("setDeliveryStarted"));
   }
 }

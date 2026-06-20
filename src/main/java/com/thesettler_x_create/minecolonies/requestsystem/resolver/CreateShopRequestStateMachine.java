@@ -13,6 +13,7 @@ final class CreateShopRequestStateMachine {
   private static final String TAG_FLOW_STATES = "FlowStates";
 
   private final Map<IToken<?>, CreateShopFlowRecord> active = new ConcurrentHashMap<>();
+
   /**
    * UUID → FlowState loaded from NBT, consumed the first time a matching token is seen via
    * getOrCreate. Allows exact state restoration after world reload without heuristic derivation.
@@ -20,7 +21,8 @@ final class CreateShopRequestStateMachine {
   private final Map<UUID, CreateShopFlowState> pendingRestore = new ConcurrentHashMap<>();
 
   CreateShopFlowRecord getOrCreate(IToken<?> token, long now) {
-    CreateShopFlowRecord record = active.computeIfAbsent(token, k -> new CreateShopFlowRecord(k, now));
+    CreateShopFlowRecord record =
+        active.computeIfAbsent(token, k -> new CreateShopFlowRecord(k, now));
     // Restore persisted FlowState if the record hasn't progressed past NEW yet.
     if (!pendingRestore.isEmpty() && record.getState() == CreateShopFlowState.NEW) {
       UUID uuid = CreateShopRequestResolver.toRequestId(token);
@@ -95,10 +97,10 @@ final class CreateShopRequestStateMachine {
   }
 
   /**
-   * Saves non-terminal, progressed FlowStates to NBT so they survive world reload.
-   * Only states beyond NEW and ELIGIBILITY_CHECK are saved — those are re-derivable from the
-   * MineColonies request graph. States from ORDERED_FROM_NETWORK onward represent actual progress
-   * and must be restored exactly to prevent double-ordering.
+   * Saves non-terminal, progressed FlowStates to NBT so they survive world reload. Only states
+   * beyond NEW and ELIGIBILITY_CHECK are saved — those are re-derivable from the MineColonies
+   * request graph. States from ORDERED_FROM_NETWORK onward represent actual progress and must be
+   * restored exactly to prevent double-ordering.
    */
   void saveFlowStates(CompoundTag tag) {
     if (active.isEmpty()) {

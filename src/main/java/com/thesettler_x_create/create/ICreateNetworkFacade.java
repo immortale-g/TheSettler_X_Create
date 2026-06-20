@@ -33,8 +33,7 @@ public interface ICreateNetworkFacade {
       IDeliverable deliverable, int amount, String requesterName, @Nullable UUID requestUuid);
 
   /** Broadcasts a stock network order without request-UUID tracking. */
-  default List<ItemStack> requestItems(
-      IDeliverable deliverable, int amount, String requesterName) {
+  default List<ItemStack> requestItems(IDeliverable deliverable, int amount, String requesterName) {
     return requestItems(deliverable, amount, requesterName, null);
   }
 

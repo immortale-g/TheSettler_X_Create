@@ -172,10 +172,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
   @Override
   public List<ItemStack> requestItems(
-      IDeliverable deliverable,
-      int amount,
-      String requesterName,
-      @Nullable UUID requestUuid) {
+      IDeliverable deliverable, int amount, String requesterName, @Nullable UUID requestUuid) {
     if (!hasNetwork() || amount <= 0) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -362,7 +359,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       return;
     }
     var baseline = building.getStockCountsForKeys(orderedStacks);
-    pickup.recordInflight(orderedStacks, baseline, requesterName, shop.getShopAddress(), requestUuid);
+    pickup.recordInflight(
+        orderedStacks, baseline, requesterName, shop.getShopAddress(), requestUuid);
   }
 
   private int getToolLevel(Tool tool, ItemStack stack) {

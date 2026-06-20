@@ -27,9 +27,7 @@ final class CreateShopReservationReleaseService {
   }
 
   void releaseReservation(
-      IRequestManager manager,
-      IRequest<?> request,
-      ILocation resolverLocation) {
+      IRequestManager manager, IRequest<?> request, ILocation resolverLocation) {
     BuildingCreateShop shop = resolveShop(manager, resolverLocation);
     if (shop == null || request == null) {
       return;
