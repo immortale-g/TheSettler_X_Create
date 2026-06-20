@@ -15,7 +15,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 public class CreateNetworkFacade implements ICreateNetworkFacade {
   private static final int MAX_PACKAGE_COUNT = 99;
@@ -169,7 +171,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   @Override
-  public List<ItemStack> requestItems(IDeliverable deliverable, int amount, String requesterName) {
+  public List<ItemStack> requestItems(
+      IDeliverable deliverable,
+      int amount,
+      String requesterName,
+      @Nullable UUID requestUuid) {
     if (!hasNetwork() || amount <= 0) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -190,11 +196,16 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
 
     List<ItemStack> orderedStacks = planItems(deliverable, amount);
-    return requestStacks(orderedStacks, requesterName);
+    return requestStacksWithUuid(orderedStacks, requesterName, requestUuid);
   }
 
   @Override
   public List<ItemStack> requestStacks(List<ItemStack> requestedStacks, String requesterName) {
+    return requestStacksWithUuid(requestedStacks, requesterName, null);
+  }
+
+  private List<ItemStack> requestStacksWithUuid(
+      List<ItemStack> requestedStacks, String requesterName, @Nullable UUID requestUuid) {
     List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
     if (normalized.isEmpty()) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -203,7 +214,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return Collections.emptyList();
     }
-    queueRequestStacks(normalized, requesterName);
+    queueRequestStacks(normalized, requesterName, requestUuid);
     if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] queued {} stack(s) for grouped network broadcast {} -> '{}'",
@@ -211,7 +222,6 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
           shop.getStockNetworkId(),
           shop.getShopAddress());
     }
-
     return normalized;
   }
 
@@ -225,7 +235,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         new QueuedRequestKey(
             shop.getStockNetworkId(),
             shop.getShopAddress(),
-            requesterName == null ? "" : requesterName);
+            requesterName == null ? "" : requesterName,
+            null);
     return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
   }
 
@@ -338,7 +349,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     return total;
   }
 
-  private void recordInflight(List<ItemStack> orderedStacks, String requesterName) {
+  private void recordInflight(
+      List<ItemStack> orderedStacks, String requesterName, @Nullable UUID requestUuid) {
     if (orderedStacks == null || orderedStacks.isEmpty()) {
       return;
     }
@@ -350,7 +362,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       return;
     }
     var baseline = building.getStockCountsForKeys(orderedStacks);
-    pickup.recordInflight(orderedStacks, baseline, requesterName, shop.getShopAddress());
+    pickup.recordInflight(orderedStacks, baseline, requesterName, shop.getShopAddress(), requestUuid);
   }
 
   private int getToolLevel(Tool tool, ItemStack stack) {
@@ -427,7 +439,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         lastBroadcastCount);
   }
 
-  private void queueRequestStacks(List<ItemStack> stacks, String requesterName) {
+  private void queueRequestStacks(
+      List<ItemStack> stacks, String requesterName, @Nullable UUID requestUuid) {
     if (stacks == null || stacks.isEmpty() || shop == null || shop.getStockNetworkId() == null) {
       return;
     }
@@ -435,7 +448,8 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         new QueuedRequestKey(
             shop.getStockNetworkId(),
             shop.getShopAddress(),
-            requesterName == null ? "" : requesterName);
+            requesterName == null ? "" : requesterName,
+            requestUuid);
     QueuedRequestBucket bucket =
         QUEUED_REQUESTS.computeIfAbsent(key, k -> new QueuedRequestBucket(this));
     bucket.facade = this;
@@ -502,7 +516,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.address,
             key.requesterName);
       }
-      recordInflight(consolidated, key.requesterName);
+      recordInflight(consolidated, key.requesterName, key.requestUuid);
       return true;
     } catch (Exception ex) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -542,14 +556,17 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   private static final class QueuedRequestKey {
-    private final java.util.UUID networkId;
+    private final UUID networkId;
     private final String address;
     private final String requesterName;
+    @Nullable private final UUID requestUuid;
 
-    private QueuedRequestKey(java.util.UUID networkId, String address, String requesterName) {
+    private QueuedRequestKey(
+        UUID networkId, String address, String requesterName, @Nullable UUID requestUuid) {
       this.networkId = networkId;
       this.address = address == null ? "" : address;
       this.requesterName = requesterName == null ? "" : requesterName;
+      this.requestUuid = requestUuid;
     }
 
     @Override
@@ -562,12 +579,13 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return java.util.Objects.equals(networkId, other.networkId)
           && java.util.Objects.equals(address, other.address)
-          && java.util.Objects.equals(requesterName, other.requesterName);
+          && java.util.Objects.equals(requesterName, other.requesterName)
+          && java.util.Objects.equals(requestUuid, other.requestUuid);
     }
 
     @Override
     public int hashCode() {
-      return java.util.Objects.hash(networkId, address, requesterName);
+      return java.util.Objects.hash(networkId, address, requesterName, requestUuid);
     }
   }
 }

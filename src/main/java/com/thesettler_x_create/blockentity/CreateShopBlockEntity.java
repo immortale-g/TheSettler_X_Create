@@ -190,6 +190,15 @@ public class CreateShopBlockEntity extends BlockEntity {
       Map<ItemStack, Integer> baselines,
       String requesterName,
       String address) {
+    recordInflight(stacks, baselines, requesterName, address, null);
+  }
+
+  public void recordInflight(
+      List<ItemStack> stacks,
+      Map<ItemStack, Integer> baselines,
+      String requesterName,
+      String address,
+      @Nullable UUID requestUuid) {
     if (!ensureServerThread("recordInflight")) {
       return;
     }
@@ -207,7 +216,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       upsertBaseline(key, baseline);
       inflightEntries.add(
           new InflightEntry(
-              key, stack.getCount(), now, sanitize(requesterName), sanitize(address)));
+              key, stack.getCount(), now, sanitize(requesterName), sanitize(address), requestUuid));
       changed = true;
     }
     if (compactInflightEntriesForPromptStability()) {
@@ -425,6 +434,37 @@ public class CreateShopBlockEntity extends BlockEntity {
     // Fallback: requester labels can drift (hut name vs citizen name); clear by stack+address.
     if (removed <= 0 && !requester.isEmpty()) {
       removed = cancelInflightMatches(stackKey, "", destination, requestedAt);
+    }
+    if (removed > 0) {
+      pruneBaselines();
+      setChanged();
+    }
+    return removed;
+  }
+
+  /**
+   * Cancels all inflight entries linked to the given request UUID.
+   *
+   * <p>UUID-based cancel is precise and drift-free. String-matching fallback is still needed for
+   * legacy entries (requestUuid == null) recorded before Phase 3.1.
+   *
+   * @return total remaining quantity removed
+   */
+  public int cancelInflightByUuid(@Nullable UUID requestUuid) {
+    if (!ensureServerThread("cancelInflightByUuid")) {
+      return 0;
+    }
+    if (requestUuid == null || inflightEntries.isEmpty()) {
+      return 0;
+    }
+    int removed = 0;
+    Iterator<InflightEntry> iterator = inflightEntries.iterator();
+    while (iterator.hasNext()) {
+      InflightEntry entry = iterator.next();
+      if (requestUuid.equals(entry.requestUuid)) {
+        removed += Math.max(0, entry.remaining);
+        iterator.remove();
+      }
     }
     if (removed > 0) {
       pruneBaselines();
@@ -900,8 +940,9 @@ public class CreateShopBlockEntity extends BlockEntity {
         String requester = entry.getString("requester");
         String address = entry.getString("address");
         if (!stack.isEmpty() && remaining > 0) {
+          UUID requestUuid = entry.hasUUID("requestUuid") ? entry.getUUID("requestUuid") : null;
           InflightEntry inflight =
-              new InflightEntry(makeKey(stack), remaining, requestedAt, requester, address);
+              new InflightEntry(makeKey(stack), remaining, requestedAt, requester, address, requestUuid);
           // Interactions are not reliably restored across reload; re-arm overdue prompting for
           // still-open inflight entries after world load.
           inflight.notified = false;
@@ -960,6 +1001,9 @@ public class CreateShopBlockEntity extends BlockEntity {
         if (entry.address != null && !entry.address.isEmpty()) {
           data.putString("address", entry.address);
         }
+        if (entry.requestUuid != null) {
+          data.putUUID("requestUuid", entry.requestUuid);
+        }
         list.add(data);
       }
       tag.put(TAG_INFLIGHT, list);
@@ -1002,15 +1046,28 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final String requesterName;
     public final String address;
     public boolean notified;
+    /** UUID of the MineColonies request that created this entry. Null for legacy entries. */
+    @Nullable public UUID requestUuid;
 
     public InflightEntry(
         ItemStack stackKey, int remaining, long requestedAt, String requesterName, String address) {
+      this(stackKey, remaining, requestedAt, requesterName, address, null);
+    }
+
+    public InflightEntry(
+        ItemStack stackKey,
+        int remaining,
+        long requestedAt,
+        String requesterName,
+        String address,
+        @Nullable UUID requestUuid) {
       this.stackKey = stackKey;
       this.remaining = remaining;
       this.requestedAt = requestedAt;
       this.requesterName = requesterName == null ? "" : requesterName;
       this.address = address == null ? "" : address;
       this.notified = false;
+      this.requestUuid = requestUuid;
     }
   }
 

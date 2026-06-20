@@ -10,6 +10,8 @@ import com.thesettler_x_create.create.ICreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.item.ItemStack;
 
 final class CreateShopStockSnapshot {
@@ -108,11 +110,20 @@ final class CreateShopStockResolver {
 
   List<ItemStack> requestFromNetwork(
       TileEntityCreateShop tile, IDeliverable deliverable, int count, String requesterName) {
+    return requestFromNetwork(tile, deliverable, count, requesterName, null);
+  }
+
+  List<ItemStack> requestFromNetwork(
+      TileEntityCreateShop tile,
+      IDeliverable deliverable,
+      int count,
+      String requesterName,
+      @Nullable UUID requestUuid) {
     if (count <= 0) {
       return java.util.Collections.emptyList();
     }
     ICreateNetworkFacade network = new CreateNetworkFacade(tile);
-    return network.requestItems(deliverable, count, requesterName);
+    return network.requestItems(deliverable, count, requesterName, requestUuid);
   }
 
   int getNetworkAvailable(TileEntityCreateShop tile, IDeliverable deliverable) {
