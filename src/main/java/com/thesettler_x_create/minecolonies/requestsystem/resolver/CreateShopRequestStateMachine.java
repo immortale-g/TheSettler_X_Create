@@ -5,13 +5,33 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.nbt.CompoundTag;
 
 final class CreateShopRequestStateMachine {
+  private static final String TAG_FLOW_STATES = "FlowStates";
+
   private final Map<IToken<?>, CreateShopFlowRecord> active = new ConcurrentHashMap<>();
+  /**
+   * UUID → FlowState loaded from NBT, consumed the first time a matching token is seen via
+   * getOrCreate. Allows exact state restoration after world reload without heuristic derivation.
+   */
+  private final Map<UUID, CreateShopFlowState> pendingRestore = new ConcurrentHashMap<>();
 
   CreateShopFlowRecord getOrCreate(IToken<?> token, long now) {
-    return active.computeIfAbsent(token, k -> new CreateShopFlowRecord(k, now));
+    CreateShopFlowRecord record = active.computeIfAbsent(token, k -> new CreateShopFlowRecord(k, now));
+    // Restore persisted FlowState if the record hasn't progressed past NEW yet.
+    if (!pendingRestore.isEmpty() && record.getState() == CreateShopFlowState.NEW) {
+      UUID uuid = CreateShopRequestResolver.toRequestId(token);
+      if (uuid != null) {
+        CreateShopFlowState restored = pendingRestore.remove(uuid);
+        if (restored != null) {
+          record.setState(restored, now, "nbt-restore", record.getStackLabel(), record.getAmount());
+        }
+      }
+    }
+    return record;
   }
 
   CreateShopFlowRecord get(IToken<?> token) {
@@ -72,6 +92,63 @@ final class CreateShopRequestStateMachine {
       }
     }
     return timedOut;
+  }
+
+  /**
+   * Saves non-terminal, progressed FlowStates to NBT so they survive world reload.
+   * Only states beyond NEW and ELIGIBILITY_CHECK are saved — those are re-derivable from the
+   * MineColonies request graph. States from ORDERED_FROM_NETWORK onward represent actual progress
+   * and must be restored exactly to prevent double-ordering.
+   */
+  void saveFlowStates(CompoundTag tag) {
+    if (active.isEmpty()) {
+      return;
+    }
+    CompoundTag flowStates = new CompoundTag();
+    for (Map.Entry<IToken<?>, CreateShopFlowRecord> entry : active.entrySet()) {
+      CreateShopFlowRecord record = entry.getValue();
+      if (record == null) {
+        continue;
+      }
+      CreateShopFlowState state = record.getState();
+      if (state == null || state.isTerminal()) {
+        continue;
+      }
+      // Skip initial/ephemeral states — they're re-derived on reload.
+      if (state == CreateShopFlowState.NEW || state == CreateShopFlowState.ELIGIBILITY_CHECK) {
+        continue;
+      }
+      UUID uuid = CreateShopRequestResolver.toRequestId(entry.getKey());
+      if (uuid != null) {
+        flowStates.putString(uuid.toString(), state.name());
+      }
+    }
+    if (!flowStates.isEmpty()) {
+      tag.put(TAG_FLOW_STATES, flowStates);
+    }
+  }
+
+  /**
+   * Loads FlowStates from NBT into pendingRestore. States are applied lazily in getOrCreate the
+   * first time each token is seen after reload.
+   */
+  void loadFlowStates(CompoundTag tag) {
+    pendingRestore.clear();
+    if (tag == null || !tag.contains(TAG_FLOW_STATES)) {
+      return;
+    }
+    CompoundTag flowStates = tag.getCompound(TAG_FLOW_STATES);
+    for (String uuidStr : flowStates.getAllKeys()) {
+      try {
+        UUID uuid = UUID.fromString(uuidStr);
+        CreateShopFlowState state = CreateShopFlowState.valueOf(flowStates.getString(uuidStr));
+        if (!state.isTerminal()) {
+          pendingRestore.put(uuid, state);
+        }
+      } catch (Exception ignored) {
+        // Malformed or unknown state name — skip; worst case is re-derivation by RehydrateService.
+      }
+    }
   }
 
   private boolean isAllowedTransition(CreateShopFlowState from, CreateShopFlowState to) {

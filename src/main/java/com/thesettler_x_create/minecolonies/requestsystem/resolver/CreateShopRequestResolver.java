@@ -504,6 +504,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return flowStateMachine;
   }
 
+  /** Saves persisted FlowStates to the given NBT tag. Called from BuildingCreateShop.serializeNBT. */
+  public void saveFlowStatesToNbt(net.minecraft.nbt.CompoundTag tag) {
+    flowStateMachine.saveFlowStates(tag);
+  }
+
+  /** Loads FlowStates from NBT for lazy restore on the next tick. Called from BuildingCreateShop.deserializeNBT. */
+  public void loadFlowStatesFromNbt(net.minecraft.nbt.CompoundTag tag) {
+    flowStateMachine.loadFlowStates(tag);
+  }
+
   CreateShopTerminalRequestLifecycleService getTerminalRequestLifecycleService() {
     return terminalRequestLifecycleService;
   }
