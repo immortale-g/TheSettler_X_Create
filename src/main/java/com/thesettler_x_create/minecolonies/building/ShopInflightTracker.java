@@ -92,7 +92,8 @@ final class ShopInflightTracker {
               notice.requesterName,
               notice.address,
               notice.requestedAt,
-              shop.getLostPackageInteractionEpoch());
+              shop.getLostPackageInteractionEpoch(),
+              notice.requestUuid);
       if (BuildingCreateShop.isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction trigger dispatch citizen={} interactionId={}",

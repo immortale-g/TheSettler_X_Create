@@ -325,7 +325,8 @@ public class CreateShopBlockEntity extends BlockEntity {
             age,
             selected.requesterName,
             selected.address,
-            selected.requestedAt));
+            selected.requestedAt,
+            selected.requestUuid));
   }
 
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
@@ -543,7 +544,8 @@ public class CreateShopBlockEntity extends BlockEntity {
         age,
         selected.requesterName,
         selected.address,
-        selected.requestedAt);
+        selected.requestedAt,
+        selected.requestUuid);
   }
 
   private int cancelInflightMatches(
@@ -1078,6 +1080,8 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final String requesterName;
     public final String address;
     public final long requestedAt;
+    /** UUID of the originating MineColonies request; null for legacy entries without UUID. */
+    @Nullable public final UUID requestUuid;
 
     public InflightNotice(
         ItemStack stackKey,
@@ -1085,13 +1089,15 @@ public class CreateShopBlockEntity extends BlockEntity {
         long age,
         String requesterName,
         String address,
-        long requestedAt) {
+        long requestedAt,
+        @Nullable UUID requestUuid) {
       this.stackKey = stackKey;
       this.remaining = remaining;
       this.age = age;
       this.requesterName = requesterName == null ? "" : requesterName;
       this.address = address == null ? "" : address;
       this.requestedAt = requestedAt;
+      this.requestUuid = requestUuid;
     }
   }
 

@@ -786,6 +786,15 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public int cancelLostPackage(
       ItemStack stackKey, String requesterName, String address, long requestedAt) {
+    return cancelLostPackage(null, stackKey, requesterName, address, requestedAt);
+  }
+
+  public int cancelLostPackage(
+      @Nullable java.util.UUID requestUuid,
+      ItemStack stackKey,
+      String requesterName,
+      String address,
+      long requestedAt) {
     if (stackKey == null || stackKey.isEmpty()) {
       return 0;
     }
@@ -793,10 +802,16 @@ public class BuildingCreateShop extends AbstractBuilding {
     if (pickup == null) {
       return 0;
     }
-    int cleared = pickup.cancelInflight(stackKey, requesterName, address, requestedAt);
+    // UUID-first: precise and drift-free for entries recorded since Phase 3.1.
+    int cleared = requestUuid != null ? pickup.cancelInflightByUuid(requestUuid) : 0;
+    // String-matching fallback for legacy entries (requestUuid == null in NBT).
+    if (cleared <= 0) {
+      cleared = pickup.cancelInflight(stackKey, requesterName, address, requestedAt);
+    }
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package cancel item={} requester='{}' address='{}' cleared={}",
+          "[CreateShop] lost-package cancel uuid={} item={} requester='{}' address='{}' cleared={}",
+          requestUuid,
           stackKey.getHoverName().getString(),
           requesterName,
           address,
@@ -838,13 +853,25 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public int cancelLostPackageRequestAndInflight(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
-    int clearedInflight = cancelLostPackage(stackKey, requesterName, address, requestedAt);
+    return cancelLostPackageRequestAndInflight(
+        null, stackKey, remaining, requesterName, address, requestedAt);
+  }
+
+  public int cancelLostPackageRequestAndInflight(
+      @Nullable java.util.UUID requestUuid,
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt) {
+    int clearedInflight = cancelLostPackage(requestUuid, stackKey, requesterName, address, requestedAt);
     int cancelledRequests =
         new ShopLostPackageRequestCanceller(this)
             .cancelMatchingRequests(stackKey, requesterName, address, requestedAt);
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package cancel+requests item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
+          "[CreateShop] lost-package cancel+requests uuid={} item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
+          requestUuid,
           stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
           requesterName,
           address,
