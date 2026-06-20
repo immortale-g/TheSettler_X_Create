@@ -147,8 +147,7 @@ final class CreateShopTestHarnessCommands {
     LostTupleContext context = findOldestLostTupleContext();
     if (context == null) {
       source.sendFailure(
-          Component.literal(
-              "[CreateShop] AutoHarness lost_handover_sim: no inflight tuple found"));
+          Component.literal("[CreateShop] AutoHarness lost_handover_sim: no inflight tuple found"));
       return 0;
     }
     int simulated =

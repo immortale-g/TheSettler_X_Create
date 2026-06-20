@@ -534,9 +534,7 @@ final class CreateShopResetCommands {
           "[CreateShop] {} stale cleanup failed token={} error={}",
           reason,
           token,
-          cleanEx.getMessage() == null
-              ? cleanEx.getClass().getSimpleName()
-              : cleanEx.getMessage());
+          cleanEx.getMessage() == null ? cleanEx.getClass().getSimpleName() : cleanEx.getMessage());
     }
   }
 
@@ -677,8 +675,7 @@ final class CreateShopResetCommands {
     return shops;
   }
 
-  static java.util.Set<IToken<?>> collectAssignedRequestTokens(
-      IStandardRequestManager standard) {
+  static java.util.Set<IToken<?>> collectAssignedRequestTokens(IStandardRequestManager standard) {
     java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
     if (standard == null) {
       return tokens;

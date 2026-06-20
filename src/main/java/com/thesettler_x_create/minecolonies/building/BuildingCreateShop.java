@@ -69,8 +69,10 @@ public class BuildingCreateShop extends AbstractBuilding {
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   boolean warehouseRegistered;
   private CreateShopRequestResolver shopResolver;
+
   /** FlowStates loaded from NBT; applied to the StateMachine when the resolver first connects. */
   @Nullable private net.minecraft.nbt.CompoundTag pendingFlowStatesTag;
+
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
   private BlockPos pickupPos;
@@ -864,7 +866,8 @@ public class BuildingCreateShop extends AbstractBuilding {
       String requesterName,
       String address,
       long requestedAt) {
-    int clearedInflight = cancelLostPackage(requestUuid, stackKey, requesterName, address, requestedAt);
+    int clearedInflight =
+        cancelLostPackage(requestUuid, stackKey, requesterName, address, requestedAt);
     int cancelledRequests =
         new ShopLostPackageRequestCanceller(this)
             .cancelMatchingRequests(stackKey, requesterName, address, requestedAt);
@@ -928,6 +931,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   private void ensureWarehouseRegistration() {
     warehouseRegistrar.ensureWarehouseRegistration();
   }
+
   /**
    * Requests MineColonies' native building pickup flow for items staged in the hut.
    *
@@ -1080,6 +1084,7 @@ public class BuildingCreateShop extends AbstractBuilding {
         || state == RequestState.RECEIVED
         || state == RequestState.RESOLVED;
   }
+
   public void ensureRackContainers() {
     rackIndex.ensureRackContainers();
   }

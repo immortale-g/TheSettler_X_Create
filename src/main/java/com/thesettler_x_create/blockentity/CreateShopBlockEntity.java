@@ -944,7 +944,8 @@ public class CreateShopBlockEntity extends BlockEntity {
         if (!stack.isEmpty() && remaining > 0) {
           UUID requestUuid = entry.hasUUID("requestUuid") ? entry.getUUID("requestUuid") : null;
           InflightEntry inflight =
-              new InflightEntry(makeKey(stack), remaining, requestedAt, requester, address, requestUuid);
+              new InflightEntry(
+                  makeKey(stack), remaining, requestedAt, requester, address, requestUuid);
           // Interactions are not reliably restored across reload; re-arm overdue prompting for
           // still-open inflight entries after world load.
           inflight.notified = false;
@@ -1048,6 +1049,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final String requesterName;
     public final String address;
     public boolean notified;
+
     /** UUID of the MineColonies request that created this entry. Null for legacy entries. */
     @Nullable public UUID requestUuid;
 
@@ -1080,6 +1082,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     public final String requesterName;
     public final String address;
     public final long requestedAt;
+
     /** UUID of the originating MineColonies request; null for legacy entries without UUID. */
     @Nullable public final UUID requestUuid;
 

@@ -21,7 +21,8 @@ class CreateShopRequestResolverPartialTopupGuardTest {
     assertTrue(source.contains("tickPending:network-topup"));
     assertTrue(source.contains("stockResolver.requestFromNetwork("));
     assertTrue(source.contains("topupCount"));
-    assertTrue(source.contains("CreateShopRequestResolver.toRequestId(request.getId())")); // UUID passed
+    assertTrue(
+        source.contains("CreateShopRequestResolver.toRequestId(request.getId())")); // UUID passed
     assertTrue(source.contains("pickup.reserve("));
     assertTrue(source.contains("CreateShopRequestResolver.toRequestId(request.getId())"));
     assertTrue(source.contains("stack.copy()"));

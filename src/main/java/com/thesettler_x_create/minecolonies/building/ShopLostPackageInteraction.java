@@ -40,6 +40,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private long interactionEpoch;
   private boolean active = true;
   private final long debugInstanceId = DEBUG_INSTANCE_SEQ.getAndIncrement();
+
   /** UUID of the originating MineColonies request. Null for pre-3.1 interactions. */
   @Nullable private java.util.UUID requestUuid;
 

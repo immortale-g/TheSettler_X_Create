@@ -179,8 +179,7 @@ final class ShopHousekeepingOrchestrator {
       }
       return;
     }
-    int dueStacks =
-        Math.max(TRANSFER_STACKS, (int) Math.max(1L, elapsed / TRANSFER_INTERVAL));
+    int dueStacks = Math.max(TRANSFER_STACKS, (int) Math.max(1L, elapsed / TRANSFER_INTERVAL));
     int transferBudget = Math.min(MAX_CATCHUP_STACKS, dueStacks);
     int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
     boolean hutHasItems = tile.hasHutInventoryItems();

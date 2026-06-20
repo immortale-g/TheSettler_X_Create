@@ -1,6 +1,6 @@
 # TheSettler_x_Create – Cleanup & Improvement Roadmap
 
-Erstellt nach Code-Analyse, Juni 2026.  
+Erstellt nach Code-Analyse, Juni 2026.
 Keine Änderungen wurden vorgenommen. Dies ist eine reine Analyse und Planung.
 
 ---

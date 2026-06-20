@@ -296,9 +296,7 @@ final class CreateShopChildReconciliationService {
       return false;
     }
     CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
-    if (ledger == null
-        || ledger.pickupConfirmedAtTick < 0L
-        || ledger.terminalSeenAtTick >= 0L) {
+    if (ledger == null || ledger.pickupConfirmedAtTick < 0L || ledger.terminalSeenAtTick >= 0L) {
       return false;
     }
     if (!parentRequest.getId().equals(ledger.parentToken)) {

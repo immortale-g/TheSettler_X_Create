@@ -298,15 +298,16 @@ public final class CreateShopMaintenanceCommands {
                                                 "amount", IntegerArgumentType.integer(1, 64))
                                             .executes(
                                                 context ->
-                                                    CreateShopTestHarnessCommands.runAutoHarnessFull(
-                                                        context.getSource(),
-                                                        IntegerArgumentType.getInteger(
-                                                            context, "rounds"),
-                                                        IntegerArgumentType.getInteger(
-                                                            context, "requests"),
-                                                        IntegerArgumentType.getInteger(
-                                                            context, "amount"),
-                                                        true)))))));
+                                                    CreateShopTestHarnessCommands
+                                                        .runAutoHarnessFull(
+                                                            context.getSource(),
+                                                            IntegerArgumentType.getInteger(
+                                                                context, "rounds"),
+                                                            IntegerArgumentType.getInteger(
+                                                                context, "requests"),
+                                                            IntegerArgumentType.getInteger(
+                                                                context, "amount"),
+                                                            true)))))));
 
     root.then(
         Commands.literal("auto_test_harness_full_all")

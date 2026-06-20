@@ -11,8 +11,8 @@ import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 final class CreateShopStockSnapshot {
   private final int networkAvailable;

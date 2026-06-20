@@ -66,7 +66,8 @@ class CreateShopRehydrateServiceGuardTest {
 
     // The service expands beyond the initial candidate set with tokens from the pending tracker
     // and delivery parent snapshot — this ensures state is not lost on a partial reload.
-    assertTrue(source.contains("expandedCandidates.addAll(resolver.getPendingTracker().getTokens())"));
+    assertTrue(
+        source.contains("expandedCandidates.addAll(resolver.getPendingTracker().getTokens())"));
     assertTrue(
         source.contains("expandedCandidates.addAll(resolver.getParentDeliveryTokensSnapshot())"));
   }

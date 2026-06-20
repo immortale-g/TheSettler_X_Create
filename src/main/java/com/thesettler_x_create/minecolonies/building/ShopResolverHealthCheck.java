@@ -12,8 +12,8 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Handles resolver registration health checks, resolver selection, and ownership drift recovery
- * for the Create Shop building.
+ * Handles resolver registration health checks, resolver selection, and ownership drift recovery for
+ * the Create Shop building.
  *
  * <p>Extracted from {@link BuildingCreateShop} to keep resolver-lifecycle logic in one place.
  */
@@ -179,10 +179,8 @@ final class ShopResolverHealthCheck {
           }
           selected = assignmentSelected;
         } else {
-          CreateShopRequestResolver ownershipSelected =
-              findResolverFromRequestOwnership(manager);
-          if (ownershipSelected != null
-              && !ownershipSelected.getId().equals(selected.getId())) {
+          CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
+          if (ownershipSelected != null && !ownershipSelected.getId().equals(selected.getId())) {
             if (BuildingCreateShop.isDebugRequests()) {
               com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                   "[CreateShop] resolver ownership drift detected: switching {} -> {}",
