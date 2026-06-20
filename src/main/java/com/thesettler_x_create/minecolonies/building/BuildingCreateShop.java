@@ -64,10 +64,13 @@ public class BuildingCreateShop extends AbstractBuilding {
   static final String TAG_PERMA_ORES = "PermaOres";
   static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
+  private static final String TAG_FLOW_STATES = "FlowStates";
 
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
   boolean warehouseRegistered;
   private CreateShopRequestResolver shopResolver;
+  /** FlowStates loaded from NBT; applied to the StateMachine when the resolver first connects. */
+  @Nullable private net.minecraft.nbt.CompoundTag pendingFlowStatesTag;
   private IToken<?> deliveryResolverToken;
   private IToken<?> pickupResolverToken;
   private BlockPos pickupPos;
@@ -388,6 +391,11 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.shopResolver = resolver;
     this.deliveryResolverToken = deliveryToken;
     this.pickupResolverToken = pickupToken;
+    // Apply any FlowStates that were loaded from NBT before the resolver was available.
+    if (resolver != null && pendingFlowStatesTag != null) {
+      resolver.loadFlowStatesFromNbt(pendingFlowStatesTag);
+      pendingFlowStatesTag = null;
+    }
   }
 
   @Nullable
@@ -1195,6 +1203,15 @@ public class BuildingCreateShop extends AbstractBuilding {
       builderHutPos = BlockPos.of(compound.getLong(TAG_BUILDER_HUT_POS));
     }
     permaManager.loadPerma(compound);
+    // Buffer FlowStates for lazy application when the resolver connects (setResolverState).
+    if (compound.contains(TAG_FLOW_STATES)) {
+      net.minecraft.nbt.CompoundTag flowTag = compound.getCompound(TAG_FLOW_STATES);
+      if (shopResolver != null) {
+        shopResolver.loadFlowStatesFromNbt(flowTag);
+      } else {
+        pendingFlowStatesTag = flowTag;
+      }
+    }
   }
 
   @Override
@@ -1209,6 +1226,9 @@ public class BuildingCreateShop extends AbstractBuilding {
     permaManager.savePerma(tag);
     if (builderHutPos != null) {
       tag.putLong(TAG_BUILDER_HUT_POS, builderHutPos.asLong());
+    }
+    if (shopResolver != null) {
+      shopResolver.saveFlowStatesToNbt(tag);
     }
     return tag;
   }
