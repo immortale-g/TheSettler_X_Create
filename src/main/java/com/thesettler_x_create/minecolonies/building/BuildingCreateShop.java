@@ -7,7 +7,6 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
-import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Pickup;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
@@ -32,7 +31,6 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -344,7 +342,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     super.onDestroyed();
     var manager = getColony() == null ? null : getColony().getServerBuildingManager();
     if (manager != null && manager.getWareHouses() != null) {
-      manager.getWareHouses().remove(this);
+      manager.getWareHouses().removeIf(w -> w == this);
     }
     warehouseRegistered = false;
   }
