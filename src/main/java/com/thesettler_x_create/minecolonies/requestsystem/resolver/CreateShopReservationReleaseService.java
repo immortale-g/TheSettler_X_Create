@@ -47,17 +47,20 @@ final class CreateShopReservationReleaseService {
     if (key == null || key.isEmpty()) {
       return;
     }
-    String requesterName = messaging.resolveRequesterName(manager, request);
-    TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-    String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
-    int cleared = shop.cancelLostPackage(key, requesterName, address, -1L);
+    // UUID-first cancel: precise and drift-free for entries recorded since Phase 3.1.
+    java.util.UUID requestUuid = CreateShopRequestResolver.toRequestId(request.getId());
+    int cleared = pickup.cancelInflightByUuid(requestUuid);
+    // String-matching fallback for legacy entries (recorded before Phase 3.1, requestUuid == null).
+    if (cleared <= 0) {
+      String requesterName = messaging.resolveRequesterName(manager, request);
+      TileEntityCreateShop tile = shop.getCreateShopTileEntity();
+      String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
+      cleared = shop.cancelLostPackage(key, requesterName, address, -1L);
+    }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] releaseReservation cancelled request={} item={} requester='{}' address='{}' clearedInflight={}",
+          "[CreateShop] releaseReservation cancelled request={} clearedInflight={}",
           request.getId(),
-          key.getHoverName().getString(),
-          requesterName,
-          address,
           cleared);
     }
   }

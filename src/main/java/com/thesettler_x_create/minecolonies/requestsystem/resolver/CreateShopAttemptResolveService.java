@@ -205,7 +205,11 @@ final class CreateShopAttemptResolveService {
       if (effectiveNetworkNeeded > 0) {
         networkOrdered.addAll(
             stockResolver.requestFromNetwork(
-                tile, deliverable, effectiveNetworkNeeded, requesterName));
+                tile,
+                deliverable,
+                effectiveNetworkNeeded,
+                requesterName,
+                CreateShopRequestResolver.toRequestId(request.getId())));
         ordered.addAll(networkOrdered);
       }
     }
