@@ -137,8 +137,7 @@ final class CreateShopPendingRequestProcessorService {
         return;
       }
       if (!childResult.hasActiveChildren()) {
-        requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
+        // Delivery-child tracking is now MineColonies' responsibility; no local clocks to clear.
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
         return;
@@ -216,8 +215,6 @@ final class CreateShopPendingRequestProcessorService {
       return;
     }
     requestStateMutatorService.setParentChildrenSnapshot(resolver, request.getId(), 0, "[]");
-    requestStateMutatorService.clearParentDeliveryActive(resolver, request.getId());
-    requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
     if (resolver.hasDeliveriesCreated(request.getId())) {
       if (completionSeen) {
         resolver.clearDeliveriesCreated(request.getId());

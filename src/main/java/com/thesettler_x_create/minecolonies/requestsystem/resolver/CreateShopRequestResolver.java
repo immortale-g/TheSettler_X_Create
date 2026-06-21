@@ -154,7 +154,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.childReconciliationService =
         new CreateShopChildReconciliationService(
             deliveryManager,
-            deliveryChildLifecycleService,
             deliveryChildRecoveryService,
             deliveryRootCauseSnapshotService,
             requestStateMutatorService);
@@ -454,10 +453,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public boolean hasProtectedInventoryWindow() {
-    return hasActiveWork()
-        || hasAnyActiveChild()
-        || !getParentDeliveryTokensSnapshot().isEmpty()
-        || lifecycleStateStore.getPendingTracker().hasEntries();
+    return hasActiveWork() || lifecycleStateStore.getPendingTracker().hasEntries();
   }
 
   long resolveNowTick(IRequestManager manager) {
@@ -523,27 +519,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return terminalRequestLifecycleService;
   }
 
-  Long getParentStaleRecoveryArmedAt(IToken<?> parentToken) {
-    return lifecycleStateStore.getParentStaleRecoveryArmedAt().get(parentToken);
-  }
-
-  boolean armStaleRecoveryIfMissing(IToken<?> parentToken, long nowTick) {
-    return lifecycleStateStore.getParentStaleRecoveryArmedAt().putIfAbsent(parentToken, nowTick)
-        == null;
-  }
-
-  void clearParentStaleRecoveryArm(IToken<?> parentToken) {
-    lifecycleStateStore.getParentStaleRecoveryArmedAt().remove(parentToken);
-  }
-
-  Long markParentDeliveryActiveIfAbsent(IToken<?> parentToken, long nowTick) {
-    return lifecycleStateStore.getParentDeliveryActiveSince().putIfAbsent(parentToken, nowTick);
-  }
-
-  void clearParentDeliveryActive(IToken<?> parentToken) {
-    lifecycleStateStore.getParentDeliveryActiveSince().remove(parentToken);
-  }
-
   void markParentChildCompletedSeen(IToken<?> parentToken, long tick) {
     if (parentToken == null) {
       return;
@@ -561,26 +536,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     lifecycleStateStore.getParentChildCompletedSeenAt().remove(parentToken);
-  }
-
-  java.util.Set<IToken<?>> getParentDeliveryTokensSnapshot() {
-    return java.util.Set.copyOf(lifecycleStateStore.getParentDeliveryActiveSince().keySet());
-  }
-
-  void markChildActive(IToken<?> childToken, long sinceTick) {
-    lifecycleStateStore.getDeliveryChildActiveSince().put(childToken, sinceTick);
-  }
-
-  void clearChildActive(IToken<?> childToken) {
-    lifecycleStateStore.getDeliveryChildActiveSince().remove(childToken);
-  }
-
-  boolean hasAnyActiveChild() {
-    return !lifecycleStateStore.getDeliveryChildActiveSince().isEmpty();
-  }
-
-  java.util.Set<IToken<?>> getActiveChildTokensSnapshot() {
-    return java.util.Set.copyOf(lifecycleStateStore.getDeliveryChildActiveSince().keySet());
   }
 
   void clearMissingChildSince(IToken<?> childToken) {
