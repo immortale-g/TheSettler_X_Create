@@ -44,23 +44,6 @@ final class CreateShopLifecycleRehydrateService {
     }
     Set<IToken<?>> expandedCandidates = new LinkedHashSet<>(candidates);
     expandedCandidates.addAll(resolver.getPendingTracker().getTokens());
-    expandedCandidates.addAll(resolver.getParentDeliveryTokensSnapshot());
-    for (IToken<?> childToken : resolver.getActiveChildTokensSnapshot()) {
-      IRequest<?> childRequest = null;
-      try {
-        childRequest = manager.getRequestHandler().getRequest(childToken);
-      } catch (Exception ignored) {
-        resolver.clearChildActive(childToken);
-      }
-      if (childRequest == null) {
-        resolver.clearChildActive(childToken);
-        continue;
-      }
-      IToken<?> parent = childRequest.getParent();
-      if (parent != null) {
-        expandedCandidates.add(parent);
-      }
-    }
     Set<IToken<?>> active = new LinkedHashSet<>();
     long now = level.getGameTime();
     for (IToken<?> token : Set.copyOf(expandedCandidates)) {
@@ -72,12 +55,10 @@ final class CreateShopLifecycleRehydrateService {
         request = manager.getRequestHandler().getRequest(token);
       } catch (Exception ignored) {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (request == null || CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (!(request.getRequest() instanceof IDeliverable deliverable)) {
@@ -123,7 +104,6 @@ final class CreateShopLifecycleRehydrateService {
         active.add(token);
       } else {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, false);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
       }
     }
     return active;

@@ -172,7 +172,7 @@ final class CreateShopTerminalRequestLifecycleService {
       return;
     }
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
-    for (var parentToken : resolver.getParentDeliveryTokensSnapshot()) {
+    for (var parentToken : java.util.List.copyOf(resolver.getPendingTracker().getTokens())) {
       if (parentToken == null) {
         continue;
       }

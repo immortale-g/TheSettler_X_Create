@@ -16,6 +16,6 @@ class CreateShopRequestResolverLookupFailureGraceDropGuardTest {
 
     assertTrue(source.contains("lookup failed -> hold (no drop)"));
     assertTrue(source.contains("markMissingChildIfAbsent(childToken, nowTick)"));
-    assertTrue(source.contains("markChildActive(resolver, childToken, nowTick)"));
+    // markChildActive removed in Phase 3.5 — MineColonies owns delivery tracking post-creation.
   }
 }

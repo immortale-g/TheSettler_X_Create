@@ -1,7 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
@@ -12,7 +11,15 @@ import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/** Owns stale-arm/timeout and tracked-child cleanup lifecycle for delivery children. */
+/**
+ * Lifecycle helpers for delivery child requests.
+ *
+ * <p>Stale-child detection and forced courier recovery have been removed: once DELIVERY_CREATED is
+ * reached, MineColonies owns the delivery. The shop reacts to terminal callbacks rather than
+ * polling courier progress. The only remaining active guard is the extra-active-child check which
+ * cancels duplicate delivery children for the same parent (a programming-error guard, not a
+ * timeout-based heuristic).
+ */
 final class CreateShopDeliveryChildLifecycleService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
@@ -21,28 +28,10 @@ final class CreateShopDeliveryChildLifecycleService {
     this.requestStateMutatorService = requestStateMutatorService;
   }
 
-  boolean isStaleRecoveryArmed(
-      CreateShopRequestResolver resolver,
-      Level level,
-      IStandardRequestManager manager,
-      IToken<?> parentToken) {
-    if (level == null || manager == null || parentToken == null) {
-      return false;
-    }
-    long now = level.getGameTime();
-    Long armedAt = resolver.getParentStaleRecoveryArmedAt(parentToken);
-    if (armedAt == null) {
-      requestStateMutatorService.armStaleRecoveryIfMissing(resolver, parentToken, now);
-      resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken);
-      return false;
-    }
-    long staleRecheckDelay = 20L;
-    if (now - armedAt < staleRecheckDelay) {
-      return false;
-    }
-    return true;
-  }
-
+  /**
+   * Returns true if the missing-child grace period has elapsed. Used only for the
+   * immediate-pickup-confirmed recovery path.
+   */
   boolean shouldDropMissingChild(
       CreateShopRequestResolver resolver, Level level, IToken<?> childToken) {
     if (resolver == null || level == null || childToken == null) {
@@ -56,68 +45,16 @@ final class CreateShopDeliveryChildLifecycleService {
     return now - since >= 40L;
   }
 
-  boolean isStaleDeliveryChild(
-      CreateShopRequestResolver resolver,
-      Level level,
-      IToken<?> parentToken,
-      IToken<?> childToken,
-      RequestState state) {
-    if (level == null || parentToken == null || childToken == null || state == null) {
-      return false;
-    }
-    boolean activeState =
-        state == RequestState.CREATED
-            || state == RequestState.ASSIGNED
-            || state == RequestState.IN_PROGRESS;
-    if (!activeState) {
-      requestStateMutatorService.clearChildActive(resolver, childToken);
-      return false;
-    }
-    long now = level.getGameTime();
-    Long since =
-        requestStateMutatorService.markParentDeliveryActiveIfAbsent(resolver, parentToken, now);
-    if (since == null) {
-      requestStateMutatorService.markChildActive(resolver, childToken, now);
-      return false;
-    }
-    requestStateMutatorService.markChildActive(resolver, childToken, since);
-    long timeout =
-        Math.max(
-            CreateShopRequestResolver.getDeliveryChildStaleTimeoutFloorTicks(),
-            resolver.getInflightTimeoutTicksSafe());
-    return now - since >= timeout;
-  }
-
   void clearTrackedChildrenForParent(
       CreateShopRequestResolver resolver, IStandardRequestManager manager, IToken<?> parentToken) {
-    if (manager == null || parentToken == null) {
+    if (parentToken == null) {
       return;
     }
-    requestStateMutatorService.clearParentDeliveryActive(resolver, parentToken);
-    requestStateMutatorService.clearStaleRecoveryArm(resolver, parentToken);
     requestStateMutatorService.clearParentChildrenSnapshot(resolver, parentToken);
-    if (!resolver.hasAnyActiveChild()) {
-      return;
-    }
-    var handler = manager.getRequestHandler();
-    if (handler == null) {
-      return;
-    }
-    for (IToken<?> childToken : resolver.getActiveChildTokensSnapshot()) {
-      try {
-        IRequest<?> child = handler.getRequest(childToken);
-        IToken<?> parent = child == null ? null : child.getParent();
-        if (parentToken.equals(parent)) {
-          requestStateMutatorService.clearChildActive(resolver, childToken);
-        }
-      } catch (Exception ignored) {
-        requestStateMutatorService.clearChildActive(resolver, childToken);
-      }
-    }
   }
 }
 
-/** Performs guarded local-delivery child recovery and parent requeue reconciliation. */
+/** Cancels a duplicate or otherwise-problematic delivery child and re-opens the pending window. */
 final class CreateShopDeliveryChildRecoveryService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverOwnership ownership;
@@ -151,7 +88,6 @@ final class CreateShopDeliveryChildRecoveryService {
       return false;
     }
     if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest)) {
-      requestStateMutatorService.clearStaleRecoveryArm(resolver, parentRequest.getId());
       return false;
     }
     if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(childRequest, shop, pickup)) {

@@ -1,18 +1,18 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
+/**
+ * After Phase 3.5 the two-phase stale recovery (arm + recheck + mutation) has been removed.
+ * MineColonies owns courier delivery retries; the shop no longer polls or forces recovery.
+ */
 class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
   @Test
-  void staleRecoveryRequiresArmAndRecheckBeforeMutation() throws Exception {
-    String resolverSource =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
+  void staleRecoveryArmAndRecheckAreRemoved() throws Exception {
     String lifecycleSource =
         Files.readString(
             Path.of(
@@ -21,14 +21,14 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
+    String resolverSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
 
-    assertTrue(lifecycleSource.contains("getParentStaleRecoveryArmedAt(parentToken)"));
-    assertTrue(reconcileSource.contains("deliveryChildLifecycleService.isStaleRecoveryArmed("));
-    assertTrue(
-        reconcileSource.contains("if (!deliveryChildLifecycleService.isStaleRecoveryArmed("));
-    assertTrue(
-        lifecycleSource.contains(
-            "resolver.getRecheck().scheduleParentChildRecheck(manager, parentToken)"));
-    assertTrue(resolverSource.contains("clearParentStaleRecoveryArm("));
+    assertFalse(lifecycleSource.contains("getParentStaleRecoveryArmedAt"));
+    assertFalse(reconcileSource.contains("isStaleRecoveryArmed("));
+    assertFalse(reconcileSource.contains("stale-child-recovery"));
+    assertFalse(resolverSource.contains("clearParentStaleRecoveryArm("));
   }
 }

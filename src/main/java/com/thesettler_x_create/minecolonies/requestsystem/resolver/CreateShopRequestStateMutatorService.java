@@ -36,6 +36,10 @@ final class CreateShopRequestStateMutatorService {
     resolver.getPendingTracker().remove(requestToken);
   }
 
+  /**
+   * Opens the delivery window: marks the parent as having at least 1 pending unit. Stale-child
+   * clock tracking has been removed — MineColonies owns the delivery lifecycle after this point.
+   */
   void openDeliveryWindow(
       CreateShopRequestResolver resolver,
       Level level,
@@ -46,12 +50,6 @@ final class CreateShopRequestStateMutatorService {
       return;
     }
     markOrderedWithPendingAtLeastOne(resolver, level, parentToken, Math.max(1, pendingCount));
-    resolver.markParentDeliveryActiveIfAbsent(
-        parentToken, level == null ? 0L : level.getGameTime());
-    clearStaleRecoveryArm(resolver, parentToken);
-    if (childToken != null) {
-      resolver.markChildActive(childToken, level == null ? 0L : level.getGameTime());
-    }
   }
 
   void closeDeliveryWindow(
@@ -59,72 +57,14 @@ final class CreateShopRequestStateMutatorService {
     if (resolver == null) {
       return;
     }
-    if (childToken != null) {
-      resolver.clearChildActive(childToken);
-    }
     if (parentToken != null) {
-      resolver.clearParentDeliveryActive(parentToken);
-      clearStaleRecoveryArm(resolver, parentToken);
       resolver.clearDeliveriesCreated(parentToken);
     }
   }
 
   void completeDeliveryWindow(
       CreateShopRequestResolver resolver, IToken<?> parentToken, IToken<?> childToken) {
-    if (resolver == null) {
-      return;
-    }
-    if (childToken != null) {
-      resolver.clearChildActive(childToken);
-    }
-    if (parentToken != null) {
-      resolver.clearParentDeliveryActive(parentToken);
-      clearStaleRecoveryArm(resolver, parentToken);
-    }
-  }
-
-  boolean armStaleRecoveryIfMissing(
-      CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
-    if (resolver == null || parentToken == null) {
-      return false;
-    }
-    return resolver.armStaleRecoveryIfMissing(parentToken, nowTick);
-  }
-
-  void clearStaleRecoveryArm(CreateShopRequestResolver resolver, IToken<?> parentToken) {
-    if (resolver == null || parentToken == null) {
-      return;
-    }
-    resolver.clearParentStaleRecoveryArm(parentToken);
-  }
-
-  Long markParentDeliveryActiveIfAbsent(
-      CreateShopRequestResolver resolver, IToken<?> parentToken, long nowTick) {
-    if (resolver == null || parentToken == null) {
-      return null;
-    }
-    return resolver.markParentDeliveryActiveIfAbsent(parentToken, nowTick);
-  }
-
-  void clearParentDeliveryActive(CreateShopRequestResolver resolver, IToken<?> parentToken) {
-    if (resolver == null || parentToken == null) {
-      return;
-    }
-    resolver.clearParentDeliveryActive(parentToken);
-  }
-
-  void markChildActive(CreateShopRequestResolver resolver, IToken<?> childToken, long sinceTick) {
-    if (resolver == null || childToken == null) {
-      return;
-    }
-    resolver.markChildActive(childToken, sinceTick);
-  }
-
-  void clearChildActive(CreateShopRequestResolver resolver, IToken<?> childToken) {
-    if (resolver == null || childToken == null) {
-      return;
-    }
-    resolver.clearChildActive(childToken);
+    // No stale-clock cleanup needed — those maps have been removed.
   }
 
   void clearMissingChild(CreateShopRequestResolver resolver, IToken<?> childToken) {
@@ -167,12 +107,9 @@ final class CreateShopRequestStateMutatorService {
     }
     clearOrderedAndPending(resolver, token);
     resolver.clearDeliveriesCreated(token);
-    resolver.clearParentDeliveryActive(token);
     resolver.clearParentChildCompletedSeen(token);
-    resolver.clearParentStaleRecoveryArm(token);
     resolver.clearParentChildrenSnapshot(token);
     resolver.clearDeliveryChildLedgerForParent(token);
-    resolver.clearChildActive(token);
     resolver.clearMissingChildSince(token);
     resolver.clearRootCauseTracking(token);
     resolver.clearRetryingReassignAttempt(token);
@@ -187,10 +124,6 @@ final class CreateShopRequestStateMutatorService {
       IToken<?> token,
       boolean clearFlowState) {
     clearPendingTokenState(resolver, token, clearFlowState);
-    if (resolver == null || manager == null || token == null) {
-      return;
-    }
-    resolver.clearTrackedChildrenForParent(manager, token);
   }
 
   void finalizeOrphanDeliveryChild(
@@ -309,7 +242,6 @@ final class CreateShopRequestStateMutatorService {
     } catch (Exception ignored) {
       // Best effort only.
     }
-    clearChildActive(resolver, childToken);
     clearMissingChild(resolver, childToken);
     resolver.clearRootCauseTracking(childToken);
     if (resolver.isDebugLoggingEnabled()) {

@@ -155,8 +155,7 @@ final class CreateShopFlowTimeoutCleanupService {
         resolver.getFlowStateMachine().collectTimedOut(level.getGameTime(), timeout)) {
       IToken<?> token = record.getRequestToken();
       boolean runtimeDeliveryWindowOpen =
-          resolver.getParentDeliveryTokensSnapshot().contains(token)
-              || resolver.hasDeliveriesCreated(token)
+          resolver.hasDeliveriesCreated(token)
               || resolver.getPendingTracker().hasDeliveryStarted(token);
       IRequest<?> request = null;
       try {

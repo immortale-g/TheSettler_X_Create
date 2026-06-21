@@ -15,7 +15,6 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -67,8 +66,8 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
     resolver.markDeliveriesCreated(parentToken);
-    parentMap("parentDeliveryActiveSince").put(parentToken, 8_000L);
-    parentMap("deliveryChildActiveSince").put(childToken, 8_500L);
+    // Since Phase 3.5, parentDeliveryActiveSince and deliveryChildActiveSince are removed.
+    // The active-delivery window is now signalled solely by hasDeliveriesCreated.
 
     invokeProcessTimedOutFlows(manager, level);
 
@@ -76,8 +75,6 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     assertEquals(3, resolver.getPendingTracker().getPendingCount(parentToken));
     assertTrue(resolver.getCooldown().isOrdered(parentToken));
     assertTrue(resolver.hasDeliveriesCreated(parentToken));
-    assertTrue(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
-    assertTrue(parentMap("deliveryChildActiveSince").containsKey(childToken));
   }
 
   @Test
@@ -108,8 +105,6 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
-    assertFalse(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
-    assertFalse(parentMap("deliveryChildActiveSince").containsKey(parentToken));
   }
 
   private void invokeProcessTimedOutFlows(IStandardRequestManager manager, Level level)
@@ -133,16 +128,6 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     Field field = CreateShopRequestResolver.class.getDeclaredField(fieldName);
     field.setAccessible(true);
     return field.get(resolver);
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<IToken<?>, Long> parentMap(String fieldName) throws Exception {
-    Field storeField = CreateShopRequestResolver.class.getDeclaredField("lifecycleStateStore");
-    storeField.setAccessible(true);
-    Object store = storeField.get(resolver);
-    Field mapField = store.getClass().getDeclaredField(fieldName);
-    mapField.setAccessible(true);
-    return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
   @SuppressWarnings("unchecked")

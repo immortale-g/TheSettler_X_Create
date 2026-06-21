@@ -22,19 +22,16 @@ import net.minecraft.world.level.Level;
 /** Reconciles parent child-request lifecycle for pending Create Shop requests. */
 final class CreateShopChildReconciliationService {
   private final CreateShopDeliveryManager deliveryManager;
-  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopChildReconciliationService(
       CreateShopDeliveryManager deliveryManager,
-      CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService,
       CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService,
       CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService,
       CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.deliveryManager = deliveryManager;
-    this.deliveryChildLifecycleService = deliveryChildLifecycleService;
     this.deliveryChildRecoveryService = deliveryChildRecoveryService;
     this.deliveryRootCauseSnapshotService = deliveryRootCauseSnapshotService;
     this.requestStateMutatorService = requestStateMutatorService;
@@ -75,7 +72,6 @@ final class CreateShopChildReconciliationService {
           if (child == null) {
             long nowTick = level == null ? 0L : level.getGameTime();
             resolver.markMissingChildIfAbsent(childToken, nowTick);
-            requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
             resolver.observeDeliveryChildMissing(
                 level, request.getId(), childToken, "poll-missing", "handler lookup returned null");
             hasActiveChildren = true;
@@ -104,9 +100,7 @@ final class CreateShopChildReconciliationService {
                     || childState == RequestState.RECEIVED;
             if (terminalChild) {
               request.removeChild(childToken);
-              requestStateMutatorService.clearChildActive(resolver, childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
-              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
               requestStateMutatorService.completeDeliveryWindow(
                   resolver, request.getId(), childToken);
               resolver.markParentChildCompletedSeen(
@@ -175,37 +169,9 @@ final class CreateShopChildReconciliationService {
             } else {
               activeLocalDeliveryChild = childToken;
             }
-            if (deliveryChildLifecycleService.isStaleDeliveryChild(
-                resolver, level, request.getId(), childToken, childState)) {
-              if (!deliveryChildLifecycleService.isStaleRecoveryArmed(
-                  resolver, level, standardManager, request.getId())) {
-                hasActiveChildren = true;
-                continue;
-              }
-              boolean recovered =
-                  deliveryChildRecoveryService.recover(
-                      resolver,
-                      standardManager,
-                      level,
-                      request,
-                      childToken,
-                      child,
-                      shop,
-                      pickup,
-                      "stale-child-recovery",
-                      "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
-              if (recovered) {
-                missing++;
-                continue;
-              }
-            } else {
-              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
-            }
             deliveryRootCauseSnapshotService.logSnapshot(
                 resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
-          } else {
-            requestStateMutatorService.clearChildActive(resolver, childToken);
           }
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             String childType = child.getRequest().getClass().getName();
@@ -220,7 +186,6 @@ final class CreateShopChildReconciliationService {
         } catch (Exception ex) {
           long nowTick = level == null ? 0L : level.getGameTime();
           resolver.markMissingChildIfAbsent(childToken, nowTick);
-          requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
           resolver.observeDeliveryChildMissing(
               level,
               request.getId(),
