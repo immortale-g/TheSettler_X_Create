@@ -35,6 +35,6 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
     assertFalse(reconcileSource.contains("isStaleDeliveryChild("));
     assertFalse(reconcileSource.contains("isStaleRecoveryArmed("));
     // Extra-active-child guard (duplicate children) is still present.
-    assertTrue(reconcileSource.contains("extra-active-child-recovery"));
+    assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
   }
 }

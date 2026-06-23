@@ -16,6 +16,6 @@ class CreateShopRequestResolverSingleActiveChildGuardTest {
 
     assertTrue(reconcileSource.contains("IToken<?> activeLocalDeliveryChild = null;"));
     assertTrue(reconcileSource.contains("deliveryChildRecoveryService.recover("));
-    assertTrue(reconcileSource.contains("extra-active-child-recovery"));
+    assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
   }
 }
