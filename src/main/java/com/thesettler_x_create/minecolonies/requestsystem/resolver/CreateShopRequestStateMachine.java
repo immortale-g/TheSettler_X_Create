@@ -134,12 +134,11 @@ final class CreateShopRequestStateMachine {
    * Loads FlowStates from NBT into pendingRestore. States are applied lazily in getOrCreate the
    * first time each token is seen after reload.
    */
-  void loadFlowStates(CompoundTag tag) {
+  void loadFlowStates(CompoundTag flowStates) {
     pendingRestore.clear();
-    if (tag == null || !tag.contains(TAG_FLOW_STATES)) {
+    if (flowStates == null) {
       return;
     }
-    CompoundTag flowStates = tag.getCompound(TAG_FLOW_STATES);
     for (String uuidStr : flowStates.getAllKeys()) {
       try {
         UUID uuid = UUID.fromString(uuidStr);
