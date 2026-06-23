@@ -45,7 +45,7 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
 
-    assertTrue(reconcileSource.contains("extra-active-child-recovery"));
+    assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
     assertTrue(reconcileSource.contains("isLocalShopDeliveryChild("));
     assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
     assertTrue(resolverSource.contains("lifecycleStateStore"));
