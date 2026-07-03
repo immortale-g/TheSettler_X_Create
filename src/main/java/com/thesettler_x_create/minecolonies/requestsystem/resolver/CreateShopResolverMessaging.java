@@ -23,7 +23,7 @@ final class CreateShopResolverMessaging {
       return;
     }
     for (ItemStack stack : stacks) {
-      if (stack.isEmpty()) {
+      if (stack == null || stack.isEmpty()) {
         continue;
       }
       MessageUtils.format(key, stack.getHoverName().getString(), stack.getCount())

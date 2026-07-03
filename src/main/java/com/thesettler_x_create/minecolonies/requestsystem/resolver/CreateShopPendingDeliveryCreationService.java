@@ -58,10 +58,15 @@ final class CreateShopPendingDeliveryCreationService {
               + " pending="
               + pendingCount);
       if (pendingState.shouldNotifyPending(level, request.getId())) {
-        messaging.sendShopChat(
-            manager,
-            "com.thesettler_x_create.message.createshop.delivery_waiting",
-            java.util.Collections.singletonList(deliverable.getResult()));
+        // getResult() is @Nullable until the resolver actually sets it; skip the
+        // chat notification rather than passing null into sendShopChat.
+        ItemStack pendingResult = deliverable.getResult();
+        if (pendingResult != null) {
+          messaging.sendShopChat(
+              manager,
+              "com.thesettler_x_create.message.createshop.delivery_waiting",
+              java.util.Collections.singletonList(pendingResult));
+        }
       }
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(

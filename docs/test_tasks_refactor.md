@@ -54,6 +54,67 @@ Run `run_live_test` twice quickly, verify:
 - verify unavailable dialog appears
 - return and recover via handover/cancel path
 
+## Shopkeeper Gate & NPE Fix (0.2.3-alpha)
+
+These scenarios target the fix where the resolver was claiming requests even without a working
+shopkeeper, causing a recurring NPE in `sendShopChat` and leaving workers like the Forester
+permanently stuck.
+
+### Pre-conditions (shared)
+- Create Shop built and stocked (e.g. `create:shaft`, stripped logs, an axe in the rack).
+- Debug logging enabled so resolver decisions are visible.
+
+### 7. No shopkeeper — resolver must not claim requests
+- Do **not** assign a citizen to the Create Shop.
+- Trigger a colony request for an item the shop has in stock (e.g. let the Forester work).
+- Wait 5–10 seconds.
+- **Expected:**
+  - Log shows `canResolve=false (no shopkeeper working)` for each candidate request.
+  - Request appears on the Clipboard **or** reaches the correct worker directly.
+  - **No** `NullPointerException` in `sendShopChat` in the log.
+
+### 8. Shopkeeper working — resolver claims and fulfills
+- Assign a shopkeeper and wait until they are `WORKING`.
+- Trigger a request for a stocked item.
+- **Expected:**
+  - Resolver claims the request (no `canResolve=false (no shopkeeper)` log line).
+  - Delivery child is created, courier delivers, parent goes terminal.
+
+### 9. Shopkeeper unavailable (sleeping / sick / blocked)
+- Assign a shopkeeper but put them in a state where `isWorkerWorking()` is false
+  (e.g. night-time sleep, injury, or blocked pathing).
+- Trigger a colony request.
+- **Expected:**
+  - Resolver returns false, request is not claimed.
+  - Once the shopkeeper becomes available again and a new request arrives, the resolver
+    claims it normally.
+
+### 10. Shopkeeper leaves mid-delivery — in-flight delivery must complete
+- Let the resolver claim a request with the shopkeeper working.
+- Wait until the delivery child is created (`IN_PROGRESS`).
+- Fire / unassign the shopkeeper.
+- **Expected:**
+  - `canResolveRequest` still returns `true` for that request (delivery window held).
+  - Courier finishes the delivery, parent goes terminal.
+  - No stuck request requiring manual intervention.
+
+### 11. NPE regression — null result stack must never reach `sendShopChat`
+- Remove the shopkeeper so no deliveries are created (rack stays empty).
+- Create requests for multiple item types including a Tool request (e.g. the Forester needs
+  an axe).
+- Let 30+ seconds pass (multiple cooldown cycles).
+- **Expected:**
+  - Absolutely no `NullPointerException: Cannot invoke "ItemStack.isEmpty()"` in the log.
+  - All requests are visible on the Clipboard or assigned to other resolvers.
+
+### 12. Shopkeeper rehired — new requests are claimed again
+- Start with no shopkeeper (requests go to Clipboard / other resolvers).
+- Hire a shopkeeper and wait until `WORKING`.
+- Create a new request for a stocked item.
+- **Expected:**
+  - Resolver now claims the new request.
+  - Previously unresolved requests that were rerouted are **not** double-processed.
+
 ## World Reload Stability
 1. Save/quit during:
 - parent waiting inflight
