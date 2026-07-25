@@ -11,26 +11,30 @@ class CreateShopMaintenanceCommandsGuardTest {
   void uninstallPrepareCommandIsRegistered() throws Exception {
     String mainSource =
         Files.readString(Path.of("src/main/java/com/thesettler_x_create/TheSettlerXCreate.java"));
-    String commandSource =
+    String routerSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopMaintenanceCommands.java"));
+    String resetSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
 
     assertTrue(mainSource.contains("onRegisterCommands"));
     assertTrue(mainSource.contains("CreateShopMaintenanceCommands.register"));
-    assertTrue(commandSource.contains("thesettlerxcreate"));
-    assertTrue(commandSource.contains("prepare_uninstall"));
-    assertTrue(commandSource.contains("run_live_test"));
-    assertTrue(commandSource.contains("reset_live_state"));
-    assertTrue(commandSource.contains("force_warehouse_queue"));
-    assertTrue(commandSource.contains("clearWarehouseQueues("));
-    assertTrue(commandSource.contains("cancelCreateShopOwnedRequestsGraphAware("));
-    assertTrue(commandSource.contains("cancelAllAssignedRequestsGraphAware("));
-    assertTrue(commandSource.contains("cancelRequestGraphPostOrder("));
-    assertTrue(commandSource.contains("cancelSingleRequest("));
-    assertTrue(commandSource.contains("countShopsWithActiveLocalDeliveries("));
-    assertTrue(commandSource.contains("reconcileAssignmentsAndKickCouriers("));
-    assertTrue(commandSource.contains("cancelActiveLocalDeliveries("));
-    assertTrue(commandSource.contains("drainRounds"));
+    assertTrue(routerSource.contains("thesettlerxcreate"));
+    assertTrue(routerSource.contains("prepare_uninstall"));
+    assertTrue(routerSource.contains("run_live_test"));
+    assertTrue(routerSource.contains("reset_live_state"));
+    assertTrue(routerSource.contains("force_warehouse_queue"));
+    assertTrue(resetSource.contains("clearWarehouseQueues("));
+    assertTrue(resetSource.contains("cancelCreateShopOwnedRequestsGraphAware("));
+    assertTrue(resetSource.contains("cancelAllAssignedRequestsGraphAware("));
+    assertTrue(resetSource.contains("cancelRequestGraphPostOrder("));
+    assertTrue(resetSource.contains("cancelSingleRequest("));
+    assertTrue(resetSource.contains("countShopsWithActiveLocalDeliveries("));
+    assertTrue(resetSource.contains("reconcileAssignmentsAndKickCouriers("));
+    assertTrue(resetSource.contains("cancelActiveLocalDeliveries("));
+    assertTrue(resetSource.contains("drainRounds"));
   }
 }

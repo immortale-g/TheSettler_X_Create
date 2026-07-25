@@ -12,7 +12,7 @@ class BuildingCreateShopResolverDriftGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopResolverHealthCheck.java"));
 
     assertTrue(source.contains("resolver assignment drift detected: switching"));
     assertTrue(source.contains("hasAssignedRequestsForResolver"));

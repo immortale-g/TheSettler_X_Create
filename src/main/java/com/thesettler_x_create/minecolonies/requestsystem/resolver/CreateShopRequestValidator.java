@@ -89,6 +89,12 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
+    if (!shop.isWorkerWorking() && !holdDeliveryWindow) {
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (no shopkeeper working)");
+      }
+      return false;
+    }
     chain.sanitizeRequestChain(manager, request);
     if (!chain.safeIsRequestChainValid(manager, request)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {

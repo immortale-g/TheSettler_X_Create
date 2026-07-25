@@ -1,5 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
@@ -15,24 +16,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 /** Reconciles parent child-request lifecycle for pending Create Shop requests. */
 final class CreateShopChildReconciliationService {
   private final CreateShopDeliveryManager deliveryManager;
-  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopChildReconciliationService(
       CreateShopDeliveryManager deliveryManager,
-      CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService,
       CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService,
       CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService,
       CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.deliveryManager = deliveryManager;
-    this.deliveryChildLifecycleService = deliveryChildLifecycleService;
     this.deliveryChildRecoveryService = deliveryChildRecoveryService;
     this.deliveryRootCauseSnapshotService = deliveryRootCauseSnapshotService;
     this.requestStateMutatorService = requestStateMutatorService;
@@ -73,7 +72,6 @@ final class CreateShopChildReconciliationService {
           if (child == null) {
             long nowTick = level == null ? 0L : level.getGameTime();
             resolver.markMissingChildIfAbsent(childToken, nowTick);
-            requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
             resolver.observeDeliveryChildMissing(
                 level, request.getId(), childToken, "poll-missing", "handler lookup returned null");
             hasActiveChildren = true;
@@ -102,9 +100,7 @@ final class CreateShopChildReconciliationService {
                     || childState == RequestState.RECEIVED;
             if (terminalChild) {
               request.removeChild(childToken);
-              requestStateMutatorService.clearChildActive(resolver, childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
-              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
               requestStateMutatorService.completeDeliveryWindow(
                   resolver, request.getId(), childToken);
               resolver.markParentChildCompletedSeen(
@@ -173,37 +169,9 @@ final class CreateShopChildReconciliationService {
             } else {
               activeLocalDeliveryChild = childToken;
             }
-            if (deliveryChildLifecycleService.isStaleDeliveryChild(
-                resolver, level, request.getId(), childToken, childState)) {
-              if (!deliveryChildLifecycleService.isStaleRecoveryArmed(
-                  resolver, level, standardManager, request.getId())) {
-                hasActiveChildren = true;
-                continue;
-              }
-              boolean recovered =
-                  deliveryChildRecoveryService.recover(
-                      resolver,
-                      standardManager,
-                      level,
-                      request,
-                      childToken,
-                      child,
-                      shop,
-                      pickup,
-                      "stale-child-recovery",
-                      "[CreateShop] stale delivery-child recovery parent={} child={} stateUpdated={} item={} count={}");
-              if (recovered) {
-                missing++;
-                continue;
-              }
-            } else {
-              requestStateMutatorService.clearStaleRecoveryArm(resolver, request.getId());
-            }
             deliveryRootCauseSnapshotService.logSnapshot(
                 resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
-          } else {
-            requestStateMutatorService.clearChildActive(resolver, childToken);
           }
           if (Config.DEBUG_LOGGING.getAsBoolean()) {
             String childType = child.getRequest().getClass().getName();
@@ -218,7 +186,6 @@ final class CreateShopChildReconciliationService {
         } catch (Exception ex) {
           long nowTick = level == null ? 0L : level.getGameTime();
           resolver.markMissingChildIfAbsent(childToken, nowTick);
-          requestStateMutatorService.markChildActive(resolver, childToken, nowTick);
           resolver.observeDeliveryChildMissing(
               level,
               request.getId(),
@@ -294,12 +261,10 @@ final class CreateShopChildReconciliationService {
       return false;
     }
     CreateShopDeliveryChildLedgerEntry ledger = resolver.getDeliveryChildLedgerEntry(childToken);
-    if (ledger == null
-        || ledger.getPickupConfirmedAtTick() < 0L
-        || ledger.getTerminalSeenAtTick() >= 0L) {
+    if (ledger == null || ledger.pickupConfirmedAtTick < 0L || ledger.terminalSeenAtTick >= 0L) {
       return false;
     }
-    if (!parentRequest.getId().equals(ledger.getParentToken())) {
+    if (!parentRequest.getId().equals(ledger.parentToken)) {
       return false;
     }
     BuildingCreateShop shop = resolver.getShop(standardManager);
@@ -340,5 +305,58 @@ final class CreateShopChildReconciliationService {
           childToken);
     }
     return true;
+  }
+}
+
+/** Utility matcher for deciding whether deliveries originate from the local Create Shop. */
+final class CreateShopDeliveryOriginMatcher {
+  private CreateShopDeliveryOriginMatcher() {}
+
+  static boolean isLocalShopDeliveryChild(
+      IRequest<?> childRequest, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
+    if (childRequest == null || shop == null || pickup == null) {
+      return false;
+    }
+    if (!(childRequest.getRequest() instanceof Delivery delivery)) {
+      return false;
+    }
+    ILocation start = delivery.getStart();
+    net.minecraft.world.level.Level level = pickup.getLevel();
+    if (start == null || level == null || start.getDimension() == null) {
+      return false;
+    }
+    if (!level.dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (pickup.getBlockPos().equals(startPos)) {
+      return true;
+    }
+    return shop.hasContainerPosition(startPos);
+  }
+
+  static boolean isDeliveryFromLocalShopStart(
+      Delivery delivery, BuildingCreateShop shop, CreateShopBlockEntity pickup) {
+    if (delivery == null || pickup == null || pickup.getLevel() == null) {
+      return false;
+    }
+    ILocation start = delivery.getStart();
+    if (start == null || start.getDimension() == null) {
+      return false;
+    }
+    if (!pickup.getLevel().dimension().equals(start.getDimension())) {
+      return false;
+    }
+    BlockPos startPos = start.getInDimensionLocation();
+    if (startPos == null) {
+      return false;
+    }
+    if (pickup.getBlockPos().equals(startPos)) {
+      return true;
+    }
+    return shop != null && shop.hasContainerPosition(startPos);
   }
 }

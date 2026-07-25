@@ -12,12 +12,12 @@ class CreateShopFlowTimeoutCleanupActiveDeliveryGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopFlowTimeoutCleanupService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopTickPendingService.java"));
 
     assertTrue(source.contains("timeout-cleanup:skip-active-delivery"));
     assertTrue(source.contains("timeout-cleanup:skip-runtime-active"));
-    assertTrue(source.contains("resolver.getParentDeliveryTokensSnapshot().contains(token)"));
-    assertTrue(source.contains("request.hasChildren()"));
+    // Since Phase 3.5 the parentDeliveryActiveSince map is removed; runtime window now uses
+    // hasDeliveriesCreated and hasDeliveryStarted only.
     assertTrue(source.contains("resolver.hasDeliveriesCreated(token)"));
     assertTrue(source.contains("resolver.getPendingTracker().hasDeliveryStarted(token)"));
   }

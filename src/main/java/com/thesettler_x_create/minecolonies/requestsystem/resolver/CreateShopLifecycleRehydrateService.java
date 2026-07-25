@@ -11,8 +11,10 @@ import net.minecraft.world.level.Level;
 /**
  * Rehydrates lifecycle state from MineColonies request graph before tick-pending mutation starts.
  *
- * <p>This avoids relying on stale local pending/cooldown maps after reloads or resolver ownership
- * drift.
+ * <p>Since Phase 3.2 the StateMachine persists FlowState to NBT. On reload, FlowStates are loaded
+ * into {@code StateMachine.pendingRestore} and applied lazily in {@code getOrCreate}. This service
+ * uses that restored state as the primary source of truth. The heuristic derivation from the
+ * MineColonies request graph is retained as a fallback for saves that predate Phase 3.2.
  */
 final class CreateShopLifecycleRehydrateService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
@@ -42,24 +44,8 @@ final class CreateShopLifecycleRehydrateService {
     }
     Set<IToken<?>> expandedCandidates = new LinkedHashSet<>(candidates);
     expandedCandidates.addAll(resolver.getPendingTracker().getTokens());
-    expandedCandidates.addAll(resolver.getParentDeliveryTokensSnapshot());
-    for (IToken<?> childToken : resolver.getActiveChildTokensSnapshot()) {
-      IRequest<?> childRequest = null;
-      try {
-        childRequest = manager.getRequestHandler().getRequest(childToken);
-      } catch (Exception ignored) {
-        resolver.clearChildActive(childToken);
-      }
-      if (childRequest == null) {
-        resolver.clearChildActive(childToken);
-        continue;
-      }
-      IToken<?> parent = childRequest.getParent();
-      if (parent != null) {
-        expandedCandidates.add(parent);
-      }
-    }
     Set<IToken<?>> active = new LinkedHashSet<>();
+    long now = level.getGameTime();
     for (IToken<?> token : Set.copyOf(expandedCandidates)) {
       if (token == null) {
         continue;
@@ -69,18 +55,33 @@ final class CreateShopLifecycleRehydrateService {
         request = manager.getRequestHandler().getRequest(token);
       } catch (Exception ignored) {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (request == null || CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, true);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
         continue;
       }
       if (!(request.getRequest() instanceof IDeliverable deliverable)) {
         active.add(token);
         continue;
       }
+
+      // Fast path: trigger lazy NBT-restore and check if a FlowState was persisted for this token.
+      // getOrCreate consumes the pendingRestore entry if present, giving us the restored state.
+      CreateShopFlowRecord flowRecord = resolver.getFlowStateMachine().getOrCreate(token, now);
+      CreateShopFlowState restoredState = flowRecord.getState();
+      if (restoredState != CreateShopFlowState.NEW && !restoredState.isTerminal()) {
+        // State was restored from NBT — no heuristic derivation needed.
+        int currentPending = Math.max(0, resolver.getPendingTracker().getPendingCount(token));
+        requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+            resolver, level, token, Math.max(1, currentPending));
+        diagnostics.recordPendingSource(token, "rehydrate:nbt-restored");
+        resolver.touchFlow(token, now, "rehydrate:nbt-restored");
+        active.add(token);
+        continue;
+      }
+
+      // Heuristic fallback for saves without FlowStates NBT (pre-Phase-3.2 worlds).
       if (request.hasChildren()
           || resolver.hasDeliveriesCreated(token)
           || resolver.getPendingTracker().hasDeliveryStarted(token)) {
@@ -88,7 +89,7 @@ final class CreateShopLifecycleRehydrateService {
         requestStateMutatorService.markOrderedWithPendingAtLeastOne(
             resolver, level, token, Math.max(1, currentPending));
         diagnostics.recordPendingSource(token, "rehydrate:inflight-or-children-or-started");
-        resolver.touchFlow(token, level.getGameTime(), "rehydrate:inflight-or-children-or-started");
+        resolver.touchFlow(token, now, "rehydrate:inflight-or-children-or-started");
         active.add(token);
         continue;
       }
@@ -99,11 +100,10 @@ final class CreateShopLifecycleRehydrateService {
         int merged = Math.max(currentPending, derivedPending);
         requestStateMutatorService.markOrderedWithPending(resolver, level, token, merged);
         diagnostics.recordPendingSource(token, "rehydrate:derived-request");
-        resolver.touchFlow(token, level.getGameTime(), "rehydrate:derived-request");
+        resolver.touchFlow(token, now, "rehydrate:derived-request");
         active.add(token);
       } else {
         requestStateMutatorService.clearPendingTokenState(resolver, manager, token, false);
-        requestStateMutatorService.clearStaleRecoveryArm(resolver, token);
       }
     }
     return active;

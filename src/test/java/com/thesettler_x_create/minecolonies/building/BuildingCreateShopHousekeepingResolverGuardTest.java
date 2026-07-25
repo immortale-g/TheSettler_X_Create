@@ -12,7 +12,7 @@ class BuildingCreateShopHousekeepingResolverGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopHousekeepingOrchestrator.java"));
 
     assertTrue(source.contains("resolver != null && resolver.hasProtectedInventoryWindow()"));
     assertTrue(

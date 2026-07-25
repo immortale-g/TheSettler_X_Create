@@ -14,8 +14,8 @@ class CreateShopRequestResolverLookupFailureGraceDropGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
 
-    assertTrue(source.contains("lookup failed -> hold (no drop)"));
+    assertTrue(source.contains(CreateShopGuardConstants.LOOKUP_FAILED_HOLD_NO_DROP));
     assertTrue(source.contains("markMissingChildIfAbsent(childToken, nowTick)"));
-    assertTrue(source.contains("markChildActive(resolver, childToken, nowTick)"));
+    // markChildActive removed in Phase 3.5 — MineColonies owns delivery tracking post-creation.
   }
 }

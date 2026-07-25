@@ -154,7 +154,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.childReconciliationService =
         new CreateShopChildReconciliationService(
             deliveryManager,
-            deliveryChildLifecycleService,
             deliveryChildRecoveryService,
             deliveryRootCauseSnapshotService,
             requestStateMutatorService);
@@ -454,10 +453,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public boolean hasProtectedInventoryWindow() {
-    return hasActiveWork()
-        || hasAnyActiveChild()
-        || !getParentDeliveryTokensSnapshot().isEmpty()
-        || lifecycleStateStore.getPendingTracker().hasEntries();
+    return hasActiveWork() || lifecycleStateStore.getPendingTracker().hasEntries();
   }
 
   long resolveNowTick(IRequestManager manager) {
@@ -504,29 +500,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return flowStateMachine;
   }
 
+  /**
+   * Saves persisted FlowStates to the given NBT tag. Called from BuildingCreateShop.serializeNBT.
+   */
+  public void saveFlowStatesToNbt(net.minecraft.nbt.CompoundTag tag) {
+    flowStateMachine.saveFlowStates(tag);
+  }
+
+  /**
+   * Loads FlowStates from NBT for lazy restore on the next tick. Called from
+   * BuildingCreateShop.deserializeNBT.
+   */
+  public void loadFlowStatesFromNbt(net.minecraft.nbt.CompoundTag tag) {
+    flowStateMachine.loadFlowStates(tag);
+  }
+
   CreateShopTerminalRequestLifecycleService getTerminalRequestLifecycleService() {
     return terminalRequestLifecycleService;
-  }
-
-  Long getParentStaleRecoveryArmedAt(IToken<?> parentToken) {
-    return lifecycleStateStore.getParentStaleRecoveryArmedAt().get(parentToken);
-  }
-
-  boolean armStaleRecoveryIfMissing(IToken<?> parentToken, long nowTick) {
-    return lifecycleStateStore.getParentStaleRecoveryArmedAt().putIfAbsent(parentToken, nowTick)
-        == null;
-  }
-
-  void clearParentStaleRecoveryArm(IToken<?> parentToken) {
-    lifecycleStateStore.getParentStaleRecoveryArmedAt().remove(parentToken);
-  }
-
-  Long markParentDeliveryActiveIfAbsent(IToken<?> parentToken, long nowTick) {
-    return lifecycleStateStore.getParentDeliveryActiveSince().putIfAbsent(parentToken, nowTick);
-  }
-
-  void clearParentDeliveryActive(IToken<?> parentToken) {
-    lifecycleStateStore.getParentDeliveryActiveSince().remove(parentToken);
   }
 
   void markParentChildCompletedSeen(IToken<?> parentToken, long tick) {
@@ -546,26 +536,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     lifecycleStateStore.getParentChildCompletedSeenAt().remove(parentToken);
-  }
-
-  java.util.Set<IToken<?>> getParentDeliveryTokensSnapshot() {
-    return java.util.Set.copyOf(lifecycleStateStore.getParentDeliveryActiveSince().keySet());
-  }
-
-  void markChildActive(IToken<?> childToken, long sinceTick) {
-    lifecycleStateStore.getDeliveryChildActiveSince().put(childToken, sinceTick);
-  }
-
-  void clearChildActive(IToken<?> childToken) {
-    lifecycleStateStore.getDeliveryChildActiveSince().remove(childToken);
-  }
-
-  boolean hasAnyActiveChild() {
-    return !lifecycleStateStore.getDeliveryChildActiveSince().isEmpty();
-  }
-
-  java.util.Set<IToken<?>> getActiveChildTokensSnapshot() {
-    return java.util.Set.copyOf(lifecycleStateStore.getDeliveryChildActiveSince().keySet());
   }
 
   void clearMissingChildSince(IToken<?> childToken) {
@@ -663,7 +633,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     for (var entry :
         java.util.List.copyOf(lifecycleStateStore.getDeliveryChildLedger().entrySet())) {
       CreateShopDeliveryChildLedgerEntry ledger = entry.getValue();
-      if (ledger == null || !parentToken.equals(ledger.getParentToken())) {
+      if (ledger == null || !parentToken.equals(ledger.parentToken)) {
         continue;
       }
       IToken<?> childToken = entry.getKey();
@@ -734,17 +704,46 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       if (ledger == null) {
         continue;
       }
-      if (!parentToken.equals(ledger.getParentToken())) {
+      if (!parentToken.equals(ledger.parentToken)) {
         continue;
       }
-      if (ledger.getPickupConfirmedAtTick() < 0L) {
+      if (ledger.pickupConfirmedAtTick < 0L) {
         continue;
       }
-      if (ledger.getTerminalSeenAtTick() >= 0L) {
+      if (ledger.terminalSeenAtTick >= 0L) {
         continue;
       }
       return entry.getKey();
     }
     return null;
+  }
+}
+
+/** Routes MineColonies delivery callbacks to the matching local Create Shop resolver instance. */
+final class CreateShopDeliveryCallbackService {
+  void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
+    CreateShopRequestResolver resolver =
+        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
+    if (resolver == null) {
+      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
+    }
+    if (resolver != null) {
+      resolver.handleDeliveryCancelled(manager, request);
+      return;
+    }
+    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
+  }
+
+  void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
+    CreateShopRequestResolver resolver =
+        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
+    if (resolver == null) {
+      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
+    }
+    if (resolver != null) {
+      resolver.handleDeliveryComplete(manager, request);
+      return;
+    }
+    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("complete", manager, request);
   }
 }

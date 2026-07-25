@@ -103,7 +103,12 @@ final class CreateShopPendingTopupService {
         return;
       }
       List<ItemStack> topupOrdered =
-          stockResolver.requestFromNetwork(tile, deliverable, topupCount, requesterName);
+          stockResolver.requestFromNetwork(
+              tile,
+              deliverable,
+              topupCount,
+              requesterName,
+              CreateShopRequestResolver.toRequestId(request.getId()));
       if (topupOrdered.isEmpty()) {
         return;
       }

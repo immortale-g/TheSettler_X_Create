@@ -5,7 +5,6 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.Tool;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
-import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.WorldUtil;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -53,20 +52,13 @@ final class CreateShopResolverPlanning {
     if (total > 0) {
       return Math.max(0, total);
     }
-    // Fallback: direct scan around the shop for unregistered racks.
-    RackScanStats fallback = scanRacksAroundShop(tile, deliverable, expected, null);
-    total = fallback.strictCount();
-    sameItemTotal += fallback.sameItemCount();
-    rackCount += fallback.rackCount();
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] rack availability strict=0 expected={} containers={} racksSeen={} sameItem={} fallbackStrict={} fallbackSameItem={}",
+          "[CreateShop] rack availability strict=0 expected={} containers={} racksSeen={} sameItem={}",
           expected == null || expected.isEmpty() ? "<empty>" : expected.getItem(),
           containerCount,
           rackCount,
-          sameItemTotal,
-          fallback.strictCount(),
-          fallback.sameItemCount());
+          sameItemTotal);
     }
     return Math.max(0, total);
   }
@@ -129,112 +121,7 @@ final class CreateShopResolverPlanning {
       planned.add(new com.minecolonies.api.util.Tuple<>(copy, tuple.getB()));
       remaining -= toTake;
     }
-    if (planned.isEmpty()) {
-      ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
-      RackScanStats fallback = scanRacksAroundShop(tile, deliverable, expected, planned);
-      if (!planned.isEmpty()) {
-        // Trim to requested amount.
-        int plannedCount = countPlanned(planned);
-        if (plannedCount > amount) {
-          List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> trimmed = Lists.newArrayList();
-          int needed = amount;
-          for (var entry : planned) {
-            if (needed <= 0) {
-              break;
-            }
-            ItemStack stack = entry.getA();
-            if (stack.isEmpty()) {
-              continue;
-            }
-            int take = Math.min(needed, stack.getCount());
-            ItemStack copy = stack.copy();
-            copy.setCount(take);
-            trimmed.add(new com.minecolonies.api.util.Tuple<>(copy, entry.getB()));
-            needed -= take;
-          }
-          planned = trimmed;
-        }
-      } else if (Config.DEBUG_LOGGING.getAsBoolean()
-          && fallback.sameItemCount() > 0
-          && expected != null
-          && !expected.isEmpty()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] rack plan mismatch expected={} strict=0 but sameItem={} (components/metadata mismatch suspected)",
-            expected.getItem(),
-            fallback.sameItemCount());
-      }
-    }
     return planned;
-  }
-
-  int scanRacksAroundShop(
-      TileEntityCreateShop tile,
-      IDeliverable deliverable,
-      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
-    ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
-    return scanRacksAroundShop(tile, deliverable, expected, planned).strictCount();
-  }
-
-  private RackScanStats scanRacksAroundShop(
-      TileEntityCreateShop tile,
-      IDeliverable deliverable,
-      ItemStack expected,
-      List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned) {
-    BuildingCreateShop shop = tile.getBuilding() instanceof BuildingCreateShop b ? b : null;
-    if (shop == null) {
-      return new RackScanStats(0, 0, 0);
-    }
-    Level level = tile.getLevel();
-    if (level == null) {
-      return new RackScanStats(0, 0, 0);
-    }
-    BlockPos origin = shop.getLocation().getInDimensionLocation();
-    int radius = 16;
-    int minX = origin.getX() - radius;
-    int maxX = origin.getX() + radius;
-    int minY = origin.getY() - 6;
-    int maxY = origin.getY() + 6;
-    int minZ = origin.getZ() - radius;
-    int maxZ = origin.getZ() + radius;
-    int strictTotal = 0;
-    int sameItemTotal = 0;
-    int racksSeen = 0;
-    for (int x = minX; x <= maxX; x++) {
-      for (int y = minY; y <= maxY; y++) {
-        for (int z = minZ; z <= maxZ; z++) {
-          BlockPos pos = new BlockPos(x, y, z);
-          if (!WorldUtil.isBlockLoaded(level, pos)) {
-            continue;
-          }
-          BlockEntity entity = level.getBlockEntity(pos);
-          if (!(entity instanceof AbstractTileEntityRack rack)) {
-            continue;
-          }
-          racksSeen++;
-          int count = rack.getItemCount(deliverable::matches);
-          sameItemTotal += countSameItemInRack(rack, expected);
-          if (count <= 0) {
-            continue;
-          }
-          strictTotal += count;
-          if (planned != null) {
-            for (ItemStack stack :
-                InventoryUtils.filterItemHandler(rack.getInventory(), deliverable::matches)) {
-              planned.add(new com.minecolonies.api.util.Tuple<>(stack.copy(), pos));
-            }
-          }
-        }
-      }
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && strictTotal > 0) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] fallback rack scan found strict={} sameItem={} racks={} near {}",
-          strictTotal,
-          sameItemTotal,
-          racksSeen,
-          origin);
-    }
-    return new RackScanStats(strictTotal, sameItemTotal, racksSeen);
   }
 
   List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
@@ -318,6 +205,4 @@ final class CreateShopResolverPlanning {
     return rack.getItemCount(
         candidate -> candidate != null && ItemStack.isSameItem(candidate, expected));
   }
-
-  private record RackScanStats(int strictCount, int sameItemCount, int rackCount) {}
 }

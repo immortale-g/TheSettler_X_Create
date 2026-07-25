@@ -9,10 +9,7 @@ final class CreateShopLifecycleStateStore {
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
   private final Map<IToken<?>, Long> retryingReassignAttempts = new ConcurrentHashMap<>();
-  private final Map<IToken<?>, Long> deliveryChildActiveSince = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> missingChildSince = new ConcurrentHashMap<>();
-  private final Map<IToken<?>, Long> parentDeliveryActiveSince = new ConcurrentHashMap<>();
-  private final Map<IToken<?>, Long> parentStaleRecoveryArmedAt = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Integer> parentLastKnownChildCount = new ConcurrentHashMap<>();
   private final Map<IToken<?>, String> parentLastKnownChildren = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> parentChildDropLastLogTick = new ConcurrentHashMap<>();
@@ -31,20 +28,8 @@ final class CreateShopLifecycleStateStore {
     return retryingReassignAttempts;
   }
 
-  Map<IToken<?>, Long> getDeliveryChildActiveSince() {
-    return deliveryChildActiveSince;
-  }
-
   Map<IToken<?>, Long> getMissingChildSince() {
     return missingChildSince;
-  }
-
-  Map<IToken<?>, Long> getParentDeliveryActiveSince() {
-    return parentDeliveryActiveSince;
-  }
-
-  Map<IToken<?>, Long> getParentStaleRecoveryArmedAt() {
-    return parentStaleRecoveryArmedAt;
   }
 
   Map<IToken<?>, Integer> getParentLastKnownChildCount() {

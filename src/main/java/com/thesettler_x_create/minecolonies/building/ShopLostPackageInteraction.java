@@ -30,6 +30,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private static final String TAG_REQUESTED_AT = "RequestedAt";
   private static final String TAG_EPOCH = "Epoch";
   private static final String TAG_ACTIVE = "Active";
+  private static final String TAG_REQUEST_UUID = "RequestUuid";
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
@@ -40,13 +41,16 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   private boolean active = true;
   private final long debugInstanceId = DEBUG_INSTANCE_SEQ.getAndIncrement();
 
+  /** UUID of the originating MineColonies request. Null for pre-3.1 interactions. */
+  @Nullable private java.util.UUID requestUuid;
+
   public ShopLostPackageInteraction(ICitizen citizen) {
     super(citizen);
   }
 
   public ShopLostPackageInteraction(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
-    this(stackKey, remaining, requesterName, address, requestedAt, 0L);
+    this(stackKey, remaining, requesterName, address, requestedAt, 0L, null);
   }
 
   public ShopLostPackageInteraction(
@@ -56,6 +60,17 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       String address,
       long requestedAt,
       long interactionEpoch) {
+    this(stackKey, remaining, requesterName, address, requestedAt, interactionEpoch, null);
+  }
+
+  public ShopLostPackageInteraction(
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt,
+      long interactionEpoch,
+      @Nullable java.util.UUID requestUuid) {
     super(
         buildInquiry(stackKey, remaining, requesterName, address),
         true,
@@ -84,6 +99,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.address = sanitize(address);
     this.requestedAt = requestedAt;
     this.interactionEpoch = interactionEpoch;
+    this.requestUuid = requestUuid;
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction created debugId={} item={} remaining={} requester='{}' address='{}'",
@@ -173,7 +189,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     } else if (response == 2) {
       consumed =
           shop.cancelLostPackageRequestAndInflight(
-              stackKey, remaining, requesterName, address, requestedAt);
+              requestUuid, stackKey, remaining, requesterName, address, requestedAt);
     }
     if (consumed > 0) {
       remaining = Math.max(0, remaining - consumed);
@@ -280,6 +296,9 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (!active) {
       tag.putBoolean(TAG_ACTIVE, false);
     }
+    if (requestUuid != null) {
+      tag.putUUID(TAG_REQUEST_UUID, requestUuid);
+    }
     return tag;
   }
 
@@ -296,6 +315,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     requestedAt = tag.contains(TAG_REQUESTED_AT) ? tag.getLong(TAG_REQUESTED_AT) : -1L;
     interactionEpoch = tag.contains(TAG_EPOCH) ? tag.getLong(TAG_EPOCH) : 0L;
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
+    requestUuid = tag.hasUUID(TAG_REQUEST_UUID) ? tag.getUUID(TAG_REQUEST_UUID) : null;
     if (BuildingCreateShop.isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction deserialize debugId={} item={} remaining={} requester='{}' address='{}' active={}",

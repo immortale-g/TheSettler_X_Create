@@ -2,7 +2,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -19,7 +18,6 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -77,21 +75,12 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
   @SuppressWarnings({"rawtypes", "unchecked"})
   void requestedCompleteCleansParentTrackingAndPendingState() throws Exception {
     IToken<?> parentToken = token(UUID.randomUUID());
-    IToken<?> childToken = token(UUID.randomUUID());
 
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
     resolver.markDeliveriesCreated(parentToken);
     resolver.markParentChildCompletedSeen(parentToken, level.getGameTime());
     resolver.scheduleParentChildRecheckAtForTest(parentToken, 10_100L);
-
-    parentMap("parentDeliveryActiveSince").put(parentToken, 9_000L);
-    parentMap("parentStaleRecoveryArmedAt").put(parentToken, 9_500L);
-    parentMap("deliveryChildActiveSince").put(childToken, 9_200L);
-
-    IRequest<?> childRequest = mock(IRequest.class);
-    when(childRequest.getParent()).thenReturn(parentToken);
-    when(manager.getRequestHandler().getRequest(childToken)).thenReturn((IRequest) childRequest);
 
     IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
     when(parentRequest.getId()).thenReturn(parentToken);
@@ -105,10 +94,6 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.hasDeliveriesCreated(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
-    assertFalse(parentMap("parentDeliveryActiveSince").containsKey(parentToken));
-    assertFalse(parentMap("parentStaleRecoveryArmedAt").containsKey(parentToken));
-    assertFalse(parentMap("deliveryChildActiveSince").containsKey(childToken));
-    assertTrue(parentMap("deliveryChildActiveSince").isEmpty());
   }
 
   private boolean invokeRecoverDeliveryChild(
@@ -154,16 +139,6 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
             pickup,
             pendingSource,
             logTemplate);
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<IToken<?>, Long> parentMap(String fieldName) throws Exception {
-    Field storeField = CreateShopRequestResolver.class.getDeclaredField("lifecycleStateStore");
-    storeField.setAccessible(true);
-    Object store = storeField.get(resolver);
-    Field mapField = store.getClass().getDeclaredField(fieldName);
-    mapField.setAccessible(true);
-    return (Map<IToken<?>, Long>) mapField.get(store);
   }
 
   @SuppressWarnings("unchecked")
