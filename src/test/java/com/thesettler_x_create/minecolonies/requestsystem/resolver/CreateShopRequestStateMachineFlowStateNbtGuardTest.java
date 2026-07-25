@@ -74,8 +74,7 @@ class CreateShopRequestStateMachineFlowStateNbtGuardTest {
 
     // Ephemeral states (NEW, ELIGIBILITY_CHECK) must not be persisted — they are re-derived.
     assertTrue(
-        saveSection.contains("CreateShopFlowState.NEW"),
-        "saveFlowStates must skip NEW state");
+        saveSection.contains("CreateShopFlowState.NEW"), "saveFlowStates must skip NEW state");
     assertTrue(
         saveSection.contains("CreateShopFlowState.ELIGIBILITY_CHECK"),
         "saveFlowStates must skip ELIGIBILITY_CHECK state");
