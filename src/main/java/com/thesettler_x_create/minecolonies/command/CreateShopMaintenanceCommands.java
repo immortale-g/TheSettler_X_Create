@@ -316,6 +316,18 @@ public final class CreateShopMaintenanceCommands {
                     CreateShopTestHarnessCommands.runAutoHarnessFullAll(
                         context.getSource(), 2, 1, 8, 8, 20 * 60, true)));
 
+    root.then(
+        Commands.literal("diag_output_block")
+            .executes(
+                context ->
+                    CreateShopOutputBlockTestCommands.runOutputBlockDiag(context.getSource())));
+
+    root.then(
+        Commands.literal("test_output_packaging")
+            .executes(
+                context ->
+                    CreateShopOutputBlockTestCommands.runOutputBlockTest(context.getSource())));
+
     dispatcher.register(root);
   }
 }
