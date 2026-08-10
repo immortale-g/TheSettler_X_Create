@@ -7,7 +7,9 @@ import com.minecolonies.api.entity.ai.statemachine.states.IAIState;
 import com.minecolonies.api.entity.ai.statemachine.tickratestatemachine.IStateSupplier;
 import com.minecolonies.api.entity.citizen.VisibleCitizenStatus;
 import com.minecolonies.core.entity.ai.workers.AbstractEntityAIInteract;
+import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.minecolonies.building.ShopMissingOutputAddressInteraction;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 
 public class EntityAIWorkCreateShop
@@ -61,6 +63,12 @@ public class EntityAIWorkCreateShop
       return AIWorkerState.IDLE;
     }
     markWorking();
+    if (building != null && building.hasOutputBlock()) {
+      CreateShopOutputBlockEntity obe = building.getOutputBlockEntity();
+      if (obe != null && obe.getPackageAddress().isEmpty() && worker.getCitizenData() != null) {
+        worker.getCitizenData().triggerInteraction(new ShopMissingOutputAddressInteraction());
+      }
+    }
     if (walkToBuilding()) {
       return AIWorkerState.START_WORKING;
     }

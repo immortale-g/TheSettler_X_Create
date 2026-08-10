@@ -7,14 +7,20 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 
 public class CreateShopAddressModuleView extends AbstractBuildingModuleView {
   private String address = "";
+  private String packageAddress = "";
 
   @Override
   public void deserialize(RegistryFriendlyByteBuf buf) {
     address = buf.readUtf(64);
+    packageAddress = buf.readUtf(64);
   }
 
   public String getAddress() {
     return address == null ? "" : address;
+  }
+
+  public String getPackageAddress() {
+    return packageAddress == null ? "" : packageAddress;
   }
 
   @Override

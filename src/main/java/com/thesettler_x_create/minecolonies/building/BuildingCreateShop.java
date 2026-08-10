@@ -188,6 +188,10 @@ public class BuildingCreateShop extends AbstractBuilding {
     return null;
   }
 
+  public boolean hasOutputBlock() {
+    return outputPos != null;
+  }
+
   @Nullable
   public BlockPos getOutputPos() {
     return outputPos;
