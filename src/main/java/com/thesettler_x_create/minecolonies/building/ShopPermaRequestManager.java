@@ -146,7 +146,7 @@ final class ShopPermaRequestManager {
         continue;
       }
       Stack deliverable = new Stack(stack, amount, 1);
-      IToken<?> token = manager.createRequest(requester, deliverable);
+      IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
       if (token != null) {
         permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
         permaPendingCounts.merge(itemId, amount, Integer::sum);
