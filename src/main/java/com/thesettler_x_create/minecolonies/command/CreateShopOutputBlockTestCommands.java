@@ -292,6 +292,101 @@ final class CreateShopOutputBlockTestCommands {
     return count;
   }
 
+  // -------------------------------------------------------------------------
+  // diag_perma_requests
+  // -------------------------------------------------------------------------
+
+  static int runPermaRequestDiag(CommandSourceStack source) {
+    int shops = 0;
+    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+      var bm = colony.getServerBuildingManager();
+      if (bm == null || bm.getBuildings() == null) {
+        continue;
+      }
+      for (var entry : bm.getBuildings().entrySet()) {
+        if (!(entry.getValue() instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop shop)) {
+          continue;
+        }
+        shops++;
+        String loc = shop.getLocation().getInDimensionLocation().toString();
+        var permaOres = shop.getPermaOres();
+        boolean canUse = shop.canUsePermaRequests();
+        boolean workerWorking = shop.isWorkerWorking();
+
+        source.sendSuccess(
+            () ->
+                Component.literal(
+                    "[CreateShop/PERMA] shop="
+                        + loc
+                        + " canUsePerma="
+                        + canUse
+                        + " workerWorking="
+                        + workerWorking
+                        + " ores="
+                        + permaOres.size()),
+            false);
+
+        // Count items in racks vs colony warehouse
+        var shopTE = shop.getCreateShopTileEntity();
+        for (var oreId : permaOres) {
+          var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(oreId);
+          if (item == null || item == net.minecraft.world.item.Items.AIR) {
+            source.sendSuccess(
+                () -> Component.literal("[CreateShop/PERMA]   " + oreId + " -> item not found"),
+                false);
+            continue;
+          }
+          var stack = new ItemStack(item, 1);
+
+          // Count in racks
+          int inRacks = 0;
+          if (shopTE != null) {
+            for (var entry2 : shopTE.getMatchingItemStacksInWarehouse(s -> ItemStack.isSameItemSameComponents(s, stack))) {
+              if (entry2.getA() != null && !entry2.getA().isEmpty()) inRacks += entry2.getA().getCount();
+            }
+          }
+
+          // Count in colony warehouses
+          int inWarehouse = 0;
+          var warehouses = colony.getServerBuildingManager().getWareHouses();
+          if (warehouses != null) {
+            for (var wh : warehouses) {
+              if (wh == null || wh == shop) continue;
+              if (!(wh.getTileEntity() instanceof com.minecolonies.api.tileentities.AbstractTileEntityWareHouse whTE)) continue;
+              for (var e : whTE.getMatchingItemStacksInWarehouse(s -> ItemStack.isSameItemSameComponents(s, stack))) {
+                if (e.getA() != null && !e.getA().isEmpty()) inWarehouse += e.getA().getCount();
+              }
+            }
+          }
+
+          final int rF = inRacks;
+          final int wF = inWarehouse;
+          source.sendSuccess(
+              () ->
+                  Component.literal(
+                      "[CreateShop/PERMA]   ore="
+                          + oreId
+                          + " inRacks="
+                          + rF
+                          + " inColonyWarehouse="
+                          + wF),
+              false);
+        }
+
+        // Show pending request states
+        source.sendSuccess(
+            () -> Component.literal("[CreateShop/PERMA] pending requests:"), false);
+        for (String line : shop.getPermaPendingDebugLines()) {
+          source.sendSuccess(() -> Component.literal("[CreateShop/PERMA]" + line), false);
+        }
+      }
+    }
+    if (shops == 0) {
+      source.sendFailure(Component.literal("[CreateShop/PERMA] no create shops found"));
+    }
+    return shops > 0 ? 1 : 0;
+  }
+
   private static int countIterable(Iterable<?> iterable) {
     if (iterable == null) {
       return 0;

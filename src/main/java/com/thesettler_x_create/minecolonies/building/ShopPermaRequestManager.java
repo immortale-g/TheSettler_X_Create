@@ -207,6 +207,41 @@ final class ShopPermaRequestManager {
     }
   }
 
+  /**
+   * Returns a snapshot for diagnostics: pending token → [itemId, count, requestState].
+   * requestState is resolved from the colony's request manager if available.
+   */
+  java.util.List<String> getPendingPermaDebugLines(IColony colony) {
+    java.util.List<String> lines = new java.util.ArrayList<>();
+    var manager = colony == null ? null : colony.getRequestManager();
+    for (var entry : permaPendingRequests.entrySet()) {
+      var token = entry.getKey();
+      var pending = entry.getValue();
+      String state = "unknown";
+      if (manager != null) {
+        try {
+          var req = manager.getRequestForToken(token);
+          state = req == null ? "null" : req.getState().name();
+        } catch (Exception ex) {
+          state = "err:" + ex.getClass().getSimpleName();
+        }
+      }
+      lines.add(
+          "  token="
+              + token.getIdentifier()
+              + " item="
+              + pending.itemId
+              + " count="
+              + pending.count
+              + " state="
+              + state);
+    }
+    if (lines.isEmpty()) {
+      lines.add("  (no pending perma requests)");
+    }
+    return lines;
+  }
+
   private void setDirty() {
     if (shop.getColony() != null) {
       shop.getColony().markDirty();

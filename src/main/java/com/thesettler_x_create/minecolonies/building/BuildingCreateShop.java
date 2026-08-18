@@ -229,6 +229,10 @@ public class BuildingCreateShop extends AbstractBuilding {
     return isBuilt() && getBuildingLevel() >= Config.PERMA_MIN_BUILDING_LEVEL.getAsInt();
   }
 
+  public java.util.List<String> getPermaPendingDebugLines() {
+    return permaManager.getPendingPermaDebugLines(getColony());
+  }
+
   public boolean hasContainerPosition(BlockPos pos) {
     return containerList.contains(pos) || getLocation().getInDimensionLocation().equals(pos);
   }
