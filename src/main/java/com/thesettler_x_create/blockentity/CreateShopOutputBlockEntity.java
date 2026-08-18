@@ -127,11 +127,18 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       if (permaItems.isEmpty()) {
         return ItemStack.EMPTY;
       }
+      boolean waitFull = getWaitFullStack();
       ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
       int handlerSlot = 0;
       for (ItemStack key : permaItems) {
         if (handlerSlot >= PackageItem.SLOTS) {
           break;
+        }
+        if (waitFull) {
+          ItemStack peeked = extractFromRacks(key, key.getMaxStackSize(), true);
+          if (peeked.getCount() < key.getMaxStackSize()) {
+            continue;
+          }
         }
         ItemStack pulled = extractFromRacks(key, key.getMaxStackSize(), simulate);
         if (!pulled.isEmpty()) {
@@ -151,6 +158,17 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       ItemStack pkg = PackageItem.containing(handler);
       PackageItem.addAddress(pkg, packageAddress);
       return pkg;
+    }
+
+    private boolean getWaitFullStack() {
+      TileEntityCreateShop shop = getShopTile();
+      if (shop == null || shop.getBuilding() == null) {
+        return false;
+      }
+      if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
+        return false;
+      }
+      return building.isPermaWaitFullStack();
     }
 
     private List<ItemStack> getPermaItems() {
