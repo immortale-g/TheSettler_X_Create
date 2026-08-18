@@ -188,6 +188,10 @@ public class BuildingCreateShop extends AbstractBuilding {
     return null;
   }
 
+  public boolean hasOutputBlock() {
+    return outputPos != null;
+  }
+
   @Nullable
   public BlockPos getOutputPos() {
     return outputPos;
@@ -223,6 +227,10 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public boolean canUsePermaRequests() {
     return isBuilt() && getBuildingLevel() >= Config.PERMA_MIN_BUILDING_LEVEL.getAsInt();
+  }
+
+  public java.util.List<String> getPermaPendingDebugLines() {
+    return permaManager.getPendingPermaDebugLines(getColony());
   }
 
   public boolean hasContainerPosition(BlockPos pos) {

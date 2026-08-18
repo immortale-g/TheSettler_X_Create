@@ -7,6 +7,7 @@ import com.minecolonies.core.client.gui.AbstractModuleWindow;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
 import com.thesettler_x_create.network.SetCreateShopAddressPayload;
+import com.thesettler_x_create.network.SetPackagerAddressPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -14,6 +15,7 @@ public class CreateShopAddressModuleWindow
     extends AbstractModuleWindow<CreateShopAddressModuleView> {
   private final com.minecolonies.api.colony.buildings.views.IBuildingView building;
   private final TextField addressInput;
+  private final TextField packageAddressInput;
 
   public CreateShopAddressModuleWindow(CreateShopAddressModuleView moduleView) {
     super(
@@ -32,6 +34,11 @@ public class CreateShopAddressModuleWindow
       addressInput.setText(moduleView.getAddress());
     }
 
+    packageAddressInput = findPaneOfTypeByID("packageAddressInput", TextField.class);
+    if (packageAddressInput != null) {
+      packageAddressInput.setText(moduleView.getPackageAddress());
+    }
+
     registerButton("save", this::onSave);
   }
 
@@ -39,8 +46,11 @@ public class CreateShopAddressModuleWindow
     if (addressInput == null) {
       return;
     }
-    String address = addressInput.getText();
     PacketDistributor.sendToServer(
-        new SetCreateShopAddressPayload(building.getPosition(), address));
+        new SetCreateShopAddressPayload(building.getPosition(), addressInput.getText()));
+    if (packageAddressInput != null) {
+      PacketDistributor.sendToServer(
+          new SetPackagerAddressPayload(building.getPosition(), packageAddressInput.getText()));
+    }
   }
 }

@@ -2,6 +2,7 @@ package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
+import com.simibubi.create.content.logistics.box.PackageItem;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -15,12 +16,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 public class CreateShopOutputBlockEntity extends BlockEntity {
   private static final String TAG_SHOP_POS = "ShopPos";
+  private static final String TAG_PACKAGE_ADDRESS = "PackageAddress";
   private final IItemHandler itemHandler = new OutputItemHandler();
   private BlockPos shopPos;
+  private String packageAddress = "";
 
   public CreateShopOutputBlockEntity(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_OUTPUT.get(), pos, state);
@@ -48,6 +52,15 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     return null;
   }
 
+  public String getPackageAddress() {
+    return packageAddress;
+  }
+
+  public void setPackageAddress(String address) {
+    packageAddress = address == null ? "" : address;
+    setChanged();
+  }
+
   public IItemHandler getItemHandler(@Nullable Direction side) {
     return itemHandler;
   }
@@ -58,6 +71,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     if (tag.contains(TAG_SHOP_POS)) {
       shopPos = BlockPos.of(tag.getLong(TAG_SHOP_POS));
     }
+    packageAddress = tag.getString(TAG_PACKAGE_ADDRESS);
   }
 
   @Override
@@ -66,28 +80,23 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     if (shopPos != null) {
       tag.putLong(TAG_SHOP_POS, shopPos.asLong());
     }
+    if (!packageAddress.isEmpty()) {
+      tag.putString(TAG_PACKAGE_ADDRESS, packageAddress);
+    }
   }
 
   private final class OutputItemHandler implements IItemHandler {
     @Override
     public int getSlots() {
-      return getPermaItems().size();
+      return 1;
     }
 
     @Override
     public ItemStack getStackInSlot(int slot) {
-      List<ItemStack> permaItems = getPermaItems();
-      if (slot < 0 || slot >= permaItems.size()) {
+      if (slot != 0 || packageAddress.isEmpty()) {
         return ItemStack.EMPTY;
       }
-      ItemStack key = permaItems.get(slot);
-      int available = countAvailable(key);
-      if (available <= 0) {
-        return ItemStack.EMPTY;
-      }
-      ItemStack stack = key.copy();
-      stack.setCount(Math.max(1, Math.min(stack.getMaxStackSize(), available)));
-      return stack;
+      return assemblePackage(true);
     }
 
     @Override
@@ -97,28 +106,69 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
     @Override
     public ItemStack extractItem(int slot, int amount, boolean simulate) {
-      if (amount <= 0) {
+      if (slot != 0 || amount <= 0 || packageAddress.isEmpty()) {
         return ItemStack.EMPTY;
       }
-      List<ItemStack> permaItems = getPermaItems();
-      if (slot < 0 || slot >= permaItems.size()) {
-        return ItemStack.EMPTY;
-      }
-      ItemStack key = permaItems.get(slot);
-      if (key.isEmpty()) {
-        return ItemStack.EMPTY;
-      }
-      return extractFromRacks(key, amount, simulate);
+      return assemblePackage(simulate);
     }
 
     @Override
     public int getSlotLimit(int slot) {
-      return 64;
+      return 1;
     }
 
     @Override
     public boolean isItemValid(int slot, ItemStack stack) {
       return false;
+    }
+
+    private ItemStack assemblePackage(boolean simulate) {
+      List<ItemStack> permaItems = getPermaItems();
+      if (permaItems.isEmpty()) {
+        return ItemStack.EMPTY;
+      }
+      boolean waitFull = getWaitFullStack();
+      ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
+      int handlerSlot = 0;
+      for (ItemStack key : permaItems) {
+        if (handlerSlot >= PackageItem.SLOTS) {
+          break;
+        }
+        if (waitFull) {
+          ItemStack peeked = extractFromRacks(key, key.getMaxStackSize(), true);
+          if (peeked.getCount() < key.getMaxStackSize()) {
+            continue;
+          }
+        }
+        ItemStack pulled = extractFromRacks(key, key.getMaxStackSize(), simulate);
+        if (!pulled.isEmpty()) {
+          handler.setStackInSlot(handlerSlot++, pulled);
+        }
+      }
+      boolean allEmpty = true;
+      for (int i = 0; i < handler.getSlots(); i++) {
+        if (!handler.getStackInSlot(i).isEmpty()) {
+          allEmpty = false;
+          break;
+        }
+      }
+      if (allEmpty) {
+        return ItemStack.EMPTY;
+      }
+      ItemStack pkg = PackageItem.containing(handler);
+      PackageItem.addAddress(pkg, packageAddress);
+      return pkg;
+    }
+
+    private boolean getWaitFullStack() {
+      TileEntityCreateShop shop = getShopTile();
+      if (shop == null || shop.getBuilding() == null) {
+        return false;
+      }
+      if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
+        return false;
+      }
+      return building.isPermaWaitFullStack();
     }
 
     private List<ItemStack> getPermaItems() {
@@ -144,25 +194,6 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
                       .getKey(stack.getItem())
                       .toString()));
       return stacks;
-    }
-
-    private int countAvailable(ItemStack key) {
-      TileEntityCreateShop shop = getShopTile();
-      if (shop == null || shop.getBuilding() == null || shop.getLevel() == null) {
-        return 0;
-      }
-      int total = 0;
-      for (BlockPos pos : shop.getBuilding().getContainers()) {
-        if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-          continue;
-        }
-        BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-        if (!(entity instanceof AbstractTileEntityRack rack)) {
-          continue;
-        }
-        total += rack.getItemCount(match -> ItemStack.isSameItemSameComponents(match, key));
-      }
-      return Math.max(0, total);
     }
 
     private ItemStack extractFromRacks(ItemStack key, int amount, boolean simulate) {

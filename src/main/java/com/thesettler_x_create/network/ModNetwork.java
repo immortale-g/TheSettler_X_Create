@@ -46,6 +46,10 @@ public final class ModNetwork {
         CreateShopStockRefreshPayload.TYPE,
         CreateShopStockRefreshPayload.STREAM_CODEC,
         ModNetwork::handleStockRefresh);
+    registrar.playToServer(
+        SetPackagerAddressPayload.TYPE,
+        SetPackagerAddressPayload.STREAM_CODEC,
+        ModNetwork::handleSetPackagerAddress);
   }
 
   private static void handleSetAddress(
@@ -185,6 +189,28 @@ public final class ModNetwork {
             return;
           }
           new ColonyViewBuildingViewMessage(shop.getBuilding(), true).sendToPlayer(player);
+        });
+  }
+
+  private static void handleSetPackagerAddress(
+      SetPackagerAddressPayload payload, IPayloadContext context) {
+    context.enqueueWork(
+        () -> {
+          TileEntityCreateShop shop = getShop(context, payload.hutPos());
+          if (shop == null || shop.getBuilding() == null) {
+            return;
+          }
+          if (!(shop.getBuilding()
+              instanceof
+              com.thesettler_x_create.minecolonies.building.BuildingCreateShop
+              building)) {
+            return;
+          }
+          com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity obe =
+              building.getOutputBlockEntity();
+          if (obe != null) {
+            obe.setPackageAddress(payload.address());
+          }
         });
   }
 

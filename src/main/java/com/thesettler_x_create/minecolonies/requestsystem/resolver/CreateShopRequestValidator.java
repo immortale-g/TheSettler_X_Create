@@ -80,6 +80,21 @@ final class CreateShopRequestValidator {
       }
       return false;
     }
+    // Secondary guard: ILocation.equals() may create new objects and fail silently.
+    // Compare BlockPos directly to catch perma-request self-loops.
+    {
+      net.minecraft.core.BlockPos requesterPos =
+          request.getRequester().getLocation().getInDimensionLocation();
+      net.minecraft.core.BlockPos resolverPos = resolver.getLocation().getInDimensionLocation();
+      if (requesterPos != null && requesterPos.equals(resolverPos)) {
+        TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] canResolve=false (self-loop by BlockPos — ILocation.equals missed it)"
+                + " requester={} resolver={}",
+            requesterPos,
+            resolverPos);
+        return false;
+      }
+    }
     IDeliverable deliverable = request.getRequest();
 
     BuildingCreateShop shop = resolver.getShop(manager);
