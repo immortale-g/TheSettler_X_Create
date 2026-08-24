@@ -304,7 +304,8 @@ final class CreateShopOutputBlockTestCommands {
         continue;
       }
       for (var entry : bm.getBuildings().entrySet()) {
-        if (!(entry.getValue() instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop shop)) {
+        if (!(entry.getValue()
+            instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop shop)) {
           continue;
         }
         shops++;
@@ -341,8 +342,11 @@ final class CreateShopOutputBlockTestCommands {
           // Count in racks
           int inRacks = 0;
           if (shopTE != null) {
-            for (var entry2 : shopTE.getMatchingItemStacksInWarehouse(s -> ItemStack.isSameItemSameComponents(s, stack))) {
-              if (entry2.getA() != null && !entry2.getA().isEmpty()) inRacks += entry2.getA().getCount();
+            for (var entry2 :
+                shopTE.getMatchingItemStacksInWarehouse(
+                    s -> ItemStack.isSameItemSameComponents(s, stack))) {
+              if (entry2.getA() != null && !entry2.getA().isEmpty())
+                inRacks += entry2.getA().getCount();
             }
           }
 
@@ -352,8 +356,12 @@ final class CreateShopOutputBlockTestCommands {
           if (warehouses != null) {
             for (var wh : warehouses) {
               if (wh == null || wh == shop) continue;
-              if (!(wh.getTileEntity() instanceof com.minecolonies.api.tileentities.AbstractTileEntityWareHouse whTE)) continue;
-              for (var e : whTE.getMatchingItemStacksInWarehouse(s -> ItemStack.isSameItemSameComponents(s, stack))) {
+              if (!(wh.getTileEntity()
+                  instanceof com.minecolonies.api.tileentities.AbstractTileEntityWareHouse whTE))
+                continue;
+              for (var e :
+                  whTE.getMatchingItemStacksInWarehouse(
+                      s -> ItemStack.isSameItemSameComponents(s, stack))) {
                 if (e.getA() != null && !e.getA().isEmpty()) inWarehouse += e.getA().getCount();
               }
             }
@@ -374,8 +382,7 @@ final class CreateShopOutputBlockTestCommands {
         }
 
         // Show pending request states
-        source.sendSuccess(
-            () -> Component.literal("[CreateShop/PERMA] pending requests:"), false);
+        source.sendSuccess(() -> Component.literal("[CreateShop/PERMA] pending requests:"), false);
         for (String line : shop.getPermaPendingDebugLines()) {
           source.sendSuccess(() -> Component.literal("[CreateShop/PERMA]" + line), false);
         }

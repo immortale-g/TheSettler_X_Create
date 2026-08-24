@@ -208,8 +208,8 @@ final class ShopPermaRequestManager {
   }
 
   /**
-   * Returns a snapshot for diagnostics: pending token → [itemId, count, requestState].
-   * requestState is resolved from the colony's request manager if available.
+   * Returns a snapshot for diagnostics: pending token → [itemId, count, requestState]. requestState
+   * is resolved from the colony's request manager if available.
    */
   java.util.List<String> getPendingPermaDebugLines(IColony colony) {
     java.util.List<String> lines = new java.util.ArrayList<>();
