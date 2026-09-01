@@ -332,24 +332,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return false;
   }
 
-  public net.minecraft.world.item.ItemStack peekFirstHutInventoryItem() {
-    IItemHandler hut = getInventory();
-    if (hut == null) {
-      hut = getItemHandlerCap((Direction) null);
-    }
-    if (hut == null) {
-      return net.minecraft.world.item.ItemStack.EMPTY;
-    }
-    for (int slot = 0; slot < hut.getSlots(); slot++) {
-      net.minecraft.world.item.ItemStack s = hut.getStackInSlot(slot);
-      if (!s.isEmpty()) {
-        return s;
-      }
-    }
-    return net.minecraft.world.item.ItemStack.EMPTY;
-  }
-
-  /**
+/**
    * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
    *
    * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
