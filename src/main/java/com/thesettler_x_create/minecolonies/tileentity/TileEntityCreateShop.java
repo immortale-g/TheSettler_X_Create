@@ -332,7 +332,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return false;
   }
 
-  /**
+/**
    * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
    *
    * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.

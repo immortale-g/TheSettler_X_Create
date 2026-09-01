@@ -474,6 +474,28 @@ public class CreateShopBlockEntity extends BlockEntity {
     return removed;
   }
 
+  public void markInflightHandedOff(@Nullable UUID requestUuid) {
+    if (requestUuid == null) return;
+    for (InflightEntry e : inflightEntries) {
+      if (requestUuid.equals(e.requestUuid)) {
+        e.handedOff = true;
+        setChanged();
+        return;
+      }
+    }
+  }
+
+  public int clearInflightByUuid(@Nullable UUID requestUuid) {
+    if (requestUuid == null || inflightEntries.isEmpty()) return 0;
+    boolean removed = inflightEntries.removeIf(e -> requestUuid.equals(e.requestUuid));
+    if (removed) {
+      pruneBaselines();
+      setChanged();
+      return 1;
+    }
+    return 0;
+  }
+
   /** Clears reservations and inflight tracking for test/debug clean-state runs. */
   public int clearRuntimeTrackingForDebug() {
     if (!ensureServerThread("clearRuntimeTrackingForDebug")) {
@@ -949,6 +971,7 @@ public class CreateShopBlockEntity extends BlockEntity {
           // Interactions are not reliably restored across reload; re-arm overdue prompting for
           // still-open inflight entries after world load.
           inflight.notified = false;
+          inflight.handedOff = entry.getBoolean("handedOff");
           inflightEntries.add(inflight);
         }
       }
@@ -997,6 +1020,9 @@ public class CreateShopBlockEntity extends BlockEntity {
         data.putLong("requestedAt", entry.requestedAt);
         if (entry.notified) {
           data.putBoolean("notified", true);
+        }
+        if (entry.handedOff) {
+          data.putBoolean("handedOff", true);
         }
         if (entry.requesterName != null && !entry.requesterName.isEmpty()) {
           data.putString("requester", entry.requesterName);
@@ -1052,6 +1078,9 @@ public class CreateShopBlockEntity extends BlockEntity {
 
     /** UUID of the MineColonies request that created this entry. Null for legacy entries. */
     @Nullable public UUID requestUuid;
+
+    /** True once DELIVERY_CREATED — MC owns the courier lifecycle from this point on. */
+    public boolean handedOff;
 
     public InflightEntry(
         ItemStack stackKey, int remaining, long requestedAt, String requesterName, String address) {
