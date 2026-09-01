@@ -69,7 +69,20 @@ public class BuildingCreateShop extends AbstractBuilding {
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
   private static final String TAG_FLOW_STATES = "FlowStates";
 
+  /** Gauge packaging task: items to extract from racks and send to the gauge address. */
+  public record GaugePackagingTask(
+      net.minecraft.world.item.ItemStack item, int amount, String gaugeAddress) {}
+
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
+
+  /** Transient: maps pending colony-request token → gauge task (for cancellation cleanup). */
+  private final java.util.Map<IToken<?>, GaugePackagingTask> pendingGaugeRequests =
+      new java.util.LinkedHashMap<>();
+
+  /** Persisted: gauge packaging tasks waiting for items to arrive in racks. */
+  private final java.util.List<GaugePackagingTask> gaugePackagingQueue =
+      new java.util.ArrayList<>();
+
   boolean warehouseRegistered;
   private CreateShopRequestResolver shopResolver;
 
@@ -316,6 +329,16 @@ public class BuildingCreateShop extends AbstractBuilding {
     try {
       super.onRequestedRequestCancelled(manager, request);
       clearPermaPending(request);
+      if (request != null) {
+        GaugePackagingTask task = pendingGaugeRequests.remove(request.getId());
+        if (task != null) {
+          gaugePackagingQueue.removeIf(
+              t ->
+                  net.minecraft.world.item.ItemStack.isSameItem(t.item(), task.item())
+                      && t.gaugeAddress().equals(task.gaugeAddress()));
+          markDirty();
+        }
+      }
     } catch (Exception ex) {
       String token = request == null ? "<null>" : String.valueOf(request.getId());
       String msg =
@@ -338,6 +361,9 @@ public class BuildingCreateShop extends AbstractBuilding {
     try {
       super.onRequestedRequestComplete(manager, request);
       clearPermaPending(request);
+      if (request != null) {
+        pendingGaugeRequests.remove(request.getId());
+      }
     } catch (Exception ex) {
       String token = request == null ? "<null>" : String.valueOf(request.getId());
       String msg =
@@ -483,15 +509,49 @@ public class BuildingCreateShop extends AbstractBuilding {
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
     Stack deliverable = new Stack(item.copy(), amount, 1);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
-    if (token != null && isDebugRequests()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[ColonyGauge] request created token={} item={} amount={} address={}",
-          token,
-          item.getItem(),
-          amount,
-          gaugeAddress);
+    if (token != null) {
+      GaugePackagingTask task = new GaugePackagingTask(item.copy(), amount, gaugeAddress);
+      // Queue for packaging (deduplicated by item+address to avoid double-queuing on re-request).
+      boolean alreadyQueued =
+          gaugePackagingQueue.stream()
+              .anyMatch(
+                  t ->
+                      ItemStack.isSameItem(t.item(), item)
+                          && t.gaugeAddress().equals(gaugeAddress));
+      if (!alreadyQueued) {
+        gaugePackagingQueue.add(task);
+        markDirty();
+      }
+      pendingGaugeRequests.put(token, task);
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] request created token={} item={} amount={} address={} queued={}",
+            token,
+            item.getItem(),
+            amount,
+            gaugeAddress,
+            !alreadyQueued);
+      }
     }
     return token != null;
+  }
+
+  /** Returns the next gauge packaging task without removing it, or null if queue is empty. */
+  @Nullable
+  public GaugePackagingTask peekNextGaugeTask() {
+    return gaugePackagingQueue.isEmpty() ? null : gaugePackagingQueue.get(0);
+  }
+
+  /** Removes and returns the next gauge packaging task (call after successfully packaging). */
+  public void completeNextGaugeTask() {
+    if (!gaugePackagingQueue.isEmpty()) {
+      gaugePackagingQueue.remove(0);
+      markDirty();
+    }
+  }
+
+  public boolean hasGaugeTask() {
+    return !gaugePackagingQueue.isEmpty();
   }
 
   public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {
@@ -1281,6 +1341,19 @@ public class BuildingCreateShop extends AbstractBuilding {
         pendingFlowStatesTag = flowTag;
       }
     }
+    gaugePackagingQueue.clear();
+    if (compound.contains("GaugePackagingQueue", 9)) {
+      net.minecraft.nbt.ListTag list = compound.getList("GaugePackagingQueue", 10);
+      for (int i = 0; i < list.size(); i++) {
+        CompoundTag t = list.getCompound(i);
+        ItemStack item = ItemStack.parseOptional(provider, t.getCompound("Item"));
+        int amount = t.getInt("Amount");
+        String address = t.getString("Address");
+        if (!item.isEmpty() && amount > 0 && !address.isEmpty()) {
+          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address));
+        }
+      }
+    }
   }
 
   @Override
@@ -1298,6 +1371,17 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
     if (shopResolver != null) {
       shopResolver.saveFlowStatesToNbt(tag);
+    }
+    if (!gaugePackagingQueue.isEmpty()) {
+      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+      for (GaugePackagingTask task : gaugePackagingQueue) {
+        CompoundTag t = new CompoundTag();
+        t.put("Item", task.item().save(provider));
+        t.putInt("Amount", task.amount());
+        t.putString("Address", task.gaugeAddress());
+        list.add(t);
+      }
+      tag.put("GaugePackagingQueue", list);
     }
     return tag;
   }

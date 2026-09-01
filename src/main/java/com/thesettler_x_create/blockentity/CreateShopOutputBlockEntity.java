@@ -93,7 +93,10 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
     @Override
     public ItemStack getStackInSlot(int slot) {
-      if (slot != 0 || packageAddress.isEmpty()) {
+      if (slot != 0) {
+        return ItemStack.EMPTY;
+      }
+      if (packageAddress.isEmpty() && !hasGaugeTask()) {
         return ItemStack.EMPTY;
       }
       return assemblePackage(true);
@@ -106,10 +109,27 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
     @Override
     public ItemStack extractItem(int slot, int amount, boolean simulate) {
-      if (slot != 0 || amount <= 0 || packageAddress.isEmpty()) {
+      if (slot != 0 || amount <= 0) {
+        return ItemStack.EMPTY;
+      }
+      if (packageAddress.isEmpty() && !hasGaugeTask()) {
         return ItemStack.EMPTY;
       }
       return assemblePackage(simulate);
+    }
+
+    private boolean hasGaugeTask() {
+      BuildingCreateShop building = getBuilding();
+      return building != null && building.hasGaugeTask();
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private BuildingCreateShop getBuilding() {
+      TileEntityCreateShop shop = getShopTile();
+      if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop b)) {
+        return null;
+      }
+      return b;
     }
 
     @Override
@@ -123,6 +143,26 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     }
 
     private ItemStack assemblePackage(boolean simulate) {
+      // Gauge tasks have priority: package items for the gauge address first.
+      BuildingCreateShop building = getBuilding();
+      if (building != null) {
+        BuildingCreateShop.GaugePackagingTask task = building.peekNextGaugeTask();
+        if (task != null) {
+          ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
+          if (!extracted.isEmpty()) {
+            if (!simulate) {
+              building.completeNextGaugeTask();
+            }
+            ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
+            handler.setStackInSlot(0, extracted);
+            ItemStack pkg = PackageItem.containing(handler);
+            PackageItem.addAddress(pkg, task.gaugeAddress());
+            return pkg;
+          }
+          // Items not yet in racks — do not fall through to perma packaging.
+          return ItemStack.EMPTY;
+        }
+      }
       List<ItemStack> permaItems = getPermaItems();
       if (permaItems.isEmpty()) {
         return ItemStack.EMPTY;
