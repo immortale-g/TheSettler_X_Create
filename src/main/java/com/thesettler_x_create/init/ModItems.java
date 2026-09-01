@@ -2,6 +2,7 @@ package com.thesettler_x_create.init;
 
 import com.minecolonies.api.items.ItemBlockHut;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.block.ColonyGaugeBlockItem;
 import com.thesettler_x_create.item.StockLinkLinkerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -29,6 +30,12 @@ public final class ModItems {
       ITEMS.register(
           "create_shop_output",
           () -> new BlockItem(ModBlocks.CREATE_SHOP_OUTPUT.get(), new Item.Properties()));
+  public static final DeferredItem<Item> COLONY_GAUGE =
+      ITEMS.register(
+          "colony_gauge",
+          () ->
+              new ColonyGaugeBlockItem(
+                  ModBlocks.COLONY_GAUGE.get(), new Item.Properties().stacksTo(1)));
 
   public static void register(IEventBus bus) {
     ITEMS.register(bus);

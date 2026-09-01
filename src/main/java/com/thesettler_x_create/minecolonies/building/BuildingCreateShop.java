@@ -6,8 +6,10 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
+import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Pickup;
+import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -21,6 +23,7 @@ import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolve
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -463,6 +466,32 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public boolean hasIncomingRackWork() {
     return housekeepingOrchestrator.hasIncomingRackWork();
+  }
+
+  /**
+   * Creates a colony delivery request for the given item on behalf of a Colony Factory Gauge. Items
+   * will be delivered to this shop's hut by a colony courier.
+   *
+   * @return true if the request was successfully created
+   */
+  public boolean requestForGauge(ItemStack item, int amount, String gaugeAddress) {
+    if (item.isEmpty() || amount <= 0) return false;
+    IColony colony = getColony();
+    if (colony == null) return false;
+    IRequester requester = getRequester();
+    if (requester == null) return false;
+    IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
+    Stack deliverable = new Stack(item.copy(), amount, 1);
+    IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
+    if (token != null && isDebugRequests()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[ColonyGauge] request created token={} item={} amount={} address={}",
+          token,
+          item.getItem(),
+          amount,
+          gaugeAddress);
+    }
+    return token != null;
   }
 
   public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {

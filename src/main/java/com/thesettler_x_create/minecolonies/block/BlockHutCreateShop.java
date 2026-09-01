@@ -3,17 +3,21 @@ package com.thesettler_x_create.minecolonies.block;
 import com.minecolonies.api.blocks.AbstractBlockHut;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
+import com.thesettler_x_create.block.ColonyGaugeBlockItem;
 import com.thesettler_x_create.item.StockLinkLinkerItem;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesBuildings;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -45,6 +49,27 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
       Player player,
       InteractionHand hand,
       BlockHitResult hit) {
+    if (stack.getItem() instanceof ColonyGaugeBlockItem) {
+      if (!level.isClientSide) {
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof TileEntityCreateShop shop && shop.getColony() != null) {
+          CompoundTag tag =
+              stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+          tag.putInt("GaugeColonyId", shop.getColony().getID());
+          tag.putLong("GaugeShopPos", pos.asLong());
+          tag.putString("GaugeDimension", level.dimension().location().toString());
+          stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+          player.displayClientMessage(
+              Component.literal("Colony Gauge linked to shop. Now place it near a Frogport."),
+              true);
+        } else {
+          player.displayClientMessage(
+              Component.literal("No active colony shop found at this position."), true);
+        }
+      }
+      return ItemInteractionResult.SUCCESS;
+    }
+
     if (stack.getItem() instanceof StockLinkLinkerItem) {
       if (player.isShiftKeyDown()) {
         if (!level.isClientSide) {
