@@ -11,6 +11,9 @@ import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.building.ShopMissingOutputAddressInteraction;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public class EntityAIWorkCreateShop
     extends AbstractEntityAIInteract<JobCreateShop, BuildingCreateShop> {
@@ -114,6 +117,7 @@ public class EntityAIWorkCreateShop
     if (worker == null || worker.getCitizenData() == null) {
       return;
     }
+    worker.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.CHEST));
     if (building != null && building.hasCapacityStall()) {
       worker.getCitizenData().setJobStatus(JobStatus.STUCK);
       worker.getCitizenData().setVisibleStatus(VisibleCitizenStatus.WORKING);
@@ -127,6 +131,7 @@ public class EntityAIWorkCreateShop
     if (worker == null || worker.getCitizenData() == null) {
       return;
     }
+    worker.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
     worker.getCitizenData().setJobStatus(JobStatus.IDLE);
   }
 }

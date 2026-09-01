@@ -100,6 +100,7 @@ final class CreateShopDeliveryCompletionService {
             && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(
                 delivery, shop, pickup)) {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
+          pickup.clearInflightByUuid(parentRequestId);
           ItemStack stack = delivery.getStack().copy();
           int reservedForStackBefore = pickup.getReservedFor(stack);
           if (!stack.isEmpty()) {
