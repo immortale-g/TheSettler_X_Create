@@ -1,5 +1,11 @@
 {
-  "variants": {
-    "": { "model": "thesettler_x_create:block/colony_gauge" }
-  }
+  "multipart": [
+    {
+      "apply": { "model": "thesettler_x_create:block/colony_gauge" }
+    },
+    {
+      "when": { "powered": "true" },
+      "apply": { "model": "thesettler_x_create:block/colony_gauge_powered" }
+    }
+  ]
 }

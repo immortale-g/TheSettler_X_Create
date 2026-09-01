@@ -26,6 +26,7 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
+import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
@@ -71,7 +72,10 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   /** Gauge packaging task: items to extract from racks and send to the gauge address. */
   public record GaugePackagingTask(
-      net.minecraft.world.item.ItemStack item, int amount, String gaugeAddress) {}
+      net.minecraft.world.item.ItemStack item,
+      int amount,
+      String gaugeAddress,
+      @Nullable BlockPos gaugePos) {}
 
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
 
@@ -362,7 +366,15 @@ public class BuildingCreateShop extends AbstractBuilding {
       super.onRequestedRequestComplete(manager, request);
       clearPermaPending(request);
       if (request != null) {
-        pendingGaugeRequests.remove(request.getId());
+        GaugePackagingTask gaugeTask = pendingGaugeRequests.remove(request.getId());
+        if (gaugeTask != null && gaugeTask.gaugePos() != null) {
+          Level world = getColony() == null ? null : getColony().getWorld();
+          if (world != null
+              && world.getBlockEntity(gaugeTask.gaugePos())
+                  instanceof ColonyGaugeBlockEntity gauge) {
+            gauge.onDeliveryReceived();
+          }
+        }
       }
     } catch (Exception ex) {
       String token = request == null ? "<null>" : String.valueOf(request.getId());
@@ -500,7 +512,8 @@ public class BuildingCreateShop extends AbstractBuilding {
    *
    * @return true if the request was successfully created
    */
-  public boolean requestForGauge(ItemStack item, int amount, String gaugeAddress) {
+  public boolean requestForGauge(
+      ItemStack item, int amount, String gaugeAddress, @Nullable BlockPos gaugePos) {
     if (item.isEmpty() || amount <= 0) return false;
     IColony colony = getColony();
     if (colony == null) return false;
@@ -510,7 +523,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     Stack deliverable = new Stack(item.copy(), amount, 1);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
     if (token != null) {
-      GaugePackagingTask task = new GaugePackagingTask(item.copy(), amount, gaugeAddress);
+      GaugePackagingTask task = new GaugePackagingTask(item.copy(), amount, gaugeAddress, gaugePos);
       // Queue for packaging (deduplicated by item+address to avoid double-queuing on re-request).
       boolean alreadyQueued =
           gaugePackagingQueue.stream()
@@ -525,11 +538,12 @@ public class BuildingCreateShop extends AbstractBuilding {
       pendingGaugeRequests.put(token, task);
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] request created token={} item={} amount={} address={} queued={}",
+            "[ColonyGauge] request created token={} item={} amount={} address={} gaugePos={} queued={}",
             token,
             item.getItem(),
             amount,
             gaugeAddress,
+            gaugePos,
             !alreadyQueued);
       }
     }
@@ -1349,8 +1363,9 @@ public class BuildingCreateShop extends AbstractBuilding {
         ItemStack item = ItemStack.parseOptional(provider, t.getCompound("Item"));
         int amount = t.getInt("Amount");
         String address = t.getString("Address");
+        BlockPos gaugePos = t.contains("GaugePos") ? BlockPos.of(t.getLong("GaugePos")) : null;
         if (!item.isEmpty() && amount > 0 && !address.isEmpty()) {
-          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address));
+          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address, gaugePos));
         }
       }
     }
@@ -1379,6 +1394,7 @@ public class BuildingCreateShop extends AbstractBuilding {
         t.put("Item", task.item().save(provider));
         t.putInt("Amount", task.amount());
         t.putString("Address", task.gaugeAddress());
+        if (task.gaugePos() != null) t.putLong("GaugePos", task.gaugePos().asLong());
         list.add(t);
       }
       tag.put("GaugePackagingQueue", list);

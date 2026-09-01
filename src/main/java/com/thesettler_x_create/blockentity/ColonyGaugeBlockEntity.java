@@ -3,17 +3,21 @@ package com.thesettler_x_create.blockentity;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
 import com.simibubi.create.content.logistics.packagePort.PackagePortBlockEntity;
+import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.block.ColonyGaugeBlock;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.List;
+import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -29,7 +33,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   /** Ticks between request attempts. */
   private static final int REQUEST_INTERVAL = 100;
 
-  /** 30 seconds in ticks — how long a sent request counts as "promised". */
+  /** 30 seconds — how long a sent request counts as promised. */
   private static final int PROMISE_EXPIRY_TICKS = 600;
 
   public FilteringBehaviour filter;
@@ -41,10 +45,16 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   private int timer = REQUEST_INTERVAL;
   private long promisedUntil = 0L;
 
-  /** Cached address from adjacent Frogport — refreshed each tick. */
+  /**
+   * True when an adjacent block (in connectedDirection) is a Packager. In restocker mode the
+   * Frogport address is read from above the Packager instead of adjacent to the gauge.
+   */
+  private boolean restocker = false;
+
+  /** Cached address from adjacent/restocker Frogport — refreshed each lazy tick. */
   @Nullable private String cachedFrogportAddress;
 
-  // Client-side state flags (synced via write/read)
+  // Synced client-side state
   public boolean satisfied = false;
   public boolean promisedSatisfied = false;
 
@@ -54,6 +64,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
   public ColonyGaugeBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
     super(type, pos, state);
+    setLazyTickRate(20);
   }
 
   @Override
@@ -74,11 +85,18 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   }
 
   @Override
+  public void lazyTick() {
+    super.lazyTick();
+    if (level == null || level.isClientSide()) return;
+    detectPackager();
+    scanFrogport();
+  }
+
+  @Override
   public void tick() {
     super.tick();
     if (level == null || level.isClientSide()) return;
 
-    scanAdjacentFrogport();
     updateSatisfiedState();
 
     if (timer > 0) {
@@ -89,19 +107,46 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     tryRequest();
   }
 
-  private void scanAdjacentFrogport() {
+  /** Checks if the block this gauge is attached to is a Packager. */
+  private void detectPackager() {
+    BlockState state = getBlockState();
+    Direction connectedDir = ColonyGaugeBlock.connectedDirection(state);
+    BlockPos attachedPos = getBlockPos().relative(connectedDir);
+    boolean isRestocker = level.getBlockEntity(attachedPos) instanceof PackagerBlockEntity;
+    if (isRestocker != restocker) {
+      restocker = isRestocker;
+      sendData();
+    }
+  }
+
+  /**
+   * Scans for a Frogport. In restocker mode reads from above the attached Packager (matching
+   * Create's FactoryPanel.getFrogAddress()). Otherwise scans all adjacent blocks.
+   */
+  private void scanFrogport() {
     String found = null;
-    for (Direction dir : Direction.values()) {
-      BlockPos neighbor = getBlockPos().relative(dir);
-      if (level.getBlockEntity(neighbor) instanceof PackagePortBlockEntity port) {
+    if (restocker) {
+      BlockState state = getBlockState();
+      Direction connectedDir = ColonyGaugeBlock.connectedDirection(state);
+      BlockPos packagerPos = getBlockPos().relative(connectedDir);
+      BlockPos abovePackager = packagerPos.above();
+      if (level.getBlockEntity(abovePackager) instanceof PackagePortBlockEntity port) {
         String addr = port.addressFilter;
-        if (addr != null && !addr.isBlank()) {
-          found = addr;
-          break;
+        if (addr != null && !addr.isBlank()) found = addr;
+      }
+    } else {
+      for (Direction dir : Direction.values()) {
+        BlockPos neighbor = getBlockPos().relative(dir);
+        if (level.getBlockEntity(neighbor) instanceof PackagePortBlockEntity port) {
+          String addr = port.addressFilter;
+          if (addr != null && !addr.isBlank()) {
+            found = addr;
+            break;
+          }
         }
       }
     }
-    if (!java.util.Objects.equals(found, cachedFrogportAddress)) {
+    if (!Objects.equals(found, cachedFrogportAddress)) {
       cachedFrogportAddress = found;
       sendData();
     }
@@ -110,19 +155,27 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   private void updateSatisfiedState() {
     long now = level.getGameTime();
     boolean newPromised = promisedUntil > now;
-    // "satisfied" is always false for now — we rely on promisedSatisfied to gate requests
     if (newPromised != promisedSatisfied) {
       promisedSatisfied = newPromised;
-      satisfied = false;
+      if (!promisedSatisfied) satisfied = false;
       sendData();
+      updatePowered(promisedSatisfied || satisfied);
     }
+  }
+
+  private void updatePowered(boolean powered) {
+    BlockState state = getBlockState();
+    if (!state.hasProperty(ColonyGaugeBlock.POWERED)) return;
+    if (state.getValue(ColonyGaugeBlock.POWERED) == powered) return;
+    level.setBlock(
+        getBlockPos(), state.setValue(ColonyGaugeBlock.POWERED, powered), Block.UPDATE_ALL);
   }
 
   private void tryRequest() {
     if (!isLinked()) return;
     if (filter.getFilter().isEmpty()) return;
     if (cachedFrogportAddress == null || cachedFrogportAddress.isBlank()) return;
-    if (promisedSatisfied) return;
+    if (promisedSatisfied || satisfied) return;
 
     BuildingCreateShop building = findBuilding();
     if (building == null) return;
@@ -131,17 +184,30 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     if (amount <= 0) amount = filter.getFilter().getMaxStackSize();
 
     boolean requested =
-        building.requestForGauge(filter.getFilter().copy(), amount, cachedFrogportAddress);
+        building.requestForGauge(
+            filter.getFilter().copy(), amount, cachedFrogportAddress, getBlockPos());
     if (requested) {
       promisedUntil = level.getGameTime() + PROMISE_EXPIRY_TICKS;
       promisedSatisfied = true;
       sendData();
+      updatePowered(true);
       TheSettlerXCreate.LOGGER.debug(
-          "[ColonyGauge] request sent item={} amount={} address={}",
+          "[ColonyGauge] request sent item={} amount={} address={} restocker={}",
           filter.getFilter().getItem(),
           amount,
-          cachedFrogportAddress);
+          cachedFrogportAddress,
+          restocker);
     }
+  }
+
+  /**
+   * Called by BuildingCreateShop when the colony courier delivers items to the shop for this gauge.
+   * Items are now in shop racks and packaging is queued.
+   */
+  public void onDeliveryReceived() {
+    satisfied = true;
+    sendData();
+    updatePowered(true);
   }
 
   @Nullable
@@ -164,6 +230,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     tag.putLong(TAG_PROMISED_UNTIL, promisedUntil);
     tag.putBoolean("Satisfied", satisfied);
     tag.putBoolean("PromisedSatisfied", promisedSatisfied);
+    tag.putBoolean("Restocker", restocker);
     if (cachedFrogportAddress != null) tag.putString("FrogportAddress", cachedFrogportAddress);
   }
 
@@ -177,6 +244,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     promisedUntil = tag.getLong(TAG_PROMISED_UNTIL);
     satisfied = tag.getBoolean("Satisfied");
     promisedSatisfied = tag.getBoolean("PromisedSatisfied");
+    restocker = tag.getBoolean("Restocker");
     cachedFrogportAddress =
         tag.contains("FrogportAddress") ? tag.getString("FrogportAddress") : null;
   }
@@ -184,6 +252,10 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   @Nullable
   public String getCachedFrogportAddress() {
     return cachedFrogportAddress;
+  }
+
+  public boolean isRestocker() {
+    return restocker;
   }
 
   public int getColonyId() {
