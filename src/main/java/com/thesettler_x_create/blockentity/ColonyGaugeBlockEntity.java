@@ -184,8 +184,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     if (amount <= 0) amount = filter.getFilter().getMaxStackSize();
 
     boolean requested =
-        building.requestForGauge(
-            filter.getFilter().copy(), amount, cachedFrogportAddress, getBlockPos());
+        building.requestForGauge(filter.getFilter().copy(), amount, cachedFrogportAddress);
     if (requested) {
       promisedUntil = level.getGameTime() + PROMISE_EXPIRY_TICKS;
       promisedSatisfied = true;

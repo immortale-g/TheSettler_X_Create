@@ -6,9 +6,6 @@ import com.simibubi.create.content.logistics.box.PackageItem;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -93,12 +90,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
     @Override
     public ItemStack getStackInSlot(int slot) {
-      if (slot != 0) {
-        return ItemStack.EMPTY;
-      }
-      if (packageAddress.isEmpty() && !hasGaugeTask()) {
-        return ItemStack.EMPTY;
-      }
+      if (slot != 0 || !hasGaugeTask()) return ItemStack.EMPTY;
       return assemblePackage(true);
     }
 
@@ -109,12 +101,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
     @Override
     public ItemStack extractItem(int slot, int amount, boolean simulate) {
-      if (slot != 0 || amount <= 0) {
-        return ItemStack.EMPTY;
-      }
-      if (packageAddress.isEmpty() && !hasGaugeTask()) {
-        return ItemStack.EMPTY;
-      }
+      if (slot != 0 || amount <= 0 || !hasGaugeTask()) return ItemStack.EMPTY;
       return assemblePackage(simulate);
     }
 
@@ -126,9 +113,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     @org.jetbrains.annotations.Nullable
     private BuildingCreateShop getBuilding() {
       TileEntityCreateShop shop = getShopTile();
-      if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop b)) {
-        return null;
-      }
+      if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop b)) return null;
       return b;
     }
 
@@ -143,97 +128,18 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     }
 
     private ItemStack assemblePackage(boolean simulate) {
-      // Gauge tasks have priority: package items for the gauge address first.
       BuildingCreateShop building = getBuilding();
-      if (building != null) {
-        BuildingCreateShop.GaugePackagingTask task = building.peekNextGaugeTask();
-        if (task != null) {
-          ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
-          if (!extracted.isEmpty()) {
-            if (!simulate) {
-              building.completeNextGaugeTask();
-            }
-            ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
-            handler.setStackInSlot(0, extracted);
-            ItemStack pkg = PackageItem.containing(handler);
-            PackageItem.addAddress(pkg, task.gaugeAddress());
-            return pkg;
-          }
-          // Items not yet in racks — do not fall through to perma packaging.
-          return ItemStack.EMPTY;
-        }
-      }
-      List<ItemStack> permaItems = getPermaItems();
-      if (permaItems.isEmpty()) {
-        return ItemStack.EMPTY;
-      }
-      boolean waitFull = getWaitFullStack();
+      if (building == null) return ItemStack.EMPTY;
+      BuildingCreateShop.GaugePackagingTask task = building.peekNextGaugeTask();
+      if (task == null) return ItemStack.EMPTY;
+      ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
+      if (extracted.isEmpty()) return ItemStack.EMPTY;
+      if (!simulate) building.completeNextGaugeTask();
       ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
-      int handlerSlot = 0;
-      for (ItemStack key : permaItems) {
-        if (handlerSlot >= PackageItem.SLOTS) {
-          break;
-        }
-        if (waitFull) {
-          ItemStack peeked = extractFromRacks(key, key.getMaxStackSize(), true);
-          if (peeked.getCount() < key.getMaxStackSize()) {
-            continue;
-          }
-        }
-        ItemStack pulled = extractFromRacks(key, key.getMaxStackSize(), simulate);
-        if (!pulled.isEmpty()) {
-          handler.setStackInSlot(handlerSlot++, pulled);
-        }
-      }
-      boolean allEmpty = true;
-      for (int i = 0; i < handler.getSlots(); i++) {
-        if (!handler.getStackInSlot(i).isEmpty()) {
-          allEmpty = false;
-          break;
-        }
-      }
-      if (allEmpty) {
-        return ItemStack.EMPTY;
-      }
+      handler.setStackInSlot(0, extracted);
       ItemStack pkg = PackageItem.containing(handler);
-      PackageItem.addAddress(pkg, packageAddress);
+      PackageItem.addAddress(pkg, task.gaugeAddress());
       return pkg;
-    }
-
-    private boolean getWaitFullStack() {
-      TileEntityCreateShop shop = getShopTile();
-      if (shop == null || shop.getBuilding() == null) {
-        return false;
-      }
-      if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
-        return false;
-      }
-      return building.isPermaWaitFullStack();
-    }
-
-    private List<ItemStack> getPermaItems() {
-      TileEntityCreateShop shop = getShopTile();
-      if (shop == null || shop.getBuilding() == null) {
-        return List.of();
-      }
-      if (!(shop.getBuilding() instanceof BuildingCreateShop building)
-          || !building.canUsePermaRequests()) {
-        return List.of();
-      }
-      List<ItemStack> stacks = new ArrayList<>();
-      for (var id : building.getPermaOres()) {
-        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(id);
-        if (item != null && item != net.minecraft.world.item.Items.AIR) {
-          stacks.add(new ItemStack(item, 1));
-        }
-      }
-      stacks.sort(
-          Comparator.comparing(
-              stack ->
-                  net.minecraft.core.registries.BuiltInRegistries.ITEM
-                      .getKey(stack.getItem())
-                      .toString()));
-      return stacks;
     }
 
     private ItemStack extractFromRacks(ItemStack key, int amount, boolean simulate) {

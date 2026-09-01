@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CCC",
+    "CGC",
+    "CCC"
+  ],
+  "key": {
+    "C": { "tag": "c:ingots/copper" },
+    "G": { "item": "create:factory_gauge" }
+  },
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:colony_gauge"
+  }
+}

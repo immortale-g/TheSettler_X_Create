@@ -1,6 +1,8 @@
 {
   "block.thesettler_x_create.colony_gauge": "Kolonie-Gauge",
   "item.thesettler_x_create.colony_gauge": "Kolonie-Gauge",
+  "block.thesettler_x_create.colony_packager": "Kolonie-Packager",
+  "item.thesettler_x_create.colony_packager": "Kolonie-Packager",
   "item.thesettler_x_create.network_link_tuner": "Network Link Tuner",
   "block.thesettler_x_create.create_shop_output": "Create Shop Output",
   "item.thesettler_x_create.create_shop_output": "Create Shop Output",

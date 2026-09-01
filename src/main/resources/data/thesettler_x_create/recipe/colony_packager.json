@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CCC",
+    "CPC",
+    "CCC"
+  ],
+  "key": {
+    "C": { "tag": "c:ingots/copper" },
+    "P": { "item": "create:packager" }
+  },
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:colony_packager"
+  }
+}
