@@ -315,6 +315,93 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return false;
   }
 
+  /**
+   * Returns the first rack position and item stack that is not reserved by pending requests, or
+   * null if nothing needs to be moved.
+   */
+  @Nullable
+  public Tuple<BlockPos, ItemStack> findNextUnreservedRackItem(
+      @Nullable CreateShopBlockEntity pickup) {
+    if (pickup == null || getBuilding() == null || getLevel() == null) {
+      return null;
+    }
+    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    if (budgets.isEmpty()) {
+      return null;
+    }
+    for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
+      if (rack == null) {
+        continue;
+      }
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        handler = rack.getInventory();
+      }
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots(); slot++) {
+        ItemStack inSlot = handler.getStackInSlot(slot);
+        if (inSlot.isEmpty()) {
+          continue;
+        }
+        RackStackBudget budget = findBudget(budgets, inSlot);
+        if (budget == null || budget.remaining <= 0) {
+          continue;
+        }
+        return new Tuple<>(rack.getBlockPos(), inSlot.copy());
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extracts one stack of {@code target} item type from the rack at {@code rackPos}, respecting the
+   * remaining unreserved budget. Returns the extracted stack, or empty if nothing could be taken.
+   */
+  public ItemStack extractFromRack(
+      BlockPos rackPos, ItemStack target, @Nullable CreateShopBlockEntity pickup) {
+    if (rackPos == null || target == null || target.isEmpty() || getLevel() == null) {
+      return ItemStack.EMPTY;
+    }
+    BlockEntity entity = getLevel().getBlockEntity(rackPos);
+    if (!(entity instanceof AbstractTileEntityRack rack)) {
+      return ItemStack.EMPTY;
+    }
+    IItemHandler handler = rack.getItemHandlerCap();
+    if (handler == null) {
+      handler = rack.getInventory();
+    }
+    if (handler == null) {
+      return ItemStack.EMPTY;
+    }
+    int budget = Integer.MAX_VALUE;
+    if (pickup != null) {
+      List<RackStackBudget> budgets = collectRackBudgets(pickup);
+      RackStackBudget b = findBudget(budgets, target);
+      budget = b != null ? b.remaining : 0;
+    }
+    if (budget <= 0) {
+      return ItemStack.EMPTY;
+    }
+    for (int slot = 0; slot < handler.getSlots(); slot++) {
+      ItemStack inSlot = handler.getStackInSlot(slot);
+      if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, target)) {
+        continue;
+      }
+      int toExtract = Math.min(inSlot.getCount(), budget);
+      if (toExtract <= 0) {
+        continue;
+      }
+      ItemStack extracted = handler.extractItem(slot, toExtract, false);
+      if (!extracted.isEmpty()) {
+        setChanged();
+        return extracted;
+      }
+    }
+    return ItemStack.EMPTY;
+  }
+
   /** Returns true when the hut-internal inventory contains items awaiting native pickup. */
   public boolean hasHutInventoryItems() {
     IItemHandler hut = getInventory();
@@ -332,7 +419,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return false;
   }
 
-/**
+  /**
    * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
    *
    * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
