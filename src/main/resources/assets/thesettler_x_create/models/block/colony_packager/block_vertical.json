@@ -1,3 +1,9 @@
 {
-  "parent": "create:block/packager/block_vertical"
+  "parent": "create:block/packager/block_vertical",
+  "textures": {
+    "0": "thesettler_x_create:block/colony_packager_frame",
+    "1": "thesettler_x_create:block/colony_packager_details",
+    "5": "thesettler_x_create:block/colony_packager_vertical_unpowered",
+    "particle": "thesettler_x_create:block/colony_packager_particle"
+  }
 }

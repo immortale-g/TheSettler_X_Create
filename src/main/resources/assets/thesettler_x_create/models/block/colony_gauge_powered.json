@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "minecraft:block/copper_block"
-  }
+  "parent": "thesettler_x_create:block/colony_gauge/block"
 }
