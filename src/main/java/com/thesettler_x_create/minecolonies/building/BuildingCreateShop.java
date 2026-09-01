@@ -242,7 +242,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   public boolean canUsePermaRequests() {
-    return isBuilt() && getBuildingLevel() >= Config.PERMA_MIN_BUILDING_LEVEL.getAsInt();
+    return false; // disabled — gauge-based restocking replaces perma requests
   }
 
   public java.util.List<String> getPermaPendingDebugLines() {
