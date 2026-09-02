@@ -30,19 +30,16 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
   public ColonyGaugeBlock(Properties properties) {
     super(properties);
-    registerDefaultState(
-        stateDefinition
-            .any()
-            .setValue(FACE, AttachFace.WALL)
-            .setValue(FACING, Direction.NORTH)
-            .setValue(POWERED, false));
+    registerDefaultState(defaultBlockState()
+        .setValue(FACE, AttachFace.WALL)
+        .setValue(FACING, Direction.NORTH)
+        .setValue(POWERED, false));
   }
 
   @Override
   protected void createBlockStateDefinition(
       StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
-    super.createBlockStateDefinition(builder);
-    builder.add(POWERED);
+    super.createBlockStateDefinition(builder.add(FACE, FACING, POWERED));
   }
 
   /** Direction from the gauge toward the block it is attached to. */
