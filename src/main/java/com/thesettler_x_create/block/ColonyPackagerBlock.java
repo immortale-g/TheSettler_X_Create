@@ -35,7 +35,7 @@ public class ColonyPackagerBlock extends PackagerBlock {
   protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
       Player player, InteractionHand hand, BlockHitResult hitResult) {
     if (ColonyGaugeBlock.isGaugeStack(stack))
-      return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+      return ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
     return super.useItemOn(stack, state, level, pos, player, hand, hitResult);
   }
 }
