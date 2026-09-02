@@ -31,6 +31,12 @@ public class ColonyGaugeBlockItem extends BlockItem {
       }
       return InteractionResult.FAIL;
     }
-    return super.place(context);
+    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+        "[ColonyGaugeBlockItem] place() called, clickedPos={}, client={}",
+        context.getClickedPos(), context.getLevel().isClientSide());
+    InteractionResult result = super.place(context);
+    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+        "[ColonyGaugeBlockItem] place() result={}", result);
+    return result;
   }
 }

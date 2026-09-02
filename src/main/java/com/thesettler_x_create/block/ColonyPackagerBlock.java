@@ -34,8 +34,11 @@ public class ColonyPackagerBlock extends PackagerBlock {
   @Override
   protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
       Player player, InteractionHand hand, BlockHitResult hitResult) {
-    if (ColonyGaugeBlock.isGaugeStack(stack))
+    if (ColonyGaugeBlock.isGaugeStack(stack)) {
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+          "[ColonyPackager] gauge in hand → SKIP_DEFAULT_BLOCK_INTERACTION, side={}", hitResult.getDirection());
       return ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
+    }
     return super.useItemOn(stack, state, level, pos, player, hand, hitResult);
   }
 }

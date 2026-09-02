@@ -38,7 +38,7 @@ public final class ModBlocks {
   public static final DeferredBlock<ColonyPackagerBlock> COLONY_PACKAGER =
       BLOCKS.register(
           "colony_packager",
-          () -> new ColonyPackagerBlock(BlockBehaviour.Properties.of().strength(1.5f)));
+          () -> new ColonyPackagerBlock(BlockBehaviour.Properties.of().strength(1.5f).noOcclusion()));
 
   public static void register(IEventBus bus) {
     BLOCKS.register(bus);

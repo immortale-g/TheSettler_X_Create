@@ -36,6 +36,10 @@ public final class ModItems {
           () ->
               new ColonyGaugeBlockItem(
                   ModBlocks.COLONY_GAUGE.get(), new Item.Properties()));
+  public static final DeferredItem<Item> COLONY_PACKAGER =
+      ITEMS.register(
+          "colony_packager",
+          () -> new BlockItem(ModBlocks.COLONY_PACKAGER.get(), new Item.Properties()));
 
   public static void register(IEventBus bus) {
     ITEMS.register(bus);

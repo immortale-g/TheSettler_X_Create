@@ -162,6 +162,7 @@ public class TheSettlerXCreate {
       event.accept(ModItems.CREATE_SHOP_PICKUP);
       event.accept(ModItems.CREATE_SHOP_OUTPUT);
       event.accept(ModItems.COLONY_GAUGE);
+      event.accept(ModItems.COLONY_PACKAGER);
     }
     if (event.getTabKey() == com.minecolonies.api.creativetab.ModCreativeTabs.HUTS.getKey()) {
       event.accept(ModItems.HUT_CREATE_SHOP);
