@@ -4,7 +4,10 @@ import com.thesettler_x_create.client.ColonyGaugeRenderer;
 import com.thesettler_x_create.client.ModPartialModels;
 import com.thesettler_x_create.client.gui.CreateShopScreen;
 import com.thesettler_x_create.init.ModBlockEntities;
+import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.init.ModMenus;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -26,6 +29,8 @@ public class TheSettlerXCreateClient {
 
   @SubscribeEvent
   static void onClientSetup(FMLClientSetupEvent event) {
+    event.enqueueWork(() ->
+        ItemBlockRenderTypes.setRenderLayer(ModBlocks.COLONY_GAUGE.get(), RenderType.cutoutMipped()));
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info("TheSettler_x_Create client setup complete");
     }

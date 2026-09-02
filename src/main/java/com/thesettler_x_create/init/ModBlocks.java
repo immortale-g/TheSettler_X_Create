@@ -34,7 +34,7 @@ public final class ModBlocks {
   public static final DeferredBlock<ColonyGaugeBlock> COLONY_GAUGE =
       BLOCKS.register(
           "colony_gauge",
-          () -> new ColonyGaugeBlock(BlockBehaviour.Properties.of().strength(1.5f)));
+          () -> new ColonyGaugeBlock(BlockBehaviour.Properties.of().strength(1.5f).noOcclusion().forceSolidOn()));
   public static final DeferredBlock<ColonyPackagerBlock> COLONY_PACKAGER =
       BLOCKS.register(
           "colony_packager",
