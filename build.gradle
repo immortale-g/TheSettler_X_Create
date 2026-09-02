@@ -20,6 +20,7 @@ group = mod_group_id
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     mavenCentral()
+    maven { url = 'https://maven.createmod.net/' } // Flywheel, Catnip
 }
 
 base {
@@ -101,6 +102,8 @@ dependencies {
     // And its provides the option to then use net.minecraft as the group, and one of; client, server or joined as the module name, plus the game version as version.
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
+    // Flywheel API — needed to compile against Create's API classes that expose Flywheel types
+    compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-1.21.1:1.0.6"
     // Load local mod jars from ./libs for runtime and compile classpath.
     compileOnly fileTree(dir: 'libs', include: ['*.jar'])
     testImplementation fileTree(dir: 'libs', include: ['*.jar'])

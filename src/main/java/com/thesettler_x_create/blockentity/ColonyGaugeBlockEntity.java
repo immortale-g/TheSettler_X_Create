@@ -1,62 +1,35 @@
 package com.thesettler_x_create.blockentity;
 
-import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.IColonyManager;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.PanelSlot;
 import com.simibubi.create.content.logistics.packagePort.PackagePortBlockEntity;
-import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
-import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour;
-import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.block.ColonyGaugeBlock;
 import com.thesettler_x_create.init.ModBlockEntities;
-import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.Direction.Axis;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.createmod.catnip.math.VecHelper;
 
 public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
-  private static final String TAG_COLONY_ID = "GaugeColonyId";
-  private static final String TAG_SHOP_POS = "GaugeShopPos";
-  private static final String TAG_DIMENSION = "GaugeDimension";
-  private static final String TAG_TIMER = "GaugeTimer";
-  private static final String TAG_PROMISED_UNTIL = "GaugePromisedUntil";
-
-  /** Ticks between request attempts. */
-  private static final int REQUEST_INTERVAL = 100;
-
-  /** 30 seconds — how long a sent request counts as promised. */
-  private static final int PROMISE_EXPIRY_TICKS = 600;
-
-  public FilteringBehaviour filter;
-
-  private int colonyId = -1;
-  @Nullable private BlockPos shopPos;
-  @Nullable private String dimension;
-
-  private int timer = REQUEST_INTERVAL;
-  private long promisedUntil = 0L;
-
-  /**
-   * True when an adjacent block (in connectedDirection) is a Packager. In restocker mode the
-   * Frogport address is read from above the Packager instead of adjacent to the gauge.
-   */
-  private boolean restocker = false;
-
-  /** Cached address from adjacent/restocker Frogport — refreshed each lazy tick. */
-  @Nullable private String cachedFrogportAddress;
-
-  // Synced client-side state
-  public boolean satisfied = false;
-  public boolean promisedSatisfied = false;
+  public EnumMap<PanelSlot, ColonyGaugeBehaviour> panels;
+  public boolean redraw;
+  public VoxelShape lastShape;
 
   public ColonyGaugeBlockEntity(BlockPos pos, BlockState state) {
     this(ModBlockEntities.COLONY_GAUGE.get(), pos, state);
@@ -69,200 +42,172 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
   @Override
   public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
-    behaviours.add(filter = new FilteringBehaviour(this, new ColonyGaugeFilterSlot()));
+    panels = new EnumMap<>(PanelSlot.class);
+    redraw = true;
+    for (PanelSlot slot : PanelSlot.values()) {
+      ColonyGaugeBehaviour b = new ColonyGaugeBehaviour(this, slot);
+      panels.put(slot, b);
+      behaviours.add(b);
+    }
   }
 
-  public void setShopLink(int colonyId, BlockPos shopPos, String dimension) {
-    this.colonyId = colonyId;
-    this.shopPos = shopPos;
-    this.dimension = dimension;
-    setChanged();
-    sendData();
-  }
-
-  public boolean isLinked() {
-    return colonyId >= 0 && shopPos != null;
+  @Override
+  protected AABB createRenderBoundingBox() {
+    return new AABB(worldPosition).inflate(8);
   }
 
   @Override
   public void lazyTick() {
     super.lazyTick();
     if (level == null || level.isClientSide()) return;
-    detectPackager();
-    scanFrogport();
-  }
 
-  @Override
-  public void tick() {
-    super.tick();
-    if (level == null || level.isClientSide()) return;
-
-    updateSatisfiedState();
-
-    if (timer > 0) {
-      timer--;
+    if (activePanels() == 0) {
+      level.setBlockAndUpdate(worldPosition, Blocks.AIR.defaultBlockState());
       return;
     }
-    timer = REQUEST_INTERVAL;
-    tryRequest();
+
+    scanFrogports();
   }
 
-  /** Checks if the block this gauge is attached to is a Packager. */
-  private void detectPackager() {
+  /** Scans for adjacent/above-packager Frogports and updates each active slot's address. */
+  private void scanFrogports() {
     BlockState state = getBlockState();
-    Direction connectedDir = ColonyGaugeBlock.connectedDirection(state);
-    BlockPos attachedPos = getBlockPos().relative(connectedDir);
-    boolean isRestocker = level.getBlockEntity(attachedPos) instanceof PackagerBlockEntity;
-    if (isRestocker != restocker) {
-      restocker = isRestocker;
-      sendData();
-    }
-  }
+    Direction connectedDir = FactoryPanelBlock.connectedDirection(state);
+    // connectedDir is the panel's "front" direction (away from attached block)
+    BlockPos attachedPos = worldPosition.relative(connectedDir.getOpposite());
+    boolean attachedIsPackager =
+        level.getBlockEntity(attachedPos) instanceof com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 
-  /**
-   * Scans for a Frogport. In restocker mode reads from above the attached Packager (matching
-   * Create's FactoryPanel.getFrogAddress()). Otherwise scans all adjacent blocks.
-   */
-  private void scanFrogport() {
-    String found = null;
-    if (restocker) {
-      BlockState state = getBlockState();
-      Direction connectedDir = ColonyGaugeBlock.connectedDirection(state);
-      BlockPos packagerPos = getBlockPos().relative(connectedDir);
-      BlockPos abovePackager = packagerPos.above();
-      if (level.getBlockEntity(abovePackager) instanceof PackagePortBlockEntity port) {
-        String addr = port.addressFilter;
-        if (addr != null && !addr.isBlank()) found = addr;
-      }
-    } else {
-      for (Direction dir : Direction.values()) {
-        BlockPos neighbor = getBlockPos().relative(dir);
-        if (level.getBlockEntity(neighbor) instanceof PackagePortBlockEntity port) {
+    for (ColonyGaugeBehaviour behaviour : panels.values()) {
+      if (!behaviour.isActive()) continue;
+      String found = null;
+      if (attachedIsPackager) {
+        BlockPos abovePackager = attachedPos.above();
+        if (level.getBlockEntity(abovePackager) instanceof PackagePortBlockEntity port) {
           String addr = port.addressFilter;
-          if (addr != null && !addr.isBlank()) {
-            found = addr;
-            break;
+          if (addr != null && !addr.isBlank()) found = addr;
+        }
+      } else {
+        for (Direction dir : Direction.values()) {
+          BlockPos neighbor = worldPosition.relative(dir);
+          if (level.getBlockEntity(neighbor) instanceof PackagePortBlockEntity port) {
+            String addr = port.addressFilter;
+            if (addr != null && !addr.isBlank()) {
+              found = addr;
+              break;
+            }
           }
         }
       }
-    }
-    if (!Objects.equals(found, cachedFrogportAddress)) {
-      cachedFrogportAddress = found;
-      sendData();
-    }
-  }
-
-  private void updateSatisfiedState() {
-    long now = level.getGameTime();
-    boolean newPromised = promisedUntil > now;
-    if (newPromised != promisedSatisfied) {
-      promisedSatisfied = newPromised;
-      if (!promisedSatisfied) satisfied = false;
-      sendData();
-      updatePowered(promisedSatisfied || satisfied);
+      if (!Objects.equals(found, behaviour.cachedFrogportAddress)) {
+        behaviour.cachedFrogportAddress = found;
+        sendData();
+      }
     }
   }
 
-  private void updatePowered(boolean powered) {
-    BlockState state = getBlockState();
-    if (!state.hasProperty(ColonyGaugeBlock.POWERED)) return;
-    if (state.getValue(ColonyGaugeBlock.POWERED) == powered) return;
-    level.setBlock(
-        getBlockPos(), state.setValue(ColonyGaugeBlock.POWERED, powered), Block.UPDATE_ALL);
+  public boolean addPanel(PanelSlot slot, int colonyId, BlockPos shopPos, String dimension) {
+    ColonyGaugeBehaviour behaviour = panels.get(slot);
+    if (behaviour != null && !behaviour.isActive()) {
+      behaviour.enable(colonyId, shopPos, dimension);
+      redraw = true;
+      lastShape = null;
+      return true;
+    }
+    return false;
   }
 
-  private void tryRequest() {
-    if (!isLinked()) return;
-    if (filter.getFilter().isEmpty()) return;
-    if (cachedFrogportAddress == null || cachedFrogportAddress.isBlank()) return;
-    if (promisedSatisfied || satisfied) return;
-
-    BuildingCreateShop building = findBuilding();
-    if (building == null) return;
-
-    int amount = filter.getAmount();
-    if (amount <= 0) amount = filter.getFilter().getMaxStackSize();
-
-    boolean requested =
-        building.requestForGauge(filter.getFilter().copy(), amount, cachedFrogportAddress);
-    if (requested) {
-      promisedUntil = level.getGameTime() + PROMISE_EXPIRY_TICKS;
-      promisedSatisfied = true;
-      sendData();
-      updatePowered(true);
-      TheSettlerXCreate.LOGGER.debug(
-          "[ColonyGauge] request sent item={} amount={} address={} restocker={}",
-          filter.getFilter().getItem(),
-          amount,
-          cachedFrogportAddress,
-          restocker);
+  public boolean removePanel(PanelSlot slot) {
+    ColonyGaugeBehaviour behaviour = panels.get(slot);
+    if (behaviour != null && behaviour.isActive()) {
+      behaviour.disable();
+      redraw = true;
+      lastShape = null;
+      return true;
     }
+    return false;
+  }
+
+  public int activePanels() {
+    int result = 0;
+    for (ColonyGaugeBehaviour b : panels.values()) if (b.isActive()) result++;
+    return result;
   }
 
   /**
-   * Called by BuildingCreateShop when the colony courier delivers items to the shop for this gauge.
-   * Items are now in shop racks and packaging is queued.
+   * Called by each ColonyGaugeBehaviour when its satisfied/promisedSatisfied state changes.
+   * Recomputes the POWERED block state property.
    */
+  public void updatePowered() {
+    if (level == null) return;
+    boolean powered = false;
+    for (ColonyGaugeBehaviour b : panels.values()) {
+      if (b.isActive() && (b.satisfied || b.promisedSatisfied)) {
+        powered = true;
+        break;
+      }
+    }
+    BlockState state = getBlockState();
+    if (!state.hasProperty(ColonyGaugeBlock.POWERED)) return;
+    if (state.getValue(ColonyGaugeBlock.POWERED) == powered) return;
+    level.setBlock(worldPosition, state.setValue(ColonyGaugeBlock.POWERED, powered), Block.UPDATE_ALL);
+  }
+
+  /**
+   * Called by ColonyPackagerBlockEntity after unwrapping a box.
+   * Tries to match by item; falls back to first promisedSatisfied slot.
+   */
+  public void onDeliveryReceived(ItemStack deliveredItem) {
+    for (ColonyGaugeBehaviour behaviour : panels.values()) {
+      if (!behaviour.isActive() || !behaviour.promisedSatisfied) continue;
+      if (ItemStack.isSameItem(behaviour.getFilter(), deliveredItem)) {
+        behaviour.onDeliveryReceived();
+        return;
+      }
+    }
+    // Fallback: no item match — mark first waiting slot as done
+    onDeliveryReceived();
+  }
+
   public void onDeliveryReceived() {
-    satisfied = true;
-    sendData();
-    updatePowered(true);
-  }
-
-  @Nullable
-  private BuildingCreateShop findBuilding() {
-    if (level == null || shopPos == null || colonyId < 0) return null;
-    IColony colony = IColonyManager.getInstance().getColonyByDimension(colonyId, level.dimension());
-    if (colony == null) return null;
-    var building = colony.getServerBuildingManager().getBuilding(shopPos);
-    if (building instanceof BuildingCreateShop shop) return shop;
-    return null;
+    for (ColonyGaugeBehaviour behaviour : panels.values()) {
+      if (behaviour.isActive() && behaviour.promisedSatisfied) {
+        behaviour.onDeliveryReceived();
+        return;
+      }
+    }
   }
 
   @Override
-  protected void write(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
-    super.write(tag, registries, clientPacket);
-    tag.putInt(TAG_COLONY_ID, colonyId);
-    if (shopPos != null) tag.putLong(TAG_SHOP_POS, shopPos.asLong());
-    if (dimension != null) tag.putString(TAG_DIMENSION, dimension);
-    tag.putInt(TAG_TIMER, timer);
-    tag.putLong(TAG_PROMISED_UNTIL, promisedUntil);
-    tag.putBoolean("Satisfied", satisfied);
-    tag.putBoolean("PromisedSatisfied", promisedSatisfied);
-    tag.putBoolean("Restocker", restocker);
-    if (cachedFrogportAddress != null) tag.putString("FrogportAddress", cachedFrogportAddress);
+  public void destroy() {
+    super.destroy();
+    int count = activePanels();
+    if (count > 1)
+      Block.popResource(level, worldPosition,
+          com.thesettler_x_create.init.ModItems.COLONY_GAUGE.get().getDefaultInstance().copyWithCount(count - 1));
   }
 
-  @Override
-  protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
-    super.read(tag, registries, clientPacket);
-    colonyId = tag.getInt(TAG_COLONY_ID);
-    if (tag.contains(TAG_SHOP_POS)) shopPos = BlockPos.of(tag.getLong(TAG_SHOP_POS));
-    if (tag.contains(TAG_DIMENSION)) dimension = tag.getString(TAG_DIMENSION);
-    timer = tag.getInt(TAG_TIMER);
-    promisedUntil = tag.getLong(TAG_PROMISED_UNTIL);
-    satisfied = tag.getBoolean("Satisfied");
-    promisedSatisfied = tag.getBoolean("PromisedSatisfied");
-    restocker = tag.getBoolean("Restocker");
-    cachedFrogportAddress =
-        tag.contains("FrogportAddress") ? tag.getString("FrogportAddress") : null;
-  }
+  public VoxelShape getShape() {
+    if (lastShape != null) return lastShape;
 
-  @Nullable
-  public String getCachedFrogportAddress() {
-    return cachedFrogportAddress;
-  }
+    BlockState state = getBlockState();
+    float xRot = Mth.RAD_TO_DEG * FactoryPanelBlock.getXRot(state) + 90;
+    float yRot = Mth.RAD_TO_DEG * FactoryPanelBlock.getYRot(state);
+    Direction connectedDirection = FactoryPanelBlock.connectedDirection(state);
+    Vec3 inflateAxes = VecHelper.axisAlingedPlaneOf(connectedDirection);
 
-  public boolean isRestocker() {
-    return restocker;
-  }
-
-  public int getColonyId() {
-    return colonyId;
-  }
-
-  @Nullable
-  public BlockPos getShopPos() {
-    return shopPos;
+    lastShape = Shapes.empty();
+    for (ColonyGaugeBehaviour behaviour : panels.values()) {
+      if (!behaviour.isActive()) continue;
+      PanelSlot slot = behaviour.slot;
+      Vec3 vec = new Vec3(.25 + slot.xOffset * .5, 1 / 16f, .25 + slot.yOffset * .5);
+      vec = VecHelper.rotateCentered(vec, 180, Axis.Y);
+      vec = VecHelper.rotateCentered(vec, xRot, Axis.X);
+      vec = VecHelper.rotateCentered(vec, yRot, Axis.Y);
+      AABB bb = new AABB(vec, vec).inflate(1 / 16f)
+          .inflate(inflateAxes.x * 3 / 16f, inflateAxes.y * 3 / 16f, inflateAxes.z * 3 / 16f);
+      lastShape = Shapes.or(lastShape, Shapes.create(bb));
+    }
+    return lastShape;
   }
 }

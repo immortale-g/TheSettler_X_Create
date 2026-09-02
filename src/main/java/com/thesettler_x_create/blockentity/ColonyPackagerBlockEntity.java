@@ -1,7 +1,7 @@
 package com.thesettler_x_create.blockentity;
 
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
-import com.thesettler_x_create.block.ColonyGaugeBlock;
 import com.thesettler_x_create.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -22,7 +22,7 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
         BlockPos neighbor = getBlockPos().relative(d);
         if (level != null
             && level.getBlockEntity(neighbor) instanceof ColonyGaugeBlockEntity gauge
-            && ColonyGaugeBlock.connectedDirection(gauge.getBlockState()) == d.getOpposite()) {
+            && FactoryPanelBlock.connectedDirection(gauge.getBlockState()) == d) {
           gauge.onDeliveryReceived();
         }
       }
