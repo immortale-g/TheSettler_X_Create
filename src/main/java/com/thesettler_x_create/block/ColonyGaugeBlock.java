@@ -1,6 +1,7 @@
 package com.thesettler_x_create.block;
 
 import com.mojang.serialization.MapCodec;
+import com.simibubi.create.AllShapes;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.PanelSlot;
@@ -9,7 +10,6 @@ import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModItems;
-import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -53,14 +53,6 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
   public static final MapCodec<ColonyGaugeBlock> CODEC = simpleCodec(ColonyGaugeBlock::new);
   public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
-
-  private static final Map<Direction, VoxelShape> FALLBACK_SHAPES = Map.of(
-      Direction.NORTH, box(0, 0, 0, 16, 16, 2),
-      Direction.SOUTH, box(0, 0, 14, 16, 16, 16),
-      Direction.WEST, box(0, 0, 0, 2, 16, 16),
-      Direction.EAST, box(14, 0, 0, 16, 16, 16),
-      Direction.UP, box(0, 14, 0, 16, 16, 16),
-      Direction.DOWN, box(0, 0, 0, 16, 2, 16));
 
   public ColonyGaugeBlock(Properties properties) {
     super(properties);
@@ -240,8 +232,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
       VoxelShape shape = be.getShape();
       if (!shape.isEmpty()) return shape;
     }
-    Direction connected = FactoryPanelBlock.connectedDirection(pState);
-    return FALLBACK_SHAPES.getOrDefault(connected, Shapes.block());
+    return AllShapes.FACTORY_PANEL_FALLBACK.get(FactoryPanelBlock.connectedDirection(pState));
   }
 
   @Override

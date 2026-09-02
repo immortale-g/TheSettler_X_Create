@@ -35,7 +35,7 @@ public final class ModItems {
           "colony_gauge",
           () ->
               new ColonyGaugeBlockItem(
-                  ModBlocks.COLONY_GAUGE.get(), new Item.Properties().stacksTo(1)));
+                  ModBlocks.COLONY_GAUGE.get(), new Item.Properties()));
 
   public static void register(IEventBus bus) {
     ITEMS.register(bus);
