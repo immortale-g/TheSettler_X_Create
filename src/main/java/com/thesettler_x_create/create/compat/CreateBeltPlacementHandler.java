@@ -151,7 +151,7 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
   }
 
   private static BlockPos readControllerPos(CompoundTag tileEntityData) {
-    CompoundTag controller = tileEntityData.getCompound("Controller");
-    return new BlockPos(controller.getInt("X"), controller.getInt("Y"), controller.getInt("Z"));
+    int[] controller = tileEntityData.getIntArray("Controller");
+    return new BlockPos(controller[0], controller[1], controller[2]);
   }
 }

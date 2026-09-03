@@ -52,5 +52,10 @@ class CreatePlacementHandlersGuardTest {
     assertTrue(source.contains("PlacementHandlers.handleTileEntityPlacement("));
     assertTrue(source.contains("segment.tileEntityData(), level, segment.pos(), rotationMirror);"));
     assertFalse(source.contains("import com.simibubi.create.AllBlocks;"));
+
+    // Confirmed against a real in-game scan: Create's BeltBlockEntity serializes Controller as
+    // an int-array tag (e.g. [I;x,y,z]), not a compound with X/Y/Z sub-tags.
+    assertTrue(source.contains("tileEntityData.getIntArray(\"Controller\")"));
+    assertFalse(source.contains("getCompound(\"Controller\")"));
   }
 }

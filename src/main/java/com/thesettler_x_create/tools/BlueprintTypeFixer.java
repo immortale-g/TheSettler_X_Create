@@ -19,7 +19,8 @@ public final class BlueprintTypeFixer {
 
   static int run(String[] args, PrintStream out, PrintStream err) {
     if (args.length < 4) {
-      err.println("Usage: BlueprintTypeFixer <path> <teId> <buildingType> <blueprintFileName>");
+      err.println(
+          "Usage: BlueprintTypeFixer <path> <teId> <buildingType> <blueprintFileName> [pack]");
       return 2;
     }
 
@@ -27,6 +28,7 @@ public final class BlueprintTypeFixer {
     String teId = args[1];
     String buildingType = args[2];
     String blueprintFileName = args[3];
+    String pack = args.length >= 5 ? args[4] : "";
 
     String validation = validatePath(path);
     if (validation != null) {
@@ -79,12 +81,12 @@ public final class BlueprintTypeFixer {
 
       te.putString("type", buildingType);
       te.putString("path", blueprintFileName);
-      te.putString("pack", "");
+      te.putString("pack", pack);
 
       if (te.contains("blueprintDataProvider", Tag.TAG_COMPOUND)) {
         CompoundTag bdp = te.getCompound("blueprintDataProvider");
         bdp.putString("path", blueprintFileName);
-        bdp.putString("pack", "");
+        bdp.putString("pack", pack);
       }
 
       updated++;
