@@ -13,6 +13,7 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Handles incoming rack housekeeping: moving unreserved rack items to the hut inventory and
@@ -24,8 +25,6 @@ import net.minecraft.world.level.Level;
 final class ShopHousekeepingOrchestrator {
   private static final long TRANSFER_INTERVAL = 20L * 3L;
   private static final long DEBUG_COOLDOWN = 20L * 5L;
-  private static final int MAX_CATCHUP_STACKS = 16;
-  private static final int TRANSFER_STACKS = 1;
 
   private final BuildingCreateShop shop;
   private long lastTransferTick = -1L;
@@ -123,101 +122,63 @@ final class ShopHousekeepingOrchestrator {
     return false;
   }
 
-  /** Runs one housekeeping tick: moves unreserved rack stacks to hut and triggers pickup. */
+  /**
+   * Returns true when the current state allows the shopkeeper AI to perform a housekeeping carry.
+   * Checks active delivery children, resolver inventory window, and worker availability.
+   */
+  boolean isHousekeepingAllowed(IColony colony, @Nullable CreateShopBlockEntity pickup) {
+    if (hasActiveLocalDeliveryChildren(colony, pickup)) {
+      return false;
+    }
+    CreateShopRequestResolver resolver = shop.getOrCreateShopResolver();
+    if (resolver != null && resolver.hasProtectedInventoryWindow()) {
+      return false;
+    }
+    return shop.hasHousekeepingAvailableWorker();
+  }
+
+  /**
+   * Periodic tick: updates rack-work cache and triggers native pickup requests when hut inventory
+   * has items. Item movement itself is now handled by the shopkeeper AI via physical carry states.
+   */
   void tick(IColony colony) {
     if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
       return;
     }
     long now = colony.getWorld().getGameTime();
-    long elapsed = lastTransferTick < 0L ? TRANSFER_INTERVAL : now - lastTransferTick;
-    if (elapsed < TRANSFER_INTERVAL) {
-      if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping wait cooldown remaining={}t", TRANSFER_INTERVAL - elapsed);
-      }
-      return;
-    }
     TileEntityCreateShop tile = shop.getCreateShopTileEntity();
     CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+    cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
+    long elapsed = lastTransferTick < 0L ? TRANSFER_INTERVAL : now - lastTransferTick;
+    if (elapsed < TRANSFER_INTERVAL) {
+      return;
+    }
     if (tile == null || pickup == null) {
-      cachedHasIncomingRackWork = tile != null && tile.hasUnreservedRackItems(pickup);
-      if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping skip tilePresent={} pickupPresent={} pendingUnreserved={}",
-            tile != null,
-            pickup != null,
-            cachedHasIncomingRackWork);
-      }
       return;
     }
-    if (hasActiveLocalDeliveryChildren(colony, pickup)) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
+    if (!isHousekeepingAllowed(colony, pickup)) {
       if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason=active-delivery-child pendingUnreserved={}",
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    CreateShopRequestResolver resolver = shop.getOrCreateShopResolver();
-    if (resolver != null && resolver.hasProtectedInventoryWindow()) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-      if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason=resolver-active-work pendingUnreserved={}",
-            cachedHasIncomingRackWork);
-      }
-      return;
-    }
-    if (!shop.hasHousekeepingAvailableWorker()) {
-      cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-      if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping blocked reason={} pendingUnreserved={}",
+            "[CreateShop] housekeeping pickup blocked reason={} pendingUnreserved={}",
             shop.describeHousekeepingBlockReason(),
             cachedHasIncomingRackWork);
       }
       return;
     }
-    int dueStacks = Math.max(TRANSFER_STACKS, (int) Math.max(1L, elapsed / TRANSFER_INTERVAL));
-    int transferBudget = Math.min(MAX_CATCHUP_STACKS, dueStacks);
-    int moved = tile.moveUnreservedRackStacksToHut(pickup, transferBudget);
     boolean hutHasItems = tile.hasHutInventoryItems();
-    cachedHasIncomingRackWork = tile.hasUnreservedRackItems(pickup);
-    if (moved > 0 || cachedHasIncomingRackWork || hutHasItems) {
+    if (hutHasItems) {
       lastTransferTick = now;
-    }
-    if (moved > 0 || hutHasItems) {
       int pickupPriority = shop.getPickUpPriority();
       if (pickupPriority > 0) {
         boolean pickupRequested = shop.createNativeHutPickupRequest(pickupPriority);
         if (BuildingCreateShop.isDebugRequests()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] housekeeping pickup request priority={} created={} moved={} hutHasItems={}",
+              "[CreateShop] housekeeping pickup request priority={} created={} hutHasItems={}",
               pickupPriority,
               pickupRequested,
-              moved,
               hutHasItems);
         }
-      } else if (BuildingCreateShop.isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] housekeeping pickup request skipped (priority disabled) moved={} hutHasItems={}",
-            moved,
-            hutHasItems);
       }
-    }
-    if (moved > 0 && BuildingCreateShop.isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping moved unreserved rack stacks to hut count={} budget={} elapsed={}t",
-          moved,
-          transferBudget,
-          elapsed);
-    } else if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] housekeeping ran but moved=0 pendingUnreserved={} budget={} elapsed={}t",
-          cachedHasIncomingRackWork,
-          transferBudget,
-          elapsed);
     }
   }
 
