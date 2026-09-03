@@ -35,9 +35,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -45,7 +43,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -103,8 +100,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   private BlockPos builderHutPos;
   private final ShopInflightTracker inflightTracker;
   private final ShopRackIndex rackIndex;
-  private final ShopBeltManager beltManager;
-  private final ShopBeltBlueprints beltBlueprints;
   private final ShopWarehouseRegistrar warehouseRegistrar;
   private final ShopResolverAssignments resolverAssignments;
   private final ShopCourierDiagnostics courierDiagnostics;
@@ -124,8 +119,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.builderHutPos = null;
     this.inflightTracker = new ShopInflightTracker(this);
     this.rackIndex = new ShopRackIndex(this);
-    this.beltManager = new ShopBeltManager(this);
-    this.beltBlueprints = new ShopBeltBlueprints(this);
     this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
     this.resolverAssignments = new ShopResolverAssignments(this);
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
@@ -261,18 +254,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   @Override
-  public Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> getRequiredItemsAndAmount() {
-    Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> base = super.getRequiredItemsAndAmount();
-    Item beltItem = BuiltInRegistries.ITEM.get(ShopBeltBlueprints.beltItemId());
-    if (beltItem == null || beltItem == net.minecraft.world.item.Items.AIR) {
-      return base;
-    }
-    Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> result = new java.util.HashMap<>(base);
-    result.put(stack -> stack != null && stack.getItem() == beltItem, new Tuple<>(1, Boolean.TRUE));
-    return result;
-  }
-
-  @Override
   public void requestRepair(BlockPos pos) {
     for (BlockPos containerPos : containerList) {
       Level world = getColony().getWorld();
@@ -285,7 +266,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       }
     }
     super.requestRepair(pos);
-    beltManager.onRepair();
   }
 
   @Override
@@ -293,7 +273,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     super.onPlacement();
     ensureWarehouseRegistration();
     ensurePickupLink();
-    beltManager.onPlacement();
   }
 
   @Override
@@ -301,7 +280,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     super.onUpgradeComplete(newLevel);
     ensureWarehouseRegistration();
     ensurePickupLink();
-    beltManager.onUpgrade();
   }
 
   @Override
@@ -311,7 +289,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     ensureWarehouseRegistration();
     ensurePickupLink();
     resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
-    beltManager.tick();
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
@@ -1384,33 +1361,6 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public void setPermaOre(ResourceLocation itemId, boolean enabled) {
     permaManager.setPermaOre(itemId, enabled);
-  }
-
-  boolean trySpawnBeltBlueprint(IColony colony) {
-    return beltBlueprints.trySpawnBeltBlueprint(colony);
-  }
-
-  boolean hasActiveWorkOrder(IColony colony) {
-    if (colony == null || colony.getWorkManager() == null) {
-      return false;
-    }
-    var workOrders =
-        colony
-            .getWorkManager()
-            .getWorkOrdersOfType(com.minecolonies.core.colony.workorders.WorkOrderBuilding.class);
-    if (workOrders == null || workOrders.isEmpty()) {
-      return false;
-    }
-    BlockPos location = getLocation().getInDimensionLocation();
-    for (var order : workOrders) {
-      if (order == null || order.getLocation() == null) {
-        continue;
-      }
-      if (order.getLocation().equals(location)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private void clearPermaPending(
