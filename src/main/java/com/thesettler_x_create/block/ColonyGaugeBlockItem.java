@@ -20,7 +20,7 @@ public class ColonyGaugeBlockItem extends BlockItem {
   public InteractionResult place(BlockPlaceContext context) {
     ItemStack stack = context.getItemInHand();
     CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-    if (!data.contains("GaugeColonyId")) {
+    if (!GaugeLinkData.isLinked(data)) {
       if (!context.getLevel().isClientSide() && context.getPlayer() != null) {
         context
             .getPlayer()
