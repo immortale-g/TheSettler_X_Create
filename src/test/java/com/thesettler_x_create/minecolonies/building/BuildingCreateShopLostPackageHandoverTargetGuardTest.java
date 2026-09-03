@@ -12,7 +12,7 @@ class BuildingCreateShopLostPackageHandoverTargetGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageHandoverProcessor.java"));
 
     assertTrue(source.contains("int targetAmount = Math.max(1, remaining);"));
     assertTrue(
