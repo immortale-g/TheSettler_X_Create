@@ -20,7 +20,7 @@ class BuildingCreateShopHousekeepingPickupRequestGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
     assertTrue(orchestratorSource.contains("boolean hutHasItems = tile.hasHutInventoryItems();"));
-    assertTrue(orchestratorSource.contains("if (moved > 0 || hutHasItems) {"));
+    assertTrue(orchestratorSource.contains("if (hutHasItems) {"));
     assertTrue(orchestratorSource.contains("int pickupPriority = shop.getPickUpPriority();"));
     assertTrue(
         orchestratorSource.contains(
@@ -31,7 +31,7 @@ class BuildingCreateShopHousekeepingPickupRequestGuardTest {
     assertTrue(buildingSource.contains("return createPickupRequest(effectivePriority);"));
     assertTrue(
         orchestratorSource.contains(
-            "housekeeping pickup request priority={} created={} moved={} hutHasItems={}"));
+            "housekeeping pickup request priority={} created={} hutHasItems={}"));
     assertTrue(buildingSource.contains("source is the building requester's hut"));
     assertFalse(buildingSource.contains("createHutInventoryPickupRequest"));
   }

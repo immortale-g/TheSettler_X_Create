@@ -15,11 +15,8 @@ class BuildingCreateShopHousekeepingResolverGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/building/ShopHousekeepingOrchestrator.java"));
 
     assertTrue(source.contains("resolver != null && resolver.hasProtectedInventoryWindow()"));
-    assertTrue(
-        source.contains("housekeeping blocked reason=resolver-active-work pendingUnreserved={}"));
+    assertTrue(source.contains("housekeeping pickup blocked reason={} pendingUnreserved={}"));
     assertTrue(source.contains("hasActiveLocalDeliveryChildren(colony, pickup)"));
-    assertTrue(
-        source.contains("housekeeping blocked reason=active-delivery-child pendingUnreserved={}"));
     assertTrue(source.contains("for (var assignmentEntry : assignments.entrySet())"));
     assertTrue(source.contains("isLocalCreateShopDeliveryParent(standard, request)"));
   }
