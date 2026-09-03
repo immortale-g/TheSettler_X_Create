@@ -22,10 +22,7 @@ import org.jetbrains.annotations.Nullable;
 public class CreateNetworkFacade implements ICreateNetworkFacade {
   private static final int MAX_PACKAGE_COUNT = 99;
   private final TileEntityCreateShop shop;
-  private long lastPerfLogTime = 0L;
-  private long lastSummaryNanos = 0L;
-  private long lastBroadcastNanos = 0L;
-  private int lastBroadcastCount = 0;
+  private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
 
   public CreateNetworkFacade(TileEntityCreateShop shop) {
     this.shop = shop;
@@ -384,8 +381,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return null;
     } finally {
-      lastSummaryNanos = System.nanoTime() - start;
-      maybeLogPerf();
+      perfLogger.recordSummary(System.nanoTime() - start, shop);
     }
   }
 
@@ -405,26 +401,6 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     return summary;
-  }
-
-  private void maybeLogPerf() {
-    if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-      return;
-    }
-    if (shop == null || shop.getLevel() == null) {
-      return;
-    }
-    long now = shop.getLevel().getGameTime();
-    if (now != 0L
-        && now - lastPerfLogTime < com.thesettler_x_create.Config.PERF_LOG_COOLDOWN.getAsLong()) {
-      return;
-    }
-    lastPerfLogTime = now;
-    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] perf summary: getSummary={}us broadcast={}us items={}",
-        lastSummaryNanos / 1000L,
-        lastBroadcastNanos / 1000L,
-        lastBroadcastCount);
   }
 
   boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
@@ -482,9 +458,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return false;
     } finally {
-      lastBroadcastNanos = System.nanoTime() - start;
-      lastBroadcastCount = order.size();
-      maybeLogPerf();
+      perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
     }
   }
 }
