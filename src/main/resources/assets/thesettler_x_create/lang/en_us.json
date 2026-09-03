@@ -44,6 +44,8 @@
   "com.thesettler_x_create.gui.createshop.save": "Save",
   "com.thesettler_x_create.gui.createshop.amount": "Amount",
   "com.thesettler_x_create.gui.createshop.request": "Request",
+  "com.thesettler_x_create.gui.colony_gauge.set_item_label": "Place Item to Request",
+  "com.thesettler_x_create.gui.colony_gauge.settings_title": "Colony Gauge",
   "com.thesettler_x_create.message.createshop.no_network": "Create Shop has no linked stock network.",
   "com.thesettler_x_create.message.createshop.request_taken": "Create Shop accepted request: %s x%d",
   "com.thesettler_x_create.message.createshop.request_sent": "Create Shop ordered from network: %s x%d",

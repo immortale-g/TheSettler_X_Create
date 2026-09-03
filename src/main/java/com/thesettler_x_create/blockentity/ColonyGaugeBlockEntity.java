@@ -69,6 +69,24 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     scanFrogports();
   }
 
+  /**
+   * Returns the Packager this gauge is mounted on, or {@code null} if it isn't attached to one.
+   * Mirrors Create's own restocker-mode gauges, which read the actual current stock of the
+   * Packager's connected inventory (chest/vault/etc.) rather than tracking deliveries by count —
+   * so the gauge stays in sync even if items are later removed from that inventory.
+   */
+  @org.jetbrains.annotations.Nullable
+  public com.simibubi.create.content.logistics.packager.PackagerBlockEntity getConnectedPackager() {
+    if (level == null) return null;
+    Direction connectedDir = FactoryPanelBlock.connectedDirection(getBlockState());
+    BlockPos attachedPos = worldPosition.relative(connectedDir.getOpposite());
+    if (level.getBlockEntity(attachedPos)
+        instanceof com.simibubi.create.content.logistics.packager.PackagerBlockEntity packager) {
+      return packager;
+    }
+    return null;
+  }
+
   /** Scans for adjacent/above-packager Frogports and updates each active slot's address. */
   private void scanFrogports() {
     BlockState state = getBlockState();
@@ -136,21 +154,22 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
   /**
    * Called by each ColonyGaugeBehaviour when its satisfied/promisedSatisfied state changes.
-   * Recomputes the POWERED block state property.
+   *
+   * <p>Deliberately never sets {@code POWERED} to {@code true}: unlike our block model (which
+   * maps both powered states to the identical model, so there is no visual to gain), setting it
+   * makes {@link ColonyGaugeBlock#getDirectSignal} emit a real, sustained redstone signal toward
+   * the connected Packager — which then continuously re-triggers its (Create-native) redstone-mode
+   * sending logic, vacuuming whatever sits in its target inventory. Real Create's FactoryPanelBlock
+   * has the identical getSignal/getDirectSignal code, but never actually sets POWERED either — it's
+   * unused there too. Kept as a no-op (rather than removing the block state) in case a powered
+   * model variant is ever wired up.
    */
   public void updatePowered() {
     if (level == null) return;
-    boolean powered = false;
-    for (ColonyGaugeBehaviour b : panels.values()) {
-      if (b.isActive() && (b.satisfied || b.promisedSatisfied)) {
-        powered = true;
-        break;
-      }
-    }
     BlockState state = getBlockState();
     if (!state.hasProperty(ColonyGaugeBlock.POWERED)) return;
-    if (state.getValue(ColonyGaugeBlock.POWERED) == powered) return;
-    level.setBlock(worldPosition, state.setValue(ColonyGaugeBlock.POWERED, powered), Block.UPDATE_ALL);
+    if (!state.getValue(ColonyGaugeBlock.POWERED)) return;
+    level.setBlock(worldPosition, state.setValue(ColonyGaugeBlock.POWERED, false), Block.UPDATE_ALL);
   }
 
   /**

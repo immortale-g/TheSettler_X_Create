@@ -1,17 +1,13 @@
 {
-  "type": "minecraft:crafting_shaped",
+  "type": "minecraft:crafting_shapeless",
   "category": "misc",
-  "pattern": [
-    "CCC",
-    "CGC",
-    "CCC"
+  "ingredients": [
+    { "item": "create:stock_link" },
+    { "item": "create:precision_mechanism" },
+    { "item": "structurize:sceptergold" }
   ],
-  "key": {
-    "C": { "tag": "c:ingots/copper" },
-    "G": { "item": "create:factory_gauge" }
-  },
   "result": {
-    "count": 1,
+    "count": 2,
     "id": "thesettler_x_create:colony_gauge"
   }
 }

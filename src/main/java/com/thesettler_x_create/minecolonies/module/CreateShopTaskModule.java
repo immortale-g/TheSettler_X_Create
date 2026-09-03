@@ -36,25 +36,25 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
         || !(shop.getColony().getRequestManager() instanceof IStandardRequestManager manager)) {
       return List.of();
     }
+    // Requests the shop placed as a requester (Gauge/perma deliveries) don't go through the
+    // resolver-assignment lookup below, since the shop isn't resolving them — add them directly.
+    List<IToken<?>> inflight = new ArrayList<>(shop.getPendingGaugeRequestTokens());
+
     CreateShopRequestResolver resolver = shop.getOrCreateShopResolver();
     if (resolver == null || resolver.getId() == null) {
-      return List.of();
+      return List.copyOf(new LinkedHashSet<>(inflight));
     }
     IToken<?> resolverId = resolver.getId();
     var assignmentStore = manager.getRequestResolverRequestAssignmentDataStore();
-    if (assignmentStore == null || assignmentStore.getAssignments() == null) {
-      return List.of();
-    }
-    var assigned = assignmentStore.getAssignments().get(resolverId);
-    if (assigned == null || assigned.isEmpty()) {
-      return List.of();
-    }
+    var assigned =
+        assignmentStore == null || assignmentStore.getAssignments() == null
+            ? null
+            : assignmentStore.getAssignments().get(resolverId);
     var requestHandler = manager.getRequestHandler();
     var resolverHandler = manager.getResolverHandler();
-    if (requestHandler == null || resolverHandler == null) {
-      return List.of();
+    if (assigned == null || assigned.isEmpty() || requestHandler == null || resolverHandler == null) {
+      return inflight.isEmpty() ? List.of() : List.copyOf(new LinkedHashSet<>(inflight));
     }
-    List<IToken<?>> inflight = new ArrayList<>();
     for (IToken<?> token : new ArrayList<>(assigned)) {
       if (token == null) {
         continue;
@@ -87,10 +87,7 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
         // Ignore stale assignment/request links.
       }
     }
-    if (inflight.isEmpty()) {
-      return List.of();
-    }
-    return List.copyOf(new LinkedHashSet<>(inflight));
+    return inflight.isEmpty() ? List.of() : List.copyOf(new LinkedHashSet<>(inflight));
   }
 
   private static boolean isTerminalRequestState(RequestState state) {

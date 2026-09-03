@@ -4,6 +4,7 @@ import com.simibubi.create.content.logistics.packager.PackagerRenderer;
 import com.simibubi.create.content.logistics.packager.PackagerVisual;
 import com.thesettler_x_create.client.ColonyGaugeRenderer;
 import com.thesettler_x_create.client.ModPartialModels;
+import com.thesettler_x_create.client.gui.ColonyGaugeSetItemScreen;
 import com.thesettler_x_create.client.gui.CreateShopScreen;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModBlocks;
@@ -54,5 +55,6 @@ public class TheSettlerXCreateClient {
   @SubscribeEvent
   static void onRegisterScreens(RegisterMenuScreensEvent event) {
     event.register(ModMenus.CREATE_SHOP.get(), CreateShopScreen::new);
+    event.register(ModMenus.COLONY_GAUGE_SET_ITEM.get(), ColonyGaugeSetItemScreen::new);
   }
 }

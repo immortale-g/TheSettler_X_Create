@@ -72,10 +72,10 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
   @Override
   public BlockState getStateForPlacement(BlockPlaceContext pContext) {
     BlockState stateForPlacement = super.getStateForPlacement(pContext);
-    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-        "[ColonyGaugeBlock] getStateForPlacement clickedPos={} stateNull={} client={}",
-        pContext.getClickedPos(), stateForPlacement == null, pContext.getLevel().isClientSide());
     if (stateForPlacement == null) return null;
+
+    if (stateForPlacement.getValue(FACE) == AttachFace.FLOOR)
+      stateForPlacement = stateForPlacement.setValue(FACING, stateForPlacement.getValue(FACING).getOpposite());
 
     Level level = pContext.getLevel();
     BlockPos pos = pContext.getClickedPos();
@@ -199,16 +199,10 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     double range = pPlacer.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) + 1;
     HitResult hitResult = pPlacer.pick(range, 1, false);
     Vec3 location = hitResult.getLocation();
-    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-        "[ColonyGaugeBlock] setPlacedBy pos={} hitType={} location={}", pPos, hitResult.getType(), location);
     if (location == null) return;
 
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pPos, pState, location);
-    withBlockEntityDo(pLevel, pPos, be -> {
-      boolean ok = be.addPanel(slot, colonyId, shopPos, dimension);
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[ColonyGaugeBlock] setPlacedBy addPanel slot={} ok={}", slot, ok);
-    });
+    withBlockEntityDo(pLevel, pPos, be -> be.addPanel(slot, colonyId, shopPos, dimension));
   }
 
   @Override

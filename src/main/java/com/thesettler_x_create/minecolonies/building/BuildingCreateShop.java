@@ -69,9 +69,16 @@ public class BuildingCreateShop extends AbstractBuilding {
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
   private static final String TAG_FLOW_STATES = "FlowStates";
 
-  /** Gauge packaging task: items to extract from racks and send to the gauge address. */
+  /**
+   * Gauge packaging task: items to extract from racks and send to the gauge address.
+   * {@code requestId} keys the {@link CreateShopBlockEntity} reservation that protects the
+   * requested amount from being swept away by rack housekeeping before it's packaged.
+   */
   public record GaugePackagingTask(
-      net.minecraft.world.item.ItemStack item, int amount, String gaugeAddress) {}
+      net.minecraft.world.item.ItemStack item,
+      int amount,
+      String gaugeAddress,
+      java.util.UUID requestId) {}
 
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
 
@@ -332,10 +339,11 @@ public class BuildingCreateShop extends AbstractBuilding {
       if (request != null) {
         GaugePackagingTask task = pendingGaugeRequests.remove(request.getId());
         if (task != null) {
-          gaugePackagingQueue.removeIf(
-              t ->
-                  net.minecraft.world.item.ItemStack.isSameItem(t.item(), task.item())
-                      && t.gaugeAddress().equals(task.gaugeAddress()));
+          gaugePackagingQueue.removeIf(t -> t.requestId().equals(task.requestId()));
+          CreateShopBlockEntity pickup = getPickupBlockEntity();
+          if (pickup != null) {
+            pickup.release(task.requestId());
+          }
           markDirty();
         }
       }
@@ -500,17 +508,74 @@ public class BuildingCreateShop extends AbstractBuilding {
    *
    * @return true if the request was successfully created
    */
-  public boolean requestForGauge(ItemStack item, int amount, String gaugeAddress) {
-    if (item.isEmpty() || amount <= 0) return false;
+  /**
+   * Attempts to request {@code amount} of {@code item} for a Gauge, clamped to what the Colony
+   * Warehouse actually holds (partial deliveries are allowed). Returns the amount actually
+   * requested, or 0 if no request was created — the caller must use this returned amount (not the
+   * requested {@code amount}) for "promised" UI display, since it can be smaller.
+   */
+  public int requestForGauge(ItemStack item, int amount, String gaugeAddress) {
+    if (item.isEmpty() || amount <= 0) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}",
+            item, amount);
+      }
+      return 0;
+    }
+    int minLevel = Config.PERMA_MIN_BUILDING_LEVEL.get();
+    if (getBuildingLevel() < minLevel) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=building-level-too-low item={} level={} required={}",
+            item.getItem(), getBuildingLevel(), minLevel);
+      }
+      return 0;
+    }
     IColony colony = getColony();
-    if (colony == null) return false;
+    if (colony == null) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info("[ColonyGauge] requestForGauge skip reason=no-colony item={}", item.getItem());
+      }
+      return 0;
+    }
     IRequester requester = getRequester();
-    if (requester == null) return false;
+    if (requester == null) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=no-requester item={}", item.getItem());
+      }
+      return 0;
+    }
+    if (!isWorkerWorking()) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=worker-not-working item={}", item.getItem());
+      }
+      return 0;
+    }
+    // Only place a colony request once we've confirmed the Colony Warehouse actually has the item
+    // — same check the perma-request system already uses (ShopPermaRequestManager.countInWarehouses).
+    // This is the whole point of the Gauge: pull from the Colony Warehouse, not Create's stock
+    // network (vanilla Create Factory Gauges already cover that case).
+    int available = ShopPermaRequestManager.countInWarehouses(this, item);
+    if (available <= 0) {
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=nothing-in-warehouse item={} requested={}",
+            item.getItem(), amount);
+      }
+      return 0;
+    }
+    int actualAmount = Math.min(amount, available);
+
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
-    Stack deliverable = new Stack(item.copy(), amount, 1);
+    Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, 1);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
     if (token != null) {
-      GaugePackagingTask task = new GaugePackagingTask(item.copy(), amount, gaugeAddress);
+      java.util.UUID requestId = toRequestId(token);
+      GaugePackagingTask task =
+          new GaugePackagingTask(item.copy(), actualAmount, gaugeAddress, requestId);
       // Queue for packaging (deduplicated by item+address to avoid double-queuing on re-request).
       boolean alreadyQueued =
           gaugePackagingQueue.stream()
@@ -523,21 +588,107 @@ public class BuildingCreateShop extends AbstractBuilding {
         markDirty();
       }
       pendingGaugeRequests.put(token, task);
+      // Protect the delivered item from rack housekeeping (which sweeps "unreserved" rack stock
+      // back to the warehouse) until CreateShopOutputBlockEntity actually packages it.
+      CreateShopBlockEntity pickup = getPickupBlockEntity();
+      if (pickup != null) {
+        pickup.reserve(requestId, item.copy(), actualAmount);
+      }
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] request created token={} item={} amount={} address={} queued={}",
+            "[ColonyGauge] request created token={} item={} amount={} available={} address={} queued={}",
             token,
             item.getItem(),
-            amount,
+            actualAmount,
+            available,
             gaugeAddress,
             !alreadyQueued);
       }
+    } else if (isDebugRequests()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[ColonyGauge] requestForGauge skip reason=createAndAssignRequest-returned-null item={} amount={}",
+          item.getItem(), actualAmount);
     }
-    return token != null;
+    return token != null ? actualAmount : 0;
+  }
+
+  /**
+   * Cancels any still-open colony request(s) for the given Gauge item/address — called when a
+   * Gauge's promise is cleared or its filter is reset, so a request left unresolved (e.g. no
+   * courier assigned to the warehouse) doesn't keep piling up as a duplicate on the next request
+   * attempt. Matches both the transient {@code pendingGaugeRequests} tracking (by address) and,
+   * since that tracking doesn't survive a world/server restart, a live scan of this shop's own
+   * still-open requests (by item — the request payload has no address of its own).
+   */
+  public int cancelPendingGaugeRequests(ItemStack item, String gaugeAddress) {
+    if (gaugeAddress == null || gaugeAddress.isBlank() || getColony() == null) {
+      return 0;
+    }
+    if (!(getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
+      return 0;
+    }
+    Set<IToken<?>> toCancel = new java.util.LinkedHashSet<>();
+    for (var entry : pendingGaugeRequests.entrySet()) {
+      if (entry.getValue().gaugeAddress().equals(gaugeAddress)) {
+        toCancel.add(entry.getKey());
+      }
+    }
+    IRequester requester = getRequester();
+    if (item != null && !item.isEmpty() && requester != null) {
+      for (IRequest<?> request :
+          standard.getRequestHandler().getRequestsMadeByRequester(requester)) {
+        if (request == null || request.hasParent() || isTerminalRequestState(request.getState())) {
+          continue;
+        }
+        if (request.getRequest() instanceof Stack stack
+            && ItemStack.isSameItem(stack.getStack(), item)) {
+          toCancel.add(request.getId());
+        }
+      }
+    }
+    CreateShopBlockEntity pickup = getPickupBlockEntity();
+    int cancelled = 0;
+    for (IToken<?> token : toCancel) {
+      try {
+        standard.updateRequestState(token, RequestState.CANCELLED);
+        cancelled++;
+      } catch (Exception ex) {
+        if (isDebugRequests()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[ColonyGauge] cancelPendingGaugeRequests failed token={} error={}",
+              token,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
+      }
+      pendingGaugeRequests.remove(token);
+      if (pickup != null) {
+        pickup.release(toRequestId(token));
+      }
+    }
+    gaugePackagingQueue.removeIf(t -> t.gaugeAddress().equals(gaugeAddress));
+    if (cancelled > 0) {
+      markDirty();
+      if (isDebugRequests()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] cancelPendingGaugeRequests address={} cancelled={}",
+            gaugeAddress,
+            cancelled);
+      }
+    }
+    return cancelled;
   }
 
   /** Returns the next gauge packaging task without removing it, or null if queue is empty. */
   @Nullable
+  /**
+   * Tokens of colony requests this shop currently has open as a requester on behalf of a Colony
+   * Factory Gauge (delivery-to-shop, not the shop resolving a customer request) — surfaced in the
+   * shop's task UI, which otherwise only shows requests where the shop is the resolver.
+   */
+  public List<IToken<?>> getPendingGaugeRequestTokens() {
+    return List.copyOf(pendingGaugeRequests.keySet());
+  }
+
   public GaugePackagingTask peekNextGaugeTask() {
     return gaugePackagingQueue.isEmpty() ? null : gaugePackagingQueue.get(0);
   }
@@ -545,7 +696,11 @@ public class BuildingCreateShop extends AbstractBuilding {
   /** Removes and returns the next gauge packaging task (call after successfully packaging). */
   public void completeNextGaugeTask() {
     if (!gaugePackagingQueue.isEmpty()) {
-      gaugePackagingQueue.remove(0);
+      GaugePackagingTask completed = gaugePackagingQueue.remove(0);
+      CreateShopBlockEntity pickup = getPickupBlockEntity();
+      if (pickup != null) {
+        pickup.release(completed.requestId());
+      }
       markDirty();
     }
   }
@@ -1171,6 +1326,15 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
   }
 
+  private static java.util.UUID toRequestId(IToken<?> token) {
+    Object id = token == null ? null : token.getIdentifier();
+    if (id instanceof java.util.UUID uuid) {
+      return uuid;
+    }
+    return java.util.UUID.nameUUIDFromBytes(
+        String.valueOf(id).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
   private static boolean isTerminalRequestState(RequestState state) {
     if (state == null) {
       return false;
@@ -1350,7 +1514,11 @@ public class BuildingCreateShop extends AbstractBuilding {
         int amount = t.getInt("Amount");
         String address = t.getString("Address");
         if (!item.isEmpty() && amount > 0 && !address.isEmpty()) {
-          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address));
+          java.util.UUID requestId =
+              t.contains("RequestId")
+                  ? java.util.UUID.fromString(t.getString("RequestId"))
+                  : java.util.UUID.randomUUID();
+          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address, requestId));
         }
       }
     }
@@ -1379,6 +1547,7 @@ public class BuildingCreateShop extends AbstractBuilding {
         t.put("Item", task.item().save(provider));
         t.putInt("Amount", task.amount());
         t.putString("Address", task.gaugeAddress());
+        t.putString("RequestId", task.requestId().toString());
         list.add(t);
       }
       tag.put("GaugePackagingQueue", list);

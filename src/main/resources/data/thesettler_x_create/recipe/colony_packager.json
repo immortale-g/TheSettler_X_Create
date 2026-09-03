@@ -2,13 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "CCC",
-    "CPC",
-    "CCC"
+    "CBC",
+    "CAC",
+    "RCR"
   ],
   "key": {
-    "C": { "tag": "c:ingots/copper" },
-    "P": { "item": "create:packager" }
+    "A": { "item": "create:cardboard_block" },
+    "C": { "tag": "c:ingots/iron" },
+    "R": { "tag": "c:dusts/redstone" },
+    "B": { "item": "structurize:sceptergold" }
   },
   "result": {
     "count": 1,
