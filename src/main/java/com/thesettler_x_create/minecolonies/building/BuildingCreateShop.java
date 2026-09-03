@@ -465,6 +465,14 @@ public class BuildingCreateShop extends AbstractBuilding {
     return housekeepingOrchestrator.hasIncomingRackWork();
   }
 
+  public boolean isHousekeepingAllowed() {
+    IColony colony = getColony();
+    if (colony == null) {
+      return false;
+    }
+    return housekeepingOrchestrator.isHousekeepingAllowed(colony, getPickupBlockEntity());
+  }
+
   public boolean hasActiveLocalDeliveryChildrenForInflight(IColony colony) {
     return housekeepingOrchestrator.hasActiveLocalDeliveryChildren(colony, getPickupBlockEntity());
   }
