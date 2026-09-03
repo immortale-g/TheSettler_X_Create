@@ -459,7 +459,7 @@ final class CreateShopDeliveryManager {
     int warehousesChecked = 0;
     int warehousesWithQueue = 0;
     for (var entry : buildingManager.getBuildings().entrySet()) {
-      if (entry.getValue() instanceof BuildingCreateShop) {
+      if (!CreateShopWarehouseFilter.isRelevantWarehouse(entry.getValue())) {
         continue;
       }
       warehousesChecked++;
@@ -504,10 +504,7 @@ final class CreateShopDeliveryManager {
     }
     for (var entry : buildingManager.getBuildings().entrySet()) {
       var building = entry.getValue();
-      if (building == null) {
-        continue;
-      }
-      if (building instanceof BuildingCreateShop) {
+      if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
         // Never treat the Create Shop worker as courier.
         continue;
       }

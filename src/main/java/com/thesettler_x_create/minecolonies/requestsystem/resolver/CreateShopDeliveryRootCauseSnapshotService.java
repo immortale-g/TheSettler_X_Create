@@ -60,14 +60,10 @@ final class CreateShopDeliveryRootCauseSnapshotService {
     if (buildingManager != null && buildingManager.getBuildings() != null) {
       for (var entry : buildingManager.getBuildings().entrySet()) {
         Object building = entry.getValue();
-        if (!(building
-                instanceof
-                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
-                warehouse)
-            || building
-                instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
+        if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
           continue;
         }
+        var warehouse = (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
         var queue =
             warehouse.getModule(
                 com.minecolonies.core.colony.buildings.modules.BuildingModules
