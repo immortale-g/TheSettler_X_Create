@@ -395,16 +395,12 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
-    return Component.literal(
-        "Delivery seems lost for "
-            + requester
-            + ". Item: "
-            + itemLabel
-            + " x"
-            + Math.max(1, remaining)
-            + " (address: "
-            + destination
-            + ").");
+    return Component.translatable(
+        "com.thesettler_x_create.interaction.createshop.lost_package.inquiry",
+        requester,
+        itemLabel,
+        Math.max(1, remaining),
+        destination);
   }
 
   private static String sanitize(String value) {

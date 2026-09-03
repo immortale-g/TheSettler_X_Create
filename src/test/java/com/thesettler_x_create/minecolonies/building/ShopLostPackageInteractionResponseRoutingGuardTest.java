@@ -8,14 +8,23 @@ import org.junit.jupiter.api.Test;
 
 class ShopLostPackageInteractionResponseRoutingGuardTest {
   @Test
-  void lostPackageInquiryUsesLiteralContentForStableResponseLookup() throws Exception {
+  void lostPackageInquiryUsesTranslatableTextAndResponseRoutingStaysIndexBased() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageInteraction.java"));
 
-    assertTrue(source.contains("return Component.literal("));
-    assertTrue(source.contains("Delivery seems lost for "));
-    assertTrue(source.contains(". Item: "));
+    // Response routing is keyed by the fixed ".id" translation key and a numeric response index
+    // (onServerResponseTriggered(int, ...)), not by matching the inquiry text - so the inquiry
+    // itself is free to be localized.
+    assertTrue(
+        source.contains(
+            "Component.translatable(\"com.thesettler_x_create.interaction.createshop.lost_package.id\")"));
+    assertTrue(source.contains("void onServerResponseTriggered(int response,"));
+
+    assertTrue(source.contains("return Component.translatable("));
+    assertTrue(
+        source.contains(
+            "\"com.thesettler_x_create.interaction.createshop.lost_package.inquiry\","));
   }
 }

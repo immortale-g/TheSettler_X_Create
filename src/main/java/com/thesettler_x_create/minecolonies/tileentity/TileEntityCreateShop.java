@@ -7,7 +7,6 @@ import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
-import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -125,7 +124,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         continue;
       }
       BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
         continue;
       }
       if (rack.isEmpty()) {
@@ -188,7 +187,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         continue;
       }
       BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
         continue;
       }
       if (rack.isEmpty()) {
@@ -959,8 +958,11 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return null;
     }
     for (BlockPos pos : getBuilding().getContainers()) {
+      if (!WorldUtil.isBlockLoaded(level, pos)) {
+        continue;
+      }
       BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
         continue;
       }
       if (rack.isEmpty()) {

@@ -20,11 +20,6 @@ public class Config {
           .comment("Ticks between perma request evaluations.")
           .defineInRange("permaRequestIntervalTicks", 200L, 20L, 24000L);
 
-  public static final ModConfigSpec.DoubleValue SHOPKEEPER_WORK_RADIUS =
-      BUILDER
-          .comment("Max distance (blocks) a working shopkeeper may roam from the hut block.")
-          .defineInRange("shopkeeperWorkRadius", 2.5D, 0.5D, 16.0D);
-
   public static final ModConfigSpec.LongValue MISSING_NETWORK_WARNING_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) between missing network warning messages.")
@@ -39,31 +34,6 @@ public class Config {
       BUILDER
           .comment("Cooldown (ticks) between courier entity debug logs.")
           .defineInRange("courierEntityDebugCooldown", 400L, 0L, 24000L);
-
-  public static final ModConfigSpec.LongValue GLOBAL_INJECTOR_LOG_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between global resolver injector logs.")
-          .defineInRange("globalInjectorLogCooldown", 200L, 0L, 24000L);
-
-  public static final ModConfigSpec.LongValue GLOBAL_REQUEST_LOG_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between global request diagnostics.")
-          .defineInRange("globalRequestLogCooldown", 200L, 0L, 24000L);
-
-  public static final ModConfigSpec.LongValue RESOLVER_INJECTOR_DEBUG_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between Create Shop resolver injector debug logs.")
-          .defineInRange("resolverInjectorDebugCooldown", 200L, 0L, 24000L);
-
-  public static final ModConfigSpec.LongValue RESOLVER_DELIVERY_DEBUG_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between Create Shop delivery debug logs.")
-          .defineInRange("resolverDeliveryDebugCooldown", 200L, 0L, 24000L);
-
-  public static final ModConfigSpec.LongValue RESOLVER_CHAIN_SANITIZE_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between request chain sanitize passes.")
-          .defineInRange("resolverChainSanitizeCooldown", 200L, 0L, 24000L);
 
   public static final ModConfigSpec.LongValue ORDER_TTL_TICKS =
       BUILDER
@@ -89,11 +59,6 @@ public class Config {
       BUILDER
           .comment("Cooldown (ticks) for pending delivery notices.")
           .defineInRange("pendingNoticeCooldown", 20L * 10L, 20L, 24000L);
-
-  public static final ModConfigSpec.LongValue DELIVERY_ASSIGNMENT_DEBUG_COOLDOWN =
-      BUILDER
-          .comment("Cooldown (ticks) between delivery assignment debug logs.")
-          .defineInRange("deliveryAssignmentDebugCooldown", 200L, 0L, 24000L);
 
   public static final ModConfigSpec.LongValue TICK_PENDING_DEBUG_COOLDOWN =
       BUILDER
