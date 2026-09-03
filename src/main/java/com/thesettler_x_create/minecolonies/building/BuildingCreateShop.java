@@ -30,6 +30,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1328,14 +1329,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   private static boolean isTerminalRequestState(RequestState state) {
-    if (state == null) {
-      return false;
-    }
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 
   public void ensureRackContainers() {

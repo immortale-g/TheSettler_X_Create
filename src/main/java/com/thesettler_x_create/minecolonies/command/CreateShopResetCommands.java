@@ -8,6 +8,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 
 /**
  * Handles reset and uninstall commands for the Create Shop building.
@@ -751,11 +752,7 @@ final class CreateShopResetCommands {
   }
 
   static boolean isTerminalState(RequestState state) {
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 
   private static boolean isStaleRequestGraphException(Exception ex) {

@@ -390,14 +390,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   static boolean isTerminalRequestState(RequestState state) {
-    if (state == null) {
-      return false;
-    }
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 
   int getMaxChainSanitizeNodes() {
@@ -716,34 +709,5 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return entry.getKey();
     }
     return null;
-  }
-}
-
-/** Routes MineColonies delivery callbacks to the matching local Create Shop resolver instance. */
-final class CreateShopDeliveryCallbackService {
-  void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
-    CreateShopRequestResolver resolver =
-        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
-    if (resolver == null) {
-      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
-    }
-    if (resolver != null) {
-      resolver.handleDeliveryCancelled(manager, request);
-      return;
-    }
-    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("cancelled", manager, request);
-  }
-
-  void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
-    CreateShopRequestResolver resolver =
-        CreateShopDeliveryResolverLocator.findResolverForDelivery(manager, request);
-    if (resolver == null) {
-      resolver = CreateShopDeliveryResolverLocator.findResolverByDeliveryToken(manager, request);
-    }
-    if (resolver != null) {
-      resolver.handleDeliveryComplete(manager, request);
-      return;
-    }
-    CreateShopDeliveryResolverLocator.logUnresolvedDeliveryCallback("complete", manager, request);
   }
 }
