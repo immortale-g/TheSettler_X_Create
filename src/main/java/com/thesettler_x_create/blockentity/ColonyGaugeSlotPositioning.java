@@ -23,17 +23,18 @@ class ColonyGaugeSlotPositioning extends ValueBoxTransform {
 
   @Override
   public Vec3 getLocalOffset(LevelAccessor level, BlockPos pos, BlockState state) {
-    Vec3 vec =
-        new Vec3(.25 + slot.xOffset * .5, 1.5 / 16f, .25 + slot.yOffset * .5);
+    Vec3 vec = new Vec3(.25 + slot.xOffset * .5, 1.5 / 16f, .25 + slot.yOffset * .5);
     vec = VecHelper.rotateCentered(vec, 180, net.minecraft.core.Direction.Axis.Y);
-    vec = VecHelper.rotateCentered(
-        vec,
-        Mth.RAD_TO_DEG * FactoryPanelBlock.getXRot(state) + 90,
-        net.minecraft.core.Direction.Axis.X);
-    vec = VecHelper.rotateCentered(
-        vec,
-        Mth.RAD_TO_DEG * FactoryPanelBlock.getYRot(state),
-        net.minecraft.core.Direction.Axis.Y);
+    vec =
+        VecHelper.rotateCentered(
+            vec,
+            Mth.RAD_TO_DEG * FactoryPanelBlock.getXRot(state) + 90,
+            net.minecraft.core.Direction.Axis.X);
+    vec =
+        VecHelper.rotateCentered(
+            vec,
+            Mth.RAD_TO_DEG * FactoryPanelBlock.getYRot(state),
+            net.minecraft.core.Direction.Axis.Y);
     return vec;
   }
 

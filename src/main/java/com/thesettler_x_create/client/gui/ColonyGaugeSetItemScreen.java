@@ -51,7 +51,8 @@ public class ColonyGaugeSetItemScreen extends AbstractSimiContainerScreen<Colony
     renderPlayerInventory(graphics, x + 5, y + 94);
 
     ItemStack stack = ModItems.COLONY_GAUGE.get().getDefaultInstance();
-    graphics.drawString(font, TITLE, x + imageWidth / 2 - font.width(TITLE) / 2 - 5, y + 4, 0x3D3C48, false);
+    graphics.drawString(
+        font, TITLE, x + imageWidth / 2 - font.width(TITLE) / 2 - 5, y + 4, 0x3D3C48, false);
 
     GuiGameElement.of(stack).scale(3).render(graphics, x + 180, y + 48);
   }

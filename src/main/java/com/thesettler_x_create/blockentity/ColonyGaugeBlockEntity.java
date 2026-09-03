@@ -10,6 +10,7 @@ import com.thesettler_x_create.init.ModBlockEntities;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
+import net.createmod.catnip.math.VecHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
@@ -23,7 +24,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.createmod.catnip.math.VecHelper;
 
 public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
@@ -72,8 +72,8 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   /**
    * Returns the Packager this gauge is mounted on, or {@code null} if it isn't attached to one.
    * Mirrors Create's own restocker-mode gauges, which read the actual current stock of the
-   * Packager's connected inventory (chest/vault/etc.) rather than tracking deliveries by count —
-   * so the gauge stays in sync even if items are later removed from that inventory.
+   * Packager's connected inventory (chest/vault/etc.) rather than tracking deliveries by count — so
+   * the gauge stays in sync even if items are later removed from that inventory.
    */
   @org.jetbrains.annotations.Nullable
   public com.simibubi.create.content.logistics.packager.PackagerBlockEntity getConnectedPackager() {
@@ -94,7 +94,8 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     // connectedDir is the panel's "front" direction (away from attached block)
     BlockPos attachedPos = worldPosition.relative(connectedDir.getOpposite());
     boolean attachedIsPackager =
-        level.getBlockEntity(attachedPos) instanceof com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
+        level.getBlockEntity(attachedPos)
+            instanceof com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 
     for (ColonyGaugeBehaviour behaviour : panels.values()) {
       if (!behaviour.isActive()) continue;
@@ -155,10 +156,10 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   /**
    * Called by each ColonyGaugeBehaviour when its satisfied/promisedSatisfied state changes.
    *
-   * <p>Deliberately never sets {@code POWERED} to {@code true}: unlike our block model (which
-   * maps both powered states to the identical model, so there is no visual to gain), setting it
-   * makes {@link ColonyGaugeBlock#getDirectSignal} emit a real, sustained redstone signal toward
-   * the connected Packager — which then continuously re-triggers its (Create-native) redstone-mode
+   * <p>Deliberately never sets {@code POWERED} to {@code true}: unlike our block model (which maps
+   * both powered states to the identical model, so there is no visual to gain), setting it makes
+   * {@link ColonyGaugeBlock#getDirectSignal} emit a real, sustained redstone signal toward the
+   * connected Packager — which then continuously re-triggers its (Create-native) redstone-mode
    * sending logic, vacuuming whatever sits in its target inventory. Real Create's FactoryPanelBlock
    * has the identical getSignal/getDirectSignal code, but never actually sets POWERED either — it's
    * unused there too. Kept as a no-op (rather than removing the block state) in case a powered
@@ -169,12 +170,13 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     BlockState state = getBlockState();
     if (!state.hasProperty(ColonyGaugeBlock.POWERED)) return;
     if (!state.getValue(ColonyGaugeBlock.POWERED)) return;
-    level.setBlock(worldPosition, state.setValue(ColonyGaugeBlock.POWERED, false), Block.UPDATE_ALL);
+    level.setBlock(
+        worldPosition, state.setValue(ColonyGaugeBlock.POWERED, false), Block.UPDATE_ALL);
   }
 
   /**
-   * Called by ColonyPackagerBlockEntity after unwrapping a box.
-   * Tries to match by item; falls back to first promisedSatisfied slot.
+   * Called by ColonyPackagerBlockEntity after unwrapping a box. Tries to match by item; falls back
+   * to first promisedSatisfied slot.
    */
   public void onDeliveryReceived(ItemStack deliveredItem) {
     for (ColonyGaugeBehaviour behaviour : panels.values()) {
@@ -202,8 +204,13 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     super.destroy();
     int count = activePanels();
     if (count > 1)
-      Block.popResource(level, worldPosition,
-          com.thesettler_x_create.init.ModItems.COLONY_GAUGE.get().getDefaultInstance().copyWithCount(count - 1));
+      Block.popResource(
+          level,
+          worldPosition,
+          com.thesettler_x_create.init.ModItems.COLONY_GAUGE
+              .get()
+              .getDefaultInstance()
+              .copyWithCount(count - 1));
   }
 
   public VoxelShape getShape() {
@@ -223,8 +230,10 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
       vec = VecHelper.rotateCentered(vec, 180, Axis.Y);
       vec = VecHelper.rotateCentered(vec, xRot, Axis.X);
       vec = VecHelper.rotateCentered(vec, yRot, Axis.Y);
-      AABB bb = new AABB(vec, vec).inflate(1 / 16f)
-          .inflate(inflateAxes.x * 3 / 16f, inflateAxes.y * 3 / 16f, inflateAxes.z * 3 / 16f);
+      AABB bb =
+          new AABB(vec, vec)
+              .inflate(1 / 16f)
+              .inflate(inflateAxes.x * 3 / 16f, inflateAxes.y * 3 / 16f, inflateAxes.z * 3 / 16f);
       lastShape = Shapes.or(lastShape, Shapes.create(bb));
     }
     return lastShape;

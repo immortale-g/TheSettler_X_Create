@@ -21,6 +21,7 @@ public class TheSettlerJEIPlugin implements IModPlugin {
   @Override
   @SuppressWarnings({"unchecked", "rawtypes"})
   public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-    registration.addGhostIngredientHandler(ColonyGaugeSetItemScreen.class, new GhostIngredientHandler());
+    registration.addGhostIngredientHandler(
+        ColonyGaugeSetItemScreen.class, new GhostIngredientHandler());
   }
 }

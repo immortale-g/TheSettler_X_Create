@@ -247,7 +247,8 @@ public final class ModNetwork {
             if (debug) {
               TheSettlerXCreate.LOGGER.info(
                   "[ColonyGauge] config packet skip reason=behaviour-inactive-or-null pos={} slot={}",
-                  position.pos(), position.slot());
+                  position.pos(),
+                  position.slot());
             }
             return;
           }
@@ -255,7 +256,9 @@ public final class ModNetwork {
             behaviour.resetFilter();
             if (debug) {
               TheSettlerXCreate.LOGGER.info(
-                  "[ColonyGauge] config packet applied reset pos={} slot={}", position.pos(), position.slot());
+                  "[ColonyGauge] config packet applied reset pos={} slot={}",
+                  position.pos(),
+                  position.slot());
             }
             return;
           }

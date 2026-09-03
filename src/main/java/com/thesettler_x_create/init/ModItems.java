@@ -33,9 +33,7 @@ public final class ModItems {
   public static final DeferredItem<Item> COLONY_GAUGE =
       ITEMS.register(
           "colony_gauge",
-          () ->
-              new ColonyGaugeBlockItem(
-                  ModBlocks.COLONY_GAUGE.get(), new Item.Properties()));
+          () -> new ColonyGaugeBlockItem(ModBlocks.COLONY_GAUGE.get(), new Item.Properties()));
   public static final DeferredItem<Item> COLONY_PACKAGER =
       ITEMS.register(
           "colony_packager",

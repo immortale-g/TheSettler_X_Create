@@ -249,8 +249,8 @@ final class ShopPermaRequestManager {
   }
 
   /**
-   * Sums matching item stacks across all of the colony's MineColonies warehouses (excluding
-   * {@code shop} itself, in case it is ever registered as one). Shared with {@link
+   * Sums matching item stacks across all of the colony's MineColonies warehouses (excluding {@code
+   * shop} itself, in case it is ever registered as one). Shared with {@link
    * BuildingCreateShop#requestForGauge} so Gauge requests only get created when the warehouse
    * actually has stock — mirrors how perma-requests already work.
    */

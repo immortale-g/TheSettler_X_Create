@@ -22,12 +22,13 @@ public final class ModMenus {
           "create_shop",
           () -> IMenuTypeExtension.create((IContainerFactory<CreateShopMenu>) CreateShopMenu::new));
 
-  public static final DeferredHolder<MenuType<?>, MenuType<ColonyGaugeSetItemMenu>> COLONY_GAUGE_SET_ITEM =
-      MENUS.register(
-          "colony_gauge_set_item",
-          () ->
-              IMenuTypeExtension.create(
-                  (IContainerFactory<ColonyGaugeSetItemMenu>) ColonyGaugeSetItemMenu::new));
+  public static final DeferredHolder<MenuType<?>, MenuType<ColonyGaugeSetItemMenu>>
+      COLONY_GAUGE_SET_ITEM =
+          MENUS.register(
+              "colony_gauge_set_item",
+              () ->
+                  IMenuTypeExtension.create(
+                      (IContainerFactory<ColonyGaugeSetItemMenu>) ColonyGaugeSetItemMenu::new));
 
   public static void register(IEventBus bus) {
     MENUS.register(bus);

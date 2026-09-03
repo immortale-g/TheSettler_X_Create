@@ -52,7 +52,10 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
             : assignmentStore.getAssignments().get(resolverId);
     var requestHandler = manager.getRequestHandler();
     var resolverHandler = manager.getResolverHandler();
-    if (assigned == null || assigned.isEmpty() || requestHandler == null || resolverHandler == null) {
+    if (assigned == null
+        || assigned.isEmpty()
+        || requestHandler == null
+        || resolverHandler == null) {
       return inflight.isEmpty() ? List.of() : List.copyOf(new LinkedHashSet<>(inflight));
     }
     for (IToken<?> token : new ArrayList<>(assigned)) {

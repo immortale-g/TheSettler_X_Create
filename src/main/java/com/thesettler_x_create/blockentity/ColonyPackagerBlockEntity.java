@@ -30,14 +30,16 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     ItemStack deliveredItem = firstNonEmpty(PackageItem.getContents(box));
 
     if (Config.DEBUG_LOGGING.getAsBoolean() && !simulate && level != null) {
-      Direction facing = getBlockState().getOptionalValue(DirectionalBlock.FACING).orElse(Direction.UP);
+      Direction facing =
+          getBlockState().getOptionalValue(DirectionalBlock.FACING).orElse(Direction.UP);
       BlockPos target = getBlockPos().relative(facing.getOpposite());
       BlockState targetState = level.getBlockState(target);
       var targetBe = level.getBlockEntity(target);
       var cap =
           targetBe == null
               ? null
-              : level.getCapability(Capabilities.ItemHandler.BLOCK, target, targetState, targetBe, facing);
+              : level.getCapability(
+                  Capabilities.ItemHandler.BLOCK, target, targetState, targetBe, facing);
       TheSettlerXCreate.LOGGER.info(
           "[ColonyPackager] unwrapBox pos={} facing={} target={} targetBlock={} targetBe={} capabilityFound={} deliveredItem={}",
           getBlockPos(),
@@ -51,7 +53,10 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     boolean result = super.unwrapBox(box, simulate);
     if (Config.DEBUG_LOGGING.getAsBoolean() && !simulate) {
       TheSettlerXCreate.LOGGER.info(
-          "[ColonyPackager] unwrapBox pos={} result={} box={}", getBlockPos(), result, box.getItem());
+          "[ColonyPackager] unwrapBox pos={} result={} box={}",
+          getBlockPos(),
+          result,
+          box.getItem());
     }
     if (result && !simulate) {
       for (Direction d : Direction.values()) {
@@ -77,9 +82,9 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
   /**
    * The Gauge-side packager only ever receives/unwraps boxes (via {@link #unwrapBox}) — it never
    * builds or ships packages of its own. Without this override, the adjacent ColonyGauge's own
-   * redstone output (emitted toward this block once satisfied, mirroring Create's
-   * FactoryPanelBlock — see ColonyGaugeBlock#getDirectSignal) would make Create's stock "redstone
-   * mode" packing logic continuously vacuum the connected chest into new boxes.
+   * redstone output (emitted toward this block once satisfied, mirroring Create's FactoryPanelBlock
+   * — see ColonyGaugeBlock#getDirectSignal) would make Create's stock "redstone mode" packing logic
+   * continuously vacuum the connected chest into new boxes.
    */
   @Override
   public void attemptToSend(List<PackagingRequest> queuedRequests) {

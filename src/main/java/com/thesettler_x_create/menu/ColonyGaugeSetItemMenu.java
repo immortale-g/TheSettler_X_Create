@@ -24,11 +24,13 @@ public class ColonyGaugeSetItemMenu extends GhostItemMenu<ColonyGaugeBehaviour> 
     this(ModMenus.COLONY_GAUGE_SET_ITEM.get(), id, inv, extraData);
   }
 
-  private ColonyGaugeSetItemMenu(MenuType<?> type, int id, Inventory inv, RegistryFriendlyByteBuf extraData) {
+  private ColonyGaugeSetItemMenu(
+      MenuType<?> type, int id, Inventory inv, RegistryFriendlyByteBuf extraData) {
     super(type, id, inv, extraData);
   }
 
-  private ColonyGaugeSetItemMenu(MenuType<?> type, int id, Inventory inv, ColonyGaugeBehaviour contentHolder) {
+  private ColonyGaugeSetItemMenu(
+      MenuType<?> type, int id, Inventory inv, ColonyGaugeBehaviour contentHolder) {
     super(type, id, inv, contentHolder);
   }
 
@@ -69,12 +71,19 @@ public class ColonyGaugeSetItemMenu extends GhostItemMenu<ColonyGaugeBehaviour> 
   @Override
   protected void saveData(ColonyGaugeBehaviour contentHolder) {
     if (!contentHolder.setFilter(ghostInventory.getStackInSlot(0))) {
-      player.displayClientMessage(CreateLang.translateDirect("logistics.filter.invalid_item"), true);
+      player.displayClientMessage(
+          CreateLang.translateDirect("logistics.filter.invalid_item"), true);
       AllSoundEvents.DENY.playOnServer(player.level(), player.blockPosition(), 1, 1);
       return;
     }
     player
         .level()
-        .playSound(null, contentHolder.getPos(), SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, .25f, .1f);
+        .playSound(
+            null,
+            contentHolder.getPos(),
+            SoundEvents.ITEM_FRAME_ADD_ITEM,
+            SoundSource.BLOCKS,
+            .25f,
+            .1f);
   }
 }

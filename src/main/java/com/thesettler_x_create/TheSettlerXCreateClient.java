@@ -33,14 +33,17 @@ public class TheSettlerXCreateClient {
 
   @SubscribeEvent
   static void onClientSetup(FMLClientSetupEvent event) {
-    event.enqueueWork(() -> {
-      ItemBlockRenderTypes.setRenderLayer(ModBlocks.COLONY_GAUGE.get(), RenderType.cutoutMipped());
-      ItemBlockRenderTypes.setRenderLayer(ModBlocks.COLONY_PACKAGER.get(), RenderType.cutoutMipped());
-      SimpleBlockEntityVisualizer.builder(ModBlockEntities.COLONY_PACKAGER.get())
-          .factory(PackagerVisual::new)
-          .skipVanillaRender(be -> false)
-          .apply();
-    });
+    event.enqueueWork(
+        () -> {
+          ItemBlockRenderTypes.setRenderLayer(
+              ModBlocks.COLONY_GAUGE.get(), RenderType.cutoutMipped());
+          ItemBlockRenderTypes.setRenderLayer(
+              ModBlocks.COLONY_PACKAGER.get(), RenderType.cutoutMipped());
+          SimpleBlockEntityVisualizer.builder(ModBlockEntities.COLONY_PACKAGER.get())
+              .factory(PackagerVisual::new)
+              .skipVanillaRender(be -> false)
+              .apply();
+        });
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info("TheSettler_x_Create client setup complete");
     }
@@ -48,8 +51,10 @@ public class TheSettlerXCreateClient {
 
   @SubscribeEvent
   static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
-    event.registerBlockEntityRenderer(ModBlockEntities.COLONY_GAUGE.get(), ColonyGaugeRenderer::new);
-    event.registerBlockEntityRenderer(ModBlockEntities.COLONY_PACKAGER.get(), PackagerRenderer::new);
+    event.registerBlockEntityRenderer(
+        ModBlockEntities.COLONY_GAUGE.get(), ColonyGaugeRenderer::new);
+    event.registerBlockEntityRenderer(
+        ModBlockEntities.COLONY_PACKAGER.get(), PackagerRenderer::new);
   }
 
   @SubscribeEvent

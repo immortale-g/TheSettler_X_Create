@@ -2,7 +2,6 @@ package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
-import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.PanelSlot;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
 import com.simibubi.create.foundation.blockEntity.behaviour.BehaviourType;
@@ -59,13 +58,20 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   public @Nullable String cachedFrogportAddress;
   public @Nullable String manualAddress;
-  /** -1 = never expire, 0 = 30s, N = N minutes. Same scale as FactoryPanelBehaviour, whose own
-   * default is also -1 (never) — matched here. */
+
+  /**
+   * -1 = never expire, 0 = 30s, N = N minutes. Same scale as FactoryPanelBehaviour, whose own
+   * default is also -1 (never) — matched here.
+   */
   public int promiseClearingInterval = -1;
+
   private int timer = REQUEST_INTERVAL;
   private long promisedUntil = 0L;
-  /** Amount actually requested from the Colony Warehouse (may be < the target amount if the
-   * warehouse only had partial stock) — used for "promised" UI display instead of the target. */
+
+  /**
+   * Amount actually requested from the Colony Warehouse (may be < the target amount if the
+   * warehouse only had partial stock) — used for "promised" UI display instead of the target.
+   */
   private int promisedAmount = 0;
 
   public ColonyGaugeBehaviour(ColonyGaugeBlockEntity be, PanelSlot slot) {
@@ -96,9 +102,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   /**
-   * Cancels any colony request(s) still open under the currently-active address, so a request
-   * left unresolved (e.g. no courier assigned to the warehouse) doesn't linger and cause a
-   * duplicate to be created on the next {@link #tryRequest()}.
+   * Cancels any colony request(s) still open under the currently-active address, so a request left
+   * unresolved (e.g. no courier assigned to the warehouse) doesn't linger and cause a duplicate to
+   * be created on the next {@link #tryRequest()}.
    */
   private void cancelActiveRequests() {
     String targetAddress = manualAddress != null ? manualAddress : cachedFrogportAddress;
@@ -109,7 +115,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     if (cancelled > 0 && com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] cancelled {} stale colony request(s) slot={} address={}",
-          cancelled, slot.getSerializedName(), targetAddress);
+          cancelled,
+          slot.getSerializedName(),
+          targetAddress);
     }
   }
 
@@ -131,8 +139,8 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   /**
-   * Clears the requested item and pending promise, but keeps the panel linked to its shop
-   * (unlike {@link #disable()}, which fully removes the panel).
+   * Clears the requested item and pending promise, but keeps the panel linked to its shop (unlike
+   * {@link #disable()}, which fully removes the panel).
    */
   public void resetFilter() {
     cancelActiveRequests();
@@ -259,11 +267,11 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   /**
    * Continuously compares the actual current stock in the connected Packager's target inventory
-   * against the configured amount — mirroring Create's real {@code FactoryPanelBehaviour}
-   * ({@code tickStorageMonitor}/{@code getLevelInStorage}), which reads
-   * {@code packager.getAvailableItems()} every tick rather than tracking deliveries by count.
-   * This is what lets the gauge keep asking (or stop asking) as stock actually changes, including
-   * if items are later removed from the target inventory by other means.
+   * against the configured amount — mirroring Create's real {@code FactoryPanelBehaviour} ({@code
+   * tickStorageMonitor}/{@code getLevelInStorage}), which reads {@code
+   * packager.getAvailableItems()} every tick rather than tracking deliveries by count. This is what
+   * lets the gauge keep asking (or stop asking) as stock actually changes, including if items are
+   * later removed from the target inventory by other means.
    */
   private void tickStorageMonitor() {
     if (getFilter().isEmpty()) return;
@@ -280,8 +288,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     panelBE().updatePowered();
   }
 
-  /** Current stock of the filtered item in the connected Packager's target inventory (0 if not
-   * attached to a Packager, or if no inventory is connected to it yet). */
+  /**
+   * Current stock of the filtered item in the connected Packager's target inventory (0 if not
+   * attached to a Packager, or if no inventory is connected to it yet).
+   */
   private int getLevelInStorage() {
     var packager = panelBE().getConnectedPackager();
     if (packager == null) return 0;
@@ -295,7 +305,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (debug)
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] tryRequest skip slot={} reason=not-linked active={} colonyId={} shopPos={}",
-            slot.getSerializedName(), active, colonyId, shopPos);
+            slot.getSerializedName(),
+            active,
+            colonyId,
+            shopPos);
       return;
     }
     if (getFilter().isEmpty()) {
@@ -309,14 +322,18 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (debug)
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] tryRequest skip slot={} reason=no-address manualAddress={} cachedFrogportAddress={}",
-            slot.getSerializedName(), manualAddress, cachedFrogportAddress);
+            slot.getSerializedName(),
+            manualAddress,
+            cachedFrogportAddress);
       return;
     }
     if (promisedSatisfied || satisfied) {
       if (debug)
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] tryRequest skip slot={} reason=already-satisfied satisfied={} promisedSatisfied={}",
-            slot.getSerializedName(), satisfied, promisedSatisfied);
+            slot.getSerializedName(),
+            satisfied,
+            promisedSatisfied);
       return;
     }
     int amount = getAmount();
@@ -326,7 +343,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (debug)
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] tryRequest skip slot={} reason=amount-zero target={} inStorage={} (paused via scroll or already covered by storage)",
-            slot.getSerializedName(), amount, inStorage);
+            slot.getSerializedName(),
+            amount,
+            inStorage);
       return;
     }
 
@@ -335,7 +354,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (debug)
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] tryRequest skip slot={} reason=no-building colonyId={} shopPos={}",
-            slot.getSerializedName(), colonyId, shopPos);
+            slot.getSerializedName(),
+            colonyId,
+            shopPos);
       return;
     }
 
@@ -350,7 +371,13 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (debug) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] behaviour requested slot={} item={} requestedAmount={} remaining={} target={} inStorage={} address={}",
-            slot.getSerializedName(), getFilter().getItem(), requestedAmount, remaining, amount, inStorage, targetAddress);
+            slot.getSerializedName(),
+            getFilter().getItem(),
+            requestedAmount,
+            remaining,
+            amount,
+            inStorage,
+            targetAddress);
       }
     } else if (debug) {
       TheSettlerXCreate.LOGGER.info(
@@ -372,7 +399,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] onDeliveryReceived slot={} inStorage={} target={} satisfied={}",
-          slot.getSerializedName(), getLevelInStorage(), getAmount(), satisfied);
+          slot.getSerializedName(),
+          getLevelInStorage(),
+          getAmount(),
+          satisfied);
     }
   }
 
@@ -392,7 +422,8 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   @Override
-  public void onShortInteract(Player player, InteractionHand hand, Direction side, BlockHitResult hitResult) {
+  public void onShortInteract(
+      Player player, InteractionHand hand, Direction side, BlockHitResult hitResult) {
     boolean isClientSide = player.level().isClientSide();
     ItemStack heldItem = player.getItemInHand(hand);
 
@@ -401,7 +432,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
         if (!isClientSide && player instanceof ServerPlayer sp)
           sp.openMenu(
               this,
-              buf -> FactoryPanelPosition.STREAM_CODEC.encode(buf, new FactoryPanelPosition(getPos(), slot)));
+              buf ->
+                  FactoryPanelPosition.STREAM_CODEC.encode(
+                      buf, new FactoryPanelPosition(getPos(), slot)));
         return;
       }
       super.onShortInteract(player, hand, side, hitResult);
@@ -414,8 +447,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   @OnlyIn(Dist.CLIENT)
   public void displayScreen(Player player) {
-    if (player instanceof LocalPlayer)
-      ScreenOpener.open(new ColonyGaugeScreen(this));
+    if (player instanceof LocalPlayer) ScreenOpener.open(new ColonyGaugeScreen(this));
   }
 
   public FactoryPanelPosition getPanelPosition() {
@@ -423,7 +455,8 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   @Override
-  public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+  public AbstractContainerMenu createMenu(
+      int containerId, Inventory playerInventory, Player player) {
     return ColonyGaugeSetItemMenu.create(containerId, playerInventory, this);
   }
 

@@ -70,9 +70,9 @@ public class BuildingCreateShop extends AbstractBuilding {
   private static final String TAG_FLOW_STATES = "FlowStates";
 
   /**
-   * Gauge packaging task: items to extract from racks and send to the gauge address.
-   * {@code requestId} keys the {@link CreateShopBlockEntity} reservation that protects the
-   * requested amount from being swept away by rack housekeeping before it's packaged.
+   * Gauge packaging task: items to extract from racks and send to the gauge address. {@code
+   * requestId} keys the {@link CreateShopBlockEntity} reservation that protects the requested
+   * amount from being swept away by rack housekeeping before it's packaged.
    */
   public record GaugePackagingTask(
       net.minecraft.world.item.ItemStack item,
@@ -519,7 +519,8 @@ public class BuildingCreateShop extends AbstractBuilding {
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}",
-            item, amount);
+            item,
+            amount);
       }
       return 0;
     }
@@ -528,14 +529,17 @@ public class BuildingCreateShop extends AbstractBuilding {
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=building-level-too-low item={} level={} required={}",
-            item.getItem(), getBuildingLevel(), minLevel);
+            item.getItem(),
+            getBuildingLevel(),
+            minLevel);
       }
       return 0;
     }
     IColony colony = getColony();
     if (colony == null) {
       if (isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[ColonyGauge] requestForGauge skip reason=no-colony item={}", item.getItem());
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=no-colony item={}", item.getItem());
       }
       return 0;
     }
@@ -555,7 +559,8 @@ public class BuildingCreateShop extends AbstractBuilding {
       return 0;
     }
     // Only place a colony request once we've confirmed the Colony Warehouse actually has the item
-    // — same check the perma-request system already uses (ShopPermaRequestManager.countInWarehouses).
+    // — same check the perma-request system already uses
+    // (ShopPermaRequestManager.countInWarehouses).
     // This is the whole point of the Gauge: pull from the Colony Warehouse, not Create's stock
     // network (vanilla Create Factory Gauges already cover that case).
     int available = ShopPermaRequestManager.countInWarehouses(this, item);
@@ -563,7 +568,8 @@ public class BuildingCreateShop extends AbstractBuilding {
       if (isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=nothing-in-warehouse item={} requested={}",
-            item.getItem(), amount);
+            item.getItem(),
+            amount);
       }
       return 0;
     }
@@ -607,7 +613,8 @@ public class BuildingCreateShop extends AbstractBuilding {
     } else if (isDebugRequests()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] requestForGauge skip reason=createAndAssignRequest-returned-null item={} amount={}",
-          item.getItem(), actualAmount);
+          item.getItem(),
+          actualAmount);
     }
     return token != null ? actualAmount : 0;
   }

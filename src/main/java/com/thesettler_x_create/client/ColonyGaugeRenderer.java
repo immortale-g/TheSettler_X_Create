@@ -23,8 +23,13 @@ public class ColonyGaugeRenderer extends SmartBlockEntityRenderer<ColonyGaugeBlo
   }
 
   @Override
-  protected void renderSafe(ColonyGaugeBlockEntity be, float partialTicks, PoseStack ms,
-      MultiBufferSource buffer, int light, int overlay) {
+  protected void renderSafe(
+      ColonyGaugeBlockEntity be,
+      float partialTicks,
+      PoseStack ms,
+      MultiBufferSource buffer,
+      int light,
+      int overlay) {
     super.renderSafe(be, partialTicks, ms, buffer, light, overlay);
     BlockState blockState = be.getBlockState();
     float xRot = FactoryPanelBlock.getXRot(blockState) + Mth.PI / 2;
@@ -34,7 +39,8 @@ public class ColonyGaugeRenderer extends SmartBlockEntityRenderer<ColonyGaugeBlo
       if (!behaviour.isActive()) continue;
 
       boolean lit = behaviour.satisfied || behaviour.promisedSatisfied;
-      PartialModel panelModel = lit ? ModPartialModels.COLONY_GAUGE_PANEL_WITH_BULB : ModPartialModels.COLONY_GAUGE_PANEL;
+      PartialModel panelModel =
+          lit ? ModPartialModels.COLONY_GAUGE_PANEL_WITH_BULB : ModPartialModels.COLONY_GAUGE_PANEL;
 
       CachedBuffers.partial(panelModel, blockState)
           .rotateCentered(yRot, Direction.UP)

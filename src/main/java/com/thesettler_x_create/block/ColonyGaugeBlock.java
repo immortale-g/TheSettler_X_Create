@@ -56,10 +56,11 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
   public ColonyGaugeBlock(Properties properties) {
     super(properties);
-    registerDefaultState(defaultBlockState()
-        .setValue(FACE, AttachFace.WALL)
-        .setValue(FACING, Direction.NORTH)
-        .setValue(POWERED, false));
+    registerDefaultState(
+        defaultBlockState()
+            .setValue(FACE, AttachFace.WALL)
+            .setValue(FACING, Direction.NORTH)
+            .setValue(POWERED, false));
   }
 
   @Override
@@ -75,7 +76,8 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (stateForPlacement == null) return null;
 
     if (stateForPlacement.getValue(FACE) == AttachFace.FLOOR)
-      stateForPlacement = stateForPlacement.setValue(FACING, stateForPlacement.getValue(FACING).getOpposite());
+      stateForPlacement =
+          stateForPlacement.setValue(FACING, stateForPlacement.getValue(FACING).getOpposite());
 
     Level level = pContext.getLevel();
     BlockPos pos = pContext.getClickedPos();
@@ -86,7 +88,8 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (existing.is(this) && location != null && be != null) {
       if (!level.isClientSide()) {
         ItemStack stack = pContext.getItemInHand();
-        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        CompoundTag data =
+            stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         if (data.contains("GaugeColonyId")) {
           PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, existing, location);
           int colonyId = data.getInt("GaugeColonyId");
@@ -111,7 +114,8 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
   @Override
   public boolean canSurvive(BlockState pState, LevelReader pLevel, BlockPos pPos) {
-    return FactoryPanelBlock.canAttachLenient(pLevel, pPos, getConnectedDirection(pState).getOpposite());
+    return FactoryPanelBlock.canAttachLenient(
+        pLevel, pPos, getConnectedDirection(pState).getOpposite());
   }
 
   @Override
@@ -128,8 +132,14 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
   // --- Interaction ---
 
   @Override
-  protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
-      Player player, InteractionHand hand, BlockHitResult hitResult) {
+  protected ItemInteractionResult useItemOn(
+      ItemStack stack,
+      BlockState state,
+      Level level,
+      BlockPos pos,
+      Player player,
+      InteractionHand hand,
+      BlockHitResult hitResult) {
     if (player == null) return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     if (level.isClientSide) return ItemInteractionResult.SUCCESS;
     if (!isGaugeStack(stack)) return ItemInteractionResult.SUCCESS;
@@ -137,7 +147,8 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
     if (!data.contains("GaugeColonyId")) {
       player.displayClientMessage(
-          Component.literal("Right-click a Create Shop hut first to link the gauge to a colony."), true);
+          Component.literal("Right-click a Create Shop hut first to link the gauge to a colony."),
+          true);
       return ItemInteractionResult.FAIL;
     }
 
@@ -149,14 +160,17 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     String dimension = data.getString("GaugeDimension");
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, state, location);
 
-    withBlockEntityDo(level, pos, be -> {
-      if (!be.addPanel(slot, colonyId, shopPos, dimension)) return;
-      level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
-      if (!player.isCreative()) {
-        stack.shrink(1);
-        if (stack.isEmpty()) player.setItemInHand(hand, ItemStack.EMPTY);
-      }
-    });
+    withBlockEntityDo(
+        level,
+        pos,
+        be -> {
+          if (!be.addPanel(slot, colonyId, shopPos, dimension)) return;
+          level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
+          if (!player.isCreative()) {
+            stack.shrink(1);
+            if (stack.isEmpty()) player.setItemInHand(hand, ItemStack.EMPTY);
+          }
+        });
     return ItemInteractionResult.SUCCESS;
   }
 
@@ -168,24 +182,33 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (!(world instanceof ServerLevel)) return InteractionResult.SUCCESS;
 
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, state, context.getClickLocation());
-    return onBlockEntityUse(world, pos, be -> {
-      ColonyGaugeBehaviour behaviour = be.panels.get(slot);
-      if (behaviour == null || !behaviour.isActive()) return InteractionResult.SUCCESS;
+    return onBlockEntityUse(
+        world,
+        pos,
+        be -> {
+          ColonyGaugeBehaviour behaviour = be.panels.get(slot);
+          if (behaviour == null || !behaviour.isActive()) return InteractionResult.SUCCESS;
 
-      if (!be.removePanel(slot)) return InteractionResult.SUCCESS;
+          if (!be.removePanel(slot)) return InteractionResult.SUCCESS;
 
-      if (!player.isCreative())
-        player.getInventory().placeItemBackInInventory(ModItems.COLONY_GAUGE.get().getDefaultInstance());
+          if (!player.isCreative())
+            player
+                .getInventory()
+                .placeItemBackInInventory(ModItems.COLONY_GAUGE.get().getDefaultInstance());
 
-      IWrenchable.playRemoveSound(world, pos);
-      if (be.activePanels() == 0) world.destroyBlock(pos, false);
-      return InteractionResult.SUCCESS;
-    });
+          IWrenchable.playRemoveSound(world, pos);
+          if (be.activePanels() == 0) world.destroyBlock(pos, false);
+          return InteractionResult.SUCCESS;
+        });
   }
 
   @Override
-  public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState,
-      @Nullable LivingEntity pPlacer, ItemStack pStack) {
+  public void setPlacedBy(
+      Level pLevel,
+      BlockPos pPos,
+      BlockState pState,
+      @Nullable LivingEntity pPlacer,
+      ItemStack pStack) {
     super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
     if (pPlacer == null || pLevel.isClientSide()) return;
 
@@ -206,30 +229,41 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
   }
 
   @Override
-  public boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player,
-      boolean willHarvest, FluidState fluid) {
+  public boolean onDestroyedByPlayer(
+      BlockState state,
+      Level level,
+      BlockPos pos,
+      Player player,
+      boolean willHarvest,
+      FluidState fluid) {
     if (tryDestroySubPanelFirst(state, level, pos, player)) return false;
     return super.onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
   }
 
-  private boolean tryDestroySubPanelFirst(BlockState state, Level level, BlockPos pos, Player player) {
+  private boolean tryDestroySubPanelFirst(
+      BlockState state, Level level, BlockPos pos, Player player) {
     double range = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) + 1;
     HitResult hitResult = player.pick(range, 1, false);
     Vec3 location = hitResult.getLocation();
     PanelSlot destroyedSlot = FactoryPanelBlock.getTargetedSlot(pos, state, location);
-    return InteractionResult.SUCCESS == onBlockEntityUse(level, pos, be -> {
-      if (be.activePanels() < 2) return InteractionResult.FAIL;
-      if (!be.removePanel(destroyedSlot)) return InteractionResult.FAIL;
-      if (!player.isCreative())
-        popResource(level, pos, ModItems.COLONY_GAUGE.get().getDefaultInstance());
-      return InteractionResult.SUCCESS;
-    });
+    return InteractionResult.SUCCESS
+        == onBlockEntityUse(
+            level,
+            pos,
+            be -> {
+              if (be.activePanels() < 2) return InteractionResult.FAIL;
+              if (!be.removePanel(destroyedSlot)) return InteractionResult.FAIL;
+              if (!player.isCreative())
+                popResource(level, pos, ModItems.COLONY_GAUGE.get().getDefaultInstance());
+              return InteractionResult.SUCCESS;
+            });
   }
 
   // --- Shape ---
 
   @Override
-  public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
+  public VoxelShape getShape(
+      BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
     ColonyGaugeBlockEntity be = getBlockEntity(pLevel, pPos);
     if (be != null) {
       VoxelShape shape = be.getShape();
@@ -239,8 +273,8 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
   }
 
   @Override
-  public VoxelShape getCollisionShape(BlockState pState, BlockGetter pLevel, BlockPos pPos,
-      CollisionContext pContext) {
+  public VoxelShape getCollisionShape(
+      BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
     if (pContext instanceof EntityCollisionContext ecc && ecc.getEntity() == null)
       return getShape(pState, pLevel, pPos, pContext);
     return Shapes.empty();
@@ -259,14 +293,18 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
   }
 
   @Override
-  public int getDirectSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
-    return state.getValue(POWERED) && FactoryPanelBlock.connectedDirection(state) == direction ? 15 : 0;
+  public int getDirectSignal(
+      BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+    return state.getValue(POWERED) && FactoryPanelBlock.connectedDirection(state) == direction
+        ? 15
+        : 0;
   }
 
   // --- IBE / Block ---
 
   @Override
-  public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+  public void onRemove(
+      BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
     IBE.onRemove(state, level, pos, newState);
   }
 

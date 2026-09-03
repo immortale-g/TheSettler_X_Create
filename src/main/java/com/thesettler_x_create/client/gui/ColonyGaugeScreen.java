@@ -40,7 +40,8 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
   protected void init() {
     int sizeX = AllGuiTextures.FACTORY_GAUGE_BOTTOM.getWidth();
     int sizeY =
-        AllGuiTextures.FACTORY_GAUGE_RESTOCK.getHeight() + AllGuiTextures.FACTORY_GAUGE_BOTTOM.getHeight();
+        AllGuiTextures.FACTORY_GAUGE_RESTOCK.getHeight()
+            + AllGuiTextures.FACTORY_GAUGE_BOTTOM.getHeight();
     setWindowSize(sizeX, sizeY);
     super.init();
     clearWidgets();
@@ -109,16 +110,21 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
     // restocker texture drawn on top of it (same trick Create's FactoryPanelScreen uses).
     AllGuiTextures.FACTORY_GAUGE_RECIPE.render(graphics, x, y - 16);
     AllGuiTextures.FACTORY_GAUGE_RESTOCK.render(graphics, x, y);
-    AllGuiTextures.FACTORY_GAUGE_BOTTOM.render(graphics, x, y + AllGuiTextures.FACTORY_GAUGE_RESTOCK.getHeight());
+    AllGuiTextures.FACTORY_GAUGE_BOTTOM.render(
+        graphics, x, y + AllGuiTextures.FACTORY_GAUGE_RESTOCK.getHeight());
 
-    Component title = Component.translatable("com.thesettler_x_create.gui.colony_gauge.settings_title");
+    Component title =
+        Component.translatable("com.thesettler_x_create.gui.colony_gauge.settings_title");
     graphics.drawString(font, title, x + 97 - font.width(title) / 2, y - 12, 0x3D3C48, false);
 
     // Item currently requested, shown in the bracket baked into the FACTORY_GAUGE_RESTOCK texture.
     int inputX = x + 88;
     int inputY = y + 12;
     graphics.renderItem(behaviour.getFilter(), inputX, inputY);
-    if (mouseX >= inputX - 2 && mouseX < inputX + 18 && mouseY >= inputY - 2 && mouseY < inputY + 18) {
+    if (mouseX >= inputX - 2
+        && mouseX < inputX + 18
+        && mouseY >= inputY - 2
+        && mouseY < inputY + 18) {
       graphics.renderComponentTooltip(
           font,
           List.of(
@@ -137,7 +143,10 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
         .at(0, 0, -200)
         .render(graphics, x + 195, y + 55);
     if (!behaviour.getFilter().isEmpty()) {
-      GuiGameElement.of(behaviour.getFilter()).scale(1.625).at(0, 0, 100).render(graphics, x + 214, y + 68);
+      GuiGameElement.of(behaviour.getFilter())
+          .scale(1.625)
+          .at(0, 0, 100)
+          .render(graphics, x + 214, y + 68);
     }
 
     // Expiration value text, drawn over the scroll box.
@@ -158,7 +167,10 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
     int promised = behaviour.getPromised();
     graphics.renderItemDecorations(font, promiseStack, promiseX, promiseY, promised + "");
 
-    if (mouseX >= promiseX && mouseX < promiseX + 16 && mouseY >= promiseY && mouseY < promiseY + 16) {
+    if (mouseX >= promiseX
+        && mouseX < promiseX + 16
+        && mouseY >= promiseY
+        && mouseY < promiseY + 16) {
       if (promised == 0) {
         graphics.renderComponentTooltip(
             font,
@@ -184,7 +196,10 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
   public boolean mouseClicked(double mouseX, double mouseY, int button) {
     int promiseX = guiLeft + 68;
     int promiseY = guiTop + windowHeight - 24;
-    if (mouseX >= promiseX && mouseX < promiseX + 16 && mouseY >= promiseY && mouseY < promiseY + 16) {
+    if (mouseX >= promiseX
+        && mouseX < promiseX + 16
+        && mouseY >= promiseY
+        && mouseY < promiseY + 16) {
       sendClearPromises = true;
       sendConfig();
       sendClearPromises = false;
