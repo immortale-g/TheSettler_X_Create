@@ -125,10 +125,10 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
     }
   }
 
-  public boolean addPanel(PanelSlot slot, int colonyId, BlockPos shopPos, String dimension) {
+  public boolean addPanel(PanelSlot slot, int colonyId, BlockPos shopPos) {
     ColonyGaugeBehaviour behaviour = panels.get(slot);
     if (behaviour != null && !behaviour.isActive()) {
-      behaviour.enable(colonyId, shopPos, dimension);
+      behaviour.enable(colonyId, shopPos);
       redraw = true;
       lastShape = null;
       return true;

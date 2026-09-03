@@ -1,11 +1,8 @@
 package com.thesettler_x_create.tools;
 
 import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 
 /** CLI tool that dumps key metadata fields from a Structurize/MineColonies blueprint NBT. */
@@ -23,20 +20,15 @@ public final class BlueprintDump {
     }
 
     Path path = Path.of(args[0]);
-    String validation = validatePath(path);
+    String validation = BlueprintToolSupport.validatePath(path, false);
     if (validation != null) {
       err.println(validation);
       return 3;
     }
-    warnIfNotBlueprint(path, err);
+    BlueprintToolSupport.warnIfNotBlueprint(path, err);
 
-    CompoundTag tag;
-    try {
-      tag = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
-    } catch (Exception ex) {
-      err.println(
-          "Failed to read blueprint NBT: "
-              + (ex.getMessage() == null ? "<unknown>" : ex.getMessage()));
+    CompoundTag tag = BlueprintToolSupport.readCompressed(path, err);
+    if (tag == null) {
       return 4;
     }
 
@@ -58,29 +50,6 @@ public final class BlueprintDump {
     dumpNested(out, tag, "optional_data");
     dumpNested(out, tag, "blueprintDataProvider");
     return 0;
-  }
-
-  private static String validatePath(Path path) {
-    if (path == null) {
-      return "Path is required.";
-    }
-    if (!Files.exists(path)) {
-      return "Blueprint file does not exist: " + path;
-    }
-    if (!Files.isRegularFile(path)) {
-      return "Blueprint path is not a file: " + path;
-    }
-    if (!Files.isReadable(path)) {
-      return "Blueprint file is not readable: " + path;
-    }
-    return null;
-  }
-
-  private static void warnIfNotBlueprint(Path path, PrintStream err) {
-    String name = path.getFileName() == null ? "" : path.getFileName().toString();
-    if (!name.endsWith(".blueprint")) {
-      err.println("Warning: file does not end with .blueprint (" + name + ")");
-    }
   }
 
   private static void dumpKey(PrintStream out, CompoundTag tag, String key) {

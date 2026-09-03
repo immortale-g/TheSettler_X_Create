@@ -57,14 +57,6 @@ final class CreateShopResolverCooldown {
     return resolver.getPendingTracker().size();
   }
 
-  boolean hasOrderedRequests() {
-    return resolver.getPendingTracker().hasEntries();
-  }
-
-  java.util.Set<IToken<?>> getOrderedTokens() {
-    return resolver.getPendingTracker().getTokens();
-  }
-
   private static boolean isDebugLoggingEnabled() {
     try {
       return Config.DEBUG_LOGGING.getAsBoolean();

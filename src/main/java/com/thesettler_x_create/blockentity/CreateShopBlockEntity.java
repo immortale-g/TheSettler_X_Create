@@ -624,31 +624,6 @@ public class CreateShopBlockEntity extends BlockEntity {
     return remaining;
   }
 
-  //    public int consumeReserved(ItemStack key, int amount) {
-  //        if (amount <= 0) {
-  //            return 0;
-  //        }
-  //        cleanExpired();
-  //        int remaining = amount;
-  //        Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
-  //        while (iterator.hasNext() && remaining > 0) {
-  //            Reservation reservation = iterator.next().getValue();
-  //            if (!matches(reservation.stackKey, key)) {
-  //                continue;
-  //            }
-  //            int taken = Math.min(remaining, reservation.reservedAmount);
-  //            reservation.reservedAmount -= taken;
-  //            remaining -= taken;
-  //            if (reservation.reservedAmount <= 0) {
-  //                iterator.remove();
-  //            }
-  //        }
-  //        if (remaining != amount) {
-  //            setChanged();
-  //        }
-  //        return amount - remaining;
-  //    }
-
   public java.util.List<ItemStack> getReservedStacksSnapshot() {
     cleanExpired();
     java.util.List<ItemStack> stacks = new java.util.ArrayList<>();

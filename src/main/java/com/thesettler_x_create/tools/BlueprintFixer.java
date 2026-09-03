@@ -1,11 +1,8 @@
 package com.thesettler_x_create.tools;
 
 import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
 
 /** CLI tool that edits blueprint NBT fields (schematicName and level). */
 public final class BlueprintFixer {
@@ -25,12 +22,12 @@ public final class BlueprintFixer {
     String baseName = args[1];
     String levelArg = args[2];
 
-    String validation = validatePath(path);
+    String validation = BlueprintToolSupport.validatePath(path, true);
     if (validation != null) {
       err.println(validation);
       return 3;
     }
-    warnIfNotBlueprint(path, err);
+    BlueprintToolSupport.warnIfNotBlueprint(path, err);
 
     if (baseName == null || baseName.isEmpty()) {
       err.println("baseName must be non-empty or '-'");
@@ -51,13 +48,8 @@ public final class BlueprintFixer {
       }
     }
 
-    CompoundTag tag;
-    try {
-      tag = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
-    } catch (Exception ex) {
-      err.println(
-          "Failed to read blueprint NBT: "
-              + (ex.getMessage() == null ? "<unknown>" : ex.getMessage()));
+    CompoundTag tag = BlueprintToolSupport.readCompressed(path, err);
+    if (tag == null) {
       return 5;
     }
     String oldName = tag.getString("schematicName");
@@ -78,12 +70,7 @@ public final class BlueprintFixer {
       tag.putString("name", baseName);
     }
 
-    try {
-      NbtIo.writeCompressed(tag, path);
-    } catch (Exception ex) {
-      err.println(
-          "Failed to write blueprint NBT: "
-              + (ex.getMessage() == null ? "<unknown>" : ex.getMessage()));
+    if (!BlueprintToolSupport.writeCompressed(tag, path, err)) {
       return 6;
     }
     out.println(
@@ -97,31 +84,5 @@ public final class BlueprintFixer {
             + levelArg
             + ")");
     return 0;
-  }
-
-  private static String validatePath(Path path) {
-    if (path == null) {
-      return "Path is required.";
-    }
-    if (!Files.exists(path)) {
-      return "Blueprint file does not exist: " + path;
-    }
-    if (!Files.isRegularFile(path)) {
-      return "Blueprint path is not a file: " + path;
-    }
-    if (!Files.isReadable(path)) {
-      return "Blueprint file is not readable: " + path;
-    }
-    if (!Files.isWritable(path)) {
-      return "Blueprint file is not writable: " + path;
-    }
-    return null;
-  }
-
-  private static void warnIfNotBlueprint(Path path, PrintStream err) {
-    String name = path.getFileName() == null ? "" : path.getFileName().toString();
-    if (!name.endsWith(".blueprint")) {
-      err.println("Warning: file does not end with .blueprint (" + name + ")");
-    }
   }
 }

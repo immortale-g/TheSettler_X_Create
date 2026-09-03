@@ -190,7 +190,10 @@ public class CreateShopTaskModuleWindow extends AbstractModuleWindow<CreateShopT
   }
 
   private String sanitize(String value) {
-    return value.replace("\u5442", "");
+    // Strips the Minecraft "reset to white" formatting code MineColonies embeds in
+    // IRequest#getShortDisplayString(), matching WindowHutRequestTaskModule's own
+    // request.getShortDisplayString().getString().replace("\u00a7f", "").
+    return value.replace("\u00a7f", "");
   }
 
   private void updatePriority(Pane row, IRequest<?> request) {

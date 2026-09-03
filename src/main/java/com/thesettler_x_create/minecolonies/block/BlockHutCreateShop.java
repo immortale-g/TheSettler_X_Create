@@ -57,7 +57,6 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
               stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
           tag.putInt("GaugeColonyId", shop.getColony().getID());
           tag.putLong("GaugeShopPos", pos.asLong());
-          tag.putString("GaugeDimension", level.dimension().location().toString());
           stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
           player.displayClientMessage(
               Component.literal("Colony Gauge linked to shop. Now place it near a Frogport."),

@@ -94,8 +94,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
           PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, existing, location);
           int colonyId = data.getInt("GaugeColonyId");
           BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-          String dimension = data.getString("GaugeDimension");
-          if (be.addPanel(slot, colonyId, shopPos, dimension)) {
+          if (be.addPanel(slot, colonyId, shopPos)) {
             level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
             Player player = pContext.getPlayer();
             if (player != null && !player.isCreative()) {
@@ -157,14 +156,13 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
     int colonyId = data.getInt("GaugeColonyId");
     BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-    String dimension = data.getString("GaugeDimension");
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, state, location);
 
     withBlockEntityDo(
         level,
         pos,
         be -> {
-          if (!be.addPanel(slot, colonyId, shopPos, dimension)) return;
+          if (!be.addPanel(slot, colonyId, shopPos)) return;
           level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
           if (!player.isCreative()) {
             stack.shrink(1);
@@ -217,7 +215,6 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
 
     int colonyId = data.getInt("GaugeColonyId");
     BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-    String dimension = data.getString("GaugeDimension");
 
     double range = pPlacer.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) + 1;
     HitResult hitResult = pPlacer.pick(range, 1, false);
@@ -225,7 +222,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (location == null) return;
 
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pPos, pState, location);
-    withBlockEntityDo(pLevel, pPos, be -> be.addPanel(slot, colonyId, shopPos, dimension));
+    withBlockEntityDo(pLevel, pPos, be -> be.addPanel(slot, colonyId, shopPos));
   }
 
   @Override
