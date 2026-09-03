@@ -54,14 +54,7 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   @Nullable
   public TileEntityCreateShop getShopTile() {
-    if (level == null || shopPos == null) {
-      return null;
-    }
-    BlockEntity be = level.getBlockEntity(shopPos);
-    if (be instanceof TileEntityCreateShop shop) {
-      return shop;
-    }
-    return null;
+    return TileEntityCreateShop.fromLevel(level, shopPos);
   }
 
   /** Reserve items for a specific request to avoid duplicate ordering. */
@@ -804,11 +797,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   }
 
   private static String sanitize(String value) {
-    if (value == null) {
-      return "";
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
+    return com.thesettler_x_create.TextUtil.sanitize(value);
   }
 
   private static String buildNoticeSegmentKey(

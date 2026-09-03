@@ -51,7 +51,9 @@ public class StockLinkLinkerItem extends Item {
         stack.remove(DataComponents.CUSTOM_DATA);
         context
             .getPlayer()
-            .displayClientMessage(Component.literal("Stock-Link linker reset."), true);
+            .displayClientMessage(
+                Component.translatable("com.thesettler_x_create.message.network_link_tuner.reset"),
+                true);
       }
       return InteractionResult.CONSUME;
     }
@@ -84,7 +86,9 @@ public class StockLinkLinkerItem extends Item {
       stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
       context
           .getPlayer()
-          .displayClientMessage(Component.literal("Stock-Link network stored."), true);
+          .displayClientMessage(
+              Component.translatable("com.thesettler_x_create.message.network_link_tuner.stored"),
+              true);
       return InteractionResult.CONSUME;
     }
 
@@ -94,7 +98,9 @@ public class StockLinkLinkerItem extends Item {
       context
           .getPlayer()
           .displayClientMessage(
-              Component.literal("Stock-Link is already linked to this network."), true);
+              Component.translatable(
+                  "com.thesettler_x_create.message.network_link_tuner.already_linked"),
+              true);
       return InteractionResult.CONSUME;
     }
 
@@ -126,7 +132,9 @@ public class StockLinkLinkerItem extends Item {
 
     context
         .getPlayer()
-        .displayClientMessage(Component.literal("Stock-Link linked to the new network."), true);
+        .displayClientMessage(
+            Component.translatable("com.thesettler_x_create.message.network_link_tuner.relinked"),
+            true);
     return InteractionResult.CONSUME;
   }
 
@@ -141,7 +149,9 @@ public class StockLinkLinkerItem extends Item {
     if (player.isShiftKeyDown()) {
       if (!level.isClientSide) {
         stack.remove(DataComponents.CUSTOM_DATA);
-        player.displayClientMessage(Component.literal("Stock-Link linker reset."), true);
+        player.displayClientMessage(
+            Component.translatable("com.thesettler_x_create.message.network_link_tuner.reset"),
+            true);
       }
       return InteractionResultHolder.consume(stack);
     }
@@ -153,12 +163,21 @@ public class StockLinkLinkerItem extends Item {
       ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
     CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
     if (tag.hasUUID(FREQ_TAG)) {
-      tooltip.add(Component.literal("Stored network: " + tag.getUUID(FREQ_TAG)));
-      tooltip.add(Component.literal("Right-click: apply to Stock-Link"));
-      tooltip.add(Component.literal("Shift + right-click: reset linker"));
+      tooltip.add(
+          Component.translatable(
+              "com.thesettler_x_create.item.network_link_tuner.tooltip.stored_network",
+              tag.getUUID(FREQ_TAG)));
+      tooltip.add(
+          Component.translatable("com.thesettler_x_create.item.network_link_tuner.tooltip.apply"));
+      tooltip.add(
+          Component.translatable(
+              "com.thesettler_x_create.item.network_link_tuner.tooltip.reset_hint"));
     } else {
-      tooltip.add(Component.literal("Right-click: store network from Stock-Link"));
-      tooltip.add(Component.literal("Shift + right-click: reset linker"));
+      tooltip.add(
+          Component.translatable("com.thesettler_x_create.item.network_link_tuner.tooltip.store"));
+      tooltip.add(
+          Component.translatable(
+              "com.thesettler_x_create.item.network_link_tuner.tooltip.reset_hint"));
     }
   }
 }

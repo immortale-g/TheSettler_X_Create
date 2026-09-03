@@ -25,8 +25,8 @@ public class ColonyGaugeBlockItem extends BlockItem {
         context
             .getPlayer()
             .displayClientMessage(
-                Component.literal(
-                    "Right-click a Create Shop hut first to link the gauge to a colony."),
+                Component.translatable(
+                    "com.thesettler_x_create.message.colony_gauge.link_shop_first"),
                 true);
       }
       return InteractionResult.FAIL;

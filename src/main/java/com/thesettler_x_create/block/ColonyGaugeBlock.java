@@ -146,7 +146,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
     if (!data.contains("GaugeColonyId")) {
       player.displayClientMessage(
-          Component.literal("Right-click a Create Shop hut first to link the gauge to a colony."),
+          Component.translatable("com.thesettler_x_create.message.colony_gauge.link_shop_first"),
           true);
       return ItemInteractionResult.FAIL;
     }
