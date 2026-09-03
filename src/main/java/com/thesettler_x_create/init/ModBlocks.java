@@ -1,6 +1,8 @@
 package com.thesettler_x_create.init;
 
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.block.ColonyGaugeBlock;
+import com.thesettler_x_create.block.ColonyPackagerBlock;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.minecolonies.block.BlockHutCreateShop;
@@ -29,6 +31,14 @@ public final class ModBlocks {
       BLOCKS.register(
           "create_shop_output",
           () -> new CreateShopOutputBlock(BlockBehaviour.Properties.of().strength(1.5f)));
+  public static final DeferredBlock<ColonyGaugeBlock> COLONY_GAUGE =
+      BLOCKS.register(
+          "colony_gauge",
+          () -> new ColonyGaugeBlock(BlockBehaviour.Properties.of().strength(1.5f).noOcclusion().forceSolidOn()));
+  public static final DeferredBlock<ColonyPackagerBlock> COLONY_PACKAGER =
+      BLOCKS.register(
+          "colony_packager",
+          () -> new ColonyPackagerBlock(BlockBehaviour.Properties.of().strength(1.5f).noOcclusion()));
 
   public static void register(IEventBus bus) {
     BLOCKS.register(bus);

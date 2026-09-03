@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CBC",
+    "CAC",
+    "RCR"
+  ],
+  "key": {
+    "A": { "item": "create:cardboard_block" },
+    "C": { "tag": "c:ingots/iron" },
+    "R": { "tag": "c:dusts/redstone" },
+    "B": { "item": "structurize:sceptergold" }
+  },
+  "result": {
+    "count": 1,
+    "id": "thesettler_x_create:colony_packager"
+  }
+}

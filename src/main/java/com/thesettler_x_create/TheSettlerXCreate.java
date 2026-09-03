@@ -124,6 +124,13 @@ public class TheSettlerXCreate {
         Capabilities.ItemHandler.BLOCK,
         ModBlockEntities.CREATE_SHOP_OUTPUT.get(),
         (be, side) -> be.getItemHandler(side));
+    // Without this, funnels/belts can't find an inventory on our packager at all — it's a
+    // different BlockEntityType than Create's own PACKAGER, so Create's own capability
+    // registration (keyed to its BlockEntityType) never applies to ours.
+    event.registerBlockEntity(
+        Capabilities.ItemHandler.BLOCK,
+        ModBlockEntities.COLONY_PACKAGER.get(),
+        (be, side) -> be.inventory);
   }
 
   @SubscribeEvent
@@ -161,6 +168,8 @@ public class TheSettlerXCreate {
       event.accept(ModItems.NETWORK_LINK_TUNER);
       event.accept(ModItems.CREATE_SHOP_PICKUP);
       event.accept(ModItems.CREATE_SHOP_OUTPUT);
+      event.accept(ModItems.COLONY_GAUGE);
+      event.accept(ModItems.COLONY_PACKAGER);
     }
     if (event.getTabKey() == com.minecolonies.api.creativetab.ModCreativeTabs.HUTS.getKey()) {
       event.accept(ModItems.HUT_CREATE_SHOP);

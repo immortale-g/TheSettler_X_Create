@@ -2,10 +2,13 @@ package com.thesettler_x_create.network;
 
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
 import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
 import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
+import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +53,10 @@ public final class ModNetwork {
         SetPackagerAddressPayload.TYPE,
         SetPackagerAddressPayload.STREAM_CODEC,
         ModNetwork::handleSetPackagerAddress);
+    registrar.playToServer(
+        ColonyGaugeConfigPacket.TYPE,
+        ColonyGaugeConfigPacket.STREAM_CODEC,
+        ModNetwork::handleColonyGaugeConfig);
   }
 
   private static void handleSetAddress(
@@ -210,6 +217,62 @@ public final class ModNetwork {
               building.getOutputBlockEntity();
           if (obe != null) {
             obe.setPackageAddress(payload.address());
+          }
+        });
+  }
+
+  private static void handleColonyGaugeConfig(
+      ColonyGaugeConfigPacket payload, IPayloadContext context) {
+    context.enqueueWork(
+        () -> {
+          boolean debug = com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean();
+          if (!(context.player() instanceof ServerPlayer player)) {
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet skip reason=no-server-player");
+            }
+            return;
+          }
+          FactoryPanelPosition position = payload.position();
+          if (!(player.level().getBlockEntity(position.pos())
+              instanceof ColonyGaugeBlockEntity be)) {
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet skip reason=no-block-entity pos={}", position.pos());
+            }
+            return;
+          }
+          ColonyGaugeBehaviour behaviour = be.panels.get(position.slot());
+          if (behaviour == null || !behaviour.isActive()) {
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet skip reason=behaviour-inactive-or-null pos={} slot={}",
+                  position.pos(), position.slot());
+            }
+            return;
+          }
+          if (payload.reset()) {
+            behaviour.resetFilter();
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet applied reset pos={} slot={}", position.pos(), position.slot());
+            }
+            return;
+          }
+          behaviour.setManualAddress(payload.address());
+          behaviour.setPromiseClearingInterval(payload.promiseClearingInterval());
+          if (payload.clearPromises()) {
+            behaviour.forceClearPromises();
+          }
+          if (debug) {
+            TheSettlerXCreate.LOGGER.info(
+                "[ColonyGauge] config packet applied address='{}' promiseClearingInterval={} clearPromises={} pos={} slot={} -> manualAddress={}",
+                payload.address(),
+                payload.promiseClearingInterval(),
+                payload.clearPromises(),
+                position.pos(),
+                position.slot(),
+                behaviour.manualAddress);
           }
         });
   }

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
+        { "condition": "minecraft:survives_explosion" }
+      ],
+      "entries": [
+        { "type": "minecraft:item", "name": "thesettler_x_create:colony_packager" }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "thesettler_x_create:blocks/colony_packager"
+}

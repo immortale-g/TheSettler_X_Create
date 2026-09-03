@@ -125,7 +125,7 @@ final class ShopPermaRequestManager {
         continue;
       }
       ItemStack stack = new ItemStack(item, 1);
-      int available = countInWarehouses(stack);
+      int available = countInWarehouses(shop, stack);
       int pending = permaPendingCounts.getOrDefault(itemId, 0);
       int requestable = Math.max(0, available - pending);
       if (BuildingCreateShop.isDebugRequests()) {
@@ -248,7 +248,13 @@ final class ShopPermaRequestManager {
     }
   }
 
-  private int countInWarehouses(ItemStack stack) {
+  /**
+   * Sums matching item stacks across all of the colony's MineColonies warehouses (excluding
+   * {@code shop} itself, in case it is ever registered as one). Shared with {@link
+   * BuildingCreateShop#requestForGauge} so Gauge requests only get created when the warehouse
+   * actually has stock — mirrors how perma-requests already work.
+   */
+  static int countInWarehouses(BuildingCreateShop shop, ItemStack stack) {
     if (stack == null || stack.isEmpty() || shop.getColony() == null) {
       return 0;
     }
@@ -280,7 +286,7 @@ final class ShopPermaRequestManager {
     return Math.max(0, total);
   }
 
-  private boolean matchesStack(ItemStack candidate, ItemStack target) {
+  private static boolean matchesStack(ItemStack candidate, ItemStack target) {
     if (candidate == null || target == null) {
       return false;
     }

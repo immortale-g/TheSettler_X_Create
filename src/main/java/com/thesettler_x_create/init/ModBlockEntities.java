@@ -1,6 +1,8 @@
 package com.thesettler_x_create.init;
 
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
+import com.thesettler_x_create.blockentity.ColonyPackagerBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -40,6 +42,22 @@ public final class ModBlockEntities {
               () ->
                   BlockEntityType.Builder.of(
                           CreateShopOutputBlockEntity::new, ModBlocks.CREATE_SHOP_OUTPUT.get())
+                      .build(null));
+  public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ColonyGaugeBlockEntity>>
+      COLONY_GAUGE =
+          BLOCK_ENTITIES.register(
+              "colony_gauge",
+              () ->
+                  BlockEntityType.Builder.of(
+                          ColonyGaugeBlockEntity::new, ModBlocks.COLONY_GAUGE.get())
+                      .build(null));
+  public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ColonyPackagerBlockEntity>>
+      COLONY_PACKAGER =
+          BLOCK_ENTITIES.register(
+              "colony_packager",
+              () ->
+                  BlockEntityType.Builder.of(
+                          ColonyPackagerBlockEntity::new, ModBlocks.COLONY_PACKAGER.get())
                       .build(null));
 
   public static void register(IEventBus bus) {

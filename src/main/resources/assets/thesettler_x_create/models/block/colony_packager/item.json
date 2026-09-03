@@ -1,0 +1,10 @@
+{
+  "parent": "create:block/packager/item",
+  "textures": {
+    "0": "thesettler_x_create:block/colony_packager_frame",
+    "1": "thesettler_x_create:block/colony_packager_details",
+    "2": "thesettler_x_create:block/colony_packager_horizontal_unpowered",
+    "3": "thesettler_x_create:block/colony_packager_iris_closed",
+    "particle": "thesettler_x_create:block/colony_packager_particle"
+  }
+}
