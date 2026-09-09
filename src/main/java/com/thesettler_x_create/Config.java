@@ -78,5 +78,14 @@ public class Config {
           .comment("Cooldown (ticks) between performance timing summaries.")
           .defineInRange("perfLogCooldown", 200L, 0L, 24000L);
 
+  public static final ModConfigSpec.BooleanValue ENABLE_DEV_TEST_COMMANDS =
+      BUILDER
+          .comment(
+              "Enable the /thesettlerxcreate dev/test-harness commands (run_live_test,"
+                  + " auto_test_harness*, diag_*, test_output_packaging). These create fake"
+                  + " requests and inflight data in live colonies and are meant for development"
+                  + " servers only, so they default to disabled even for operators.")
+          .define("enableDevTestCommands", false);
+
   static final ModConfigSpec SPEC = BUILDER.build();
 }

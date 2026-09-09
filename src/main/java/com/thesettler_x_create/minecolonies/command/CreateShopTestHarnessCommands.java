@@ -29,7 +29,7 @@ final class CreateShopTestHarnessCommands {
   static int runAutoHarnessStart(
       CommandSourceStack source, int requests, int amount, boolean forceWarehouseQueue) {
     CreateShopResetCommands.ResetLiveStateResult reset =
-        CreateShopResetCommands.resetLiveState(forceWarehouseQueue);
+        CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
     CreateShopDiagnosticCommands.LiveTestResult live =
         CreateShopDiagnosticCommands.runLiveTest(requests, amount);
     HarnessSnapshot snapshot = collectHarnessSnapshot();
@@ -220,7 +220,7 @@ final class CreateShopTestHarnessCommands {
     int errors = 0;
     for (int i = 0; i < safeRounds; i++) {
       CreateShopResetCommands.ResetLiveStateResult reset =
-          CreateShopResetCommands.resetLiveState(forceWarehouseQueue);
+          CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
       CreateShopDiagnosticCommands.LiveTestResult live =
           CreateShopDiagnosticCommands.runLiveTest(requestsPerRound, amount);
       createdTotal += live.created;
@@ -278,7 +278,7 @@ final class CreateShopTestHarnessCommands {
 
     for (int i = 0; i < safeRounds; i++) {
       CreateShopResetCommands.ResetLiveStateResult reset =
-          CreateShopResetCommands.resetLiveState(forceWarehouseQueue);
+          CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
       CreateShopDiagnosticCommands.LiveTestResult live =
           CreateShopDiagnosticCommands.runLiveTest(requestsPerRound, amount);
       createdTotal += live.created;
@@ -414,8 +414,7 @@ final class CreateShopTestHarnessCommands {
         continue;
       }
       java.util.Set<IToken<?>> assigned =
-          CreateShopResetCommands.collectAssignedRequestTokens(standard);
-      // Note: collectAssignedRequestTokens is package-private in CreateShopResetCommands
+          CreateShopCommandSupport.collectAssignedRequestTokens(standard);
       snapshot.assignmentEntries += assigned.size();
       for (IToken<?> token : assigned) {
         if (token == null) {
@@ -424,16 +423,16 @@ final class CreateShopTestHarnessCommands {
         try {
           var request = standard.getRequestHandler().getRequestOrNull(token);
           if (request == null
-              || !CreateShopResetCommands.isCreateShopOwnedRequest(standard, request)) {
+              || !CreateShopCommandSupport.isCreateShopOwnedRequest(standard, request)) {
             continue;
           }
           if (request.hasParent()) {
-            if (CreateShopResetCommands.isTerminalState(request.getState())) {
+            if (CreateShopCommandSupport.isTerminalState(request.getState())) {
               snapshot.childrenTerminal++;
             } else {
               snapshot.childrenActive++;
             }
-          } else if (CreateShopResetCommands.isTerminalState(request.getState())) {
+          } else if (CreateShopCommandSupport.isTerminalState(request.getState())) {
             snapshot.rootsTerminal++;
           } else {
             snapshot.rootsActive++;
@@ -443,7 +442,7 @@ final class CreateShopTestHarnessCommands {
         }
       }
 
-      java.util.Set<BuildingCreateShop> shops = CreateShopResetCommands.collectCreateShops(colony);
+      java.util.Set<BuildingCreateShop> shops = CreateShopCommandSupport.collectCreateShops(colony);
       snapshot.shops += shops.size();
 
       var buildingManager = colony.getServerBuildingManager();

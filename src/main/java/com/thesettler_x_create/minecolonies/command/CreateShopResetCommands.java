@@ -1,101 +1,38 @@
 package com.thesettler_x_create.minecolonies.command;
 
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
-import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
-import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
+import net.minecraft.commands.CommandSourceStack;
 
 /**
- * Handles reset and uninstall commands for the Create Shop building.
+ * Handles the {@code reset_live_state} command for the Create Shop building.
  *
  * <p>Extracted from {@link CreateShopMaintenanceCommands} to separate destructive maintenance
- * operations from diagnostic and test-harness commands.
+ * operations from diagnostic and test-harness commands. {@code prepare_uninstall} lives in {@link
+ * CreateShopUninstallCommands}; helpers shared between the two live in {@link
+ * CreateShopCommandSupport}.
  */
 final class CreateShopResetCommands {
   private CreateShopResetCommands() {}
 
   // -------------------------------------------------------------------------
-  // Package-visible entry points (called from CreateShopMaintenanceCommands)
+  // Package-visible entry point (called from CreateShopMaintenanceCommands)
   // -------------------------------------------------------------------------
 
-  static Result prepareUninstall() {
-    Result result = new Result();
-    for (var colony : IColonyManager.getInstance().getAllColonies()) {
-      result.colonies++;
-      if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
-        continue;
-      }
-      var buildingManager = colony.getServerBuildingManager();
-      if (buildingManager != null && buildingManager.getBuildings() != null) {
-        for (var entry : buildingManager.getBuildings().entrySet()) {
-          var building = entry.getValue();
-          if (!(building instanceof BuildingCreateShop shop)) {
-            continue;
-          }
-          result.shops++;
-          try {
-            colony.getRequestManager().onProviderRemovedFromColony(shop);
-            result.providerUnregister++;
-          } catch (Exception ex) {
-            result.errors++;
-            TheSettlerXCreate.LOGGER.warn(
-                "[CreateShop] prepare_uninstall provider unregister failed shop={} error={}",
-                shop.getLocation() == null
-                    ? "<unknown>"
-                    : shop.getLocation().getInDimensionLocation(),
-                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-          }
-        }
-      }
-
-      var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
-      if (assignments == null || assignments.isEmpty()) {
-        continue;
-      }
-      java.util.Set<IToken<?>> requestTokens = new java.util.LinkedHashSet<>();
-      for (var tokens : assignments.values()) {
-        if (tokens != null) {
-          requestTokens.addAll(tokens);
-        }
-      }
-      for (var requestToken : requestTokens) {
-        try {
-          var request = standard.getRequestHandler().getRequest(requestToken);
-          if (request == null) {
-            continue;
-          }
-          var owner = standard.getResolverHandler().getResolverForRequest(request);
-          if (!(owner instanceof CreateShopRequestResolver)) {
-            continue;
-          }
-          standard.updateRequestState(request.getId(), RequestState.CANCELLED);
-          result.requestsCancelled++;
-        } catch (Exception ex) {
-          result.errors++;
-          TheSettlerXCreate.LOGGER.warn(
-              "[CreateShop] prepare_uninstall cancel failed token={} error={}",
-              requestToken,
-              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        }
-      }
-    }
-    return result;
-  }
-
-  static ResetLiveStateResult resetLiveState(boolean forceWarehouseQueueClear) {
+  static ResetLiveStateResult resetLiveState(
+      CommandSourceStack source, boolean forceWarehouseQueueClear) {
     ResetLiveStateResult result = new ResetLiveStateResult();
-    for (IColony colony : IColonyManager.getInstance().getAllColonies()) {
+    for (IColony colony : CreateShopCommandSupport.resolveTargetColonies(source)) {
       result.colonies++;
       if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {
         continue;
       }
 
-      java.util.Set<BuildingCreateShop> shops = collectCreateShops(colony);
+      java.util.Set<BuildingCreateShop> shops = CreateShopCommandSupport.collectCreateShops(colony);
       result.shops += shops.size();
       int initialActiveLocalDeliveries = countShopsWithActiveLocalDeliveries(colony, shops);
       int drainRounds = Math.max(1, 3 + (initialActiveLocalDeliveries > 0 ? 1 : 0));
@@ -159,7 +96,7 @@ final class CreateShopResetCommands {
     if (requestHandler == null) {
       return;
     }
-    java.util.Set<BuildingCreateShop> shops = collectCreateShops(colony);
+    java.util.Set<BuildingCreateShop> shops = CreateShopCommandSupport.collectCreateShops(colony);
     if (shops.isEmpty()) {
       return;
     }
@@ -181,7 +118,8 @@ final class CreateShopResetCommands {
                   com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery)) {
             continue;
           }
-          if (isTerminalState(request.getState()) || !isCreateShopOwnedRequest(standard, request)) {
+          if (CreateShopCommandSupport.isTerminalState(request.getState())
+              || !CreateShopCommandSupport.isCreateShopOwnedRequest(standard, request)) {
             continue;
           }
           boolean localDeliveryForAnyShop = false;
@@ -250,32 +188,34 @@ final class CreateShopResetCommands {
       return;
     }
 
-    for (var assignmentEntry : store.getAssignments().entrySet()) {
+    for (var assignmentEntry : java.util.List.copyOf(store.getAssignments().entrySet())) {
       java.util.Collection<IToken<?>> assigned = assignmentEntry.getValue();
       if (assigned == null || assigned.isEmpty()) {
         continue;
       }
-      java.util.Iterator<IToken<?>> iterator = assigned.iterator();
-      while (iterator.hasNext()) {
-        IToken<?> token = iterator.next();
+      // Iterate a defensive snapshot, not the live per-resolver collection: standard.assignRequest
+      // below can mutate that very collection (MineColonies' addRequestToResolver adds to it). A
+      // raw Iterator would be unsafe here, since a mutation from inside assignRequest would
+      // invalidate it out from under us.
+      for (IToken<?> token : java.util.List.copyOf(assigned)) {
         if (token == null) {
-          iterator.remove();
+          assigned.remove(token);
           result.assignmentPruned++;
           continue;
         }
         try {
           var request = requestHandler.getRequestOrNull(token);
           if (request == null) {
-            iterator.remove();
+            assigned.remove(token);
             result.assignmentPruned++;
             continue;
           }
-          if (isTerminalState(request.getState())) {
-            iterator.remove();
+          if (CreateShopCommandSupport.isTerminalState(request.getState())) {
+            assigned.remove(token);
             result.assignmentPruned++;
             continue;
           }
-          if (!isCreateShopOwnedRequest(standard, request)) {
+          if (!CreateShopCommandSupport.isCreateShopOwnedRequest(standard, request)) {
             continue;
           }
           if (request.getRequest()
@@ -297,7 +237,7 @@ final class CreateShopResetCommands {
           }
         } catch (Exception ex) {
           if (isStaleRequestGraphException(ex)) {
-            iterator.remove();
+            assigned.remove(token);
             result.assignmentPruned++;
             continue;
           }
@@ -316,7 +256,8 @@ final class CreateShopResetCommands {
     if (standard == null || result == null) {
       return;
     }
-    java.util.Set<IToken<?>> assignedTokens = collectAssignedRequestTokens(standard);
+    java.util.Set<IToken<?>> assignedTokens =
+        CreateShopCommandSupport.collectAssignedRequestTokens(standard);
     if (assignedTokens.isEmpty()) {
       return;
     }
@@ -357,7 +298,8 @@ final class CreateShopResetCommands {
       }
       try {
         var request = standard.getRequestHandler().getRequestOrNull(token);
-        if (request == null || !isCreateShopOwnedRequest(standard, request)) {
+        if (request == null
+            || !CreateShopCommandSupport.isCreateShopOwnedRequest(standard, request)) {
           continue;
         }
         cancelSingleRequest(standard, request, result);
@@ -384,7 +326,8 @@ final class CreateShopResetCommands {
     if (standard == null || result == null) {
       return;
     }
-    java.util.Set<IToken<?>> assignedTokens = collectAssignedRequestTokens(standard);
+    java.util.Set<IToken<?>> assignedTokens =
+        CreateShopCommandSupport.collectAssignedRequestTokens(standard);
     if (assignedTokens.isEmpty()) {
       return;
     }
@@ -495,7 +438,7 @@ final class CreateShopResetCommands {
       return;
     }
     try {
-      if (isTerminalState(request.getState())) {
+      if (CreateShopCommandSupport.isTerminalState(request.getState())) {
         if (request.getState() == RequestState.CANCELLED) {
           standard.getRequestHandler().cleanRequestData(request.getId());
           result.staleCleaned++;
@@ -562,24 +505,27 @@ final class CreateShopResetCommands {
           || queue.getMutableRequestList().isEmpty()) {
         continue;
       }
-      java.util.Iterator<IToken<?>> iterator = queue.getMutableRequestList().iterator();
-      while (iterator.hasNext()) {
-        IToken<?> queuedToken = iterator.next();
+      // Defensive snapshot, not the live queue list: standard.updateRequestState below can route
+      // into DeliverymenRequestResolver.onAssignedRequestBeingCancelled, which itself calls
+      // module.getMutableRequestList().remove(...) on this exact list - mutating it out from under
+      // a raw Iterator we're still using would be unsafe.
+      java.util.List<IToken<?>> liveQueue = queue.getMutableRequestList();
+      for (IToken<?> queuedToken : java.util.List.copyOf(liveQueue)) {
         if (queuedToken == null) {
-          iterator.remove();
+          liveQueue.remove(queuedToken);
           result.queueEntriesCleared++;
           continue;
         }
         try {
           var queuedRequest = standard.getRequestHandler().getRequestOrNull(queuedToken);
           if (queuedRequest == null) {
-            iterator.remove();
+            liveQueue.remove(queuedToken);
             result.queueEntriesCleared++;
             result.staleCleaned++;
             continue;
           }
-          if (!isTerminalState(queuedRequest.getState())) {
-            if (!isCreateShopOwnedRequest(standard, queuedRequest)) {
+          if (!CreateShopCommandSupport.isTerminalState(queuedRequest.getState())) {
+            if (!CreateShopCommandSupport.isCreateShopOwnedRequest(standard, queuedRequest)) {
               continue;
             }
             try {
@@ -596,7 +542,7 @@ final class CreateShopResetCommands {
                         : cancelEx.getMessage());
               }
             }
-            iterator.remove();
+            liveQueue.remove(queuedToken);
             result.queueEntriesCleared++;
             try {
               standard.getRequestHandler().cleanRequestData(queuedToken);
@@ -614,7 +560,7 @@ final class CreateShopResetCommands {
             }
             continue;
           }
-          iterator.remove();
+          liveQueue.remove(queuedToken);
           result.queueEntriesCleared++;
           if (queuedRequest.getState() == RequestState.CANCELLED) {
             try {
@@ -632,7 +578,7 @@ final class CreateShopResetCommands {
           }
         } catch (Exception ex) {
           if (isStaleRequestGraphException(ex)) {
-            iterator.remove();
+            liveQueue.remove(queuedToken);
             result.queueEntriesCleared++;
             try {
               standard.getRequestHandler().cleanRequestData(queuedToken);
@@ -658,70 +604,10 @@ final class CreateShopResetCommands {
     }
   }
 
-  static java.util.Set<BuildingCreateShop> collectCreateShops(IColony colony) {
-    java.util.Set<BuildingCreateShop> shops = new java.util.LinkedHashSet<>();
-    if (colony == null) {
-      return shops;
-    }
-    var buildingManager = colony.getServerBuildingManager();
-    if (buildingManager == null || buildingManager.getBuildings() == null) {
-      return shops;
-    }
-    for (var entry : buildingManager.getBuildings().entrySet()) {
-      var building = entry.getValue();
-      if (building instanceof BuildingCreateShop shop) {
-        shops.add(shop);
-      }
-    }
-    return shops;
-  }
-
-  static java.util.Set<IToken<?>> collectAssignedRequestTokens(IStandardRequestManager standard) {
-    java.util.Set<IToken<?>> tokens = new java.util.LinkedHashSet<>();
-    if (standard == null) {
-      return tokens;
-    }
-    var assignments = standard.getRequestResolverRequestAssignmentDataStore().getAssignments();
-    if (assignments == null || assignments.isEmpty()) {
-      return tokens;
-    }
-    for (var assigned : assignments.values()) {
-      if (assigned != null) {
-        tokens.addAll(assigned);
-      }
-    }
-    return tokens;
-  }
-
-  static boolean isCreateShopOwnedRequest(
-      IStandardRequestManager standard,
-      com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
-    if (standard == null || request == null) {
-      return false;
-    }
-    try {
-      var owner = standard.getResolverHandler().getResolverForRequest(request);
-      if (owner instanceof CreateShopRequestResolver) {
-        return true;
-      }
-      if (!request.hasParent()) {
-        return false;
-      }
-      var parent = standard.getRequestHandler().getRequest(request.getParent());
-      if (parent == null) {
-        return false;
-      }
-      var parentOwner = standard.getResolverHandler().getResolverForRequest(parent);
-      return parentOwner instanceof CreateShopRequestResolver;
-    } catch (Exception ignored) {
-      return false;
-    }
-  }
-
   private static boolean isCreateShopOwnedRootRequest(
       IStandardRequestManager standard,
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
-    if (!isCreateShopOwnedRequest(standard, request)) {
+    if (!CreateShopCommandSupport.isCreateShopOwnedRequest(standard, request)) {
       return false;
     }
     return request != null && !request.hasParent();
@@ -731,7 +617,8 @@ final class CreateShopResetCommands {
     if (standard == null) {
       return false;
     }
-    java.util.Set<IToken<?>> tokens = collectAssignedRequestTokens(standard);
+    java.util.Set<IToken<?>> tokens =
+        CreateShopCommandSupport.collectAssignedRequestTokens(standard);
     for (IToken<?> token : tokens) {
       if (token == null) {
         continue;
@@ -741,7 +628,7 @@ final class CreateShopResetCommands {
         if (request == null || !isCreateShopOwnedRootRequest(standard, request)) {
           continue;
         }
-        if (!isTerminalState(request.getState())) {
+        if (!CreateShopCommandSupport.isTerminalState(request.getState())) {
           return true;
         }
       } catch (Exception ignored) {
@@ -751,25 +638,29 @@ final class CreateShopResetCommands {
     return false;
   }
 
-  static boolean isTerminalState(RequestState state) {
-    return RequestStateUtil.isTerminalRequestState(state);
-  }
-
+  /**
+   * Detects the "request graph went stale underneath us" failure mode (a request/resolver was
+   * concurrently removed by MineColonies while we were mid-traversal) so callers can clean up and
+   * move on instead of logging it as a real error.
+   *
+   * <p>This used to match on exact substrings of the exception message (e.g. {@code
+   * "hasChildren()"}), but that text is JVM-generated helpful-NPE detail, not a MineColonies
+   * contract - it can change with the JDK or with unrelated MineColonies refactors and silently
+   * stop matching. Instead, match on the exception's type (the two known failure shapes are both
+   * NPE/ISE from dereferencing a request that vanished mid-traversal) and on the exception having
+   * actually originated inside MineColonies' own request-system code, which is what makes it "a
+   * stale request graph" rather than an unrelated failure in our own code.
+   */
   private static boolean isStaleRequestGraphException(Exception ex) {
-    if (ex == null) {
+    if (!(ex instanceof NullPointerException) && !(ex instanceof IllegalStateException)) {
       return false;
     }
-    String message = ex.getMessage();
-    if (message == null || message.isEmpty()) {
+    StackTraceElement[] trace = ex.getStackTrace();
+    if (trace == null || trace.length == 0) {
       return false;
     }
-    String normalized = message.toLowerCase(java.util.Locale.ROOT);
-    boolean staleChildren =
-        normalized.contains("haschildren()")
-            && normalized.contains("request")
-            && normalized.contains("null");
-    boolean assignmentDrift = normalized.contains("intvalue()");
-    return staleChildren || assignmentDrift;
+    String originClass = trace[0].getClassName();
+    return originClass != null && originClass.startsWith("com.minecolonies.");
   }
 
   // -------------------------------------------------------------------------

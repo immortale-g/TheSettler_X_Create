@@ -207,6 +207,11 @@ final class CreateShopDiagnosticCommands {
         continue;
       }
       int tier = targetPriorityTier(candidate);
+      if (tier < 0) {
+        continue; // Not a Warehouse or PostBox - the live-test picker must never target arbitrary
+        // worker buildings, since firing a fake request at e.g. a random crafter's building can
+        // disturb its real, player-relevant work queue.
+      }
       double distance = targetPos.distSqr(shopPos);
       if (tier < bestTier || (tier == bestTier && distance < bestDistance)) {
         best = requester;
@@ -225,7 +230,7 @@ final class CreateShopDiagnosticCommands {
     if (building != null && "PostBox".equals(building.getClass().getSimpleName())) {
       return 1; // Then PostBox.
     }
-    return 2; // Finally any other requester building.
+    return -1; // Reject: no other building is an eligible live-test target.
   }
 
   // -------------------------------------------------------------------------

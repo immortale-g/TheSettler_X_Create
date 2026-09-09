@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.thesettler_x_create.Config;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -11,13 +12,24 @@ import net.minecraft.network.chat.Component;
  * classes.
  *
  * <ul>
- *   <li>{@link CreateShopResetCommands} – prepare_uninstall, reset_live_state
+ *   <li>{@link CreateShopUninstallCommands} – prepare_uninstall
+ *   <li>{@link CreateShopResetCommands} – reset_live_state
  *   <li>{@link CreateShopDiagnosticCommands} – run_live_test
  *   <li>{@link CreateShopTestHarnessCommands} – auto_test_harness, auto_test_harness_full_all
  * </ul>
+ *
+ * <p>{@code prepare_uninstall} and {@code reset_live_state} are legitimate production maintenance
+ * operations and only require operator permission. Every other command here creates fake requests
+ * or fake inflight data in a live colony purely for development/testing, so those additionally
+ * require {@link Config#ENABLE_DEV_TEST_COMMANDS} (default off) via {@link
+ * #requiresDevTestCommands()}.
  */
 public final class CreateShopMaintenanceCommands {
   private CreateShopMaintenanceCommands() {}
+
+  private static boolean requiresDevTestCommands(CommandSourceStack source) {
+    return Config.ENABLE_DEV_TEST_COMMANDS.get();
+  }
 
   public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
     var root = Commands.literal("thesettlerxcreate").requires(source -> source.hasPermission(2));
@@ -26,8 +38,8 @@ public final class CreateShopMaintenanceCommands {
         Commands.literal("prepare_uninstall")
             .executes(
                 context -> {
-                  CreateShopResetCommands.Result result =
-                      CreateShopResetCommands.prepareUninstall();
+                  CreateShopUninstallCommands.Result result =
+                      CreateShopUninstallCommands.prepareUninstall(context.getSource());
                   context
                       .getSource()
                       .sendSuccess(
@@ -56,6 +68,7 @@ public final class CreateShopMaintenanceCommands {
 
     root.then(
         Commands.literal("run_live_test")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopDiagnosticCommands.runLiveTestCommand(context.getSource(), 8, 8))
@@ -81,7 +94,7 @@ public final class CreateShopMaintenanceCommands {
             .executes(
                 context -> {
                   CreateShopResetCommands.ResetLiveStateResult result =
-                      CreateShopResetCommands.resetLiveState(false);
+                      CreateShopResetCommands.resetLiveState(context.getSource(), false);
                   context
                       .getSource()
                       .sendSuccess(
@@ -125,7 +138,7 @@ public final class CreateShopMaintenanceCommands {
                     .executes(
                         context -> {
                           CreateShopResetCommands.ResetLiveStateResult result =
-                              CreateShopResetCommands.resetLiveState(true);
+                              CreateShopResetCommands.resetLiveState(context.getSource(), true);
                           context
                               .getSource()
                               .sendSuccess(
@@ -167,6 +180,7 @@ public final class CreateShopMaintenanceCommands {
 
     root.then(
         Commands.literal("auto_test_harness")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopTestHarnessCommands.runAutoHarnessStart(
@@ -311,6 +325,7 @@ public final class CreateShopMaintenanceCommands {
 
     root.then(
         Commands.literal("auto_test_harness_full_all")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopTestHarnessCommands.runAutoHarnessFullAll(
@@ -318,18 +333,21 @@ public final class CreateShopMaintenanceCommands {
 
     root.then(
         Commands.literal("diag_output_block")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopOutputBlockTestCommands.runOutputBlockDiag(context.getSource())));
 
     root.then(
         Commands.literal("test_output_packaging")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopOutputBlockTestCommands.runOutputBlockTest(context.getSource())));
 
     root.then(
         Commands.literal("diag_perma_requests")
+            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
             .executes(
                 context ->
                     CreateShopOutputBlockTestCommands.runPermaRequestDiag(context.getSource())));
