@@ -1,5 +1,6 @@
 package com.thesettler_x_create.minecolonies.tileentity;
 
+import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.inventory.InventoryCitizen;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
@@ -7,7 +8,6 @@ import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
-import com.minecolonies.core.tileentities.TileEntityRack;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -45,6 +45,24 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   public TileEntityCreateShop(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_BUILDING.get(), pos, state);
     this.lastNotification = 0L;
+  }
+
+  /** Resolves the shop tile entity a building module is attached to, or null if there is none. */
+  @Nullable
+  public static TileEntityCreateShop fromBuilding(@Nullable IBuilding building) {
+    if (building == null) {
+      return null;
+    }
+    return building.getTileEntity() instanceof TileEntityCreateShop shop ? shop : null;
+  }
+
+  /** Resolves the shop tile entity at a remembered position, or null if there is none loaded. */
+  @Nullable
+  public static TileEntityCreateShop fromLevel(@Nullable Level level, @Nullable BlockPos pos) {
+    if (level == null || pos == null) {
+      return null;
+    }
+    return level.getBlockEntity(pos) instanceof TileEntityCreateShop shop ? shop : null;
   }
 
   public void setStockNetworkId(@Nullable UUID id) {
@@ -114,20 +132,36 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     resolver.sweepFastOrphanRecoveries(shop.getColony().getRequestManager());
   }
 
-  @Override
-  public boolean hasMatchingItemStackInWarehouse(Predicate<ItemStack> filter, int count) {
-    int found = 0;
-    if (getBuilding() == null) {
-      return false;
+  /** A shop container position paired with the rack block entity found there. */
+  public record LoadedRack(BlockPos pos, AbstractTileEntityRack rack) {}
+
+  /**
+   * Collects every rack among this shop's containers that sits in a loaded chunk. Shared by every
+   * method that needs to scan the shop's racks, so the loaded-chunk check and rack-type check only
+   * need to be correct in one place.
+   */
+  public List<LoadedRack> getLoadedRacks() {
+    List<LoadedRack> racks = new ArrayList<>();
+    if (getBuilding() == null || getLevel() == null) {
+      return racks;
     }
     for (BlockPos pos : getBuilding().getContainers()) {
       if (!WorldUtil.isBlockLoaded(level, pos)) {
         continue;
       }
       BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
-        continue;
+      if (entity instanceof AbstractTileEntityRack rack) {
+        racks.add(new LoadedRack(pos, rack));
       }
+    }
+    return racks;
+  }
+
+  @Override
+  public boolean hasMatchingItemStackInWarehouse(Predicate<ItemStack> filter, int count) {
+    int found = 0;
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.isEmpty()) {
         continue;
       }
@@ -148,17 +182,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   public boolean hasMatchingItemStackInWarehouse(
       ItemStack stack, int count, boolean matchNBT, boolean matchDamage, int countExcluded) {
     int found = 0 - countExcluded;
-    if (getBuilding() == null) {
-      return false;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.isEmpty()) {
         continue;
       }
@@ -180,17 +205,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   public List<Tuple<ItemStack, BlockPos>> getMatchingItemStacksInWarehouse(
       Predicate<ItemStack> filter) {
     List<Tuple<ItemStack, BlockPos>> matches = new ArrayList<>();
-    if (getBuilding() == null) {
-      return matches;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
-        continue;
-      }
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.isEmpty()) {
         continue;
       }
@@ -198,7 +214,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         continue;
       }
       for (ItemStack stack : InventoryUtils.filterItemHandler(rack.getInventory(), filter)) {
-        matches.add(new Tuple<>(stack, pos));
+        matches.add(new Tuple<>(stack, loaded.pos()));
       }
     }
     return matches;
@@ -621,18 +637,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
 
   private List<VirtualItemHandler> collectVirtualRacks() {
     List<VirtualItemHandler> racks = new ArrayList<>();
-    if (getBuilding() == null || getLevel() == null) {
-      return racks;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      VirtualItemHandler virtual = createVirtualHandler(rack.getItemHandlerCap());
+    for (LoadedRack loaded : getLoadedRacks()) {
+      VirtualItemHandler virtual = createVirtualHandler(loaded.rack().getItemHandlerCap());
       if (virtual != null) {
         racks.add(virtual);
       }
@@ -836,21 +842,15 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   private List<AbstractTileEntityRack> collectRacksForHousekeeping() {
-    List<AbstractTileEntityRack> racks = new ArrayList<>();
     if (getBuilding() == null || getLevel() == null) {
-      return racks;
+      return new ArrayList<>();
     }
     if (getBuilding() instanceof BuildingCreateShop shop) {
       shop.ensureRackContainers();
     }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (entity instanceof AbstractTileEntityRack rack) {
-        racks.add(rack);
-      }
+    List<AbstractTileEntityRack> racks = new ArrayList<>();
+    for (LoadedRack loaded : getLoadedRacks()) {
+      racks.add(loaded.rack());
     }
     return racks;
   }
@@ -909,17 +909,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   private AbstractTileEntityRack getPositionOfChestWithItemStack(ItemStack stack) {
-    if (getBuilding() == null) {
-      return null;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.getFreeSlots() <= 0) {
         continue;
       }
@@ -931,17 +922,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   private AbstractTileEntityRack getPositionOfChestWithSimilarItemStack(ItemStack stack) {
-    if (getBuilding() == null) {
-      return null;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.getFreeSlots() <= 0) {
         continue;
       }
@@ -955,14 +937,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private AbstractTileEntityRack searchMostEmptyRack() {
     int bestFree = 0;
     AbstractTileEntityRack bestRack = null;
-    if (getBuilding() == null) {
-      return null;
-    }
-    for (BlockPos pos : getBuilding().getContainers()) {
-      BlockEntity entity = getLevel().getBlockEntity(pos);
-      if (!(entity instanceof TileEntityRack rack)) {
-        continue;
-      }
+    for (LoadedRack loaded : getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       if (rack.isEmpty()) {
         return rack;
       }

@@ -12,7 +12,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 public class CreateShopStockModule extends AbstractBuildingModule {
   @Override
   public void serializeToView(RegistryFriendlyByteBuf buf) {
-    TileEntityCreateShop shop = getShopTile();
+    TileEntityCreateShop shop = TileEntityCreateShop.fromBuilding(building);
     UUID networkId = shop == null ? null : shop.getStockNetworkId();
     if (networkId == null) {
       buf.writeBoolean(false);
@@ -21,16 +21,6 @@ public class CreateShopStockModule extends AbstractBuildingModule {
     }
     buf.writeBoolean(true);
     writeStacks(buf, getRegisteredStorageStock());
-  }
-
-  private TileEntityCreateShop getShopTile() {
-    if (building == null) {
-      return null;
-    }
-    if (building.getTileEntity() instanceof TileEntityCreateShop shop) {
-      return shop;
-    }
-    return null;
   }
 
   private List<BigItemStack> getRegisteredStorageStock() {

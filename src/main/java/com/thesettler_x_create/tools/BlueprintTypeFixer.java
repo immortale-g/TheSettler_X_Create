@@ -1,12 +1,9 @@
 package com.thesettler_x_create.tools;
 
 import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 
 /** CLI tool that updates hut tile entity metadata inside a blueprint. */
@@ -19,7 +16,8 @@ public final class BlueprintTypeFixer {
 
   static int run(String[] args, PrintStream out, PrintStream err) {
     if (args.length < 4) {
-      err.println("Usage: BlueprintTypeFixer <path> <teId> <buildingType> <blueprintFileName>");
+      err.println(
+          "Usage: BlueprintTypeFixer <path> <teId> <buildingType> <blueprintFileName> [pack]");
       return 2;
     }
 
@@ -27,13 +25,14 @@ public final class BlueprintTypeFixer {
     String teId = args[1];
     String buildingType = args[2];
     String blueprintFileName = args[3];
+    String pack = args.length >= 5 ? args[4] : "";
 
-    String validation = validatePath(path);
+    String validation = BlueprintToolSupport.validatePath(path, true);
     if (validation != null) {
       err.println(validation);
       return 3;
     }
-    warnIfNotBlueprint(path, err);
+    BlueprintToolSupport.warnIfNotBlueprint(path, err);
 
     if (teId == null || teId.isBlank()) {
       err.println("teId must be non-empty.");
@@ -48,13 +47,8 @@ public final class BlueprintTypeFixer {
       return 4;
     }
 
-    CompoundTag root;
-    try {
-      root = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
-    } catch (Exception ex) {
-      err.println(
-          "Failed to read blueprint NBT: "
-              + (ex.getMessage() == null ? "<unknown>" : ex.getMessage()));
+    CompoundTag root = BlueprintToolSupport.readCompressed(path, err);
+    if (root == null) {
       return 5;
     }
     if (!root.contains("tile_entities", Tag.TAG_LIST)) {
@@ -79,12 +73,12 @@ public final class BlueprintTypeFixer {
 
       te.putString("type", buildingType);
       te.putString("path", blueprintFileName);
-      te.putString("pack", "");
+      te.putString("pack", pack);
 
       if (te.contains("blueprintDataProvider", Tag.TAG_COMPOUND)) {
         CompoundTag bdp = te.getCompound("blueprintDataProvider");
         bdp.putString("path", blueprintFileName);
-        bdp.putString("pack", "");
+        bdp.putString("pack", pack);
       }
 
       updated++;
@@ -95,41 +89,10 @@ public final class BlueprintTypeFixer {
       return 1;
     }
 
-    try {
-      NbtIo.writeCompressed(root, path);
-    } catch (Exception ex) {
-      err.println(
-          "Failed to write blueprint NBT: "
-              + (ex.getMessage() == null ? "<unknown>" : ex.getMessage()));
+    if (!BlueprintToolSupport.writeCompressed(root, path, err)) {
       return 7;
     }
     out.println("Updated " + updated + " tile_entities in " + path);
     return 0;
-  }
-
-  private static String validatePath(Path path) {
-    if (path == null) {
-      return "Path is required.";
-    }
-    if (!Files.exists(path)) {
-      return "Blueprint file does not exist: " + path;
-    }
-    if (!Files.isRegularFile(path)) {
-      return "Blueprint path is not a file: " + path;
-    }
-    if (!Files.isReadable(path)) {
-      return "Blueprint file is not readable: " + path;
-    }
-    if (!Files.isWritable(path)) {
-      return "Blueprint file is not writable: " + path;
-    }
-    return null;
-  }
-
-  private static void warnIfNotBlueprint(Path path, PrintStream err) {
-    String name = path.getFileName() == null ? "" : path.getFileName().toString();
-    if (!name.endsWith(".blueprint")) {
-      err.println("Warning: file does not end with .blueprint (" + name + ")");
-    }
   }
 }

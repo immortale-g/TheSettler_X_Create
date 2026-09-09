@@ -99,15 +99,7 @@ final class CreateShopResolverOwnership {
   }
 
   boolean isLocalShopResolver(CreateShopRequestResolver shopResolver) {
-    if (shopResolver == null
-        || shopResolver.getLocation() == null
-        || resolver.getLocation() == null) {
-      return false;
-    }
-    return shopResolver.getLocation().getDimension().equals(resolver.getLocation().getDimension())
-        && shopResolver
-            .getLocation()
-            .getInDimensionLocation()
-            .equals(resolver.getLocation().getInDimensionLocation());
+    return shopResolver != null
+        && ResolverLocationUtil.sameLocation(shopResolver.getLocation(), resolver.getLocation());
   }
 }

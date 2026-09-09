@@ -20,13 +20,13 @@ public class ColonyGaugeBlockItem extends BlockItem {
   public InteractionResult place(BlockPlaceContext context) {
     ItemStack stack = context.getItemInHand();
     CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-    if (!data.contains("GaugeColonyId")) {
+    if (!GaugeLinkData.isLinked(data)) {
       if (!context.getLevel().isClientSide() && context.getPlayer() != null) {
         context
             .getPlayer()
             .displayClientMessage(
-                Component.literal(
-                    "Right-click a Create Shop hut first to link the gauge to a colony."),
+                Component.translatable(
+                    "com.thesettler_x_create.message.colony_gauge.link_shop_first"),
                 true);
       }
       return InteractionResult.FAIL;

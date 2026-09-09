@@ -54,7 +54,6 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   private int colonyId = -1;
   @Nullable private BlockPos shopPos;
-  @Nullable private String dimension;
 
   public @Nullable String cachedFrogportAddress;
   public @Nullable String manualAddress;
@@ -93,11 +92,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     return active && colonyId >= 0 && shopPos != null;
   }
 
-  public void enable(int colonyId, BlockPos shopPos, String dimension) {
+  public void enable(int colonyId, BlockPos shopPos) {
     this.active = true;
     this.colonyId = colonyId;
     this.shopPos = shopPos;
-    this.dimension = dimension;
     blockEntity.notifyUpdate();
   }
 
@@ -126,7 +124,6 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     active = false;
     colonyId = -1;
     shopPos = null;
-    dimension = null;
     cachedFrogportAddress = null;
     manualAddress = null;
     satisfied = false;
@@ -491,7 +488,6 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     super.write(tag, registries, clientPacket);
     tag.putInt("ColonyId", colonyId);
     if (shopPos != null) tag.putLong("ShopPos", shopPos.asLong());
-    if (dimension != null) tag.putString("Dimension", dimension);
     tag.putInt("Timer", timer);
     tag.putLong("PromisedUntil", promisedUntil);
     tag.putBoolean("Satisfied", satisfied);
@@ -514,7 +510,6 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     super.read(tag, registries, clientPacket);
     colonyId = tag.getInt("ColonyId");
     shopPos = tag.contains("ShopPos") ? BlockPos.of(tag.getLong("ShopPos")) : null;
-    dimension = tag.contains("Dimension") ? tag.getString("Dimension") : null;
     timer = tag.getInt("Timer");
     promisedUntil = tag.getLong("PromisedUntil");
     satisfied = tag.getBoolean("Satisfied");

@@ -11,6 +11,7 @@ import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModul
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,13 +95,6 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
   }
 
   private static boolean isTerminalRequestState(RequestState state) {
-    if (state == null) {
-      return false;
-    }
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 }

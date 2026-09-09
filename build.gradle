@@ -209,16 +209,21 @@ tasks.register('fixBlueprintType', JavaExec) {
     description = 'Sets building type/path on a hut tile entity inside a blueprint.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.thesettler_x_create.tools.BlueprintTypeFixer'
-    // Usage: gradlew fixBlueprintType -Pbp=<path> -PteId=<id> -Ptype=<buildingType> -PbpFile=<filename>
+    // Usage: gradlew fixBlueprintType -Pbp=<path> -PteId=<id> -Ptype=<buildingType> -PbpFile=<filename> [-Ppack=<pack>]
     doFirst {
         def bp = project.findProperty('bp')
         def teId = project.findProperty('teId')
         def type = project.findProperty('type')
         def bpFile = project.findProperty('bpFile')
+        def pack = project.findProperty('pack')
         if (bp == null || teId == null || type == null || bpFile == null) {
             throw new GradleException("Missing -Pbp, -PteId, -Ptype, or -PbpFile.")
         }
-        args bp, teId, type, bpFile
+        if (pack == null) {
+            args bp, teId, type, bpFile
+        } else {
+            args bp, teId, type, bpFile, pack
+        }
     }
 }
 

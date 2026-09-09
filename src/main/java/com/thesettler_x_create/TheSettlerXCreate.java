@@ -7,10 +7,10 @@ import com.minecolonies.api.sounds.ModSoundEvents;
 import com.minecolonies.api.util.Tuple;
 import com.mojang.logging.LogUtils;
 import com.thesettler_x_create.create.CreateNetworkFacade;
+import com.thesettler_x_create.create.compat.CreatePlacementHandlers;
 import com.thesettler_x_create.event.StockLinkLinkerEvents;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModBlocks;
-import com.thesettler_x_create.init.ModCreativeTabs;
 import com.thesettler_x_create.init.ModItems;
 import com.thesettler_x_create.init.ModMenus;
 import com.thesettler_x_create.minecolonies.command.CreateShopMaintenanceCommands;
@@ -55,7 +55,6 @@ public class TheSettlerXCreate {
     ModBlocks.register(modEventBus);
     ModBlockEntities.register(modEventBus);
     ModItems.register(modEventBus);
-    ModCreativeTabs.register(modEventBus);
     ModMenus.register(modEventBus);
     ModMinecoloniesBuildings.register(modEventBus);
     ModMinecoloniesJobs.register(modEventBus);
@@ -93,6 +92,7 @@ public class TheSettlerXCreate {
           } catch (IllegalArgumentException ignored) {
             // Ignore duplicate factory registration across reloads.
           }
+          CreatePlacementHandlers.register();
           // Ensure Create Shop has citizen sound mappings to avoid NPEs in SoundUtils.
           Map<String, Map<EventType, List<Tuple<SoundEvent, SoundEvent>>>> sounds =
               ModSoundEvents.CITIZEN_SOUND_EVENTS;

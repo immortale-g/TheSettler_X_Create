@@ -13,7 +13,6 @@ import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
-import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
@@ -30,14 +29,13 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -45,7 +43,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.Tuple;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -103,8 +100,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   private BlockPos builderHutPos;
   private final ShopInflightTracker inflightTracker;
   private final ShopRackIndex rackIndex;
-  private final ShopBeltManager beltManager;
-  private final ShopBeltBlueprints beltBlueprints;
   private final ShopWarehouseRegistrar warehouseRegistrar;
   private final ShopResolverAssignments resolverAssignments;
   private final ShopCourierDiagnostics courierDiagnostics;
@@ -124,8 +119,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.builderHutPos = null;
     this.inflightTracker = new ShopInflightTracker(this);
     this.rackIndex = new ShopRackIndex(this);
-    this.beltManager = new ShopBeltManager(this);
-    this.beltBlueprints = new ShopBeltBlueprints(this);
     this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
     this.resolverAssignments = new ShopResolverAssignments(this);
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
@@ -261,18 +254,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   @Override
-  public Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> getRequiredItemsAndAmount() {
-    Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> base = super.getRequiredItemsAndAmount();
-    Item beltItem = BuiltInRegistries.ITEM.get(ShopBeltBlueprints.beltItemId());
-    if (beltItem == null || beltItem == net.minecraft.world.item.Items.AIR) {
-      return base;
-    }
-    Map<Predicate<ItemStack>, Tuple<Integer, Boolean>> result = new java.util.HashMap<>(base);
-    result.put(stack -> stack != null && stack.getItem() == beltItem, new Tuple<>(1, Boolean.TRUE));
-    return result;
-  }
-
-  @Override
   public void requestRepair(BlockPos pos) {
     for (BlockPos containerPos : containerList) {
       Level world = getColony().getWorld();
@@ -285,7 +266,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       }
     }
     super.requestRepair(pos);
-    beltManager.onRepair();
   }
 
   @Override
@@ -293,7 +273,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     super.onPlacement();
     ensureWarehouseRegistration();
     ensurePickupLink();
-    beltManager.onPlacement();
   }
 
   @Override
@@ -301,7 +280,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     super.onUpgradeComplete(newLevel);
     ensureWarehouseRegistration();
     ensurePickupLink();
-    beltManager.onUpgrade();
   }
 
   @Override
@@ -311,7 +289,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     ensureWarehouseRegistration();
     ensurePickupLink();
     resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
-    beltManager.tick();
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
@@ -833,224 +810,8 @@ public class BuildingCreateShop extends AbstractBuilding {
       String requesterName,
       String address,
       long requestedAt) {
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package handover requested player={} item={} remaining={} requester='{}' address='{}'",
-          player == null ? "<null>" : player.getName().getString(),
-          stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
-          remaining,
-          requesterName,
-          address);
-    }
-    if (player == null || stackKey == null || stackKey.isEmpty()) {
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover rejected: invalid input");
-      }
-      return 0;
-    }
-    TileEntityCreateShop tile = getCreateShopTileEntity();
-    CreateShopBlockEntity pickup = getPickupBlockEntity();
-    if (tile == null || pickup == null) {
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover rejected: tilePresent={} pickupPresent={}",
-            tile != null,
-            pickup != null);
-      }
-      return 0;
-    }
-    var inventory = player.getInventory();
-    rackIndex.ensureRackContainers();
-    int targetAmount = Math.max(1, remaining);
-    int inflightBefore = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package handover precheck inventorySlots={} target={} inflightBefore={} requester='{}' address='{}'",
-          inventory.getContainerSize(),
-          targetAmount,
-          inflightBefore,
-          requesterName,
-          address);
-    }
-    int totalConsumed = 0;
-    int totalInsertedMatching = 0;
-    int scannedPackages = 0;
-    int matchedPackages = 0;
-    int removedPackages = 0;
-    for (int slot = 0;
-        slot < inventory.getContainerSize() && totalConsumed < targetAmount;
-        slot++) {
-      ItemStack candidate = inventory.getItem(slot);
-      boolean isPackage =
-          candidate != null
-              && !candidate.isEmpty()
-              && com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
-      if (isPackage) {
-        scannedPackages++;
-      }
-      int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
-      if (isDebugRequests() && candidate != null && !candidate.isEmpty()) {
-        if (isPackage || matching > 0) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover scan slot={} stack={} isPackage={} matchingCount={}",
-              slot,
-              candidate.getHoverName().getString(),
-              isPackage,
-              matching);
-        }
-      }
-      if (matching <= 0) {
-        continue;
-      }
-      matchedPackages++;
-      List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover slot={} previewUnpackedStacks={} matching={}",
-            slot,
-            previewUnpacked.size(),
-            matching);
-      }
-      if (previewUnpacked.isEmpty()) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} skip: preview unpack empty", slot);
-        }
-        continue;
-      }
-      List<ItemStack> previewAccepted = tile.planInboundAcceptedStacks(previewUnpacked);
-      int previewInsertedMatching = countMatching(previewAccepted, stackKey);
-      int consumeTarget =
-          Math.min(targetAmount - totalConsumed, Math.max(0, previewInsertedMatching));
-      if (consumeTarget <= 0) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} skip: preview accepted no matching items",
-              slot);
-        }
-        continue;
-      }
-      int strictRemaining =
-          pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-      int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
-      if (strictRemaining < consumeTarget && looseRemaining < consumeTarget) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} skip: no inflight remainder for consumeTarget={} strictRemaining={} looseRemaining={}",
-              slot,
-              consumeTarget,
-              strictRemaining,
-              looseRemaining);
-        }
-        continue;
-      }
-      ItemStack removedPackage = inventory.removeItem(slot, 1);
-      if (removedPackage.isEmpty()) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} failed: package remove returned empty",
-              slot);
-        }
-        continue;
-      }
-      removedPackages++;
-      List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(removedPackage);
-      if (unpacked.isEmpty() && !previewUnpacked.isEmpty()) {
-        unpacked = new ArrayList<>(previewUnpacked.size());
-        for (ItemStack stack : previewUnpacked) {
-          if (stack != null && !stack.isEmpty()) {
-            unpacked.add(stack.copy());
-          }
-        }
-      }
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover slot={} unpackedStacks={}", slot, unpacked.size());
-      }
-      if (unpacked.isEmpty()) {
-        if (isDebugRequests()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover slot={} skipped: package unpacked empty", slot);
-        }
-        continue;
-      }
-      List<ItemStack> leftovers = tile.insertIntoRacksOnly(unpacked);
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover slot={} insertedStacks={} leftoverStacks={}",
-            slot,
-            unpacked.size() - leftovers.size(),
-            leftovers.size());
-      }
-      for (ItemStack leftover : leftovers) {
-        if (!leftover.isEmpty()) {
-          Level level = getColony() == null ? null : getColony().getWorld();
-          BlockPos dropPos = getLocation().getInDimensionLocation();
-          if (level != null) {
-            InventoryUtils.spawnItemStack(
-                level,
-                dropPos.getX() + 0.5D,
-                dropPos.getY() + 1.0D,
-                dropPos.getZ() + 0.5D,
-                leftover);
-          }
-        }
-      }
-      int insertedMatching = countMatching(unpacked, stackKey) - countMatching(leftovers, stackKey);
-      totalInsertedMatching += Math.max(0, insertedMatching);
-      consumeTarget = Math.min(targetAmount - totalConsumed, Math.max(0, insertedMatching));
-      int consumed =
-          pickup.consumeInflight(stackKey, consumeTarget, requesterName, address, requestedAt);
-      totalConsumed += Math.max(0, consumed);
-      if (isDebugRequests()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={} totalConsumed={} target={}",
-            requesterName,
-            stackKey.getHoverName().getString(),
-            insertedMatching,
-            consumed,
-            totalConsumed,
-            targetAmount);
-        if (consumed <= 0 && consumeTarget > 0) {
-          strictRemaining =
-              pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-          looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package handover consume-miss slot={} consumeTarget={} strictRemaining={} looseRemaining={}",
-              slot,
-              consumeTarget,
-              strictRemaining,
-              looseRemaining);
-        }
-      }
-      if (consumeTarget > 0 && consumed <= 0) {
-        // Avoid draining additional player packages when inflight tuple cannot be consumed.
-        break;
-      }
-    }
-    int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package handover summary scannedPackages={} matchedPackages={} removedPackages={} insertedMatchingTotal={} consumedTotal={} target={} inflightBefore={} inflightAfter={}",
-          scannedPackages,
-          matchedPackages,
-          removedPackages,
-          totalInsertedMatching,
-          totalConsumed,
-          targetAmount,
-          inflightBefore,
-          inflightAfter);
-    }
-    if (totalConsumed > 0) {
-      return totalConsumed;
-    }
-    if (isDebugRequests()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] lost-package handover failed: no matching package found in player inventory or no inflight consumed (insertedMatchingTotal={})",
-          totalInsertedMatching);
-    }
-    return 0;
+    return new ShopLostPackageHandoverProcessor(this)
+        .acceptFromPlayer(player, stackKey, remaining, requesterName, address, requestedAt);
   }
 
   public int cancelLostPackage(
@@ -1351,14 +1112,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   private static boolean isTerminalRequestState(RequestState state) {
-    if (state == null) {
-      return false;
-    }
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 
   public void ensureRackContainers() {
@@ -1384,33 +1138,6 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public void setPermaOre(ResourceLocation itemId, boolean enabled) {
     permaManager.setPermaOre(itemId, enabled);
-  }
-
-  boolean trySpawnBeltBlueprint(IColony colony) {
-    return beltBlueprints.trySpawnBeltBlueprint(colony);
-  }
-
-  boolean hasActiveWorkOrder(IColony colony) {
-    if (colony == null || colony.getWorkManager() == null) {
-      return false;
-    }
-    var workOrders =
-        colony
-            .getWorkManager()
-            .getWorkOrdersOfType(com.minecolonies.core.colony.workorders.WorkOrderBuilding.class);
-    if (workOrders == null || workOrders.isEmpty()) {
-      return false;
-    }
-    BlockPos location = getLocation().getInDimensionLocation();
-    for (var order : workOrders) {
-      if (order == null || order.getLocation() == null) {
-        continue;
-      }
-      if (order.getLocation().equals(location)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private void clearPermaPending(
@@ -1450,22 +1177,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] legacy shop-courier migration modulePresent=true cleared={}", cleared);
     }
-  }
-
-  private static int countMatching(List<ItemStack> stacks, ItemStack key) {
-    if (stacks == null || stacks.isEmpty() || key == null || key.isEmpty()) {
-      return 0;
-    }
-    int count = 0;
-    for (ItemStack stack : stacks) {
-      if (stack == null || stack.isEmpty()) {
-        continue;
-      }
-      if (ItemStack.isSameItemSameComponents(stack, key) || ItemStack.isSameItem(stack, key)) {
-        count += stack.getCount();
-      }
-    }
-    return count;
   }
 
   public static List<ItemStack> getOreCandidates() {

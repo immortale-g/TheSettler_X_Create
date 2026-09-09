@@ -15,13 +15,13 @@ import net.minecraft.world.item.ItemStack;
 
 /** One-shot info interaction for reorder failures due to unavailable stock network items. */
 public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenInteraction {
-  private static final String TAG_STACK = "Stack";
-  private static final String TAG_REMAINING = "Remaining";
-  private static final String TAG_REQUESTER = "Requester";
-  private static final String TAG_ADDRESS = "Address";
-  private static final String TAG_REQUESTED_AT = "RequestedAt";
-  private static final String TAG_EPOCH = "Epoch";
-  private static final String TAG_ACTIVE = "Active";
+  private static final String TAG_STACK = LostPackageInteractionTags.TAG_STACK;
+  private static final String TAG_REMAINING = LostPackageInteractionTags.TAG_REMAINING;
+  private static final String TAG_REQUESTER = LostPackageInteractionTags.TAG_REQUESTER;
+  private static final String TAG_ADDRESS = LostPackageInteractionTags.TAG_ADDRESS;
+  private static final String TAG_REQUESTED_AT = LostPackageInteractionTags.TAG_REQUESTED_AT;
+  private static final String TAG_EPOCH = LostPackageInteractionTags.TAG_EPOCH;
+  private static final String TAG_ACTIVE = LostPackageInteractionTags.TAG_ACTIVE;
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int remaining;
@@ -172,10 +172,6 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
   }
 
   private static String sanitize(String value) {
-    if (value == null) {
-      return "";
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
+    return com.thesettler_x_create.TextUtil.sanitize(value);
   }
 }

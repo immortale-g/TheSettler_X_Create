@@ -4,6 +4,7 @@ import com.minecolonies.api.blocks.AbstractBlockHut;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.thesettler_x_create.block.ColonyGaugeBlockItem;
+import com.thesettler_x_create.block.GaugeLinkData;
 import com.thesettler_x_create.item.StockLinkLinkerItem;
 import com.thesettler_x_create.minecolonies.registry.ModMinecoloniesBuildings;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -55,16 +56,14 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
         if (be instanceof TileEntityCreateShop shop && shop.getColony() != null) {
           CompoundTag tag =
               stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-          tag.putInt("GaugeColonyId", shop.getColony().getID());
-          tag.putLong("GaugeShopPos", pos.asLong());
-          tag.putString("GaugeDimension", level.dimension().location().toString());
+          GaugeLinkData.writeTo(tag, shop.getColony().getID(), pos);
           stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
           player.displayClientMessage(
-              Component.literal("Colony Gauge linked to shop. Now place it near a Frogport."),
-              true);
+              Component.translatable("com.thesettler_x_create.message.colony_gauge.linked"), true);
         } else {
           player.displayClientMessage(
-              Component.literal("No active colony shop found at this position."), true);
+              Component.translatable("com.thesettler_x_create.message.createshop.no_shop_here"),
+              true);
         }
       }
       return ItemInteractionResult.SUCCESS;
@@ -74,7 +73,9 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
       if (player.isShiftKeyDown()) {
         if (!level.isClientSide) {
           stack.remove(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
-          player.displayClientMessage(Component.literal("Stock-Link Linker zurückgesetzt."), true);
+          player.displayClientMessage(
+              Component.translatable("com.thesettler_x_create.message.network_link_tuner.reset"),
+              true);
         }
         return ItemInteractionResult.SUCCESS;
       }
@@ -84,12 +85,16 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
           UUID stored = StockLinkLinkerItem.getStoredNetworkId(stack);
           if (stored == null) {
             player.displayClientMessage(
-                Component.literal("Kein Netzwerk im Linker gespeichert."), true);
+                Component.translatable(
+                    "com.thesettler_x_create.message.network_link_tuner.no_network_stored"),
+                true);
           } else {
             shop.setStockNetworkId(stored);
             level.sendBlockUpdated(pos, state, state, 3);
             player.displayClientMessage(
-                Component.literal("Shop mit Stock-Netzwerk verbunden."), true);
+                Component.translatable(
+                    "com.thesettler_x_create.message.network_link_tuner.shop_connected"),
+                true);
           }
         }
       }

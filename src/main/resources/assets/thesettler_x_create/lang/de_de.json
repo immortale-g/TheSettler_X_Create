@@ -42,5 +42,18 @@
   "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.id": "createshop_lost_package_reorder_unavailable",
   "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.inquiry": "Neu-Bestellung fehlgeschlagen fuer %s. Nicht genug Items im Stock Network fuer %s x%s (Adresse: %s).",
   "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.response_back": "Zurueck",
-  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.answer_back": "Verstanden. Ich gehe zurueck zu den Missing-Package-Optionen."
+  "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.answer_back": "Verstanden. Ich gehe zurueck zu den Missing-Package-Optionen.",
+  "com.thesettler_x_create.message.colony_gauge.link_shop_first": "Rechtsklicke zuerst eine Create-Shop-Huette, um das Gauge mit einer Kolonie zu verknuepfen.",
+  "com.thesettler_x_create.message.colony_gauge.linked": "Kolonie-Gauge mit Shop verknuepft. Jetzt in der Naehe eines Frogports platzieren.",
+  "com.thesettler_x_create.message.createshop.no_shop_here": "Kein aktiver Colony Shop an dieser Position gefunden.",
+  "com.thesettler_x_create.message.network_link_tuner.no_network_stored": "Kein Netzwerk im Linker gespeichert.",
+  "com.thesettler_x_create.message.network_link_tuner.shop_connected": "Shop mit Stock-Netzwerk verbunden.",
+  "com.thesettler_x_create.message.network_link_tuner.reset": "Stock-Link-Linker zurueckgesetzt.",
+  "com.thesettler_x_create.message.network_link_tuner.stored": "Stock-Link-Netzwerk gespeichert.",
+  "com.thesettler_x_create.message.network_link_tuner.already_linked": "Stock-Link ist bereits mit diesem Netzwerk verknuepft.",
+  "com.thesettler_x_create.message.network_link_tuner.relinked": "Stock-Link mit dem neuen Netzwerk verknuepft.",
+  "com.thesettler_x_create.item.network_link_tuner.tooltip.stored_network": "Gespeichertes Netzwerk: %s",
+  "com.thesettler_x_create.item.network_link_tuner.tooltip.apply": "Rechtsklick: auf Stock-Link anwenden",
+  "com.thesettler_x_create.item.network_link_tuner.tooltip.reset_hint": "Umschalt + Rechtsklick: Linker zuruecksetzen",
+  "com.thesettler_x_create.item.network_link_tuner.tooltip.store": "Rechtsklick: Netzwerk von Stock-Link speichern"
 }

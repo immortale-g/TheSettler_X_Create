@@ -54,14 +54,7 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   @Nullable
   public TileEntityCreateShop getShopTile() {
-    if (level == null || shopPos == null) {
-      return null;
-    }
-    BlockEntity be = level.getBlockEntity(shopPos);
-    if (be instanceof TileEntityCreateShop shop) {
-      return shop;
-    }
-    return null;
+    return TileEntityCreateShop.fromLevel(level, shopPos);
   }
 
   /** Reserve items for a specific request to avoid duplicate ordering. */
@@ -624,31 +617,6 @@ public class CreateShopBlockEntity extends BlockEntity {
     return remaining;
   }
 
-  //    public int consumeReserved(ItemStack key, int amount) {
-  //        if (amount <= 0) {
-  //            return 0;
-  //        }
-  //        cleanExpired();
-  //        int remaining = amount;
-  //        Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
-  //        while (iterator.hasNext() && remaining > 0) {
-  //            Reservation reservation = iterator.next().getValue();
-  //            if (!matches(reservation.stackKey, key)) {
-  //                continue;
-  //            }
-  //            int taken = Math.min(remaining, reservation.reservedAmount);
-  //            reservation.reservedAmount -= taken;
-  //            remaining -= taken;
-  //            if (reservation.reservedAmount <= 0) {
-  //                iterator.remove();
-  //            }
-  //        }
-  //        if (remaining != amount) {
-  //            setChanged();
-  //        }
-  //        return amount - remaining;
-  //    }
-
   public java.util.List<ItemStack> getReservedStacksSnapshot() {
     cleanExpired();
     java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
@@ -829,11 +797,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   }
 
   private static String sanitize(String value) {
-    if (value == null) {
-      return "";
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
+    return com.thesettler_x_create.TextUtil.sanitize(value);
   }
 
   private static String buildNoticeSegmentKey(

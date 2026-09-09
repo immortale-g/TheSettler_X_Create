@@ -15,11 +15,10 @@ import org.junit.jupiter.api.Test;
 class CreateShopRequestResolverRecoveryOwnershipGuardTest {
   @Test
   void ownershipGuardIsRetainedInRecoveryServiceForExtraActiveChildCase() throws Exception {
-    // RecoveryService is the second top-level class in DeliveryChildLifecycleService.java
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildRecoveryService.java"));
 
     assertTrue(
         source.contains("if (!ownership.isRequestOwnedByLocalResolver(manager, parentRequest))"));

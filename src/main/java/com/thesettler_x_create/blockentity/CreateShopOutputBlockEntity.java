@@ -1,7 +1,6 @@
 package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
-import com.minecolonies.api.util.WorldUtil;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -39,14 +38,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
 
   @Nullable
   public TileEntityCreateShop getShopTile() {
-    if (level == null || shopPos == null) {
-      return null;
-    }
-    BlockEntity be = level.getBlockEntity(shopPos);
-    if (be instanceof TileEntityCreateShop shop) {
-      return shop;
-    }
-    return null;
+    return TileEntityCreateShop.fromLevel(level, shopPos);
   }
 
   public String getPackageAddress() {
@@ -151,17 +143,11 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       ItemStack extracted = key.copy();
       extracted.setCount(0);
 
-      for (BlockPos pos : shop.getBuilding().getContainers()) {
+      for (TileEntityCreateShop.LoadedRack loaded : shop.getLoadedRacks()) {
         if (remaining <= 0) {
           break;
         }
-        if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-          continue;
-        }
-        BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-        if (!(entity instanceof AbstractTileEntityRack rack)) {
-          continue;
-        }
+        AbstractTileEntityRack rack = loaded.rack();
         IItemHandler handler = rack.getItemHandlerCap();
         if (handler == null) {
           continue;

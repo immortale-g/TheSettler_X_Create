@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -149,11 +150,7 @@ final class ShopLostPackageRequestCanceller {
   }
 
   private static boolean isTerminalRequestState(RequestState state) {
-    return state == RequestState.CANCELLED
-        || state == RequestState.COMPLETED
-        || state == RequestState.FAILED
-        || state == RequestState.RECEIVED
-        || state == RequestState.RESOLVED;
+    return RequestStateUtil.isTerminalRequestState(state);
   }
 
   private static boolean matchesLostPackageDeliverable(

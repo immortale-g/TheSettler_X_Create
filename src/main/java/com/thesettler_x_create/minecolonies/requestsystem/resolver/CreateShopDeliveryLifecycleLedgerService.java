@@ -225,14 +225,11 @@ final class CreateShopDeliveryLifecycleLedgerService {
       if (buildingManager != null && buildingManager.getBuildings() != null) {
         for (var entry : buildingManager.getBuildings().entrySet()) {
           Object building = entry.getValue();
-          if (!(building
-                  instanceof
-                  com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
-                  warehouse)
-              || building
-                  instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
+          if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
             continue;
           }
+          var warehouse =
+              (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
           var queue = warehouse.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
           if (queue != null && queue.getMutableRequestList() != null) {
             queueContains |= queue.getMutableRequestList().contains(childToken);
@@ -303,14 +300,10 @@ final class CreateShopDeliveryLifecycleLedgerService {
       }
       for (var entry : buildingManager.getBuildings().entrySet()) {
         Object building = entry.getValue();
-        if (!(building
-                instanceof
-                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
-                warehouse)
-            || building
-                instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
+        if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
           continue;
         }
+        var warehouse = (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
         var couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
         if (couriers == null || couriers.getAssignedCitizen() == null) {
           continue;
@@ -355,14 +348,10 @@ final class CreateShopDeliveryLifecycleLedgerService {
       }
       for (var entry : buildingManager.getBuildings().entrySet()) {
         Object building = entry.getValue();
-        if (!(building
-                instanceof
-                com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse
-                warehouse)
-            || building
-                instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop) {
+        if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
           continue;
         }
+        var warehouse = (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
         var couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
         if (couriers == null || couriers.getAssignedCitizen() == null) {
           continue;

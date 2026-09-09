@@ -21,13 +21,8 @@ import org.jetbrains.annotations.Nullable;
 
 public class CreateNetworkFacade implements ICreateNetworkFacade {
   private static final int MAX_PACKAGE_COUNT = 99;
-  private static final java.util.Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS =
-      new java.util.concurrent.ConcurrentHashMap<>();
   private final TileEntityCreateShop shop;
-  private long lastPerfLogTime = 0L;
-  private long lastSummaryNanos = 0L;
-  private long lastBroadcastNanos = 0L;
-  private int lastBroadcastCount = 0;
+  private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
 
   public CreateNetworkFacade(TileEntityCreateShop shop) {
     this.shop = shop;
@@ -211,7 +206,13 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return Collections.emptyList();
     }
-    queueRequestStacks(normalized, requesterName, requestUuid);
+    CreateNetworkRequestQueue.queue(
+        this,
+        shop.getStockNetworkId(),
+        shop.getShopAddress(),
+        normalized,
+        requesterName,
+        requestUuid);
     if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] queued {} stack(s) for grouped network broadcast {} -> '{}'",
@@ -238,21 +239,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   public static void flushQueuedRequests() {
-    if (QUEUED_REQUESTS.isEmpty()) {
-      return;
-    }
-    var snapshot = new java.util.ArrayList<>(QUEUED_REQUESTS.entrySet());
-    QUEUED_REQUESTS.clear();
-    for (var entry : snapshot) {
-      QueuedRequestKey key = entry.getKey();
-      QueuedRequestBucket bucket = entry.getValue();
-      if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
-        continue;
-      }
-      if (!bucket.facade.broadcastQueuedRequest(key, bucket.stacks)) {
-        requeueFailedBucket(key, bucket);
-      }
-    }
+    CreateNetworkRequestQueue.flush();
   }
 
   private List<ItemStack> consolidateRequestedStacks(List<ItemStack> requestedStacks) {
@@ -394,8 +381,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return null;
     } finally {
-      lastSummaryNanos = System.nanoTime() - start;
-      maybeLogPerf();
+      perfLogger.recordSummary(System.nanoTime() - start, shop);
     }
   }
 
@@ -417,60 +403,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     return summary;
   }
 
-  private void maybeLogPerf() {
-    if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-      return;
-    }
-    if (shop == null || shop.getLevel() == null) {
-      return;
-    }
-    long now = shop.getLevel().getGameTime();
-    if (now != 0L
-        && now - lastPerfLogTime < com.thesettler_x_create.Config.PERF_LOG_COOLDOWN.getAsLong()) {
-      return;
-    }
-    lastPerfLogTime = now;
-    com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] perf summary: getSummary={}us broadcast={}us items={}",
-        lastSummaryNanos / 1000L,
-        lastBroadcastNanos / 1000L,
-        lastBroadcastCount);
-  }
-
-  private void queueRequestStacks(
-      List<ItemStack> stacks, String requesterName, @Nullable UUID requestUuid) {
-    if (stacks == null || stacks.isEmpty() || shop == null || shop.getStockNetworkId() == null) {
-      return;
-    }
-    QueuedRequestKey key =
-        new QueuedRequestKey(
-            shop.getStockNetworkId(),
-            shop.getShopAddress(),
-            requesterName == null ? "" : requesterName,
-            requestUuid);
-    QueuedRequestBucket bucket =
-        QUEUED_REQUESTS.computeIfAbsent(key, k -> new QueuedRequestBucket(this));
-    bucket.facade = this;
-    for (ItemStack stack : stacks) {
-      mergeInto(bucket.stacks, stack);
-    }
-  }
-
-  private static void requeueFailedBucket(QueuedRequestKey key, QueuedRequestBucket failed) {
-    if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
-      return;
-    }
-    QueuedRequestBucket target =
-        QUEUED_REQUESTS.computeIfAbsent(key, ignored -> new QueuedRequestBucket(failed.facade));
-    if (target.facade == null) {
-      target.facade = failed.facade;
-    }
-    for (ItemStack stack : failed.stacks) {
-      mergeInto(target.stacks, stack);
-    }
-  }
-
-  private boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
+  boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
     if (key == null
         || stacks == null
         || stacks.isEmpty()
@@ -525,65 +458,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       return false;
     } finally {
-      lastBroadcastNanos = System.nanoTime() - start;
-      lastBroadcastCount = order.size();
-      maybeLogPerf();
-    }
-  }
-
-  private static void mergeInto(List<ItemStack> target, ItemStack stack) {
-    if (target == null || stack == null || stack.isEmpty()) {
-      return;
-    }
-    for (ItemStack existing : target) {
-      if (ItemStack.isSameItemSameComponents(existing, stack)) {
-        existing.setCount(existing.getCount() + stack.getCount());
-        return;
-      }
-    }
-    target.add(stack.copy());
-  }
-
-  private static final class QueuedRequestBucket {
-    private CreateNetworkFacade facade;
-    private final List<ItemStack> stacks = new ArrayList<>();
-
-    private QueuedRequestBucket(CreateNetworkFacade facade) {
-      this.facade = facade;
-    }
-  }
-
-  private static final class QueuedRequestKey {
-    private final UUID networkId;
-    private final String address;
-    private final String requesterName;
-    @Nullable private final UUID requestUuid;
-
-    private QueuedRequestKey(
-        UUID networkId, String address, String requesterName, @Nullable UUID requestUuid) {
-      this.networkId = networkId;
-      this.address = address == null ? "" : address;
-      this.requesterName = requesterName == null ? "" : requesterName;
-      this.requestUuid = requestUuid;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) {
-        return true;
-      }
-      if (!(obj instanceof QueuedRequestKey other)) {
-        return false;
-      }
-      return java.util.Objects.equals(networkId, other.networkId)
-          && java.util.Objects.equals(address, other.address)
-          && java.util.Objects.equals(requesterName, other.requesterName)
-          && java.util.Objects.equals(requestUuid, other.requestUuid);
-    }
-
-    @Override
-    public int hashCode() {
-      return java.util.Objects.hash(networkId, address, requesterName, requestUuid);
+      perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
     }
   }
 }

@@ -90,12 +90,10 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
         ItemStack stack = pContext.getItemInHand();
         CompoundTag data =
             stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (data.contains("GaugeColonyId")) {
+        if (GaugeLinkData.isLinked(data)) {
           PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, existing, location);
-          int colonyId = data.getInt("GaugeColonyId");
-          BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-          String dimension = data.getString("GaugeDimension");
-          if (be.addPanel(slot, colonyId, shopPos, dimension)) {
+          GaugeLinkData link = GaugeLinkData.readFrom(data);
+          if (be.addPanel(slot, link.colonyId(), link.shopPos())) {
             level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
             Player player = pContext.getPlayer();
             if (player != null && !player.isCreative()) {
@@ -145,9 +143,9 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (!isGaugeStack(stack)) return ItemInteractionResult.SUCCESS;
 
     CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-    if (!data.contains("GaugeColonyId")) {
+    if (!GaugeLinkData.isLinked(data)) {
       player.displayClientMessage(
-          Component.literal("Right-click a Create Shop hut first to link the gauge to a colony."),
+          Component.translatable("com.thesettler_x_create.message.colony_gauge.link_shop_first"),
           true);
       return ItemInteractionResult.FAIL;
     }
@@ -155,16 +153,14 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     Vec3 location = hitResult.getLocation();
     if (location == null) return ItemInteractionResult.SUCCESS;
 
-    int colonyId = data.getInt("GaugeColonyId");
-    BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-    String dimension = data.getString("GaugeDimension");
+    GaugeLinkData link = GaugeLinkData.readFrom(data);
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, state, location);
 
     withBlockEntityDo(
         level,
         pos,
         be -> {
-          if (!be.addPanel(slot, colonyId, shopPos, dimension)) return;
+          if (!be.addPanel(slot, link.colonyId(), link.shopPos())) return;
           level.playSound(null, pos, soundType.getPlaceSound(), SoundSource.BLOCKS, 1f, 1f);
           if (!player.isCreative()) {
             stack.shrink(1);
@@ -213,11 +209,9 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (pPlacer == null || pLevel.isClientSide()) return;
 
     CompoundTag data = pStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-    if (!data.contains("GaugeColonyId")) return;
+    if (!GaugeLinkData.isLinked(data)) return;
 
-    int colonyId = data.getInt("GaugeColonyId");
-    BlockPos shopPos = BlockPos.of(data.getLong("GaugeShopPos"));
-    String dimension = data.getString("GaugeDimension");
+    GaugeLinkData link = GaugeLinkData.readFrom(data);
 
     double range = pPlacer.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) + 1;
     HitResult hitResult = pPlacer.pick(range, 1, false);
@@ -225,7 +219,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (location == null) return;
 
     PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pPos, pState, location);
-    withBlockEntityDo(pLevel, pPos, be -> be.addPanel(slot, colonyId, shopPos, dimension));
+    withBlockEntityDo(pLevel, pPos, be -> be.addPanel(slot, link.colonyId(), link.shopPos()));
   }
 
   @Override

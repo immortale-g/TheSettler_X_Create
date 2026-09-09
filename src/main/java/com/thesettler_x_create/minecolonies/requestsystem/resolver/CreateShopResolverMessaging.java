@@ -13,8 +13,6 @@ import org.jetbrains.annotations.Nullable;
 final class CreateShopResolverMessaging {
   private final Map<String, Long> lastFlowChatTick = new HashMap<>();
 
-  CreateShopResolverMessaging(CreateShopRequestResolver resolver) {}
-
   void sendShopChat(IRequestManager manager, String key, List<ItemStack> stacks) {
     if (!isChatMessagesEnabled()) {
       return;

@@ -12,9 +12,9 @@ class BuildingCreateShopLostPackageHandoverPreviewFallbackGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageHandoverProcessor.java"));
 
-    assertTrue(source.contains("rackIndex.ensureRackContainers();"));
+    assertTrue(source.contains("shop.ensureRackContainers();"));
     assertTrue(
         source.contains(
             "List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);"));

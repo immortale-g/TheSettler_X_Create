@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.ResolverLocationUtil;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -367,13 +368,7 @@ final class ShopResolverHealthCheck {
   }
 
   private boolean isLocalShopResolver(CreateShopRequestResolver resolver) {
-    if (resolver == null || resolver.getLocation() == null || shop.getLocation() == null) {
-      return false;
-    }
-    return resolver.getLocation().getDimension().equals(shop.getLocation().getDimension())
-        && resolver
-            .getLocation()
-            .getInDimensionLocation()
-            .equals(shop.getLocation().getInDimensionLocation());
+    return resolver != null
+        && ResolverLocationUtil.sameLocation(resolver.getLocation(), shop.getLocation());
   }
 }
