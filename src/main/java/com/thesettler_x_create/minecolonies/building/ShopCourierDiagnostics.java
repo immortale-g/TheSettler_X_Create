@@ -2,8 +2,11 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.constant.TypeConstants;
+import com.minecolonies.core.colony.CitizenData;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.managers.CitizenManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.HashMap;
@@ -481,22 +484,16 @@ final class ShopCourierDiagnostics {
     }
     boolean invoked = false;
     String result = "<unknown>";
-    try {
-      var method = citizen.getClass().getMethod("updateEntityIfNecessary", Level.class);
-      method.invoke(citizen, level);
-      invoked = true;
-      result = "ok";
-    } catch (NoSuchMethodException ignored) {
+    if (citizen instanceof CitizenData cd) {
       try {
-        var method = citizen.getClass().getMethod("updateEntityIfNecessary");
-        method.invoke(citizen);
+        cd.updateEntityIfNecessary();
         invoked = true;
         result = "ok";
       } catch (Exception ex) {
         result = ex.getMessage() == null ? "<error>" : ex.getMessage();
       }
-    } catch (Exception ex) {
-      result = ex.getMessage() == null ? "<error>" : ex.getMessage();
+    } else {
+      result = "<not-CitizenData>";
     }
     boolean forceInvoked = false;
     String forceResult = "<skipped>";
@@ -555,17 +552,8 @@ final class ShopCourierDiagnostics {
       if (manager == null) {
         return "<no-manager>";
       }
-      var method =
-          manager
-              .getClass()
-              .getMethod(
-                  "spawnOrCreateCitizen",
-                  com.minecolonies.api.colony.ICitizenData.class,
-                  Level.class);
-      method.invoke(manager, citizen, level);
+      manager.spawnOrCreateCitizen(citizen, level);
       return "ok";
-    } catch (NoSuchMethodException ex) {
-      return "<no-method>";
     } catch (Exception ex) {
       return ex.getMessage() == null ? "<error>" : ex.getMessage();
     }
@@ -576,26 +564,15 @@ final class ShopCourierDiagnostics {
       return "<skipped>";
     }
     Object entity = getCitizenEntity(citizen, level);
-    if (entity == null) {
+    if (!(entity instanceof AbstractEntityCitizen mcEntity)) {
       return "<no-entity>";
     }
     try {
       var manager = shop.getColony().getCitizenManager();
-      if (manager == null) {
+      if (!(manager instanceof CitizenManager cm)) {
         return "<no-manager>";
       }
-      java.lang.reflect.Method target = null;
-      for (var method : manager.getClass().getMethods()) {
-        if (!"registerCivilian".equals(method.getName()) || method.getParameterCount() != 1) {
-          continue;
-        }
-        target = method;
-        break;
-      }
-      if (target == null) {
-        return "<no-method>";
-      }
-      target.invoke(manager, entity);
+      cm.registerCivilian(mcEntity);
       return "ok";
     } catch (Exception ex) {
       return ex.getMessage() == null ? "<error>" : ex.getMessage();
@@ -603,14 +580,12 @@ final class ShopCourierDiagnostics {
   }
 
   private Object getCitizenEntity(ICitizenData citizen, Level level) {
-    java.util.Optional<com.minecolonies.api.entity.citizen.AbstractEntityCitizen> opt =
-        citizen.getEntity();
+    java.util.Optional<AbstractEntityCitizen> opt = citizen.getEntity();
     if (opt.isPresent()) {
       return opt.get();
     }
-    Object uuidValue = tryInvoke(citizen, "getUUID");
-    if (uuidValue instanceof java.util.UUID uuid
-        && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+    java.util.UUID uuid = citizen instanceof CitizenData cd ? cd.getUUID() : null;
+    if (uuid != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
       return serverLevel.getEntity(uuid);
     }
     return null;
@@ -620,17 +595,14 @@ final class ShopCourierDiagnostics {
     if (citizen == null || level == null) {
       return "<skipped>";
     }
-    Object entityOpt = tryInvoke(citizen, "getEntity");
-    boolean hasEntityOpt = entityOpt instanceof java.util.Optional<?>;
-    boolean entityOptPresent = hasEntityOpt && ((java.util.Optional<?>) entityOpt).isPresent();
+    java.util.Optional<AbstractEntityCitizen> entityOpt = citizen.getEntity();
     Object entity = getCitizenEntity(citizen, level);
+    java.util.UUID citizenUuid = citizen instanceof CitizenData cd ? cd.getUUID() : null;
     if (!(entity instanceof net.minecraft.world.entity.Entity mcEntity)) {
-      Object uuidValue = tryInvoke(citizen, "getUUID");
-      String uuidInfo = uuidValue instanceof java.util.UUID uuid ? uuid.toString() : "<null>";
+      String uuidInfo = citizenUuid == null ? "<null>" : citizenUuid.toString();
       String lookup = "<n/a>";
-      if (uuidValue instanceof java.util.UUID uuid
-          && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-        var found = serverLevel.getEntity(uuid);
+      if (citizenUuid != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+        var found = serverLevel.getEntity(citizenUuid);
         lookup =
             found == null
                 ? "<missing>"
@@ -640,63 +612,32 @@ final class ShopCourierDiagnostics {
                     + " dim="
                     + serverLevel.dimension().location();
       }
-      String optInfo = hasEntityOpt ? (entityOptPresent ? "present" : "empty") : "n/a";
+      String optInfo = entityOpt.isPresent() ? "present" : "empty";
       return "<no-entity opt=" + optInfo + " uuid=" + uuidInfo + " uuidLookup=" + lookup + ">";
     }
-    Object citizenUuidValue = tryInvoke(citizen, "getUUID");
-    if (citizenUuidValue instanceof java.util.UUID citizenUuid) {
+    if (citizenUuid != null) {
       java.util.UUID entityUuid = mcEntity.getUUID();
       if (!citizenUuid.equals(entityUuid)) {
         return "<uuid-mismatch citizen=" + citizenUuid + " entity=" + entityUuid + ">";
       }
     }
     int id = mcEntity.getId();
-    try {
-      java.lang.reflect.Method target = null;
-      for (var method : citizen.getClass().getMethods()) {
-        if (!"setEntity".equals(method.getName()) || method.getParameterCount() != 1) {
-          continue;
-        }
-        Class<?> param = method.getParameterTypes()[0];
-        if (param.isAssignableFrom(entity.getClass())) {
-          target = method;
-          break;
-        }
-      }
-      if (target != null) {
-        target.invoke(citizen, entity);
+    if (citizen instanceof CitizenData cd && entity instanceof AbstractEntityCitizen ace) {
+      try {
+        cd.setEntity(ace);
         return "setEntity ok id=" + id;
+      } catch (Exception ex) {
+        return ex.getMessage() == null ? "<error>" : ex.getMessage();
       }
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
-    }
-    try {
-      var method = citizen.getClass().getMethod("setEntityId", int.class);
-      method.invoke(citizen, id);
-      return "setEntityId(int) ok id=" + id;
-    } catch (NoSuchMethodException ignored) {
-      // Fallthrough to other options.
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
-    }
-    try {
-      var method = citizen.getClass().getMethod("setEntityId", Integer.class);
-      method.invoke(citizen, Integer.valueOf(id));
-      return "setEntityId(Integer) ok id=" + id;
-    } catch (NoSuchMethodException ignored) {
-      // Fallthrough to field.
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
     }
     return "<no-public-setter>";
   }
 
   private int safeCitizenEntityId(ICitizenData citizen) {
-    Object entityIdValue = tryInvoke(citizen, "getEntityId");
-    if (entityIdValue instanceof Number number) {
-      return number.intValue();
+    if (citizen == null) {
+      return -1;
     }
-    return -1;
+    return citizen.getEntity().map(net.minecraft.world.entity.Entity::getId).orElse(-1);
   }
 
   private String describeCitizenPosition(ICitizenData citizen) {
