@@ -13,17 +13,20 @@ import org.junit.jupiter.api.Test;
  * two Gauges requesting the same item from the same shop could then have one cancel the other's
  * still-wanted request. Fixed together with s1-4 (persist the tracking map instead of relying on a
  * fallback that can't tell two gauges apart).
+ *
+ * <p>This logic lives in {@code ShopGaugeQueue} (extracted from {@code BuildingCreateShop} in the
+ * pre-1.0 hardening pass's Cluster 6 god-class refactor).
  */
 class BuildingCreateShopGaugeCancelPrecisionGuardTest {
 
+  private static final String SOURCE =
+      "src/main/java/com/thesettler_x_create/minecolonies/building/ShopGaugeQueue.java";
+
   @Test
   void cancelDoesNotFallBackToItemOnlyLiveScan() throws Exception {
-    String source =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+    String source = Files.readString(Path.of(SOURCE));
 
-    int method = source.indexOf("public int cancelPendingGaugeRequests(");
+    int method = source.indexOf("int cancelPendingGaugeRequests(");
     // Bounded lookahead instead of a line-ending-sensitive "end of method" marker - this file is
     // checked out with CRLF line endings, which broke a "\n  }\n" search.
     String body = source.substring(method, Math.min(source.length(), method + 1400));
@@ -37,10 +40,7 @@ class BuildingCreateShopGaugeCancelPrecisionGuardTest {
 
   @Test
   void pendingGaugeRequestsIsPersistedToNbt() throws Exception {
-    String source =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
+    String source = Files.readString(Path.of(SOURCE));
 
     assertTrue(source.contains("tag.put(\"PendingGaugeRequests\", list);"));
     assertTrue(source.contains("compound.contains(\"PendingGaugeRequests\", 9)"));
