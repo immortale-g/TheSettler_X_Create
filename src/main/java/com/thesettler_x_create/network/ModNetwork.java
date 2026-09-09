@@ -26,6 +26,15 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModNetwork {
   private ModNetwork() {}
 
+  /**
+   * Shared max length for this mod's own address fields (Create Shop, Packager). Not used by the
+   * Colony Gauge's address field - that one reuses Create's own {@code AddressEditBox} widget,
+   * which hardcodes a 25-character max length matching Create's package-address convention, so
+   * {@code ColonyGaugeConfigPacket} intentionally keeps its own, smaller constant instead of
+   * sharing this one.
+   */
+  public static final int SHOP_ADDRESS_MAX_LENGTH = 64;
+
   public static void registerPayloads(RegisterPayloadHandlersEvent event) {
     PayloadRegistrar registrar = event.registrar(TheSettlerXCreate.MODID).versioned("1");
     registrar.playToServer(

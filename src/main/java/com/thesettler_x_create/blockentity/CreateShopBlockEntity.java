@@ -417,9 +417,10 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
     String requester = sanitize(requesterName);
     String destination = sanitize(address);
+    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
     int remaining = 0;
     for (InflightEntry entry : inflightEntries) {
-      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
       if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
@@ -596,11 +597,12 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   private int cancelInflightMatches(
       ItemStack stackKey, String requester, String destination, long requestedAt) {
+    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
     int removed = 0;
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext()) {
       InflightEntry entry = iterator.next();
-      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
       if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
@@ -620,10 +622,11 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   private int consumeInflightMatches(
       ItemStack stackKey, int remaining, String requester, String destination, long requestedAt) {
+    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
     Iterator<InflightEntry> iterator = inflightEntries.iterator();
     while (iterator.hasNext() && remaining > 0) {
       InflightEntry entry = iterator.next();
-      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
       if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
@@ -798,6 +801,25 @@ public class CreateShopBlockEntity extends BlockEntity {
       return true;
     }
     return ItemStack.isSameItem(a, b);
+  }
+
+  /**
+   * Seam-audit finding s1-5: matching by item type alone (ignoring components) is only trustworthy
+   * when the requester/address tuple also positively confirms which request an entry belongs to.
+   * Once that tuple is dropped - the drift-recovery fallback both {@link #getInflightRemaining(
+   * ItemStack, String, String, long)} and {@link #consumeInflightMatches} use when a citizen
+   * rename/reassignment makes the recorded requester/address stop matching - item type is the only
+   * signal left, so loosening it too would let two unrelated requests for component-different
+   * variants of the same item (e.g. differently enchanted books) consume each other's inflight
+   * entries. Callers pass {@code requireExactItemMatch = requester.isEmpty() &&
+   * destination.isEmpty()} to require an exact match precisely in that degraded case.
+   */
+  private static boolean matchesForInflightLookup(
+      ItemStack entryStack, ItemStack stackKey, boolean requireExactItemMatch) {
+    if (requireExactItemMatch) {
+      return matches(entryStack, stackKey);
+    }
+    return matchesForInflightRecovery(entryStack, stackKey);
   }
 
   private static boolean containsKey(List<ItemStack> keys, ItemStack key) {

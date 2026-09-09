@@ -7,12 +7,29 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 
+/**
+ * Read-mostly {@link IItemHandler} view of everything currently sitting in this shop's racks, so
+ * Create's automation (Stock Ticker, hoppers, etc.) can see and pull from rack contents through the
+ * same interface it uses for any other inventory. It is a snapshot, not a live index: {@code
+ * cachedStacks} is rebuilt from a fresh rack scan every {@link #CACHE_TTL_TICKS}, and a slot index
+ * only identifies "the Nth distinct item as of the last refresh" - it is not a stable handle to a
+ * particular item across refreshes. A caller that reads {@link #getStackInSlot(int)} to decide what
+ * to extract and then calls {@link #extractItem(int, int, boolean)} with that same index some time
+ * later (rather than in the same synchronous step) can therefore end up extracting a different item
+ * than the one it saw, if a refresh reordered the list in between - the same well-known caveat
+ * every dynamic/virtual slot-index IItemHandler has (no different from a chest's contents changing
+ * between two ticks). The list is kept in a deterministic order (by registry name, not rack-scan
+ * order) so a slot's meaning stays stable across refreshes for as long as the same set of distinct
+ * items remains present, minimizing - though not eliminating - the practical window for this.
+ */
 public class VirtualCreateNetworkItemHandler implements IItemHandler {
   private static final int MAX_DISPLAY = 64;
   private static final long CACHE_TTL_TICKS = 20L;
@@ -141,6 +158,10 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
     cachedStacks = getAvailableStacksFromRacks();
     mergeReservedStacks(shopBlockEntity.getReservedStacksSnapshot());
+    // Deterministic order (not rack-scan order) so a slot keeps meaning the same item across
+    // refreshes for as long as the same set of distinct items is present - see class Javadoc.
+    cachedStacks.sort(
+        Comparator.comparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
   }
 
   private void mergeReservedStacks(List<ItemStack> reservedStacks) {

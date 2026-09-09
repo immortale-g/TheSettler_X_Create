@@ -14,6 +14,10 @@ public record ColonyGaugeConfigPacket(
     boolean clearPromises,
     boolean reset)
     implements CustomPacketPayload {
+  // Intentionally not ModNetwork.SHOP_ADDRESS_MAX_LENGTH: the Gauge screen's address field is
+  // Create's own AddressEditBox, which hardcodes setMaxLength(25) in its constructor to match
+  // Create's package-address convention - this constant must track that, not this mod's own
+  // (longer) Shop/Packager address length.
   private static final int ADDRESS_MAX_LENGTH = 25;
 
   public static final Type<ColonyGaugeConfigPacket> TYPE =

@@ -1,6 +1,7 @@
 package com.thesettler_x_create.client.gui;
 
 import com.thesettler_x_create.menu.CreateShopMenu;
+import com.thesettler_x_create.network.ModNetwork;
 import com.thesettler_x_create.network.SetCreateShopAddressPayload;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -10,7 +11,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public class CreateShopScreen extends AbstractContainerScreen<CreateShopMenu> {
-  private static final int ADDRESS_MAX_LENGTH = 64;
   private static final Component LABEL_ADDRESS =
       Component.translatable("com.thesettler_x_create.gui.createshop.address_label");
   private static final Component LABEL_SAVE =
@@ -31,7 +31,7 @@ public class CreateShopScreen extends AbstractContainerScreen<CreateShopMenu> {
     int y = (height - imageHeight) / 2;
 
     addressBox = new EditBox(font, x + 10, y + 25, 156, 18, LABEL_ADDRESS);
-    addressBox.setMaxLength(ADDRESS_MAX_LENGTH);
+    addressBox.setMaxLength(ModNetwork.SHOP_ADDRESS_MAX_LENGTH);
     addressBox.setValue(menu.getShopAddress());
     addRenderableWidget(addressBox);
 

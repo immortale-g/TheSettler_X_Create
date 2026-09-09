@@ -9,7 +9,6 @@ import net.minecraft.resources.ResourceLocation;
 
 public record SetPackagerAddressPayload(BlockPos hutPos, String address)
     implements CustomPacketPayload {
-  private static final int ADDRESS_MAX_LENGTH = 64;
   public static final Type<SetPackagerAddressPayload> TYPE =
       new Type<>(
           ResourceLocation.fromNamespaceAndPath(TheSettlerXCreate.MODID, "set_packager_address"));
@@ -18,10 +17,11 @@ public record SetPackagerAddressPayload(BlockPos hutPos, String address)
       StreamCodec.of(
           (buf, payload) -> {
             buf.writeBlockPos(payload.hutPos);
-            buf.writeUtf(payload.address, ADDRESS_MAX_LENGTH);
+            buf.writeUtf(payload.address, ModNetwork.SHOP_ADDRESS_MAX_LENGTH);
           },
           buf ->
-              new SetPackagerAddressPayload(buf.readBlockPos(), buf.readUtf(ADDRESS_MAX_LENGTH)));
+              new SetPackagerAddressPayload(
+                  buf.readBlockPos(), buf.readUtf(ModNetwork.SHOP_ADDRESS_MAX_LENGTH)));
 
   @Override
   public Type<? extends CustomPacketPayload> type() {
