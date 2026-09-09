@@ -166,7 +166,8 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     int consumed = 0;
     if (response == 0) {
       BuildingCreateShop.LostPackageReorderResult reorder =
-          shop.restartLostPackageDetailed(stackKey, remaining, requesterName, address, requestedAt);
+          shop.restartLostPackageDetailed(
+              stackKey, remaining, requesterName, address, requestedAt, requestUuid);
       consumed = reorder.consumed();
       if (reorder.status() == BuildingCreateShop.LostPackageReorderStatus.NO_NETWORK_STOCK) {
         active = false;

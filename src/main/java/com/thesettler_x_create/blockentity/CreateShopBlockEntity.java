@@ -367,6 +367,37 @@ public class CreateShopBlockEntity extends BlockEntity {
     return consumed;
   }
 
+  /**
+   * Returns currently tracked inflight remainder for a request, matched by its MineColonies request
+   * UUID rather than the requester-name/address strings {@link #getInflightRemaining( ItemStack,
+   * String, String, long)} relies on — those can drift if a citizen is renamed or a resolver
+   * reassigns the request before this check runs, causing a false "nothing inflight" read and a
+   * duplicate network order. Every other lifecycle step (cancel, clear, hand-off) was already
+   * UUID-first; this was the one read path still on strings-only.
+   */
+  public int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid) {
+    if (!ensureServerThread("getInflightRemaining")) {
+      return 0;
+    }
+    if (stackKey == null
+        || stackKey.isEmpty()
+        || requestUuid == null
+        || inflightEntries.isEmpty()) {
+      return 0;
+    }
+    int remaining = 0;
+    for (InflightEntry entry : inflightEntries) {
+      if (!requestUuid.equals(entry.requestUuid)) {
+        continue;
+      }
+      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
+        continue;
+      }
+      remaining += Math.max(0, entry.remaining);
+    }
+    return remaining;
+  }
+
   /** Returns currently tracked inflight remainder for a lost-package tuple. */
   public int getInflightRemaining(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {

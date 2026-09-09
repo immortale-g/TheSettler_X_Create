@@ -9,6 +9,7 @@ import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.api.util.WorldUtil;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.create.CreateNetworkPerfLogger;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private ItemStack capacityStallStack = ItemStack.EMPTY;
   private int capacityStallRequested;
   private int capacityStallAccepted;
+
+  // One logger per shop, not per CreateNetworkFacade call - see CreateNetworkPerfLogger's javadoc.
+  private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
 
   public TileEntityCreateShop(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_BUILDING.get(), pos, state);
@@ -77,6 +81,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   @Nullable
   public UUID getStockNetworkId() {
     return stockNetworkId;
+  }
+
+  public CreateNetworkPerfLogger getPerfLogger() {
+    return perfLogger;
   }
 
   public String getShopAddress() {

@@ -8,8 +8,13 @@ import java.util.concurrent.TimeUnit;
 import net.minecraft.world.level.Level;
 
 final class CreateShopPendingDeliveryTracker {
+  // 5 minutes was too short for a slow courier leg (traffic jam, sleep cycle) to survive without
+  // the cache entry expiring mid-flight; ROADMAP.md Phase 4.3 already flagged this and proposed
+  // 30 minutes. request.hasChildren() covers the case where a native MineColonies child delivery
+  // already exists, so this TTL only matters for requests still waiting on a slower Create-network
+  // leg with no child yet.
   private final Cache<IToken<?>, CreateShopPendingDeliveryState> pending =
-      CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
+      CacheBuilder.newBuilder().expireAfterWrite(30, TimeUnit.MINUTES).build();
 
   CreateShopPendingDeliveryState getOrCreate(IToken<?> token) {
     CreateShopPendingDeliveryState state = pending.getIfPresent(token);

@@ -79,7 +79,13 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
 
-  /** Transient: maps pending colony-request token → gauge task (for cancellation cleanup). */
+  /**
+   * Persisted: maps pending colony-request token → gauge task (for cancellation cleanup). Kept in
+   * NBT (see {@code PendingGaugeRequests}) so {@link #cancelPendingGaugeRequests(ItemStack,
+   * String)} can always resolve which address a token belongs to, even after a world/server
+   * restart, without falling back to an item-only scan that can't distinguish between two gauges
+   * requesting the same item.
+   */
   private final java.util.Map<IToken<?>, GaugePackagingTask> pendingGaugeRequests =
       new java.util.LinkedHashMap<>();
 
@@ -600,9 +606,11 @@ public class BuildingCreateShop extends AbstractBuilding {
    * Cancels any still-open colony request(s) for the given Gauge item/address — called when a
    * Gauge's promise is cleared or its filter is reset, so a request left unresolved (e.g. no
    * courier assigned to the warehouse) doesn't keep piling up as a duplicate on the next request
-   * attempt. Matches both the transient {@code pendingGaugeRequests} tracking (by address) and,
-   * since that tracking doesn't survive a world/server restart, a live scan of this shop's own
-   * still-open requests (by item — the request payload has no address of its own).
+   * attempt. Matches the NBT-persisted {@code pendingGaugeRequests} tracking by address (with
+   * {@code item} as an extra safety filter) — deliberately does not fall back to a live, item-only
+   * scan of this shop's other open requests, since two different Gauges requesting the same item
+   * from the same shop would then be indistinguishable and cancelling one could cancel the other's
+   * still-wanted request too.
    */
   public int cancelPendingGaugeRequests(ItemStack item, String gaugeAddress) {
     if (gaugeAddress == null || gaugeAddress.isBlank() || getColony() == null) {
@@ -613,21 +621,10 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
     Set<IToken<?>> toCancel = new java.util.LinkedHashSet<>();
     for (var entry : pendingGaugeRequests.entrySet()) {
-      if (entry.getValue().gaugeAddress().equals(gaugeAddress)) {
+      GaugePackagingTask task = entry.getValue();
+      if (task.gaugeAddress().equals(gaugeAddress)
+          && (item == null || item.isEmpty() || ItemStack.isSameItem(task.item(), item))) {
         toCancel.add(entry.getKey());
-      }
-    }
-    IRequester requester = getRequester();
-    if (item != null && !item.isEmpty() && requester != null) {
-      for (IRequest<?> request :
-          standard.getRequestHandler().getRequestsMadeByRequester(requester)) {
-        if (request == null || request.hasParent() || isTerminalRequestState(request.getState())) {
-          continue;
-        }
-        if (request.getRequest() instanceof Stack stack
-            && ItemStack.isSameItem(stack.getStack(), item)) {
-          toCancel.add(request.getId());
-        }
       }
     }
     CreateShopBlockEntity pickup = getPickupBlockEntity();
@@ -729,6 +726,17 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   LostPackageReorderResult restartLostPackageDetailed(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    return restartLostPackageDetailed(
+        stackKey, remaining, requesterName, address, requestedAt, null);
+  }
+
+  LostPackageReorderResult restartLostPackageDetailed(
+      ItemStack stackKey,
+      int remaining,
+      String requesterName,
+      String address,
+      long requestedAt,
+      @Nullable java.util.UUID requestUuid) {
     if (isDebugRequests()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requested item={} remaining={} requester='{}' address='{}'",
@@ -769,7 +777,8 @@ public class BuildingCreateShop extends AbstractBuilding {
     ItemStack requested = stackKey.copy();
     requested.setCount(reorderTarget);
     var reordered =
-        new CreateNetworkFacade(tile).requestStacksImmediate(List.of(requested), requesterName);
+        new CreateNetworkFacade(tile)
+            .requestStacksImmediate(List.of(requested), requesterName, requestUuid);
     if (reordered.isEmpty()) {
       if (isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -1248,6 +1257,36 @@ public class BuildingCreateShop extends AbstractBuilding {
         }
       }
     }
+    pendingGaugeRequests.clear();
+    if (compound.contains("PendingGaugeRequests", 9)) {
+      net.minecraft.nbt.ListTag list = compound.getList("PendingGaugeRequests", 10);
+      var factoryController =
+          com.minecolonies.api.colony.requestsystem.StandardFactoryController.getInstance();
+      for (int i = 0; i < list.size(); i++) {
+        CompoundTag t = list.getCompound(i);
+        try {
+          IToken<?> token = factoryController.deserializeTag(provider, t.getCompound("Token"));
+          ItemStack item = ItemStack.parseOptional(provider, t.getCompound("Item"));
+          int amount = t.getInt("Amount");
+          String address = t.getString("Address");
+          if (token != null && !item.isEmpty() && amount > 0 && !address.isEmpty()) {
+            java.util.UUID requestId =
+                t.contains("RequestId")
+                    ? java.util.UUID.fromString(t.getString("RequestId"))
+                    : java.util.UUID.randomUUID();
+            pendingGaugeRequests.put(
+                token, new GaugePackagingTask(item, amount, address, requestId));
+          }
+        } catch (Exception ex) {
+          if (isDebugRequests()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[ColonyGauge] failed to restore pendingGaugeRequests entry {}: {}",
+                i,
+                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+          }
+        }
+      }
+    }
   }
 
   @Override
@@ -1277,6 +1316,22 @@ public class BuildingCreateShop extends AbstractBuilding {
         list.add(t);
       }
       tag.put("GaugePackagingQueue", list);
+    }
+    if (!pendingGaugeRequests.isEmpty()) {
+      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+      var factoryController =
+          com.minecolonies.api.colony.requestsystem.StandardFactoryController.getInstance();
+      for (var entry : pendingGaugeRequests.entrySet()) {
+        GaugePackagingTask task = entry.getValue();
+        CompoundTag t = new CompoundTag();
+        t.put("Token", factoryController.serializeTag(provider, entry.getKey()));
+        t.put("Item", task.item().save(provider));
+        t.putInt("Amount", task.amount());
+        t.putString("Address", task.gaugeAddress());
+        t.putString("RequestId", task.requestId().toString());
+        list.add(t);
+      }
+      tag.put("PendingGaugeRequests", list);
     }
     return tag;
   }

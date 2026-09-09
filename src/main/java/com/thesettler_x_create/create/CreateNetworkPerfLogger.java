@@ -4,8 +4,14 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 
-/** Tracks and rate-limits debug perf logging for one {@link CreateNetworkFacade}. */
-final class CreateNetworkPerfLogger {
+/**
+ * Tracks and rate-limits debug perf logging for one Create Shop.
+ *
+ * <p>Owned by {@link TileEntityCreateShop} (one instance per shop, long-lived) rather than by
+ * {@code CreateNetworkFacade} - the facade is constructed fresh at essentially every call site, so
+ * a logger living inside it never carries its cooldown state past a single call.
+ */
+public final class CreateNetworkPerfLogger {
   private long lastPerfLogTime = 0L;
   private long lastSummaryNanos = 0L;
   private long lastBroadcastNanos = 0L;

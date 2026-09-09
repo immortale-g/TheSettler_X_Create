@@ -22,10 +22,13 @@ import org.jetbrains.annotations.Nullable;
 public class CreateNetworkFacade implements ICreateNetworkFacade {
   private static final int MAX_PACKAGE_COUNT = 99;
   private final TileEntityCreateShop shop;
-  private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
+  // Owned by the shop, not this facade - the facade is constructed fresh at nearly every call
+  // site, so a logger living here would never carry its cooldown state past a single call.
+  private final CreateNetworkPerfLogger perfLogger;
 
   public CreateNetworkFacade(TileEntityCreateShop shop) {
     this.shop = shop;
+    this.perfLogger = shop != null ? shop.getPerfLogger() : new CreateNetworkPerfLogger();
   }
 
   @Override
@@ -119,7 +122,17 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     if (summary == null || summary.isEmpty()) {
       return Collections.emptyList();
     }
+    return planItemsFromSummary(deliverable, amount, summary);
+  }
 
+  /**
+   * Same planning logic as {@link #planItems}, but reuses an already-fetched {@link
+   * InventorySummary} instead of hitting the network-wide scan again - {@link #requestItems} needs
+   * the summary for its own empty-check anyway, so fetching it twice per call wastes a full network
+   * scan every time (and the perf logger's own same-tick cooldown hides that it happened).
+   */
+  private List<ItemStack> planItemsFromSummary(
+      IDeliverable deliverable, int amount, InventorySummary summary) {
     int remaining = amount;
     List<ItemStack> orderedStacks = new ArrayList<>();
     List<BigItemStack> candidates = new ArrayList<>();
@@ -187,7 +200,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       return Collections.emptyList();
     }
 
-    List<ItemStack> orderedStacks = planItems(deliverable, amount);
+    List<ItemStack> orderedStacks = planItemsFromSummary(deliverable, amount, summary);
     return requestStacksWithUuid(orderedStacks, requesterName, requestUuid);
   }
 
@@ -225,6 +238,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
   public List<ItemStack> requestStacksImmediate(
       List<ItemStack> requestedStacks, String requesterName) {
+    return requestStacksImmediate(requestedStacks, requesterName, null);
+  }
+
+  public List<ItemStack> requestStacksImmediate(
+      List<ItemStack> requestedStacks, String requesterName, @Nullable UUID requestUuid) {
     List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
     if (normalized.isEmpty() || !hasNetwork() || shop == null) {
       return Collections.emptyList();
@@ -234,7 +252,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             shop.getStockNetworkId(),
             shop.getShopAddress(),
             requesterName == null ? "" : requesterName,
-            null);
+            requestUuid);
     return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
   }
 

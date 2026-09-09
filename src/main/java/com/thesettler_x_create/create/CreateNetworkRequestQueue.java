@@ -1,5 +1,6 @@
 package com.thesettler_x_create.create;
 
+import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,13 @@ import org.jetbrains.annotations.Nullable;
  */
 final class CreateNetworkRequestQueue {
   private CreateNetworkRequestQueue() {}
+
+  /**
+   * A broadcast that keeps failing (stale/merged network id, no linked packager, etc.) would
+   * otherwise requeue forever with no visible signal — the deficit gets silently re-derived and
+   * re-queued every tick. Give up after this many consecutive failures and log loudly instead.
+   */
+  private static final int MAX_RETRY_ATTEMPTS = 5;
 
   private static final Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS =
       new ConcurrentHashMap<>();
@@ -62,11 +70,25 @@ final class CreateNetworkRequestQueue {
     if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
       return;
     }
+    int attempts = failed.failedAttempts + 1;
+    if (attempts > MAX_RETRY_ATTEMPTS) {
+      TheSettlerXCreate.LOGGER.warn(
+          "[CreateShop] giving up on Create network request after {} failed broadcast attempts,"
+              + " network={} address='{}' requester='{}' stacks={} - dropping (reservation, if"
+              + " any, is not released here; the requester will need to re-derive the need)",
+          attempts - 1,
+          key.networkId,
+          key.address,
+          key.requesterName,
+          failed.stacks.size());
+      return;
+    }
     QueuedRequestBucket target =
         QUEUED_REQUESTS.computeIfAbsent(key, ignored -> new QueuedRequestBucket(failed.facade));
     if (target.facade == null) {
       target.facade = failed.facade;
     }
+    target.failedAttempts = attempts;
     for (ItemStack stack : failed.stacks) {
       mergeInto(target.stacks, stack);
     }

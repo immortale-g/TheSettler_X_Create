@@ -9,6 +9,9 @@ final class QueuedRequestBucket {
   CreateNetworkFacade facade;
   final List<ItemStack> stacks = new ArrayList<>();
 
+  /** How many consecutive broadcast failures this bucket has survived (see requeueFailedBucket). */
+  int failedAttempts;
+
   QueuedRequestBucket(CreateNetworkFacade facade) {
     this.facade = facade;
   }

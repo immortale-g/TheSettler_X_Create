@@ -198,9 +198,12 @@ final class CreateShopAttemptResolveService {
     int effectiveNetworkNeeded = remaining;
     if (remaining > 0 && workerWorking) {
       requesterName = messaging.resolveRequesterName(manager, request);
-      inflightRemaining =
-          pickup.getInflightRemaining(
-              deliverable.getResult(), requesterName, tile.getShopAddress());
+      inflightRemaining = pickup.getInflightRemaining(deliverable.getResult(), requestId);
+      if (inflightRemaining <= 0) {
+        inflightRemaining =
+            pickup.getInflightRemaining(
+                deliverable.getResult(), requesterName, tile.getShopAddress());
+      }
       effectiveNetworkNeeded = Math.max(0, remaining - Math.max(0, inflightRemaining));
       if (effectiveNetworkNeeded > 0) {
         networkOrdered.addAll(
