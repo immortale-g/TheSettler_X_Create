@@ -223,7 +223,14 @@ final class CreateShopResetCommands {
                   com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery
               && request.getState() == RequestState.CREATED) {
             try {
-              standard.assignRequest(token);
+              // Seam-audit finding s3-2: a raw assignRequest() here re-ran resolver search
+              // without first clearing the stale forward-map entry that got us into this loop
+              // (this token is only visible here because it's already present in
+              // store.getAssignments()) - risking a second, orphaned assignment-store entry for
+              // the same token. reassignRequest() explicitly unassigns via the same
+              // resolver-assignment data store before reassigning, closing that gap; it's the
+              // same repair idiom BuildingCreateShop.repairOpenPickupRequest already uses.
+              standard.reassignRequest(token, java.util.Collections.emptyList());
               result.deliveryAssignKicks++;
             } catch (Exception kickEx) {
               result.errors++;
