@@ -78,6 +78,15 @@ public class Config {
           .comment("Cooldown (ticks) between performance timing summaries.")
           .defineInRange("perfLogCooldown", 200L, 0L, 24000L);
 
+  public static final ModConfigSpec.LongValue BELT_PLACEMENT_BUFFER_TTL_TICKS =
+      BUILDER
+          .comment(
+              "Ticks before a buffered-but-incomplete Create belt placement (waiting on the rest"
+                  + " of its run) is considered abandoned and discarded instead of risking a"
+                  + " collision with a later, unrelated belt run that resolves to the same"
+                  + " buffer key.")
+          .defineInRange("beltPlacementBufferTtlTicks", 20L * 60L * 5L, 20L, 24000L);
+
   public static final ModConfigSpec.BooleanValue ENABLE_DEV_TEST_COMMANDS =
       BUILDER
           .comment(
