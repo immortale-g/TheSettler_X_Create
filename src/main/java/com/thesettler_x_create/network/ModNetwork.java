@@ -1,5 +1,8 @@
 package com.thesettler_x_create.network;
 
+import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.IColonyManager;
+import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
@@ -234,6 +237,13 @@ public final class ModNetwork {
             return;
           }
           FactoryPanelPosition position = payload.position();
+          if (!isAuthorized(player, position.pos())) {
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet skip reason=not-authorized pos={}", position.pos());
+            }
+            return;
+          }
           if (!(player.level().getBlockEntity(position.pos())
               instanceof ColonyGaugeBlockEntity be)) {
             if (debug) {
@@ -288,7 +298,20 @@ public final class ModNetwork {
   }
 
   private static TileEntityCreateShop getShop(ServerPlayer player, BlockPos pos) {
+    if (!isAuthorized(player, pos)) {
+      return null;
+    }
     BlockEntity be = player.level().getBlockEntity(pos);
     return be instanceof TileEntityCreateShop shop ? shop : null;
+  }
+
+  /**
+   * Requires the sending player to be a member of the colony that owns the building at {@code pos}
+   * with permission to manage huts, so a crafted packet naming an arbitrary {@link BlockPos} cannot
+   * reconfigure or drain a building the player has no relation to.
+   */
+  private static boolean isAuthorized(ServerPlayer player, BlockPos pos) {
+    IColony colony = IColonyManager.getInstance().getColonyByPosFromWorld(player.level(), pos);
+    return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
   }
 }

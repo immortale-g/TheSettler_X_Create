@@ -57,4 +57,19 @@ class ItemStackNetworkPayloadGuardTest {
             < decodeBody.indexOf("BigItemStack.STREAM_CODEC.decode"));
     assertTrue(decodeBody.contains("new ArrayList<>(count)"));
   }
+
+  @Test
+  void createShopBatchRequestPayloadBoundsCountBeforeAllocating() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/network/CreateShopBatchRequestPayload.java"));
+
+    // A client-controlled VarInt must be range-checked before it drives an ArrayList allocation -
+    // otherwise a crafted packet can force an oversized allocation attempt on the network thread.
+    int countRead = source.indexOf("int count = buf.readVarInt();");
+    int boundsCheck = source.indexOf("count > MAX_STACKS", countRead);
+    int allocation = source.indexOf("new ArrayList<>(count)", countRead);
+    assertTrue(countRead > 0 && boundsCheck > countRead && boundsCheck < allocation);
+  }
 }

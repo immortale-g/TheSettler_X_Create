@@ -13,6 +13,8 @@ import net.minecraft.resources.ResourceLocation;
 public record CreateShopBatchRequestPayload(BlockPos pos, List<BigItemStack> stacks)
     implements CustomPacketPayload {
 
+  private static final int MAX_STACKS = 256;
+
   public static final Type<CreateShopBatchRequestPayload> TYPE =
       new Type<>(
           ResourceLocation.fromNamespaceAndPath(
@@ -31,6 +33,10 @@ public record CreateShopBatchRequestPayload(BlockPos pos, List<BigItemStack> sta
               buf -> {
                 BlockPos pos = buf.readBlockPos();
                 int count = buf.readVarInt();
+                if (count < 0 || count > MAX_STACKS) {
+                  throw new io.netty.handler.codec.DecoderException(
+                      "CreateShopBatchRequestPayload stack count out of bounds: " + count);
+                }
                 List<BigItemStack> stacks = new ArrayList<>(count);
                 for (int i = 0; i < count; i++) {
                   stacks.add(BigItemStack.STREAM_CODEC.decode(buf));

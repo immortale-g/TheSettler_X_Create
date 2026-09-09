@@ -52,8 +52,13 @@ public class ColonyGaugeSetItemMenu extends GhostItemMenu<ColonyGaugeBehaviour> 
   @OnlyIn(Dist.CLIENT)
   protected ColonyGaugeBehaviour createOnClient(RegistryFriendlyByteBuf extraData) {
     FactoryPanelPosition pos = FactoryPanelPosition.STREAM_CODEC.decode(extraData);
-    ColonyGaugeBlockEntity be =
-        (ColonyGaugeBlockEntity) Minecraft.getInstance().level.getBlockEntity(pos.pos());
+    // A null return here is safe: GhostItemMenu.initAndReadInventory ignores its contentHolder
+    // argument, and MenuBase.stillValid() reports the menu invalid once contentHolder is null —
+    // the client closes the screen cleanly instead of crashing on a stale/removed panel.
+    if (!(Minecraft.getInstance().level.getBlockEntity(pos.pos())
+        instanceof ColonyGaugeBlockEntity be)) {
+      return null;
+    }
     return be.panels.get(pos.slot());
   }
 
