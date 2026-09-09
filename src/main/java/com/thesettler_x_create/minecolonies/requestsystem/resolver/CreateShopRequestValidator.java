@@ -158,7 +158,7 @@ final class CreateShopRequestValidator {
     }
     CreateShopStockSnapshot snapshot =
         stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
-    int available = snapshot.getAvailable();
+    int available = snapshot.available();
     // Return false so MineColonies falls back to the next resolver (player) when not enough stock.
     if (available <= 0) {
       if (holdDeliveryWindow) {

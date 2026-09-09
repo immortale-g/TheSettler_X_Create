@@ -15,10 +15,10 @@ import net.minecraft.world.item.ItemStack;
 
 /** Shopkeeper interaction for temporary rack-capacity stalls. */
 public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
-  private static final String TAG_STACK = "Stack";
+  private static final String TAG_STACK = LostPackageInteractionTags.TAG_STACK;
   private static final String TAG_REQUESTED = "Requested";
   private static final String TAG_ACCEPTED = "Accepted";
-  private static final String TAG_ACTIVE = "Active";
+  private static final String TAG_ACTIVE = LostPackageInteractionTags.TAG_ACTIVE;
 
   private ItemStack stackKey = ItemStack.EMPTY;
   private int requested;

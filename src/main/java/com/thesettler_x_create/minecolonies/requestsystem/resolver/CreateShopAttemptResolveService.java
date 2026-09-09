@@ -168,8 +168,8 @@ final class CreateShopAttemptResolveService {
 
     CreateShopStockSnapshot snapshot =
         stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
-    int rackUsable = snapshot.getRackUsable();
-    int networkAvailable = workerWorking ? snapshot.getNetworkAvailable() : 0;
+    int rackUsable = snapshot.rackUsable();
+    int networkAvailable = workerWorking ? snapshot.networkAvailable() : 0;
     int available = Math.max(0, networkAvailable + rackUsable);
     int provide = Math.min(available, needed);
     if (provide <= 0) {

@@ -8,6 +8,7 @@ import com.simibubi.create.content.logistics.stockTicker.StockCheckingBlockEntit
 import com.simibubi.create.content.logistics.stockTicker.StockTickerBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 import java.util.UUID;
@@ -79,7 +80,7 @@ public class StockLinkLinkerItem extends Item {
       return InteractionResult.CONSUME;
     }
 
-    CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+    CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
 
     if (!tag.hasUUID(FREQ_TAG)) {
       tag.putUUID(FREQ_TAG, behaviour.freqId);
@@ -139,7 +140,7 @@ public class StockLinkLinkerItem extends Item {
   }
 
   public static UUID getStoredNetworkId(ItemStack stack) {
-    CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+    CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
     return tag.hasUUID(FREQ_TAG) ? tag.getUUID(FREQ_TAG) : null;
   }
 
@@ -161,7 +162,7 @@ public class StockLinkLinkerItem extends Item {
   @Override
   public void appendHoverText(
       ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-    CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+    CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
     if (tag.hasUUID(FREQ_TAG)) {
       tooltip.add(
           Component.translatable(

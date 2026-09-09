@@ -44,7 +44,6 @@ If you choose to install or run this mod on a server, you do so **at your own ri
 Compatibility issues, unexpected behavior, or even world corruption may occur.
 
 Please make sure to create proper backups before installing this mod on any server.
-=======
 
 Project Positioning
 ===================

@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
  * and packaged for delivery to a Gauge's address. Extracted from {@code BuildingCreateShop} (which
  * held this directly until the pre-1.0 hardening pass) to keep that class's size manageable.
  */
-class ShopGaugeQueue {
+final class ShopGaugeQueue {
   private final BuildingCreateShop owner;
 
   /**

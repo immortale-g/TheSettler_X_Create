@@ -6,13 +6,13 @@ import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.PanelSlot;
 import com.simibubi.create.foundation.block.IBE;
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -24,7 +24,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.BlockGetter;
@@ -88,8 +87,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (existing.is(this) && location != null && be != null) {
       if (!level.isClientSide()) {
         ItemStack stack = pContext.getItemInHand();
-        CompoundTag data =
-            stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        CompoundTag data = ItemStackDataUtil.copyCustomData(stack);
         if (GaugeLinkData.isLinked(data)) {
           PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, existing, location);
           GaugeLinkData link = GaugeLinkData.readFrom(data);
@@ -142,7 +140,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     if (level.isClientSide) return ItemInteractionResult.SUCCESS;
     if (!isGaugeStack(stack)) return ItemInteractionResult.SUCCESS;
 
-    CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+    CompoundTag data = ItemStackDataUtil.copyCustomData(stack);
     if (!GaugeLinkData.isLinked(data)) {
       player.displayClientMessage(
           Component.translatable("com.thesettler_x_create.message.colony_gauge.link_shop_first"),
@@ -208,7 +206,7 @@ public class ColonyGaugeBlock extends FaceAttachedHorizontalDirectionalBlock
     super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
     if (pPlacer == null || pLevel.isClientSide()) return;
 
-    CompoundTag data = pStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+    CompoundTag data = ItemStackDataUtil.copyCustomData(pStack);
     if (!GaugeLinkData.isLinked(data)) return;
 
     GaugeLinkData link = GaugeLinkData.readFrom(data);

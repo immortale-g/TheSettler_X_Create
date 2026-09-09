@@ -9,7 +9,6 @@ public final class TextUtil {
     if (value == null) {
       return "";
     }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
+    return value.trim();
   }
 }

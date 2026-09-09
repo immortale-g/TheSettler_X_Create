@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.debug;
 
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
@@ -178,7 +179,7 @@ public final class NativeRequestFlowDiagnostics {
     }
   }
 
-  private String describeChildren(Object handler, IRequest<?> request) {
+  private String describeChildren(IRequestHandler handler, IRequest<?> request) {
     if (handler == null
         || request == null
         || request.getChildren() == null
@@ -208,14 +209,12 @@ public final class NativeRequestFlowDiagnostics {
     return children.isEmpty() ? "-" : String.join(",", children);
   }
 
-  private IRequest<?> resolveRequest(Object handler, IToken<?> token) {
+  private IRequest<?> resolveRequest(IRequestHandler handler, IToken<?> token) {
     if (handler == null || token == null) {
       return null;
     }
     try {
-      var method = handler.getClass().getMethod("getRequest", IToken.class);
-      Object result = method.invoke(handler, token);
-      return result instanceof IRequest<?> request ? request : null;
+      return handler.getRequest(token);
     } catch (Exception ignored) {
       return null;
     }

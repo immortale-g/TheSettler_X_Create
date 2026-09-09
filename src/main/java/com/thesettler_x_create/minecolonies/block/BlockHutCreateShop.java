@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.block;
 import com.minecolonies.api.blocks.AbstractBlockHut;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.block.ColonyGaugeBlockItem;
 import com.thesettler_x_create.block.GaugeLinkData;
 import com.thesettler_x_create.item.StockLinkLinkerItem;
@@ -54,8 +55,7 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
       if (!level.isClientSide) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof TileEntityCreateShop shop && shop.getColony() != null) {
-          CompoundTag tag =
-              stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+          CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
           GaugeLinkData.writeTo(tag, shop.getColony().getID(), pos);
           stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
           player.displayClientMessage(
