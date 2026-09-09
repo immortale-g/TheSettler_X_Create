@@ -13,26 +13,30 @@ import org.junit.jupiter.api.Test;
  * precisely by UUID instead of relying on string-based name/address matching. The UUID is threaded
  * from AttemptResolveService through recordInflight all the way to cancelInflightByUuid. Legacy
  * entries without a UUID fall back to string matching.
+ *
+ * <p>This bookkeeping lives in {@code ShopInflightLedger} (extracted from {@code
+ * CreateShopBlockEntity} in the pre-1.0 hardening pass); the field is no longer {@code public}
+ * since the ledger's own package-private methods are the only callers now.
  */
 class CreateShopBlockEntityUuidCancelGuardTest {
 
-  private static final String SOURCE =
-      "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java";
+  private static final String LEDGER_SOURCE =
+      "src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java";
 
   /** InflightEntry must carry a nullable UUID field so precise cancel is possible. */
   @Test
   void inflightEntryHasNullableRequestUuidField() throws Exception {
-    String source = Files.readString(Path.of(SOURCE));
+    String source = Files.readString(Path.of(LEDGER_SOURCE));
 
     assertTrue(
-        source.contains("@Nullable public UUID requestUuid"),
-        "InflightEntry must declare @Nullable public UUID requestUuid");
+        source.contains("@Nullable UUID requestUuid"),
+        "InflightEntry must declare @Nullable UUID requestUuid");
   }
 
   /** UUID is written to NBT during save and read back with a null-safe guard during load. */
   @Test
   void requestUuidIsSavedAndLoadedWithNullSafety() throws Exception {
-    String source = Files.readString(Path.of(SOURCE));
+    String source = Files.readString(Path.of(LEDGER_SOURCE));
 
     // Save path: only written when non-null.
     assertTrue(
@@ -51,7 +55,7 @@ class CreateShopBlockEntityUuidCancelGuardTest {
    */
   @Test
   void cancelInflightByUuidExistsWithStringFallback() throws Exception {
-    String source = Files.readString(Path.of(SOURCE));
+    String source = Files.readString(Path.of(LEDGER_SOURCE));
 
     assertTrue(
         source.contains("cancelInflightByUuid("),

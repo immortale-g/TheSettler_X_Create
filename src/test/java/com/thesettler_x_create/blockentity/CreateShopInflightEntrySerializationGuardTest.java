@@ -13,10 +13,14 @@ import org.junit.jupiter.api.Test;
  * <p>InflightEntry persists per-delivery inflight state across world reloads. Any field that is
  * saved but not loaded (or vice-versa) creates silent state drift — the block entity would report
  * different inflight counts after reload, causing spurious lost-package dialogs.
+ *
+ * <p>This bookkeeping lives in {@code ShopInflightLedger} (extracted from {@code
+ * CreateShopBlockEntity} in the pre-1.0 hardening pass); fields are package-private now since the
+ * ledger's own methods are the only callers.
  */
 class CreateShopInflightEntrySerializationGuardTest {
   private static final String SOURCE =
-      "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java";
+      "src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java";
 
   @Test
   void inflightEntrySavesAllMutableFields() throws Exception {
@@ -64,13 +68,13 @@ class CreateShopInflightEntrySerializationGuardTest {
   void inflightEntryClassHasExpectedFields() throws Exception {
     String source = Files.readString(Path.of(SOURCE));
 
-    // Structural check: InflightEntry must have exactly these public fields.
-    assertTrue(source.contains("public final ItemStack stackKey;"));
-    assertTrue(source.contains("public int remaining;"));
-    assertTrue(source.contains("public final long requestedAt;"));
-    assertTrue(source.contains("public final String requesterName;"));
-    assertTrue(source.contains("public final String address;"));
-    assertTrue(source.contains("public boolean notified;"));
+    // Structural check: InflightEntry must have exactly these fields.
+    assertTrue(source.contains("final ItemStack stackKey;"));
+    assertTrue(source.contains("int remaining;"));
+    assertTrue(source.contains("final long requestedAt;"));
+    assertTrue(source.contains("final String requesterName;"));
+    assertTrue(source.contains("final String address;"));
+    assertTrue(source.contains("boolean notified;"));
   }
 
   @Test

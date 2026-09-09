@@ -11,8 +11,7 @@ class CreateShopBlockEntityInflightNotifiedResetGuardTest {
   void partialConsumeResetsNotifiedForRemainingOverdueAmount() throws Exception {
     String source =
         Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java"));
+            Path.of("src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java"));
 
     assertTrue(source.contains("entry.notified = false;"));
   }

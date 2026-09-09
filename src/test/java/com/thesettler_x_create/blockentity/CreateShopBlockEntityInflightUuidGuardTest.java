@@ -18,12 +18,10 @@ class CreateShopBlockEntityInflightUuidGuardTest {
   void hasUuidBasedGetInflightRemainingOverload() throws Exception {
     String source =
         Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java"));
+            Path.of("src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java"));
 
     int method =
-        source.indexOf(
-            "public int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid)");
+        source.indexOf("int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid)");
     assertTrue(method > 0);
     // Bounded lookahead instead of hunting for a line-ending-sensitive "end of method" marker -
     // this file is checked out with CRLF line endings, which broke a "\n  }\n" search.

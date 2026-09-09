@@ -6,9 +6,6 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.VirtualCreateNetworkItemHandler;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,21 +19,21 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Pickup block entity for the Create Shop. Tracks reservations and inflight stock orders. */
+/**
+ * Pickup block entity for the Create Shop. Tracks reservations and inflight stock orders.
+ *
+ * <p>The actual bookkeeping lives in two extracted collaborators - {@link ShopReservationLedger}
+ * (per-request "this much is spoken for") and {@link ShopInflightLedger} ("this much is ordered but
+ * not here yet") - so this class stays a thin, stable public-API surface over them; every public
+ * method here delegates straight through.
+ */
 public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_SHOP_POS = "ShopPos";
-  private static final String TAG_RESERVATIONS = "Reservations";
-  private static final String TAG_INFLIGHT = "Inflight";
-  private static final String TAG_INFLIGHT_BASELINES = "InflightBaselines";
-  private static final long RESERVATION_TTL = 20L * 60L * 5L;
-  private static final int MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE = 2;
 
   private final IItemHandler itemHandler = new VirtualCreateNetworkItemHandler(this);
-  private final Map<UUID, Reservation> reservations = new HashMap<>();
-  private final List<InflightEntry> inflightEntries = new ArrayList<>();
-  private final List<BaselineEntry> inflightBaselines = new ArrayList<>();
+  private final ShopReservationLedger reservationLedger = new ShopReservationLedger(this);
+  private final ShopInflightLedger inflightLedger = new ShopInflightLedger(this);
   private BlockPos shopPos;
-  private long lastInflightLogTime;
 
   public CreateShopBlockEntity(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_PICKUP.get(), pos, state);
@@ -59,118 +56,41 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /** Reserve items for a specific request to avoid duplicate ordering. */
   public void reserve(UUID requestId, ItemStack key, int amount) {
-    if (!ensureServerThread("reserve")) {
-      return;
-    }
-    if (amount <= 0) {
-      return;
-    }
-    cleanExpired();
-    Reservation reservation = reservations.get(requestId);
-    if (reservation == null) {
-      reservations.put(
-          requestId, new Reservation(requestId, makeKey(key), amount, getExpireTime()));
-    } else {
-      reservation.stackKey = makeKey(key);
-      reservation.reservedAmount += amount;
-      reservation.expiresAtGameTime = getExpireTime();
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] Reserved {}x {} for {}", amount, key.getHoverName().getString(), requestId);
-    }
-    setChanged();
+    reservationLedger.reserve(requestId, key, amount);
   }
 
   /** Release all reservations for a request. */
   public void release(UUID requestId) {
-    if (!ensureServerThread("release")) {
-      return;
-    }
-    cleanExpired();
-    if (reservations.remove(requestId) != null) {
-      setChanged();
-    }
+    reservationLedger.release(requestId);
   }
 
   /** Returns total reserved count for a stack key. */
   public int getReservedFor(ItemStack key) {
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (matches(reservation.stackKey, key)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    return reservationLedger.getReservedFor(key);
   }
 
   /** Returns total reserved count for a deliverable match. */
   public int getReservedForDeliverable(IDeliverable deliverable) {
-    if (deliverable == null) {
-      return 0;
-    }
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (deliverable.matches(reservation.stackKey)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    return reservationLedger.getReservedForDeliverable(deliverable);
   }
 
   /** Returns reserved count for a specific request. */
   public int getReservedForRequest(UUID requestId) {
-    if (requestId == null) {
-      return 0;
-    }
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (requestId.equals(reservation.requestId)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    return reservationLedger.getReservedForRequest(requestId);
   }
 
   /** Consumes reserved items for a request when deliveries are created. */
   public int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
-    if (!ensureServerThread("consumeReservedForRequest")) {
-      return 0;
-    }
-    if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
-      return 0;
-    }
-    cleanExpired();
-    Reservation reservation = reservations.get(requestId);
-    if (reservation == null || !matches(reservation.stackKey, key)) {
-      return 0;
-    }
-    int taken = Math.min(amount, reservation.reservedAmount);
-    reservation.reservedAmount -= taken;
-    if (reservation.reservedAmount <= 0) {
-      reservations.remove(requestId);
-    }
-    if (taken > 0) {
-      setChanged();
-    }
-    return taken;
+    return reservationLedger.consumeReservedForRequest(requestId, key, amount);
+  }
+
+  public List<ItemStack> getReservedStacksSnapshot() {
+    return reservationLedger.getReservedStacksSnapshot();
   }
 
   /** Returns unique stack keys currently tracked as inflight. */
   public List<ItemStack> getInflightKeys() {
-    List<ItemStack> keys = new ArrayList<>();
-    for (InflightEntry entry : inflightEntries) {
-      if (entry.stackKey == null || entry.stackKey.isEmpty()) {
-        continue;
-      }
-      if (!containsKey(keys, entry.stackKey)) {
-        keys.add(entry.stackKey.copy());
-      }
-    }
-    return keys;
+    return inflightLedger.getInflightKeys();
   }
 
   /**
@@ -183,7 +103,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       Map<ItemStack, Integer> baselines,
       String requesterName,
       String address) {
-    recordInflight(stacks, baselines, requesterName, address, null);
+    inflightLedger.recordInflight(stacks, baselines, requesterName, address);
   }
 
   public void recordInflight(
@@ -192,140 +112,23 @@ public class CreateShopBlockEntity extends BlockEntity {
       String requesterName,
       String address,
       @Nullable UUID requestUuid) {
-    if (!ensureServerThread("recordInflight")) {
-      return;
-    }
-    if (stacks == null || stacks.isEmpty()) {
-      return;
-    }
-    long now = getGameTimeSafe();
-    boolean changed = false;
-    for (ItemStack stack : stacks) {
-      if (stack == null || stack.isEmpty() || stack.getCount() <= 0) {
-        continue;
-      }
-      ItemStack key = makeKey(stack);
-      int baseline = findCount(baselines, key);
-      upsertBaseline(key, baseline);
-      inflightEntries.add(
-          new InflightEntry(
-              key, stack.getCount(), now, sanitize(requesterName), sanitize(address), requestUuid));
-      changed = true;
-    }
-    if (compactInflightEntriesForPromptStability()) {
-      changed = true;
-    }
-    if (changed) {
-      setChanged();
-    }
+    inflightLedger.recordInflight(stacks, baselines, requesterName, address, requestUuid);
   }
 
   /** Reconciles inflight entries against current rack counts to detect arrivals. */
   public void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
-    if (!ensureServerThread("reconcileInflight")) {
-      return;
-    }
-    if (inflightEntries.isEmpty()) {
-      return;
-    }
-    ensureBaselines(currentCounts);
-    long now = getGameTimeSafe();
-    boolean changed = false;
-    for (BaselineEntry baseline : inflightBaselines) {
-      int current = findCount(currentCounts, baseline.stackKey);
-      int delta = Math.max(0, current - baseline.count);
-      if (baseline.count != current) {
-        baseline.count = current;
-        changed = true;
-      }
-      if (delta <= 0) {
-        continue;
-      }
-      int remaining = delta;
-      Iterator<InflightEntry> iterator = inflightEntries.iterator();
-      while (iterator.hasNext() && remaining > 0) {
-        InflightEntry entry = iterator.next();
-        if (!matches(entry.stackKey, baseline.stackKey)) {
-          continue;
-        }
-        int applied = Math.min(remaining, entry.remaining);
-        entry.remaining -= applied;
-        remaining -= applied;
-        if (entry.remaining <= 0) {
-          iterator.remove();
-          changed = true;
-        } else if (applied > 0) {
-          changed = true;
-        }
-      }
-    }
-    if (pruneBaselines()) {
-      changed = true;
-    }
-    if (shouldLogOverdue(now)) {
-      logOverdue(now);
-    }
-    if (changed) {
-      setChanged();
-    }
+    inflightLedger.reconcileInflight(currentCounts);
   }
 
   /** Marks overdue inflight entries as notified and returns notices to surface. */
   public List<InflightNotice> consumeOverdueNotices(long now, long timeout) {
-    if (!ensureServerThread("consumeOverdueNotices")) {
-      return java.util.Collections.emptyList();
-    }
-    if (timeout <= 0L || inflightEntries.isEmpty()) {
-      return java.util.Collections.emptyList();
-    }
-    Map<String, InflightEntry> bestPerPromptKey = new java.util.LinkedHashMap<>();
-    for (InflightEntry entry : inflightEntries) {
-      if (entry.remaining <= 0 || entry.notified) {
-        continue;
-      }
-      long age = now - entry.requestedAt;
-      if (age < timeout) {
-        continue;
-      }
-      String promptKey = buildNoticePromptKey(entry.stackKey, entry.address);
-      InflightEntry existing = bestPerPromptKey.get(promptKey);
-      if (existing == null || entry.requestedAt < existing.requestedAt) {
-        bestPerPromptKey.put(promptKey, entry);
-      }
-    }
-    if (bestPerPromptKey.isEmpty()) {
-      return java.util.Collections.emptyList();
-    }
-    InflightEntry selected = null;
-    for (InflightEntry candidate : bestPerPromptKey.values()) {
-      if (candidate == null) {
-        continue;
-      }
-      if (selected == null || candidate.requestedAt < selected.requestedAt) {
-        selected = candidate;
-      }
-    }
-    if (selected == null) {
-      return java.util.Collections.emptyList();
-    }
-    selected.notified = true;
-    setChanged();
-    long age = now - selected.requestedAt;
-    return java.util.List.of(
-        new InflightNotice(
-            selected.stackKey.copy(),
-            selected.remaining,
-            age,
-            selected.requesterName,
-            selected.address,
-            selected.requestedAt,
-            selected.requestUuid));
+    return inflightLedger.consumeOverdueNotices(now, timeout);
   }
 
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
   public int consumeInflight(
       ItemStack stackKey, int amount, @Nullable String requesterName, @Nullable String address) {
-    return consumeInflight(stackKey, amount, requesterName, address, -1L);
+    return inflightLedger.consumeInflight(stackKey, amount, requesterName, address);
   }
 
   public int consumeInflight(
@@ -334,37 +137,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!ensureServerThread("consumeInflight")) {
-      return 0;
-    }
-    if (stackKey == null || stackKey.isEmpty() || amount <= 0 || inflightEntries.isEmpty()) {
-      return 0;
-    }
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    int remaining = amount;
-    int consumed = 0;
-    boolean changed = false;
-    remaining = consumeInflightMatches(stackKey, remaining, requester, destination, requestedAt);
-    consumed = amount - remaining;
-    changed = consumed > 0;
-
-    // Fallback: old inflight entries can drift in requester/address text after reloads/renames.
-    // If strict tuple matching consumed nothing, clear by stack key to avoid stuck overdue loops.
-    if (consumed <= 0 && (!requester.isEmpty() || !destination.isEmpty()) && remaining > 0) {
-      int before = remaining;
-      remaining = consumeInflightMatches(stackKey, remaining, "", "", requestedAt);
-      int fallbackConsumed = before - remaining;
-      if (fallbackConsumed > 0) {
-        consumed += fallbackConsumed;
-        changed = true;
-      }
-    }
-    if (changed) {
-      pruneBaselines();
-      setChanged();
-    }
-    return consumed;
+    return inflightLedger.consumeInflight(stackKey, amount, requesterName, address, requestedAt);
   }
 
   /**
@@ -376,32 +149,13 @@ public class CreateShopBlockEntity extends BlockEntity {
    * UUID-first; this was the one read path still on strings-only.
    */
   public int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid) {
-    if (!ensureServerThread("getInflightRemaining")) {
-      return 0;
-    }
-    if (stackKey == null
-        || stackKey.isEmpty()
-        || requestUuid == null
-        || inflightEntries.isEmpty()) {
-      return 0;
-    }
-    int remaining = 0;
-    for (InflightEntry entry : inflightEntries) {
-      if (!requestUuid.equals(entry.requestUuid)) {
-        continue;
-      }
-      if (!matchesForInflightRecovery(entry.stackKey, stackKey)) {
-        continue;
-      }
-      remaining += Math.max(0, entry.remaining);
-    }
-    return remaining;
+    return inflightLedger.getInflightRemaining(stackKey, requestUuid);
   }
 
   /** Returns currently tracked inflight remainder for a lost-package tuple. */
   public int getInflightRemaining(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
-    return getInflightRemaining(stackKey, requesterName, address, -1L);
+    return inflightLedger.getInflightRemaining(stackKey, requesterName, address);
   }
 
   public int getInflightRemaining(
@@ -409,38 +163,13 @@ public class CreateShopBlockEntity extends BlockEntity {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!ensureServerThread("getInflightRemaining")) {
-      return 0;
-    }
-    if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
-      return 0;
-    }
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
-    int remaining = 0;
-    for (InflightEntry entry : inflightEntries) {
-      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
-        continue;
-      }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
-        continue;
-      }
-      remaining += Math.max(0, entry.remaining);
-    }
-    return remaining;
+    return inflightLedger.getInflightRemaining(stackKey, requesterName, address, requestedAt);
   }
 
   /** Clears tracked inflight entries for a matching stack/requester/address tuple. */
   public int cancelInflight(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
-    return cancelInflight(stackKey, requesterName, address, -1L);
+    return inflightLedger.cancelInflight(stackKey, requesterName, address);
   }
 
   public int cancelInflight(
@@ -448,24 +177,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!ensureServerThread("cancelInflight")) {
-      return 0;
-    }
-    if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
-      return 0;
-    }
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    int removed = cancelInflightMatches(stackKey, requester, destination, requestedAt);
-    // Fallback: requester labels can drift (hut name vs citizen name); clear by stack+address.
-    if (removed <= 0 && !requester.isEmpty()) {
-      removed = cancelInflightMatches(stackKey, "", destination, requestedAt);
-    }
-    if (removed > 0) {
-      pruneBaselines();
-      setChanged();
-    }
-    return removed;
+    return inflightLedger.cancelInflight(stackKey, requesterName, address, requestedAt);
   }
 
   /**
@@ -477,48 +189,15 @@ public class CreateShopBlockEntity extends BlockEntity {
    * @return total remaining quantity removed
    */
   public int cancelInflightByUuid(@Nullable UUID requestUuid) {
-    if (!ensureServerThread("cancelInflightByUuid")) {
-      return 0;
-    }
-    if (requestUuid == null || inflightEntries.isEmpty()) {
-      return 0;
-    }
-    int removed = 0;
-    Iterator<InflightEntry> iterator = inflightEntries.iterator();
-    while (iterator.hasNext()) {
-      InflightEntry entry = iterator.next();
-      if (requestUuid.equals(entry.requestUuid)) {
-        removed += Math.max(0, entry.remaining);
-        iterator.remove();
-      }
-    }
-    if (removed > 0) {
-      pruneBaselines();
-      setChanged();
-    }
-    return removed;
+    return inflightLedger.cancelInflightByUuid(requestUuid);
   }
 
   public void markInflightHandedOff(@Nullable UUID requestUuid) {
-    if (requestUuid == null) return;
-    for (InflightEntry e : inflightEntries) {
-      if (requestUuid.equals(e.requestUuid)) {
-        e.handedOff = true;
-        setChanged();
-        return;
-      }
-    }
+    inflightLedger.markInflightHandedOff(requestUuid);
   }
 
   public int clearInflightByUuid(@Nullable UUID requestUuid) {
-    if (requestUuid == null || inflightEntries.isEmpty()) return 0;
-    boolean removed = inflightEntries.removeIf(e -> requestUuid.equals(e.requestUuid));
-    if (removed) {
-      pruneBaselines();
-      setChanged();
-      return 1;
-    }
-    return 0;
+    return inflightLedger.clearInflightByUuid(requestUuid);
   }
 
   /** Clears reservations and inflight tracking for test/debug clean-state runs. */
@@ -526,13 +205,12 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (!ensureServerThread("clearRuntimeTrackingForDebug")) {
       return 0;
     }
-    int removed = reservations.size() + inflightEntries.size() + inflightBaselines.size();
+    int removed = reservationLedger.size() + inflightLedger.size();
     if (removed <= 0) {
       return 0;
     }
-    reservations.clear();
-    inflightEntries.clear();
-    inflightBaselines.clear();
+    reservationLedger.clear();
+    inflightLedger.clear();
     setChanged();
     return removed;
   }
@@ -546,235 +224,20 @@ public class CreateShopBlockEntity extends BlockEntity {
       @Nullable String requesterName,
       @Nullable String address,
       long ageTicks) {
-    if (!ensureServerThread("debugInjectInflight")) {
-      return 0;
-    }
-    if (stackKey == null || stackKey.isEmpty() || amount <= 0) {
-      return 0;
-    }
-    long now = getGameTimeSafe();
-    long requestedAt = Math.max(0L, now - Math.max(0L, ageTicks));
-    ItemStack key = makeKey(stackKey);
-    upsertBaseline(key, 0);
-    inflightEntries.add(
-        new InflightEntry(
-            key, Math.max(1, amount), requestedAt, sanitize(requesterName), sanitize(address)));
-    if (compactInflightEntriesForPromptStability()) {
-      // no-op; compact method mutates entries as needed
-    }
-    setChanged();
-    return amount;
+    return inflightLedger.debugInjectInflight(stackKey, amount, requesterName, address, ageTicks);
   }
 
   /** Debug helper: returns the oldest active inflight tuple, regardless of overdue state. */
   @Nullable
   public InflightNotice debugPeekOldestInflightNotice(long now) {
-    if (!ensureServerThread("debugPeekOldestInflightNotice")) {
-      return null;
-    }
-    InflightEntry selected = null;
-    for (InflightEntry entry : inflightEntries) {
-      if (entry == null || entry.remaining <= 0) {
-        continue;
-      }
-      if (selected == null || entry.requestedAt < selected.requestedAt) {
-        selected = entry;
-      }
-    }
-    if (selected == null) {
-      return null;
-    }
-    long age = Math.max(0L, now - selected.requestedAt);
-    return new InflightNotice(
-        selected.stackKey.copy(),
-        selected.remaining,
-        age,
-        selected.requesterName,
-        selected.address,
-        selected.requestedAt,
-        selected.requestUuid);
+    return inflightLedger.debugPeekOldestInflightNotice(now);
   }
 
-  private int cancelInflightMatches(
-      ItemStack stackKey, String requester, String destination, long requestedAt) {
-    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
-    int removed = 0;
-    Iterator<InflightEntry> iterator = inflightEntries.iterator();
-    while (iterator.hasNext()) {
-      InflightEntry entry = iterator.next();
-      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
-        continue;
-      }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
-        continue;
-      }
-      removed += Math.max(0, entry.remaining);
-      iterator.remove();
-    }
-    return removed;
-  }
-
-  private int consumeInflightMatches(
-      ItemStack stackKey, int remaining, String requester, String destination, long requestedAt) {
-    boolean requireExactItemMatch = requester.isEmpty() && destination.isEmpty();
-    Iterator<InflightEntry> iterator = inflightEntries.iterator();
-    while (iterator.hasNext() && remaining > 0) {
-      InflightEntry entry = iterator.next();
-      if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
-        continue;
-      }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
-        continue;
-      }
-      int used = Math.min(remaining, entry.remaining);
-      entry.remaining -= used;
-      remaining -= used;
-      if (entry.remaining <= 0) {
-        iterator.remove();
-      } else if (used > 0) {
-        // Partial inflight consumption must be promptable again for the unresolved remainder.
-        entry.notified = false;
-      }
-    }
-    return remaining;
-  }
-
-  public java.util.List<ItemStack> getReservedStacksSnapshot() {
-    cleanExpired();
-    java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
-    for (Reservation reservation : reservations.values()) {
-      if (reservation.stackKey == null || reservation.stackKey.isEmpty()) {
-        continue;
-      }
-      ItemStack stack = reservation.stackKey.copy();
-      stack.setCount(Math.max(1, reservation.reservedAmount));
-      stacks.add(stack);
-    }
-    return stacks;
-  }
-
-  private void cleanExpired() {
-    if (!ensureServerThread("cleanExpired")) {
-      return;
-    }
-    long now = getGameTimeSafe();
-    Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Reservation reservation = iterator.next().getValue();
-      if (reservation.expiresAtGameTime <= now) {
-        iterator.remove();
-      }
-    }
-  }
-
-  private void ensureBaselines(Map<ItemStack, Integer> currentCounts) {
-    for (InflightEntry entry : inflightEntries) {
-      if (entry.stackKey == null || entry.stackKey.isEmpty()) {
-        continue;
-      }
-      if (findBaseline(entry.stackKey) == null) {
-        int current = findCount(currentCounts, entry.stackKey);
-        inflightBaselines.add(new BaselineEntry(entry.stackKey.copy(), current));
-      }
-    }
-  }
-
-  private boolean pruneBaselines() {
-    boolean changed = false;
-    Iterator<BaselineEntry> iterator = inflightBaselines.iterator();
-    while (iterator.hasNext()) {
-      BaselineEntry baseline = iterator.next();
-      if (!hasInflightFor(baseline.stackKey)) {
-        iterator.remove();
-        changed = true;
-      }
-    }
-    return changed;
-  }
-
-  private boolean hasInflightFor(ItemStack key) {
-    for (InflightEntry entry : inflightEntries) {
-      if (matches(entry.stackKey, key)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private BaselineEntry findBaseline(ItemStack key) {
-    for (BaselineEntry baseline : inflightBaselines) {
-      if (matches(baseline.stackKey, key)) {
-        return baseline;
-      }
-    }
-    return null;
-  }
-
-  private void upsertBaseline(ItemStack key, int count) {
-    BaselineEntry existing = findBaseline(key);
-    if (existing != null) {
-      existing.count = count;
-      return;
-    }
-    inflightBaselines.add(new BaselineEntry(key.copy(), count));
-  }
-
-  private boolean shouldLogOverdue(long now) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
-      return false;
-    }
-    if (now == 0L) {
-      return false;
-    }
-    return now - lastInflightLogTime >= Config.INFLIGHT_LOG_COOLDOWN.getAsLong();
-  }
-
-  private void logOverdue(long now) {
-    long timeout = Config.INFLIGHT_TIMEOUT_TICKS.getAsLong();
-    if (timeout <= 0L) {
-      return;
-    }
-    List<String> entries = new ArrayList<>();
-    for (InflightEntry entry : inflightEntries) {
-      if (entry.remaining <= 0) {
-        continue;
-      }
-      long age = now - entry.requestedAt;
-      if (age < timeout) {
-        continue;
-      }
-      String label =
-          entry.stackKey.getHoverName().getString() + " x" + entry.remaining + " age=" + age;
-      entries.add(label);
-    }
-    if (entries.isEmpty()) {
-      return;
-    }
-    lastInflightLogTime = now;
-    TheSettlerXCreate.LOGGER.info("[CreateShop] inflight overdue: {}", String.join(" | ", entries));
-  }
-
-  private long getExpireTime() {
-    return getGameTimeSafe() + RESERVATION_TTL;
-  }
-
-  private long getGameTimeSafe() {
+  long getGameTimeSafe() {
     return level == null ? 0L : level.getGameTime();
   }
 
-  private boolean ensureServerThread(String action) {
+  boolean ensureServerThread(String action) {
     if (level == null || level.isClientSide) {
       return false;
     }
@@ -789,160 +252,6 @@ public class CreateShopBlockEntity extends BlockEntity {
     return true;
   }
 
-  private static boolean matches(ItemStack a, ItemStack b) {
-    return ItemStack.isSameItemSameComponents(a, b);
-  }
-
-  private static boolean matchesForInflightRecovery(ItemStack a, ItemStack b) {
-    if (a == null || a.isEmpty() || b == null || b.isEmpty()) {
-      return false;
-    }
-    if (matches(a, b)) {
-      return true;
-    }
-    return ItemStack.isSameItem(a, b);
-  }
-
-  /**
-   * Seam-audit finding s1-5: matching by item type alone (ignoring components) is only trustworthy
-   * when the requester/address tuple also positively confirms which request an entry belongs to.
-   * Once that tuple is dropped - the drift-recovery fallback both {@link #getInflightRemaining(
-   * ItemStack, String, String, long)} and {@link #consumeInflightMatches} use when a citizen
-   * rename/reassignment makes the recorded requester/address stop matching - item type is the only
-   * signal left, so loosening it too would let two unrelated requests for component-different
-   * variants of the same item (e.g. differently enchanted books) consume each other's inflight
-   * entries. Callers pass {@code requireExactItemMatch = requester.isEmpty() &&
-   * destination.isEmpty()} to require an exact match precisely in that degraded case.
-   */
-  private static boolean matchesForInflightLookup(
-      ItemStack entryStack, ItemStack stackKey, boolean requireExactItemMatch) {
-    if (requireExactItemMatch) {
-      return matches(entryStack, stackKey);
-    }
-    return matchesForInflightRecovery(entryStack, stackKey);
-  }
-
-  private static boolean containsKey(List<ItemStack> keys, ItemStack key) {
-    for (ItemStack existing : keys) {
-      if (matches(existing, key)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static int findCount(Map<ItemStack, Integer> counts, ItemStack key) {
-    if (counts == null || counts.isEmpty() || key == null || key.isEmpty()) {
-      return 0;
-    }
-    for (Map.Entry<ItemStack, Integer> entry : counts.entrySet()) {
-      if (matches(entry.getKey(), key)) {
-        return entry.getValue();
-      }
-    }
-    return 0;
-  }
-
-  private static ItemStack makeKey(ItemStack stack) {
-    ItemStack copy = stack.copy();
-    copy.setCount(1);
-    return copy;
-  }
-
-  private static String sanitize(String value) {
-    return com.thesettler_x_create.TextUtil.sanitize(value);
-  }
-
-  private static String buildNoticeSegmentKey(
-      ItemStack stackKey, String requesterName, String address, long requestedAt, int remaining) {
-    if (stackKey == null || stackKey.isEmpty()) {
-      return "minecraft:air|||" + requestedAt + "|" + remaining;
-    }
-    String itemId =
-        String.valueOf(
-            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    return itemId + "|" + requester + "|" + destination + "|" + requestedAt + "|" + remaining;
-  }
-
-  private static String buildNoticePromptKey(ItemStack stackKey, String address) {
-    if (stackKey == null || stackKey.isEmpty()) {
-      return "minecraft:air|";
-    }
-    String itemId =
-        String.valueOf(
-            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
-    String destination = sanitize(address);
-    return itemId + "|" + destination;
-  }
-
-  private static String buildNoticeTupleKey(
-      ItemStack stackKey, String requesterName, String address) {
-    if (stackKey == null || stackKey.isEmpty()) {
-      return "minecraft:air||";
-    }
-    String itemId =
-        String.valueOf(
-            net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stackKey.getItem()));
-    String requester = sanitize(requesterName);
-    String destination = sanitize(address);
-    return itemId + "|" + requester + "|" + destination;
-  }
-
-  private boolean compactInflightEntriesForPromptStability() {
-    if (inflightEntries.size() <= 1) {
-      return false;
-    }
-    boolean changed = false;
-    Map<String, InflightEntry> unique = new java.util.LinkedHashMap<>();
-    for (InflightEntry entry : inflightEntries) {
-      if (entry == null
-          || entry.stackKey == null
-          || entry.stackKey.isEmpty()
-          || entry.remaining <= 0) {
-        changed = true;
-        continue;
-      }
-      String segmentKey =
-          buildNoticeSegmentKey(
-              entry.stackKey,
-              entry.requesterName,
-              entry.address,
-              entry.requestedAt,
-              entry.remaining);
-      InflightEntry existing = unique.get(segmentKey);
-      if (existing == null) {
-        unique.put(segmentKey, entry);
-      } else {
-        existing.notified = existing.notified || entry.notified;
-        changed = true;
-      }
-    }
-
-    List<InflightEntry> sorted = new ArrayList<>(unique.values());
-    sorted.sort((left, right) -> Long.compare(right.requestedAt, left.requestedAt));
-    Map<String, Integer> keptPerTuple = new HashMap<>();
-    List<InflightEntry> compacted = new ArrayList<>(sorted.size());
-    for (InflightEntry entry : sorted) {
-      String tupleKey = buildNoticeTupleKey(entry.stackKey, entry.requesterName, entry.address);
-      int kept = keptPerTuple.getOrDefault(tupleKey, 0);
-      if (kept >= MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE) {
-        changed = true;
-        continue;
-      }
-      keptPerTuple.put(tupleKey, kept + 1);
-      compacted.add(entry);
-    }
-    compacted.sort((left, right) -> Long.compare(left.requestedAt, right.requestedAt));
-    if (!changed && compacted.size() == inflightEntries.size()) {
-      return false;
-    }
-    inflightEntries.clear();
-    inflightEntries.addAll(compacted);
-    return true;
-  }
-
   @Override
   public void loadAdditional(
       @NotNull CompoundTag tag, @NotNull net.minecraft.core.HolderLookup.Provider registries) {
@@ -950,65 +259,8 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (tag.contains(TAG_SHOP_POS)) {
       shopPos = BlockPos.of(tag.getLong(TAG_SHOP_POS));
     }
-    reservations.clear();
-    if (tag.contains(TAG_RESERVATIONS)) {
-      CompoundTag resTag = tag.getCompound(TAG_RESERVATIONS);
-      for (String key : resTag.getAllKeys()) {
-        CompoundTag entry = resTag.getCompound(key);
-        try {
-          UUID id = UUID.fromString(key);
-          ItemStack stack =
-              ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
-          int amount = entry.getInt("amount");
-          long expires = entry.getLong("expires");
-          if (!stack.isEmpty() && amount > 0) {
-            reservations.put(id, new Reservation(id, stack, amount, expires));
-          }
-        } catch (IllegalArgumentException ignored) {
-          // Ignore malformed reservation keys.
-        }
-      }
-    }
-    inflightEntries.clear();
-    if (tag.contains(TAG_INFLIGHT)) {
-      var list = tag.getList(TAG_INFLIGHT, net.minecraft.nbt.Tag.TAG_COMPOUND);
-      for (int i = 0; i < list.size(); i++) {
-        CompoundTag entry = list.getCompound(i);
-        ItemStack stack =
-            ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
-        int remaining = entry.getInt("remaining");
-        long requestedAt = entry.getLong("requestedAt");
-        String requester = entry.getString("requester");
-        String address = entry.getString("address");
-        if (!stack.isEmpty() && remaining > 0) {
-          UUID requestUuid = entry.hasUUID("requestUuid") ? entry.getUUID("requestUuid") : null;
-          InflightEntry inflight =
-              new InflightEntry(
-                  makeKey(stack), remaining, requestedAt, requester, address, requestUuid);
-          // Interactions are not reliably restored across reload; re-arm overdue prompting for
-          // still-open inflight entries after world load.
-          inflight.notified = false;
-          inflight.handedOff = entry.getBoolean("handedOff");
-          inflightEntries.add(inflight);
-        }
-      }
-    }
-    if (compactInflightEntriesForPromptStability()) {
-      setChanged();
-    }
-    inflightBaselines.clear();
-    if (tag.contains(TAG_INFLIGHT_BASELINES)) {
-      var list = tag.getList(TAG_INFLIGHT_BASELINES, net.minecraft.nbt.Tag.TAG_COMPOUND);
-      for (int i = 0; i < list.size(); i++) {
-        CompoundTag entry = list.getCompound(i);
-        ItemStack stack =
-            ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
-        int count = entry.getInt("count");
-        if (!stack.isEmpty()) {
-          inflightBaselines.add(new BaselineEntry(makeKey(stack), Math.max(0, count)));
-        }
-      }
-    }
+    reservationLedger.load(tag, registries);
+    inflightLedger.load(tag, registries);
   }
 
   @Override
@@ -1018,107 +270,12 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (shopPos != null) {
       tag.putLong(TAG_SHOP_POS, shopPos.asLong());
     }
-    CompoundTag resTag = new CompoundTag();
-    for (Map.Entry<UUID, Reservation> entry : reservations.entrySet()) {
-      Reservation reservation = entry.getValue();
-      CompoundTag data = new CompoundTag();
-      data.put("stack", reservation.stackKey.save(registries));
-      data.putInt("amount", reservation.reservedAmount);
-      data.putLong("expires", reservation.expiresAtGameTime);
-      resTag.put(entry.getKey().toString(), data);
-    }
-    tag.put(TAG_RESERVATIONS, resTag);
-    if (!inflightEntries.isEmpty()) {
-      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
-      for (InflightEntry entry : inflightEntries) {
-        CompoundTag data = new CompoundTag();
-        data.put("stack", entry.stackKey.save(registries));
-        data.putInt("remaining", entry.remaining);
-        data.putLong("requestedAt", entry.requestedAt);
-        if (entry.notified) {
-          data.putBoolean("notified", true);
-        }
-        if (entry.handedOff) {
-          data.putBoolean("handedOff", true);
-        }
-        if (entry.requesterName != null && !entry.requesterName.isEmpty()) {
-          data.putString("requester", entry.requesterName);
-        }
-        if (entry.address != null && !entry.address.isEmpty()) {
-          data.putString("address", entry.address);
-        }
-        if (entry.requestUuid != null) {
-          data.putUUID("requestUuid", entry.requestUuid);
-        }
-        list.add(data);
-      }
-      tag.put(TAG_INFLIGHT, list);
-    }
-    if (!inflightBaselines.isEmpty()) {
-      net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
-      for (BaselineEntry entry : inflightBaselines) {
-        CompoundTag data = new CompoundTag();
-        data.put("stack", entry.stackKey.save(registries));
-        data.putInt("count", entry.count);
-        list.add(data);
-      }
-      tag.put(TAG_INFLIGHT_BASELINES, list);
-    }
+    reservationLedger.save(tag, registries);
+    inflightLedger.save(tag, registries);
   }
 
   public IItemHandler getItemHandler(@Nullable Direction side) {
     return itemHandler;
-  }
-
-  public static class Reservation {
-    public final UUID requestId;
-    public ItemStack stackKey;
-    public int reservedAmount;
-    public long expiresAtGameTime;
-
-    public Reservation(
-        UUID requestId, ItemStack stackKey, int reservedAmount, long expiresAtGameTime) {
-      this.requestId = requestId;
-      this.stackKey = stackKey;
-      this.reservedAmount = reservedAmount;
-      this.expiresAtGameTime = expiresAtGameTime;
-    }
-  }
-
-  public static class InflightEntry {
-    public final ItemStack stackKey;
-    public int remaining;
-    public final long requestedAt;
-    public final String requesterName;
-    public final String address;
-    public boolean notified;
-
-    /** UUID of the MineColonies request that created this entry. Null for legacy entries. */
-    @Nullable public UUID requestUuid;
-
-    /** True once DELIVERY_CREATED — MC owns the courier lifecycle from this point on. */
-    public boolean handedOff;
-
-    public InflightEntry(
-        ItemStack stackKey, int remaining, long requestedAt, String requesterName, String address) {
-      this(stackKey, remaining, requestedAt, requesterName, address, null);
-    }
-
-    public InflightEntry(
-        ItemStack stackKey,
-        int remaining,
-        long requestedAt,
-        String requesterName,
-        String address,
-        @Nullable UUID requestUuid) {
-      this.stackKey = stackKey;
-      this.remaining = remaining;
-      this.requestedAt = requestedAt;
-      this.requesterName = requesterName == null ? "" : requesterName;
-      this.address = address == null ? "" : address;
-      this.notified = false;
-      this.requestUuid = requestUuid;
-    }
   }
 
   public static class InflightNotice {
@@ -1147,16 +304,6 @@ public class CreateShopBlockEntity extends BlockEntity {
       this.address = address == null ? "" : address;
       this.requestedAt = requestedAt;
       this.requestUuid = requestUuid;
-    }
-  }
-
-  public static class BaselineEntry {
-    public final ItemStack stackKey;
-    public int count;
-
-    public BaselineEntry(ItemStack stackKey, int count) {
-      this.stackKey = stackKey;
-      this.count = count;
     }
   }
 }

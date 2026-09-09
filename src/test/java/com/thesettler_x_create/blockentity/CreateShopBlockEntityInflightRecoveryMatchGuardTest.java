@@ -9,13 +9,17 @@ import org.junit.jupiter.api.Test;
 class CreateShopBlockEntityInflightRecoveryMatchGuardTest {
   @Test
   void consumeInflightUsesSameItemFallbackForComponentDrift() throws Exception {
-    String source =
+    String ledgerSource =
+        Files.readString(
+            Path.of("src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java"));
+    String shellSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java"));
 
-    assertTrue(source.contains("matchesForInflightRecovery(entry.stackKey, stackKey)"));
-    assertTrue(source.contains("return ItemStack.isSameItem(a, b);"));
-    assertTrue(source.contains("public int getInflightRemaining("));
+    assertTrue(ledgerSource.contains("matchesForInflightRecovery(entry.stackKey, stackKey)"));
+    assertTrue(ledgerSource.contains("return ItemStack.isSameItem(a, b);"));
+    // The public API surface (delegating wrapper) must still expose this method.
+    assertTrue(shellSource.contains("public int getInflightRemaining("));
   }
 }

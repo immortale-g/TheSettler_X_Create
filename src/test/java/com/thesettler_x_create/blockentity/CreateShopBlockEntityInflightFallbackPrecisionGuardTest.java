@@ -22,8 +22,7 @@ class CreateShopBlockEntityInflightFallbackPrecisionGuardTest {
   void exactItemMatchIsRequiredWhenRequesterAndAddressAreBothBlank() throws Exception {
     String source =
         Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/blockentity/CreateShopBlockEntity.java"));
+            Path.of("src/main/java/com/thesettler_x_create/blockentity/ShopInflightLedger.java"));
 
     int helper = source.indexOf("private static boolean matchesForInflightLookup(");
     assertTrue(helper > 0);
