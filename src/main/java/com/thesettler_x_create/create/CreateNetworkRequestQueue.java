@@ -77,15 +77,15 @@ final class CreateNetworkRequestQueue {
       // order was attempted, before broadcast success was known. Release exactly that amount now
       // instead of leaving it "spoken for" until its own TTL expires - the requester re-derives
       // its need next tick and can immediately re-order instead of waiting out the reservation.
-      failed.facade.releaseAbandonedReservation(key.requestUuid, failed.stacks);
+      failed.facade.releaseAbandonedReservation(key.requestUuid(), failed.stacks);
       TheSettlerXCreate.LOGGER.warn(
           "[CreateShop] giving up on Create network request after {} failed broadcast attempts,"
               + " network={} address='{}' requester='{}' stacks={} - dropping and releasing its"
               + " reservation so the requester can re-derive the need immediately",
           attempts - 1,
-          key.networkId,
-          key.address,
-          key.requesterName,
+          key.networkId(),
+          key.address(),
+          key.requesterName(),
           failed.stacks.size());
       return;
     }

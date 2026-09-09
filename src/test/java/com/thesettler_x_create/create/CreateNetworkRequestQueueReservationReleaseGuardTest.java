@@ -30,7 +30,7 @@ class CreateNetworkRequestQueueReservationReleaseGuardTest {
     assertTrue(body.contains("attempts > MAX_RETRY_ATTEMPTS"));
     assertTrue(
         body.contains(
-            "failed.facade.releaseAbandonedReservation(key.requestUuid, failed.stacks);"));
+            "failed.facade.releaseAbandonedReservation(key.requestUuid(), failed.stacks);"));
   }
 
   @Test

@@ -6,12 +6,11 @@ import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
-import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
-import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
-import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
+import com.thesettler_x_create.create.CreateLogisticsBridge;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.UUID;
@@ -92,15 +91,10 @@ public final class ModNetwork {
     context.enqueueWork(
         () -> {
           TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null || shop.getBuilding() == null) {
+          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
             return;
           }
-          if (shop.getBuilding()
-              instanceof
-              com.thesettler_x_create.minecolonies.building.BuildingCreateShop
-              building) {
-            building.setPermaOre(payload.oreId(), payload.enabled());
-          }
+          building.setPermaOre(payload.oreId(), payload.enabled());
         });
   }
 
@@ -109,15 +103,10 @@ public final class ModNetwork {
     context.enqueueWork(
         () -> {
           TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null || shop.getBuilding() == null) {
+          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
             return;
           }
-          if (shop.getBuilding()
-              instanceof
-              com.thesettler_x_create.minecolonies.building.BuildingCreateShop
-              building) {
-            building.setPermaWaitFullStack(payload.enabled());
-          }
+          building.setPermaWaitFullStack(payload.enabled());
         });
   }
 
@@ -141,13 +130,8 @@ public final class ModNetwork {
 
           int amount = Math.max(1, payload.amount());
           BigItemStack request = new BigItemStack(payload.stack().copy(), amount);
-          PackageOrderWithCrafts order = PackageOrderWithCrafts.simple(List.of(request));
-          LogisticsManager.broadcastPackageRequest(
-              networkId,
-              LogisticallyLinkedBehaviour.RequestType.PLAYER,
-              order,
-              null,
-              shop.getShopAddress());
+          CreateLogisticsBridge.broadcastPackageRequest(
+              networkId, List.of(request), shop.getShopAddress());
         });
   }
 
@@ -183,13 +167,8 @@ public final class ModNetwork {
             return;
           }
 
-          PackageOrderWithCrafts order = PackageOrderWithCrafts.simple(orderStacks);
-          LogisticsManager.broadcastPackageRequest(
-              networkId,
-              LogisticallyLinkedBehaviour.RequestType.PLAYER,
-              order,
-              null,
-              shop.getShopAddress());
+          CreateLogisticsBridge.broadcastPackageRequest(
+              networkId, orderStacks, shop.getShopAddress());
         });
   }
 
@@ -216,13 +195,7 @@ public final class ModNetwork {
     context.enqueueWork(
         () -> {
           TileEntityCreateShop shop = getShop(context, payload.hutPos());
-          if (shop == null || shop.getBuilding() == null) {
-            return;
-          }
-          if (!(shop.getBuilding()
-              instanceof
-              com.thesettler_x_create.minecolonies.building.BuildingCreateShop
-              building)) {
+          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
             return;
           }
           com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity obe =

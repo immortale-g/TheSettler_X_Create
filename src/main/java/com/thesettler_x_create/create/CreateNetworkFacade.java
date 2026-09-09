@@ -5,9 +5,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.Tool;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.packager.InventorySummary;
-import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
-import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -296,14 +294,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (requestStack.isEmpty()) {
         continue;
       }
-      int available = requestStack.getCount();
-      while (available > 0) {
-        int chunk = Math.min(available, MAX_PACKAGE_COUNT);
-        ItemStack chunkStack = requestStack.copy();
-        chunkStack.setCount(chunk);
-        normalized.add(chunkStack);
-        available -= chunk;
-      }
+      normalized.addAll(chunkForPackaging(requestStack));
     }
     boolean capacityStalled = false;
     for (ItemStack requested : consolidated) {
@@ -333,6 +324,29 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       shop.clearCapacityStall();
     }
     return normalized;
+  }
+
+  /**
+   * Splits {@code stack} into copies of at most {@link #MAX_PACKAGE_COUNT}, further capped to the
+   * item's own max stack size - without that second cap, an item whose max stack size is below 99
+   * (most tools and many non-stackables) would get a chunk stamped with a count higher than the
+   * item itself allows.
+   */
+  private static List<ItemStack> chunkForPackaging(ItemStack stack) {
+    List<ItemStack> chunks = new ArrayList<>();
+    if (stack == null || stack.isEmpty()) {
+      return chunks;
+    }
+    int maxPer = Math.max(1, Math.min(MAX_PACKAGE_COUNT, stack.getMaxStackSize()));
+    int available = stack.getCount();
+    while (available > 0) {
+      int chunk = Math.min(available, maxPer);
+      ItemStack chunkStack = stack.copy();
+      chunkStack.setCount(chunk);
+      chunks.add(chunkStack);
+      available -= chunk;
+    }
+    return chunks;
   }
 
   private static int countAccepted(List<ItemStack> accepted, ItemStack requested) {
@@ -456,7 +470,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         || stacks == null
         || stacks.isEmpty()
         || shop == null
-        || key.networkId == null) {
+        || key.networkId() == null) {
       return true;
     }
     List<ItemStack> consolidated = consolidateRequestedStacks(stacks);
@@ -465,43 +479,32 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
     List<BigItemStack> order = new ArrayList<>();
     for (ItemStack requestStack : consolidated) {
-      int available = requestStack.getCount();
-      while (available > 0) {
-        int chunk = Math.min(available, MAX_PACKAGE_COUNT);
-        ItemStack chunkStack = requestStack.copy();
-        chunkStack.setCount(chunk);
-        order.add(new BigItemStack(chunkStack.copy(), chunk));
-        available -= chunk;
+      for (ItemStack chunkStack : chunkForPackaging(requestStack)) {
+        order.add(new BigItemStack(chunkStack.copy(), chunkStack.getCount()));
       }
     }
     if (order.isEmpty()) {
       return true;
     }
-    PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
     long start = System.nanoTime();
     try {
-      LogisticsManager.broadcastPackageRequest(
-          key.networkId,
-          LogisticallyLinkedBehaviour.RequestType.PLAYER,
-          request,
-          null,
-          key.address == null ? "" : key.address);
+      CreateLogisticsBridge.broadcastPackageRequest(key.networkId(), order, key.address());
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] broadcast grouped request stacks={} chunks={} network={} address='{}' requester='{}'",
             consolidated.size(),
             order.size(),
-            key.networkId,
-            key.address,
-            key.requesterName);
+            key.networkId(),
+            key.address(),
+            key.requesterName());
       }
-      recordInflight(consolidated, key.requesterName, key.requestUuid);
+      recordInflight(consolidated, key.requesterName(), key.requestUuid());
       return true;
     } catch (Exception ex) {
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] grouped request broadcast failed for {}: {}",
-            key.networkId,
+            key.networkId(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
       return false;
