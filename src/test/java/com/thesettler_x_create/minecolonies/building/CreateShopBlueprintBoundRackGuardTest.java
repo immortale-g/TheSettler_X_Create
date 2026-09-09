@@ -24,14 +24,24 @@ class CreateShopBlueprintBoundRackGuardTest {
 
   @Test
   void housekeepingOnlyUsesRegisteredContainers() throws Exception {
-    String source =
+    // The rack-scan itself lives in ShopRackAccess (extracted from TileEntityCreateShop in the
+    // pre-1.0 hardening pass); housekeeping (still on TileEntityCreateShop) reuses it rather than
+    // scanning containers itself.
+    String rackAccessSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/tileentity/ShopRackAccess.java"));
+    String tileSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/tileentity/TileEntityCreateShop.java"));
 
-    assertTrue(source.contains("for (BlockPos pos : getBuilding().getContainers())"));
-    assertFalse(source.contains("housekeeping rack fallback scan active"));
-    assertFalse(source.contains("rackPositions.add(new BlockPos"));
+    assertTrue(
+        rackAccessSource.contains("for (BlockPos pos : owner.getBuilding().getContainers())"));
+    assertFalse(rackAccessSource.contains("housekeeping rack fallback scan active"));
+    assertFalse(rackAccessSource.contains("rackPositions.add(new BlockPos"));
+    assertFalse(tileSource.contains("housekeeping rack fallback scan active"));
+    assertFalse(tileSource.contains("rackPositions.add(new BlockPos"));
   }
 
   @Test
