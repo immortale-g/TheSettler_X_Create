@@ -22,9 +22,20 @@ class CreateShopOutputBlockEntityPackagingGuardTest {
 
   @Test
   void createApiCallsArePresent() throws Exception {
+    // Building the package itself is delegated to CreatePackageBridge (shared with the other
+    // PackageItem read/write call sites) - verify the delegation here, and that the bridge really
+    // does invoke Create's packaging API rather than stubbing it out.
     String src = Files.readString(SOURCE);
-    assertTrue(src.contains("PackageItem.containing("), "PackageItem.containing() call missing");
-    assertTrue(src.contains("PackageItem.addAddress("), "PackageItem.addAddress() call missing");
+    assertTrue(
+        src.contains("CreatePackageBridge.buildPackage("),
+        "CreatePackageBridge.buildPackage() call missing");
+
+    String bridgeSrc =
+        Files.readString(Path.of("src/main/java/com/thesettler_x_create/create/CreatePackageBridge.java"));
+    assertTrue(
+        bridgeSrc.contains("PackageItem.containing("), "PackageItem.containing() call missing");
+    assertTrue(
+        bridgeSrc.contains("PackageItem.addAddress("), "PackageItem.addAddress() call missing");
   }
 
   @Test

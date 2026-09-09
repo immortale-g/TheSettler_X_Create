@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.util.InventoryUtils;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,10 +78,7 @@ final class ShopLostPackageHandoverProcessor {
         slot < inventory.getContainerSize() && totalConsumed < targetAmount;
         slot++) {
       ItemStack candidate = inventory.getItem(slot);
-      boolean isPackage =
-          candidate != null
-              && !candidate.isEmpty()
-              && com.simibubi.create.content.logistics.box.PackageItem.isPackage(candidate);
+      boolean isPackage = CreatePackageBridge.isPackage(candidate);
       if (isPackage) {
         scannedPackages++;
       }

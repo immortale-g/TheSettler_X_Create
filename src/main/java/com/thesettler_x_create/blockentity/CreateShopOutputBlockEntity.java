@@ -1,7 +1,7 @@
 package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
-import com.simibubi.create.content.logistics.box.PackageItem;
+import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -12,7 +12,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 public class CreateShopOutputBlockEntity extends BlockEntity {
@@ -127,11 +126,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
       if (extracted.isEmpty()) return ItemStack.EMPTY;
       if (!simulate) building.completeNextGaugeTask();
-      ItemStackHandler handler = new ItemStackHandler(PackageItem.SLOTS);
-      handler.setStackInSlot(0, extracted);
-      ItemStack pkg = PackageItem.containing(handler);
-      PackageItem.addAddress(pkg, task.gaugeAddress());
-      return pkg;
+      return CreatePackageBridge.buildPackage(extracted, task.gaugeAddress());
     }
 
     /**

@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
-import com.simibubi.create.content.logistics.box.PackageItem;
+import com.thesettler_x_create.create.CreatePackageBridge;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,7 +17,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 /** Shopkeeper chat interaction for lost package recovery actions. */
@@ -333,13 +332,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (packageStack == null || packageStack.isEmpty() || key == null || key.isEmpty()) {
       return false;
     }
-    if (!PackageItem.isPackage(packageStack)) {
-      return false;
-    }
-    ItemStackHandler contents = PackageItem.getContents(packageStack);
-    if (contents == null) {
-      return false;
-    }
     return countMatchingInPackage(packageStack, key) >= Math.max(1, required);
   }
 
@@ -347,17 +339,9 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     if (packageStack == null || packageStack.isEmpty() || key == null || key.isEmpty()) {
       return 0;
     }
-    if (!PackageItem.isPackage(packageStack)) {
-      return 0;
-    }
-    ItemStackHandler contents = PackageItem.getContents(packageStack);
-    if (contents == null) {
-      return 0;
-    }
     int found = 0;
-    for (int i = 0; i < contents.getSlots(); i++) {
-      ItemStack content = contents.getStackInSlot(i);
-      if (!content.isEmpty() && matchesForRecovery(content, key)) {
+    for (ItemStack content : CreatePackageBridge.readContents(packageStack)) {
+      if (matchesForRecovery(content, key)) {
         found += content.getCount();
       }
     }
@@ -365,21 +349,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
   }
 
   static List<ItemStack> unpackPackage(ItemStack packageStack) {
-    List<ItemStack> unpacked = new ArrayList<>();
-    if (packageStack == null || packageStack.isEmpty() || !PackageItem.isPackage(packageStack)) {
-      return unpacked;
-    }
-    ItemStackHandler contents = PackageItem.getContents(packageStack);
-    if (contents == null) {
-      return unpacked;
-    }
-    for (int i = 0; i < contents.getSlots(); i++) {
-      ItemStack content = contents.getStackInSlot(i);
-      if (!content.isEmpty()) {
-        unpacked.add(content.copy());
-      }
-    }
-    return unpacked;
+    return new ArrayList<>(CreatePackageBridge.readContents(packageStack));
   }
 
   private static Component buildInquiry(
@@ -440,6 +410,17 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     return ItemStack.isSameItem(candidate, key);
   }
 
+  /**
+   * Reflectively reaches into MineColonies' {@code CitizenData.citizenChatOptions} to remove
+   * duplicate/stale lost-package dialogs from a citizen's queued interactions - deliberately, not
+   * as a shortcut. Verified against MineColonies' own source: {@code citizenChatOptions} is {@code
+   * protected} (so inaccessible from this package without reflection) and {@link ICitizenData} /
+   * {@code CitizenData} expose no public method to remove or enumerate a specific queued
+   * interaction - only {@code triggerInteraction} (add) and {@code onInteractionClosed} (a
+   * player-close callback, not a programmatic removal). If a future MineColonies version adds a
+   * public removal API, prefer it over this method; until then there is no non-reflective
+   * alternative, so don't "clean this up" without one.
+   */
   private void removeQueuedLostPackageInteractions(ICitizenData citizen, boolean includeSelf) {
     if (citizen == null) {
       return;

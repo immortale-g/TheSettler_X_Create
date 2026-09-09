@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
+import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.items.IItemHandler;
  *   <li>diag_output_block — dumps packageAddress, slot count, and slot-0 content for every shop
  *   <li>test_output_packaging — asserts slot_guard, empty_addr_guard, and packaging_mode for every
  *       output block found
+ *   <li>diag_perma_requests — dumps each shop's perma-ore config and pending perma requests
  * </ul>
  */
 final class CreateShopOutputBlockTestCommands {
@@ -279,17 +281,7 @@ final class CreateShopOutputBlockTestCommands {
   }
 
   private static int countPackageItems(ItemStack pkg) {
-    var contents = PackageItem.getContents(pkg);
-    if (contents == null) {
-      return 0;
-    }
-    int count = 0;
-    for (int i = 0; i < contents.getSlots(); i++) {
-      if (!contents.getStackInSlot(i).isEmpty()) {
-        count++;
-      }
-    }
-    return count;
+    return CreatePackageBridge.readContents(pkg).size();
   }
 
   // -------------------------------------------------------------------------

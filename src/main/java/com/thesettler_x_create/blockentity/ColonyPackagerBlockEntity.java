@@ -1,11 +1,11 @@
 package com.thesettler_x_create.blockentity;
 
-import com.simibubi.create.content.logistics.box.PackageItem;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 import com.simibubi.create.content.logistics.packager.PackagingRequest;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.init.ModBlockEntities;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -27,7 +27,7 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     // contents — and used below to tell the Gauge WHICH item arrived, so a gauge block with
     // several active panels waiting on different items attributes the delivery correctly
     // instead of always crediting whichever panel happens to be first in iteration order.
-    ItemStack deliveredItem = firstNonEmpty(PackageItem.getContents(box));
+    ItemStack deliveredItem = firstNonEmpty(CreatePackageBridge.readContents(box));
 
     if (Config.DEBUG_LOGGING.getAsBoolean() && !simulate && level != null) {
       Direction facing =
@@ -71,12 +71,8 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     return result;
   }
 
-  private static ItemStack firstNonEmpty(net.neoforged.neoforge.items.ItemStackHandler handler) {
-    for (int i = 0; i < handler.getSlots(); i++) {
-      ItemStack stack = handler.getStackInSlot(i);
-      if (!stack.isEmpty()) return stack;
-    }
-    return ItemStack.EMPTY;
+  private static ItemStack firstNonEmpty(List<ItemStack> stacks) {
+    return stacks.isEmpty() ? ItemStack.EMPTY : stacks.get(0);
   }
 
   /**
