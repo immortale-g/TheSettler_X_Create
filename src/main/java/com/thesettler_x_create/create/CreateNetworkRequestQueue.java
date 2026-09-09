@@ -72,10 +72,16 @@ final class CreateNetworkRequestQueue {
     }
     int attempts = failed.failedAttempts + 1;
     if (attempts > MAX_RETRY_ATTEMPTS) {
+      // Seam-audit finding s2-1 (partial-fix follow-up): the ordered amount was reserved
+      // (CreateShopAttemptResolveService.attemptResolve -> pickup.reserve(...)) as soon as the
+      // order was attempted, before broadcast success was known. Release exactly that amount now
+      // instead of leaving it "spoken for" until its own TTL expires - the requester re-derives
+      // its need next tick and can immediately re-order instead of waiting out the reservation.
+      failed.facade.releaseAbandonedReservation(key.requestUuid, failed.stacks);
       TheSettlerXCreate.LOGGER.warn(
           "[CreateShop] giving up on Create network request after {} failed broadcast attempts,"
-              + " network={} address='{}' requester='{}' stacks={} - dropping (reservation, if"
-              + " any, is not released here; the requester will need to re-derive the need)",
+              + " network={} address='{}' requester='{}' stacks={} - dropping and releasing its"
+              + " reservation so the requester can re-derive the need immediately",
           attempts - 1,
           key.networkId,
           key.address,

@@ -368,6 +368,36 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         orderedStacks, baseline, requesterName, shop.getShopAddress(), requestUuid);
   }
 
+  /**
+   * Seam-audit finding s2-1 (still-open half): called when {@link CreateNetworkRequestQueue}
+   * definitively gives up on a bucket after {@code MAX_RETRY_ATTEMPTS} failed broadcasts. {@link
+   * CreateShopAttemptResolveService} reserves the ordered amount via {@code pickup.reserve(...)} as
+   * soon as a network order is attempted - before knowing whether the broadcast will ever succeed -
+   * so a permanently-abandoned order used to leave that amount "spoken for" until the reservation's
+   * own 5-minute TTL expired it. Consuming it here per-stack (not a blanket {@code
+   * release(requestId)}) only removes the amount this specific failed attempt reserved, so a newer,
+   * still-viable reservation for the same request (e.g. a later retry that reserved more) isn't
+   * wiped alongside it.
+   */
+  void releaseAbandonedReservation(@Nullable UUID requestUuid, List<ItemStack> stacks) {
+    if (requestUuid == null || stacks == null || stacks.isEmpty()) {
+      return;
+    }
+    if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
+      return;
+    }
+    CreateShopBlockEntity pickup = building.getPickupBlockEntity();
+    if (pickup == null) {
+      return;
+    }
+    for (ItemStack stack : stacks) {
+      if (stack == null || stack.isEmpty()) {
+        continue;
+      }
+      pickup.consumeReservedForRequest(requestUuid, stack, stack.getCount());
+    }
+  }
+
   private int getToolLevel(Tool tool, ItemStack stack) {
     if (tool == null || stack == null || stack.isEmpty()) {
       return 0;

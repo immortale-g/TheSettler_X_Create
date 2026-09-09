@@ -542,8 +542,12 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   LostPackageReorderResult restartLostPackageDetailed(
       ItemStack stackKey, int remaining, String requesterName, String address, long requestedAt) {
+    // Seam-audit finding s2-3 (partial-fix follow-up): this overload is only reached from the
+    // debug/test-harness wrapper below, but a null requestUuid here still produced a legacy,
+    // UUID-cancel-unreachable inflight entry like any other caller would. A fresh random UUID
+    // costs nothing and makes even debug-triggered reorders cleanly trackable.
     return restartLostPackageDetailed(
-        stackKey, remaining, requesterName, address, requestedAt, null);
+        stackKey, remaining, requesterName, address, requestedAt, java.util.UUID.randomUUID());
   }
 
   LostPackageReorderResult restartLostPackageDetailed(
