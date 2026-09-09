@@ -19,6 +19,10 @@ class CreateShopMaintenanceCommandsGuardTest {
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
+    String cancellerSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopRequestGraphCanceller.java"));
 
     assertTrue(mainSource.contains("onRegisterCommands"));
     assertTrue(mainSource.contains("CreateShopMaintenanceCommands.register"));
@@ -27,14 +31,25 @@ class CreateShopMaintenanceCommandsGuardTest {
     assertTrue(routerSource.contains("run_live_test"));
     assertTrue(routerSource.contains("reset_live_state"));
     assertTrue(routerSource.contains("force_warehouse_queue"));
-    assertTrue(resetSource.contains("clearWarehouseQueues("));
-    assertTrue(resetSource.contains("cancelCreateShopOwnedRequestsGraphAware("));
-    assertTrue(resetSource.contains("cancelAllAssignedRequestsGraphAware("));
-    assertTrue(resetSource.contains("cancelRequestGraphPostOrder("));
-    assertTrue(resetSource.contains("cancelSingleRequest("));
-    assertTrue(resetSource.contains("countShopsWithActiveLocalDeliveries("));
-    assertTrue(resetSource.contains("reconcileAssignmentsAndKickCouriers("));
-    assertTrue(resetSource.contains("cancelActiveLocalDeliveries("));
+    // resetLiveState orchestrates via the extracted reset_live_state collaborators (see
+    // CreateShopRequestGraphCanceller/CreateShopLiveDeliveryDrainer/CreateShopAssignmentReconciler/
+    // CreateShopWarehouseQueuePruner) rather than implementing the drain rounds itself.
+    assertTrue(resetSource.contains("CreateShopWarehouseQueuePruner.clearWarehouseQueues("));
+    assertTrue(
+        resetSource.contains(
+            "CreateShopRequestGraphCanceller.cancelCreateShopOwnedRequestsGraphAware("));
+    assertTrue(
+        resetSource.contains(
+            "CreateShopRequestGraphCanceller.cancelAllAssignedRequestsGraphAware("));
+    assertTrue(cancellerSource.contains("cancelRequestGraphPostOrder("));
+    assertTrue(cancellerSource.contains("cancelSingleRequest("));
+    assertTrue(
+        resetSource.contains(
+            "CreateShopLiveDeliveryDrainer.countShopsWithActiveLocalDeliveries("));
+    assertTrue(
+        resetSource.contains(
+            "CreateShopAssignmentReconciler.reconcileAssignmentsAndKickCouriers("));
+    assertTrue(resetSource.contains("CreateShopLiveDeliveryDrainer.cancelActiveLocalDeliveries("));
     assertTrue(resetSource.contains("drainRounds"));
   }
 }

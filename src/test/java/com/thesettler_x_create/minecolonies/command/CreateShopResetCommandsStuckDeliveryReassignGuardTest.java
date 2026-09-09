@@ -21,13 +21,13 @@ import org.junit.jupiter.api.Test;
 class CreateShopResetCommandsStuckDeliveryReassignGuardTest {
 
   private static final String SOURCE =
-      "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java";
+      "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopAssignmentReconciler.java";
 
   @Test
   void stuckDeliveryKickUsesReassignNotRawAssign() throws Exception {
     String source = Files.readString(Path.of(SOURCE));
 
-    int method = source.indexOf("private static void reconcileAssignmentsAndKickCouriers(");
+    int method = source.indexOf("static void reconcileAssignmentsAndKickCouriers(");
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 3200));
 

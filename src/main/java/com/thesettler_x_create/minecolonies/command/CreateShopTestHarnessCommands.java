@@ -28,7 +28,7 @@ final class CreateShopTestHarnessCommands {
 
   static int runAutoHarnessStart(
       CommandSourceStack source, int requests, int amount, boolean forceWarehouseQueue) {
-    CreateShopResetCommands.ResetLiveStateResult reset =
+    ResetLiveStateResult reset =
         CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
     CreateShopDiagnosticCommands.LiveTestResult live =
         CreateShopDiagnosticCommands.runLiveTest(requests, amount);
@@ -219,7 +219,7 @@ final class CreateShopTestHarnessCommands {
     int createdTotal = 0;
     int errors = 0;
     for (int i = 0; i < safeRounds; i++) {
-      CreateShopResetCommands.ResetLiveStateResult reset =
+      ResetLiveStateResult reset =
           CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
       CreateShopDiagnosticCommands.LiveTestResult live =
           CreateShopDiagnosticCommands.runLiveTest(requestsPerRound, amount);
@@ -277,7 +277,7 @@ final class CreateShopTestHarnessCommands {
     int lostCancelOk = 0;
 
     for (int i = 0; i < safeRounds; i++) {
-      CreateShopResetCommands.ResetLiveStateResult reset =
+      ResetLiveStateResult reset =
           CreateShopResetCommands.resetLiveState(source, forceWarehouseQueue);
       CreateShopDiagnosticCommands.LiveTestResult live =
           CreateShopDiagnosticCommands.runLiveTest(requestsPerRound, amount);

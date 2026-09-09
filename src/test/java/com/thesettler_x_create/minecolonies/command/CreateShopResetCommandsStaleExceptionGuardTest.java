@@ -23,9 +23,9 @@ class CreateShopResetCommandsStaleExceptionGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopCommandSupport.java"));
 
-    int method = source.indexOf("private static boolean isStaleRequestGraphException(");
+    int method = source.indexOf("static boolean isStaleRequestGraphException(");
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 900));
 

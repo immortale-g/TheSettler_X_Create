@@ -20,16 +20,22 @@ import org.junit.jupiter.api.Test;
  */
 class CreateShopResetCommandsLiveMapMutationGuardTest {
 
+  private static final String[] RESET_COMMAND_FAMILY_FILES = {
+    "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java",
+    "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopAssignmentReconciler.java",
+    "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopWarehouseQueuePruner.java",
+    "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopRequestGraphCanceller.java",
+    "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopLiveDeliveryDrainer.java",
+  };
+
   @Test
   void noRawIteratorRemoveOnLiveMineColoniesCollections() throws Exception {
-    String source =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
-
-    assertFalse(
-        source.contains("iterator.remove()"),
-        "expected no raw Iterator.remove() usage left in this file");
+    for (String path : RESET_COMMAND_FAMILY_FILES) {
+      String source = Files.readString(Path.of(path));
+      assertFalse(
+          source.contains("iterator.remove()"),
+          "expected no raw Iterator.remove() usage left in " + path);
+    }
   }
 
   @Test
@@ -37,9 +43,9 @@ class CreateShopResetCommandsLiveMapMutationGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopAssignmentReconciler.java"));
 
-    int method = source.indexOf("private static void reconcileAssignmentsAndKickCouriers(");
+    int method = source.indexOf("static void reconcileAssignmentsAndKickCouriers(");
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 2200));
 
@@ -53,9 +59,9 @@ class CreateShopResetCommandsLiveMapMutationGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopResetCommands.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/command/CreateShopWarehouseQueuePruner.java"));
 
-    int method = source.indexOf("private static void clearWarehouseQueues(");
+    int method = source.indexOf("static void clearWarehouseQueues(");
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 3600));
 

@@ -93,7 +93,7 @@ public final class CreateShopMaintenanceCommands {
         Commands.literal("reset_live_state")
             .executes(
                 context -> {
-                  CreateShopResetCommands.ResetLiveStateResult result =
+                  ResetLiveStateResult result =
                       CreateShopResetCommands.resetLiveState(context.getSource(), false);
                   context
                       .getSource()
@@ -137,7 +137,7 @@ public final class CreateShopMaintenanceCommands {
                 Commands.literal("force_warehouse_queue")
                     .executes(
                         context -> {
-                          CreateShopResetCommands.ResetLiveStateResult result =
+                          ResetLiveStateResult result =
                               CreateShopResetCommands.resetLiveState(context.getSource(), true);
                           context
                               .getSource()
