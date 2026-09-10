@@ -98,12 +98,10 @@ final class ShopGaugeQueue {
       }
       return 0;
     }
-    // Only place a colony request once we've confirmed the Colony Warehouse actually has the item
-    // — same check the perma-request system already uses
-    // (ShopPermaRequestManager.countInWarehouses).
+    // Only place a colony request once we've confirmed the Colony Warehouse actually has the item.
     // This is the whole point of the Gauge: pull from the Colony Warehouse, not Create's stock
     // network (vanilla Create Factory Gauges already cover that case).
-    int available = ShopPermaRequestManager.countInWarehouses(owner, item);
+    int available = ShopWarehouseStockUtil.countInWarehouses(owner, item);
     if (available <= 0) {
       if (BuildingCreateShop.isDebugRequests()) {
         TheSettlerXCreate.LOGGER.info(

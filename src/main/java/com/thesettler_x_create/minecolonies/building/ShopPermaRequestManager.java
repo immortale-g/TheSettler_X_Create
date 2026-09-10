@@ -1,13 +1,11 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
@@ -125,7 +123,7 @@ final class ShopPermaRequestManager {
         continue;
       }
       ItemStack stack = new ItemStack(item, 1);
-      int available = countInWarehouses(shop, stack);
+      int available = ShopWarehouseStockUtil.countInWarehouses(shop, stack);
       int pending = permaPendingCounts.getOrDefault(itemId, 0);
       int requestable = Math.max(0, available - pending);
       if (BuildingCreateShop.isDebugRequests()) {
@@ -246,51 +244,6 @@ final class ShopPermaRequestManager {
     if (shop.getColony() != null) {
       shop.getColony().markDirty();
     }
-  }
-
-  /**
-   * Sums matching item stacks across all of the colony's MineColonies warehouses (excluding {@code
-   * shop} itself, in case it is ever registered as one). Shared with {@link
-   * BuildingCreateShop#requestForGauge} so Gauge requests only get created when the warehouse
-   * actually has stock — mirrors how perma-requests already work.
-   */
-  static int countInWarehouses(BuildingCreateShop shop, ItemStack stack) {
-    if (stack == null || stack.isEmpty() || shop.getColony() == null) {
-      return 0;
-    }
-    var manager = shop.getColony().getServerBuildingManager();
-    if (manager == null) {
-      return 0;
-    }
-    List<IWareHouse> warehouses = manager.getWareHouses();
-    if (warehouses == null || warehouses.isEmpty()) {
-      return 0;
-    }
-    int total = 0;
-    for (IWareHouse warehouse : warehouses) {
-      if (warehouse == null || warehouse == shop) {
-        continue;
-      }
-      if (!(warehouse.getTileEntity() instanceof AbstractTileEntityWareHouse wareHouse)) {
-        continue;
-      }
-      for (var entry :
-          wareHouse.getMatchingItemStacksInWarehouse(match -> matchesStack(match, stack))) {
-        ItemStack found = entry.getA();
-        if (found == null || found.isEmpty()) {
-          continue;
-        }
-        total += found.getCount();
-      }
-    }
-    return Math.max(0, total);
-  }
-
-  private static boolean matchesStack(ItemStack candidate, ItemStack target) {
-    if (candidate == null || target == null) {
-      return false;
-    }
-    return ItemStack.isSameItemSameComponents(candidate, target);
   }
 
   private static final class PendingPermaRequest {
