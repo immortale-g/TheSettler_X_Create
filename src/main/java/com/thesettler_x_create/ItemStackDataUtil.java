@@ -1,5 +1,6 @@
 package com.thesettler_x_create;
 
+import java.util.List;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
@@ -12,5 +13,23 @@ public final class ItemStackDataUtil {
   /** A mutable copy of {@code stack}'s {@code CUSTOM_DATA} tag, or an empty tag if it has none. */
   public static CompoundTag copyCustomData(ItemStack stack) {
     return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+  }
+
+  /**
+   * Merges {@code stack} into {@code target}: grows an existing entry with the same item and
+   * components, or appends a copy of {@code stack} if none matches yet. No-op for a null/empty
+   * {@code target} or {@code stack}.
+   */
+  public static void mergeIntoList(List<ItemStack> target, ItemStack stack) {
+    if (target == null || stack == null || stack.isEmpty()) {
+      return;
+    }
+    for (ItemStack existing : target) {
+      if (ItemStack.isSameItemSameComponents(existing, stack)) {
+        existing.grow(stack.getCount());
+        return;
+      }
+    }
+    target.add(stack.copy());
   }
 }

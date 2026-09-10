@@ -1,5 +1,6 @@
 package com.thesettler_x_create.create;
 
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +45,7 @@ final class CreateNetworkRequestQueue {
         QUEUED_REQUESTS.computeIfAbsent(key, k -> new QueuedRequestBucket(facade));
     bucket.facade = facade;
     for (ItemStack stack : stacks) {
-      mergeInto(bucket.stacks, stack);
+      ItemStackDataUtil.mergeIntoList(bucket.stacks, stack);
     }
   }
 
@@ -96,20 +97,7 @@ final class CreateNetworkRequestQueue {
     }
     target.failedAttempts = attempts;
     for (ItemStack stack : failed.stacks) {
-      mergeInto(target.stacks, stack);
+      ItemStackDataUtil.mergeIntoList(target.stacks, stack);
     }
-  }
-
-  private static void mergeInto(List<ItemStack> target, ItemStack stack) {
-    if (target == null || stack == null || stack.isEmpty()) {
-      return;
-    }
-    for (ItemStack existing : target) {
-      if (ItemStack.isSameItemSameComponents(existing, stack)) {
-        existing.setCount(existing.getCount() + stack.getCount());
-        return;
-      }
-    }
-    target.add(stack.copy());
   }
 }
