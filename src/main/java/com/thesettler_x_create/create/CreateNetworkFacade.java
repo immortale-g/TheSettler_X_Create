@@ -6,6 +6,7 @@ import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.packager.InventorySummary;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -264,21 +265,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
     List<ItemStack> consolidated = new ArrayList<>();
     for (ItemStack requestStack : requestedStacks) {
-      if (requestStack == null || requestStack.isEmpty()) {
-        continue;
-      }
-      ItemStack existing = null;
-      for (ItemStack candidate : consolidated) {
-        if (ItemStack.isSameItemSameComponents(candidate, requestStack)) {
-          existing = candidate;
-          break;
-        }
-      }
-      if (existing == null) {
-        consolidated.add(requestStack.copy());
-      } else {
-        existing.setCount(existing.getCount() + requestStack.getCount());
-      }
+      ItemStackDataUtil.mergeIntoList(consolidated, requestStack);
     }
     return consolidated;
   }
@@ -435,12 +422,12 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     try {
       return LogisticsManager.getSummaryOfNetwork(shop.getStockNetworkId(), true);
     } catch (Exception ex) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] Network summary lookup failed for {}: {}",
-            shop.getStockNetworkId(),
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      // Not gated behind Config.DEBUG_LOGGING - a server admin needs to see this even with debug
+      // logging off, or the shop just quietly stops fulfilling requests with no visible cause.
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
+          "[CreateShop] Network summary lookup failed for {}: {}",
+          shop.getStockNetworkId(),
+          ex.getMessage() == null ? "<null>" : ex.getMessage());
       return null;
     } finally {
       perfLogger.recordSummary(System.nanoTime() - start, shop);
@@ -501,12 +488,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       recordInflight(consolidated, key.requesterName(), key.requestUuid());
       return true;
     } catch (Exception ex) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] grouped request broadcast failed for {}: {}",
-            key.networkId(),
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      // Not gated behind Config.DEBUG_LOGGING - see the getSummary() catch above for why.
+      com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
+          "[CreateShop] grouped request broadcast failed for {}: {}",
+          key.networkId(),
+          ex.getMessage() == null ? "<null>" : ex.getMessage());
       return false;
     } finally {
       perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
