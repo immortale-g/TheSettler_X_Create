@@ -17,7 +17,7 @@ class BuildingCreateShopLostPackageHandoverPreviewFallbackGuardTest {
     assertTrue(source.contains("shop.ensureRackContainers();"));
     assertTrue(
         source.contains(
-            "List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);"));
+            "List<ItemStack> previewUnpacked = ShopPackageContentMatcher.unpackPackage(candidate);"));
     assertTrue(source.contains("if (unpacked.isEmpty() && !previewUnpacked.isEmpty())"));
   }
 }

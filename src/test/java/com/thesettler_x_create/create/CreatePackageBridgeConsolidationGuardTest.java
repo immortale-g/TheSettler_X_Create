@@ -13,13 +13,18 @@ import org.junit.jupiter.api.Test;
  * times), {@code ColonyPackagerBlockEntity}, and {@code CreateShopOutputBlockTestCommands}, and
  * building a new package was duplicated once more in {@code CreateShopOutputBlockEntity}. All five
  * now route through {@link CreatePackageBridge} instead of calling {@code PackageItem} directly.
+ *
+ * <p>The package-content reads originally in {@code ShopLostPackageInteraction} were later moved
+ * again, to {@code ShopPackageContentMatcher} (Clean Code Audit finding a2-6: that logic was a
+ * chat-interaction class reaching into package-content matching, not its own concern) - that class
+ * is the one that actually calls {@link CreatePackageBridge} now.
  */
 class CreatePackageBridgeConsolidationGuardTest {
 
   @Test
-  void shopLostPackageInteractionRoutesThroughTheSharedBridge() throws Exception {
+  void shopPackageContentMatcherRoutesThroughTheSharedBridge() throws Exception {
     assertNoDirectPackageItemCalls(
-        "src/main/java/com/thesettler_x_create/minecolonies/building/ShopLostPackageInteraction.java");
+        "src/main/java/com/thesettler_x_create/minecolonies/building/ShopPackageContentMatcher.java");
   }
 
   @Test

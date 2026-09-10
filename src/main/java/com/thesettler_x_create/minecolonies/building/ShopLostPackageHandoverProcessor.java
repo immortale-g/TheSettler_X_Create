@@ -82,7 +82,7 @@ final class ShopLostPackageHandoverProcessor {
       if (isPackage) {
         scannedPackages++;
       }
-      int matching = ShopLostPackageInteraction.countMatchingInPackage(candidate, stackKey);
+      int matching = ShopPackageContentMatcher.countMatchingInPackage(candidate, stackKey);
       if (BuildingCreateShop.isDebugRequests() && candidate != null && !candidate.isEmpty()) {
         if (isPackage || matching > 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -97,7 +97,7 @@ final class ShopLostPackageHandoverProcessor {
         continue;
       }
       matchedPackages++;
-      List<ItemStack> previewUnpacked = ShopLostPackageInteraction.unpackPackage(candidate);
+      List<ItemStack> previewUnpacked = ShopPackageContentMatcher.unpackPackage(candidate);
       if (BuildingCreateShop.isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} previewUnpackedStacks={} matching={}",
@@ -148,7 +148,7 @@ final class ShopLostPackageHandoverProcessor {
         continue;
       }
       removedPackages++;
-      List<ItemStack> unpacked = ShopLostPackageInteraction.unpackPackage(removedPackage);
+      List<ItemStack> unpacked = ShopPackageContentMatcher.unpackPackage(removedPackage);
       if (unpacked.isEmpty() && !previewUnpacked.isEmpty()) {
         unpacked = new ArrayList<>(previewUnpacked.size());
         for (ItemStack stack : previewUnpacked) {

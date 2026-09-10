@@ -5,9 +5,7 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
-import com.thesettler_x_create.create.CreatePackageBridge;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -328,30 +326,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
   }
 
-  static boolean packageContains(ItemStack packageStack, ItemStack key, int required) {
-    if (packageStack == null || packageStack.isEmpty() || key == null || key.isEmpty()) {
-      return false;
-    }
-    return countMatchingInPackage(packageStack, key) >= Math.max(1, required);
-  }
-
-  static int countMatchingInPackage(@Nullable ItemStack packageStack, @Nullable ItemStack key) {
-    if (packageStack == null || packageStack.isEmpty() || key == null || key.isEmpty()) {
-      return 0;
-    }
-    int found = 0;
-    for (ItemStack content : CreatePackageBridge.readContents(packageStack)) {
-      if (matchesForRecovery(content, key)) {
-        found += content.getCount();
-      }
-    }
-    return found;
-  }
-
-  static List<ItemStack> unpackPackage(ItemStack packageStack) {
-    return new ArrayList<>(CreatePackageBridge.readContents(packageStack));
-  }
-
   private static Component buildInquiry(
       ItemStack stackKey, int remaining, String requesterName, String address) {
     String requester = sanitize(requesterName);
@@ -398,16 +372,6 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return false;
     }
     return pickup.getInflightRemaining(stackKey, requesterName, address) > 0;
-  }
-
-  private static boolean matchesForRecovery(ItemStack candidate, ItemStack key) {
-    if (candidate == null || candidate.isEmpty() || key == null || key.isEmpty()) {
-      return false;
-    }
-    if (ItemStack.isSameItemSameComponents(candidate, key)) {
-      return true;
-    }
-    return ItemStack.isSameItem(candidate, key);
   }
 
   /**
