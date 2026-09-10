@@ -47,6 +47,7 @@
   "com.thesettler_x_create.gui.colony_gauge.set_item_label": "Place Item to Request",
   "com.thesettler_x_create.gui.colony_gauge.settings_title": "Colony Gauge",
   "com.thesettler_x_create.message.createshop.no_network": "Create Shop has no linked stock network.",
+  "com.thesettler_x_create.message.createshop.rack_full": "Create Shop has no free rack for incoming goods. Add a matching rack or free up existing capacity.",
   "com.thesettler_x_create.message.createshop.request_taken": "Create Shop accepted request: %s x%d",
   "com.thesettler_x_create.message.createshop.request_sent": "Create Shop ordered from network: %s x%d",
   "com.thesettler_x_create.message.createshop.delivery_waiting": "Create Shop waiting for goods: %s",

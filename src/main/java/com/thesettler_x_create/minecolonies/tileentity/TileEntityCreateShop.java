@@ -574,15 +574,26 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
   }
 
+  /** Warns the colony (chat, cooldown-gated) that a citizen found no matching rack to dump into. */
   void maybeNotifyFull() {
     Level world = getLevel();
     if (world == null) {
       return;
     }
-    if (world.getGameTime() - lastNotification <= 6000L) {
+    if (world.getGameTime() - lastNotification
+        <= com.thesettler_x_create.Config.RACK_FULL_WARNING_COOLDOWN.getAsLong()) {
       return;
     }
     lastNotification = world.getGameTime();
+    if (!com.thesettler_x_create.Config.CHAT_MESSAGES_ENABLED.getAsBoolean()) {
+      return;
+    }
+    if (getBuilding() instanceof BuildingCreateShop shop && shop.getColony() != null) {
+      com.minecolonies.api.util.MessageUtils.format(
+              "com.thesettler_x_create.message.createshop.rack_full")
+          .sendTo(shop.getColony())
+          .forAllPlayers();
+    }
   }
 
   public static class CapacityStallNotice {

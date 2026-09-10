@@ -25,6 +25,11 @@ public class Config {
           .comment("Cooldown (ticks) between missing network warning messages.")
           .defineInRange("missingNetworkWarningCooldown", 6000L, 20L, 24000L);
 
+  public static final ModConfigSpec.LongValue RACK_FULL_WARNING_COOLDOWN =
+      BUILDER
+          .comment("Cooldown (ticks) between rack-full warning messages.")
+          .defineInRange("rackFullWarningCooldown", 6000L, 20L, 24000L);
+
   public static final ModConfigSpec.LongValue COURIER_DEBUG_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) between courier debug logs.")
