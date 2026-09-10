@@ -97,40 +97,7 @@ public final class CreateShopMaintenanceCommands {
                       CreateShopResetCommands.resetLiveState(context.getSource(), false);
                   context
                       .getSource()
-                      .sendSuccess(
-                          () ->
-                              Component.literal(
-                                  "[CreateShop] Live state reset: colonies="
-                                      + result.colonies
-                                      + ", shops="
-                                      + result.shops
-                                      + ", requestsCancelled="
-                                      + result.requestsCancelled
-                                      + ", staleCleaned="
-                                      + result.staleCleaned
-                                      + ", runtimeTrackingCleared="
-                                      + result.runtimeTrackingCleared
-                                      + ", runtimeTrackingSkipped="
-                                      + result.runtimeTrackingSkipped
-                                      + ", queueEntriesCleared="
-                                      + result.queueEntriesCleared
-                                      + ", queueRequestsCancelled="
-                                      + result.queueRequestsCancelled
-                                      + ", blockedActiveDeliveries="
-                                      + result.blockedActiveDeliveries
-                                      + ", assignmentPruned="
-                                      + result.assignmentPruned
-                                      + ", deliveryAssignKicks="
-                                      + result.deliveryAssignKicks
-                                      + ", deliveryRequestsCancelled="
-                                      + result.deliveryRequestsCancelled
-                                      + ", drainRounds="
-                                      + result.drainRounds
-                                      + ", drainResiduals="
-                                      + result.drainResiduals
-                                      + ", errors="
-                                      + result.errors),
-                          true);
+                      .sendSuccess(() -> Component.literal(result.toSummaryMessage(false)), true);
                   return result.errors == 0 ? 1 : 0;
                 })
             .then(
@@ -142,39 +109,7 @@ public final class CreateShopMaintenanceCommands {
                           context
                               .getSource()
                               .sendSuccess(
-                                  () ->
-                                      Component.literal(
-                                          "[CreateShop] Live state reset (force queue): colonies="
-                                              + result.colonies
-                                              + ", shops="
-                                              + result.shops
-                                              + ", requestsCancelled="
-                                              + result.requestsCancelled
-                                              + ", staleCleaned="
-                                              + result.staleCleaned
-                                              + ", runtimeTrackingCleared="
-                                              + result.runtimeTrackingCleared
-                                              + ", runtimeTrackingSkipped="
-                                              + result.runtimeTrackingSkipped
-                                              + ", queueEntriesCleared="
-                                              + result.queueEntriesCleared
-                                              + ", queueRequestsCancelled="
-                                              + result.queueRequestsCancelled
-                                              + ", blockedActiveDeliveries="
-                                              + result.blockedActiveDeliveries
-                                              + ", assignmentPruned="
-                                              + result.assignmentPruned
-                                              + ", deliveryAssignKicks="
-                                              + result.deliveryAssignKicks
-                                              + ", deliveryRequestsCancelled="
-                                              + result.deliveryRequestsCancelled
-                                              + ", drainRounds="
-                                              + result.drainRounds
-                                              + ", drainResiduals="
-                                              + result.drainResiduals
-                                              + ", errors="
-                                              + result.errors),
-                                  true);
+                                  () -> Component.literal(result.toSummaryMessage(true)), true);
                           return result.errors == 0 ? 1 : 0;
                         })));
 
