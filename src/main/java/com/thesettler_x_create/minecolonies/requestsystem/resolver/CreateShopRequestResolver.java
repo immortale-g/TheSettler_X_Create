@@ -42,58 +42,57 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final java.util.Set<String> chainCycleLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final CreateShopResolverPlanning planning = new CreateShopResolverPlanning();
-  private final CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
   private final CreateShopResolverDiagnostics diagnostics = new CreateShopResolverDiagnostics(this);
-  private final CreateShopResolverChain chain = new CreateShopResolverChain(this);
-  private final CreateShopResolverOwnership ownership = new CreateShopResolverOwnership(this);
   private final CreateShopResolverRecheck recheck =
       new CreateShopResolverRecheck(this, diagnostics);
   private final CreateShopResolverCooldown cooldown = new CreateShopResolverCooldown(this);
-  private final CreateShopResolverPendingState pendingState = new CreateShopResolverPendingState();
   private final CreateShopResolverMessaging messaging = new CreateShopResolverMessaging();
   private final CreateShopRequestValidator validator;
-  private final CreateShopOutstandingNeededService outstandingNeededService =
-      new CreateShopOutstandingNeededService();
   private final CreateShopStockResolver stockResolver = new CreateShopStockResolver();
-  private final CreateShopTickPendingTelemetryService tickPendingTelemetryService =
-      new CreateShopTickPendingTelemetryService();
-  private final CreateShopPendingTopupService pendingTopupService;
-  private final CreateShopPendingDeliveryCreationService pendingDeliveryCreationService;
   private final CreateShopReservationReleaseService reservationReleaseService;
   private final CreateShopWarehouseCountService warehouseCountService =
       new CreateShopWarehouseCountService();
-  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
   private final CreateShopDeliveryCompletionService deliveryCompletionService;
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
-  private final CreateShopPendingTokenCollectorService pendingTokenCollectorService =
-      new CreateShopPendingTokenCollectorService(ownership, tickPendingTelemetryService);
-  private final CreateShopPendingRequestGateService pendingRequestGateService;
-  private final CreateShopChildReconciliationService childReconciliationService;
-  private final CreateShopPendingStateDecisionService pendingStateDecisionService;
-  private final CreateShopPostCreationUpdateService postCreationUpdateService;
   private final CreateShopDeliveryCancelService deliveryCancelService;
-  private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
-      new CreateShopDeliveryRootCauseSnapshotService();
+  // Kept as fields (not local-ized like their siblings below) - two runtime tests reach these via
+  // reflection (CreateShopRequestResolverLifecycleRuntimeTest,
+  // CreateShopRequestResolverTimeoutCleanupRuntimeTest), which only works against instance fields.
+  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
+  private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
   private final CreateShopDeliveryChildLedgerService deliveryChildLedgerService =
       new CreateShopDeliveryChildLedgerService();
-  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
-  private final CreateShopRequestStateMutatorService requestStateMutatorService =
-      new CreateShopRequestStateMutatorService();
-  private final CreateShopReservationSyncService reservationSyncService;
-  private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
-  private final CreateShopFlowStateRehydrateService flowStateRehydrateService;
   private final CreateShopAttemptResolveService attemptResolveService;
   private final CreateShopTickPendingService tickPendingService;
   private final CreateShopDeliveryChildGuardService deliveryChildGuardService;
   private final CreateShopResolverCallbackService resolverCallbackService;
-  private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
-      new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
       new CreateShopRequestStateMachine();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
+    // Everything declared below is wired into a field above or into another local collaborator
+    // right here in the constructor and never referenced anywhere else in this class - it doesn't
+    // need to be a field itself. Clean Code Audit finding: this alone cuts the resolver's field
+    // count from 41 to ~23, with zero behavior change (same objects, same wiring order).
+    CreateShopRequestStateMutatorService requestStateMutatorService =
+        new CreateShopRequestStateMutatorService();
+    CreateShopDeliveryManager deliveryManager = new CreateShopDeliveryManager(this);
+    CreateShopResolverChain chain = new CreateShopResolverChain(this);
+    CreateShopResolverOwnership ownership = new CreateShopResolverOwnership(this);
+    CreateShopResolverPendingState pendingState = new CreateShopResolverPendingState();
+    CreateShopOutstandingNeededService outstandingNeededService =
+        new CreateShopOutstandingNeededService();
+    CreateShopTickPendingTelemetryService tickPendingTelemetryService =
+        new CreateShopTickPendingTelemetryService();
+    CreateShopWorkerAvailabilityGate workerAvailabilityGate =
+        new CreateShopWorkerAvailabilityGate();
+    CreateShopPendingTokenCollectorService pendingTokenCollectorService =
+        new CreateShopPendingTokenCollectorService(ownership, tickPendingTelemetryService);
+    CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
+        new CreateShopDeliveryRootCauseSnapshotService();
+
     this.deliveryChildGuardService =
         new CreateShopDeliveryChildGuardService(requestStateMutatorService);
     this.flowTimeoutCleanupService =
@@ -101,13 +100,13 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.deliveryCompletionService =
         new CreateShopDeliveryCompletionService(
             requestStateMutatorService, deliveryManager, diagnostics, recheck);
-    this.pendingStateDecisionService =
+    CreateShopPendingStateDecisionService pendingStateDecisionService =
         new CreateShopPendingStateDecisionService(
             requestStateMutatorService,
             workerAvailabilityGate,
             outstandingNeededService,
             diagnostics);
-    this.postCreationUpdateService =
+    CreateShopPostCreationUpdateService postCreationUpdateService =
         new CreateShopPostCreationUpdateService(requestStateMutatorService, messaging, diagnostics);
     this.deliveryCancelService =
         new CreateShopDeliveryCancelService(
@@ -115,12 +114,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.deliveryChildRecoveryService =
         new CreateShopDeliveryChildRecoveryService(
             requestStateMutatorService, ownership, diagnostics);
-    this.pendingRequestGateService =
+    CreateShopPendingRequestGateService pendingRequestGateService =
         new CreateShopPendingRequestGateService(ownership, diagnostics, requestStateMutatorService);
-    this.reservationSyncService =
+    CreateShopReservationSyncService reservationSyncService =
         new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
     this.validator = new CreateShopRequestValidator(chain, stockResolver, planning, cooldown);
-    this.flowStateRehydrateService =
+    CreateShopFlowStateRehydrateService flowStateRehydrateService =
         new CreateShopFlowStateRehydrateService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
     this.attemptResolveService =
@@ -137,7 +136,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             flowStateMachine);
     this.resolverCallbackService =
         new CreateShopResolverCallbackService(requestStateMutatorService, cooldown, diagnostics);
-    this.pendingTopupService =
+    CreateShopPendingTopupService pendingTopupService =
         new CreateShopPendingTopupService(
             runtimeStateStore.getPendingTracker(),
             diagnostics,
@@ -145,17 +144,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             stockResolver,
             messaging,
             requestStateMutatorService);
-    this.pendingDeliveryCreationService =
+    CreateShopPendingDeliveryCreationService pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
     this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
-    this.childReconciliationService =
+    CreateShopChildReconciliationService childReconciliationService =
         new CreateShopChildReconciliationService(
             deliveryManager,
             deliveryChildRecoveryService,
             deliveryRootCauseSnapshotService,
             requestStateMutatorService);
-    this.pendingRequestProcessorService =
+    CreateShopPendingRequestProcessorService pendingRequestProcessorService =
         new CreateShopPendingRequestProcessorService(
             pendingRequestGateService,
             childReconciliationService,
