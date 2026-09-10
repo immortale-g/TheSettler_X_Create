@@ -4,6 +4,11 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import net.minecraft.world.level.Level;
 
+/**
+ * Schedules and processes a one-shot delayed re-check of a parent request's children (20 ticks
+ * later), used after an operation that changes child linkage so {@link
+ * CreateShopResolverDiagnostics} can log a before/after snapshot once the change has settled.
+ */
 final class CreateShopResolverRecheck {
   private final CreateShopResolverDiagnostics diagnostics;
   private final java.util.Map<IToken<?>, Long> parentChildrenRecheck =

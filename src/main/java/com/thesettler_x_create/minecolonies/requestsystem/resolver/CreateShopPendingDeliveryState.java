@@ -1,5 +1,10 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+/**
+ * Mutable per-request bookkeeping held in {@link CreateShopPendingDeliveryTracker}'s cache: how
+ * many delivery attempts are outstanding, whether one has been created/started, and a cooldown
+ * before the next retry.
+ */
 final class CreateShopPendingDeliveryState {
   private int pendingCount;
   private boolean deliveryCreated;

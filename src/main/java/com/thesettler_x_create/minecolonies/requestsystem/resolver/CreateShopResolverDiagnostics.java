@@ -6,6 +6,12 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 
+/**
+ * Debug-log-only snapshotting of request/child/pending-reason state at key points in the resolve
+ * flow, so a divergence between two snapshots (e.g. before/after a reassignment) is visible in the
+ * log without needing to reproduce the bug live. No effect when {@link Config#DEBUG_LOGGING} is
+ * off.
+ */
 final class CreateShopResolverDiagnostics {
   private final CreateShopRequestResolver resolver;
   private final java.util.Map<IToken<?>, String> parentChildrenSnapshots =

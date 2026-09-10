@@ -5,6 +5,11 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import net.minecraft.world.level.Level;
 
+/**
+ * Thin per-resolver wrapper around {@code resolver.getPendingTracker()}'s cooldown fields, so
+ * callers ask "is this request on cooldown" through the resolver rather than reaching into the
+ * tracker's cooldown state directly.
+ */
 final class CreateShopResolverCooldown {
   private final CreateShopRequestResolver resolver;
 

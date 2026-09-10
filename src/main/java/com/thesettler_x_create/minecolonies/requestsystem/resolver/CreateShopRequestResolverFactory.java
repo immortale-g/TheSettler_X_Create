@@ -10,6 +10,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
+/**
+ * MineColonies {@link IRequestResolverFactory} for {@link CreateShopRequestResolver} - required
+ * boilerplate so the request-system's own serialization/factory machinery can construct and
+ * (de)serialize resolver instances by their registered {@link #SERIALIZATION_ID}.
+ */
 public class CreateShopRequestResolverFactory
     implements IRequestResolverFactory<CreateShopRequestResolver> {
   private static final String TAG_TOKEN = "Token";

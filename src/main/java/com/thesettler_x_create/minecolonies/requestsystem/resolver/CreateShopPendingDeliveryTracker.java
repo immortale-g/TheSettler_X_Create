@@ -7,6 +7,11 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.world.level.Level;
 
+/**
+ * Guava-cache-backed store of {@link CreateShopPendingDeliveryState} per request token, with a
+ * 30-minute TTL so a slow courier leg doesn't lose its bookkeeping mid-flight while a stuck/
+ * abandoned request still eventually gets swept.
+ */
 final class CreateShopPendingDeliveryTracker {
   // 5 minutes was too short for a slow courier leg (traffic jam, sleep cycle) to survive without
   // the cache entry expiring mid-flight; ROADMAP.md Phase 4.3 already flagged this and proposed

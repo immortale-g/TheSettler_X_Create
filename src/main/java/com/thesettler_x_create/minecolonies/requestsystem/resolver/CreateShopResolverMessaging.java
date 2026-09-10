@@ -10,6 +10,12 @@ import java.util.Map;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Sends the resolver's player-facing chat messages: item-taken/ordered notices gated by {@link
+ * Config#CHAT_MESSAGES_ENABLED}, and the more verbose per-flow-step messages additionally gated by
+ * {@link Config#FLOW_CHAT_MESSAGES_ENABLED} with its own per-key cooldown to avoid spamming chat on
+ * a busy tick.
+ */
 final class CreateShopResolverMessaging {
   private final Map<String, Long> lastFlowChatTick = new HashMap<>();
 

@@ -9,6 +9,14 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.nbt.CompoundTag;
 
+/**
+ * Diagnostic flow-state store for the resolver: an in-memory {@code Map<IToken<?>,
+ * CreateShopFlowRecord>}, NBT-persisted (see {@code saveFlowStatesToNbt}/{@code
+ * loadFlowStatesFromNbt}) so a request's {@link CreateShopFlowState} survives a world reload. On
+ * load, states are buffered in {@link #pendingRestore} and applied lazily the first time {@link
+ * #getOrCreate} sees the matching token again, since the live {@link CreateShopFlowRecord} for a
+ * request doesn't exist yet until then.
+ */
 final class CreateShopRequestStateMachine {
   private static final String TAG_FLOW_STATES = "FlowStates";
 

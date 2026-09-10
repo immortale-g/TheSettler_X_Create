@@ -10,6 +10,11 @@ import java.util.UUID;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Computes how much of a deliverable is available across the Create network, this shop's racks,
+ * and its pickup reservation (see {@link #getAvailability}), and places the actual network order
+ * once a resolve decides to proceed (see {@link #requestFromNetwork}).
+ */
 final class CreateShopStockResolver {
   CreateShopStockSnapshot getAvailability(
       TileEntityCreateShop tile,

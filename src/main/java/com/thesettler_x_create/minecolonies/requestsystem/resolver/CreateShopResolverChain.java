@@ -8,6 +8,11 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 
+/**
+ * Walks a request's parent/child graph iteratively (bounded by {@code
+ * resolver.getMaxChainSanitizeNodes()}, not recursively) to detect and prune cycles or orphaned
+ * links that can accumulate across reloads/reassignment drift.
+ */
 final class CreateShopResolverChain {
   private final CreateShopRequestResolver resolver;
 

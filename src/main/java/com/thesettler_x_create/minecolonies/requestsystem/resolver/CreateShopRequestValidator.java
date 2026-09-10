@@ -11,6 +11,11 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.UUID;
 import net.minecraft.world.level.Level;
 
+/**
+ * Decides whether a request is currently eligible to be (re-)resolved: checks the delivery window,
+ * cooldown, and outstanding-needed amount via its injected collaborators before the resolver
+ * commits to attempting a resolve.
+ */
 final class CreateShopRequestValidator {
   private final CreateShopOutstandingNeededService outstandingNeededService =
       new CreateShopOutstandingNeededService();
