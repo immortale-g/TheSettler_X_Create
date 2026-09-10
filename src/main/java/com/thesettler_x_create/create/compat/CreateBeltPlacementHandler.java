@@ -72,11 +72,19 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
   private record ControllerKey(
       ResourceKey<Level> dimension, int colonyId, BlockPos controllerPos) {}
 
-  private final Map<ControllerKey, Map<BlockPos, List<ItemStack>>> pendingItemsByController =
-      new HashMap<>();
-  private final Map<ControllerKey, TreeMap<BlockPos, BeltSegment>> pendingSegmentsByController =
-      new HashMap<>();
-  private final Map<ControllerKey, Long> pendingStartedAtByController = new HashMap<>();
+  /**
+   * Everything buffered for one in-progress belt run, keyed together so a future code path can't
+   * update one piece of a run's state (items, segments, start time) while forgetting the others -
+   * previously three separate maps that only stayed in sync because every write site happened to
+   * touch all three by hand.
+   */
+  private static final class PendingBeltRun {
+    final Map<BlockPos, List<ItemStack>> itemsBySegment = new HashMap<>();
+    final TreeMap<BlockPos, BeltSegment> segments = new TreeMap<>();
+    long startedAt = -1L;
+  }
+
+  private final Map<ControllerKey, PendingBeltRun> pendingRunsByController = new HashMap<>();
 
   @Override
   public boolean canHandle(Level level, BlockPos blockPos, BlockState blockState) {
@@ -107,15 +115,13 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
       }
     }
 
-    markBufferTouched(key, level);
-    Map<BlockPos, List<ItemStack>> knownSegments =
-        pendingItemsByController.computeIfAbsent(key, ignored -> new HashMap<>());
-    knownSegments.put(blockPos, segmentItems);
-    if (length <= 0 || knownSegments.size() < length) {
+    PendingBeltRun run = markBufferTouched(key, level);
+    run.itemsBySegment.put(blockPos, segmentItems);
+    if (length <= 0 || run.itemsBySegment.size() < length) {
       return List.of();
     }
     List<ItemStack> combined = new ArrayList<>();
-    knownSegments.values().forEach(combined::addAll);
+    run.itemsBySegment.values().forEach(combined::addAll);
     return combined;
   }
 
@@ -134,18 +140,16 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
     ControllerKey key = resolveControllerKey(level, blockPos, tileEntityData);
     int length = tileEntityData.getInt("Length");
 
-    markBufferTouched(key, level);
-    TreeMap<BlockPos, BeltSegment> segments =
-        pendingSegmentsByController.computeIfAbsent(key, ignored -> new TreeMap<>());
-    segments.put(blockPos, new BeltSegment(blockPos, blockState, tileEntityData));
+    PendingBeltRun run = markBufferTouched(key, level);
+    run.segments.put(blockPos, new BeltSegment(blockPos, blockState, tileEntityData));
 
-    if (length <= 0 || segments.size() < length) {
+    if (length <= 0 || run.segments.size() < length) {
       // Still waiting on the rest of this belt run; hold off placing anything for now.
       return ActionProcessingResult.SUCCESS;
     }
 
     List<BlockPos> placedSoFar = new ArrayList<>();
-    for (BeltSegment segment : segments.values()) {
+    for (BeltSegment segment : run.segments.values()) {
       if (!level.setBlock(segment.pos(), segment.state(), Block.UPDATE_ALL)) {
         placedSoFar.forEach(pos -> level.removeBlock(pos, false));
         clearBuffers(key);
@@ -166,9 +170,7 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
   }
 
   private void clearBuffers(ControllerKey key) {
-    pendingSegmentsByController.remove(key);
-    pendingItemsByController.remove(key);
-    pendingStartedAtByController.remove(key);
+    pendingRunsByController.remove(key);
   }
 
   /**
@@ -187,22 +189,35 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
 
   /**
    * Discards this key's buffer if it was first touched longer than {@link
-   * Config#BELT_PLACEMENT_BUFFER_TTL_TICKS} ago (an abandoned/cancelled build), then records the
-   * current tick as this buffer's start time if it doesn't have one yet.
+   * Config#BELT_PLACEMENT_BUFFER_TTL_TICKS} ago (an abandoned/cancelled build), then returns the
+   * (possibly freshly-created) buffer for this key with its start time recorded if it doesn't have
+   * one yet.
    */
-  private void markBufferTouched(ControllerKey key, Level level) {
+  private PendingBeltRun markBufferTouched(ControllerKey key, Level level) {
     long now = level.getGameTime();
-    Long startedAt = pendingStartedAtByController.get(key);
-    if (startedAt != null && now - startedAt > Config.BELT_PLACEMENT_BUFFER_TTL_TICKS.get()) {
+    PendingBeltRun run = pendingRunsByController.get(key);
+    boolean stale =
+        run != null
+            && run.startedAt >= 0
+            && now - run.startedAt > Config.BELT_PLACEMENT_BUFFER_TTL_TICKS.get();
+    if (stale) {
       TheSettlerXCreate.LOGGER.warn(
           "[CreateCompat] discarding abandoned belt placement buffer controller={} colony={}"
               + " age={}",
           key.controllerPos(),
           key.colonyId(),
-          now - startedAt);
+          now - run.startedAt);
       clearBuffers(key);
+      run = null;
     }
-    pendingStartedAtByController.putIfAbsent(key, now);
+    if (run == null) {
+      run = new PendingBeltRun();
+      pendingRunsByController.put(key, run);
+    }
+    if (run.startedAt < 0) {
+      run.startedAt = now;
+    }
+    return run;
   }
 
   private static void addStack(List<ItemStack> items, ResourceLocation itemId) {

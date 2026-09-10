@@ -37,10 +37,12 @@ class CreateBeltPlacementHandlerCollisionGuardTest {
             "IColony colony = IColonyManager.getInstance().getColonyByPosFromWorld(level,"
                 + " segmentPos);"));
 
-    // Both buffer maps and the timestamp map must be keyed by the widened key, not raw BlockPos.
-    assertTrue(source.contains("Map<ControllerKey, Map<BlockPos, List<ItemStack>>>"));
-    assertTrue(source.contains("Map<ControllerKey, TreeMap<BlockPos, BeltSegment>>"));
-    assertTrue(source.contains("Map<ControllerKey, Long> pendingStartedAtByController"));
+    // The run's buffered items, segments and start time must all be keyed by the widened key, not
+    // raw BlockPos - bundled into one PendingBeltRun per key so they can't drift out of sync.
+    assertTrue(source.contains("Map<ControllerKey, PendingBeltRun> pendingRunsByController"));
+    assertTrue(source.contains("Map<BlockPos, List<ItemStack>> itemsBySegment"));
+    assertTrue(source.contains("TreeMap<BlockPos, BeltSegment> segments"));
+    assertTrue(source.contains("long startedAt"));
   }
 
   @Test
@@ -50,7 +52,7 @@ class CreateBeltPlacementHandlerCollisionGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/create/compat/CreateBeltPlacementHandler.java"));
 
-    int method = source.indexOf("private void markBufferTouched(");
+    int method = source.indexOf("private PendingBeltRun markBufferTouched(");
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 900));
 

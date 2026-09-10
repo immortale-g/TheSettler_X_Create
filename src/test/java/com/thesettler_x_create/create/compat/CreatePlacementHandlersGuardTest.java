@@ -46,8 +46,8 @@ class CreatePlacementHandlersGuardTest {
 
     // The core correctness property: a belt run must never be committed to the world (or its
     // resource cost reported) before every segment referencing the same Controller has arrived.
-    assertTrue(source.contains("if (length <= 0 || segments.size() < length) {"));
-    assertTrue(source.contains("if (length <= 0 || knownSegments.size() < length) {"));
+    assertTrue(source.contains("if (length <= 0 || run.segments.size() < length) {"));
+    assertTrue(source.contains("if (length <= 0 || run.itemsBySegment.size() < length) {"));
     assertTrue(source.contains("placedSoFar.forEach(pos -> level.removeBlock(pos, false));"));
     assertTrue(source.contains("PlacementHandlers.handleTileEntityPlacement("));
     assertTrue(source.contains("segment.tileEntityData(), level, segment.pos(), rotationMirror);"));
