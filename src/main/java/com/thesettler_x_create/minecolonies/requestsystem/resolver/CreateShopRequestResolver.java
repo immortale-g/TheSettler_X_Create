@@ -34,8 +34,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final CreateShopLifecycleStateStore lifecycleStateStore =
-      new CreateShopLifecycleStateStore();
+  private final CreateShopRuntimeStateStore runtimeStateStore =
+      new CreateShopRuntimeStateStore();
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
@@ -76,18 +76,18 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopDeliveryCancelService deliveryCancelService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService =
       new CreateShopDeliveryRootCauseSnapshotService();
-  private final CreateShopDeliveryLifecycleLedgerService deliveryLifecycleLedgerService =
-      new CreateShopDeliveryLifecycleLedgerService();
+  private final CreateShopDeliveryChildLedgerService deliveryChildLedgerService =
+      new CreateShopDeliveryChildLedgerService();
   private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopRequestStateMutatorService requestStateMutatorService =
       new CreateShopRequestStateMutatorService();
   private final CreateShopReservationSyncService reservationSyncService;
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
-  private final CreateShopLifecycleRehydrateService lifecycleRehydrateService;
+  private final CreateShopFlowStateRehydrateService flowStateRehydrateService;
   private final CreateShopAttemptResolveService attemptResolveService;
   private final CreateShopTickPendingService tickPendingService;
-  private final CreateShopDeliveryChildLifecycleService deliveryChildLifecycleService;
-  private final CreateShopTerminalRequestLifecycleService terminalRequestLifecycleService;
+  private final CreateShopDeliveryChildGuardService deliveryChildGuardService;
+  private final CreateShopResolverCallbackService resolverCallbackService;
   private final CreateShopWorkerAvailabilityGate workerAvailabilityGate =
       new CreateShopWorkerAvailabilityGate();
   private final CreateShopRequestStateMachine flowStateMachine =
@@ -95,8 +95,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
-    this.deliveryChildLifecycleService =
-        new CreateShopDeliveryChildLifecycleService(requestStateMutatorService);
+    this.deliveryChildGuardService =
+        new CreateShopDeliveryChildGuardService(requestStateMutatorService);
     this.flowTimeoutCleanupService =
         new CreateShopFlowTimeoutCleanupService(requestStateMutatorService);
     this.deliveryCompletionService =
@@ -121,8 +121,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.reservationSyncService =
         new CreateShopReservationSyncService(requestStateMutatorService, diagnostics);
     this.validator = new CreateShopRequestValidator(chain, stockResolver, planning, cooldown);
-    this.lifecycleRehydrateService =
-        new CreateShopLifecycleRehydrateService(
+    this.flowStateRehydrateService =
+        new CreateShopFlowStateRehydrateService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
@@ -136,12 +136,12 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             stockResolver,
             diagnostics,
             flowStateMachine);
-    this.terminalRequestLifecycleService =
-        new CreateShopTerminalRequestLifecycleService(
+    this.resolverCallbackService =
+        new CreateShopResolverCallbackService(
             requestStateMutatorService, cooldown, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
-            lifecycleStateStore.getPendingTracker(),
+            runtimeStateStore.getPendingTracker(),
             diagnostics,
             flowStateMachine,
             stockResolver,
@@ -174,7 +174,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingRequestProcessorService,
             flowTimeoutCleanupService,
             tickPendingTelemetryService,
-            lifecycleRehydrateService);
+            flowStateRehydrateService);
   }
 
   @Override
@@ -208,7 +208,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void resolveRequest(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    terminalRequestLifecycleService.resolveRequest(this, manager, request);
+    resolverCallbackService.resolveRequest(this, manager, request);
   }
 
   @Override
@@ -240,7 +240,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (standardManager == null) {
       return;
     }
-    terminalRequestLifecycleService.sweepFastOrphanPickedUpRecoveries(
+    resolverCallbackService.sweepFastOrphanPickedUpRecoveries(
         this, manager, standardManager);
   }
 
@@ -263,25 +263,25 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   @Override
   public void onAssignedRequestBeingCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    terminalRequestLifecycleService.onAssignedRequestBeingCancelled(this, manager, request);
+    resolverCallbackService.onAssignedRequestBeingCancelled(this, manager, request);
   }
 
   @Override
   public void onAssignedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
-    terminalRequestLifecycleService.onAssignedRequestCancelled(this, manager, request);
+    resolverCallbackService.onAssignedRequestCancelled(this, manager, request);
   }
 
   @Override
   public void onRequestedRequestComplete(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    terminalRequestLifecycleService.onRequestedRequestComplete(this, manager, request);
+    resolverCallbackService.onRequestedRequestComplete(this, manager, request);
   }
 
   @Override
   public void onRequestedRequestCancelled(
       @NotNull IRequestManager manager, @NotNull IRequest<?> request) {
-    terminalRequestLifecycleService.onRequestedRequestCancelled(this, manager, request);
+    resolverCallbackService.onRequestedRequestCancelled(this, manager, request);
   }
 
   @Override
@@ -366,15 +366,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   boolean hasDeliveriesCreated(IToken<?> token) {
-    return lifecycleStateStore.getPendingTracker().isDeliveryCreated(token);
+    return runtimeStateStore.getPendingTracker().isDeliveryCreated(token);
   }
 
   void markDeliveriesCreated(IToken<?> token) {
-    lifecycleStateStore.getPendingTracker().markDeliveryCreated(token);
+    runtimeStateStore.getPendingTracker().markDeliveryCreated(token);
   }
 
   void clearDeliveriesCreated(IToken<?> token) {
-    lifecycleStateStore.getPendingTracker().clearDeliveryCreated(token);
+    runtimeStateStore.getPendingTracker().clearDeliveryCreated(token);
   }
 
   String tryDescribeResolver(Object resolver) {
@@ -424,7 +424,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   CreateShopPendingDeliveryTracker getPendingTracker() {
-    return lifecycleStateStore.getPendingTracker();
+    return runtimeStateStore.getPendingTracker();
   }
 
   boolean markDeliveryCreateLogged(String key) {
@@ -436,7 +436,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public boolean hasActiveWork() {
-    if (lifecycleStateStore.getPendingTracker().hasEntries()) {
+    if (runtimeStateStore.getPendingTracker().hasEntries()) {
       return true;
     }
     if (cooldown.getOrderedCount() > 0) {
@@ -446,7 +446,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   public boolean hasProtectedInventoryWindow() {
-    return hasActiveWork() || lifecycleStateStore.getPendingTracker().hasEntries();
+    return hasActiveWork() || runtimeStateStore.getPendingTracker().hasEntries();
   }
 
   long resolveNowTick(IRequestManager manager) {
@@ -508,80 +508,80 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     flowStateMachine.loadFlowStates(tag);
   }
 
-  CreateShopTerminalRequestLifecycleService getTerminalRequestLifecycleService() {
-    return terminalRequestLifecycleService;
+  CreateShopResolverCallbackService getResolverCallbackService() {
+    return resolverCallbackService;
   }
 
   void markParentChildCompletedSeen(IToken<?> parentToken, long tick) {
     if (parentToken == null) {
       return;
     }
-    lifecycleStateStore.getParentChildCompletedSeenAt().put(parentToken, tick);
+    runtimeStateStore.getParentChildCompletedSeenAt().put(parentToken, tick);
   }
 
   public boolean hasParentChildCompletedSeen(IToken<?> parentToken) {
     return parentToken != null
-        && lifecycleStateStore.getParentChildCompletedSeenAt().containsKey(parentToken);
+        && runtimeStateStore.getParentChildCompletedSeenAt().containsKey(parentToken);
   }
 
   void clearParentChildCompletedSeen(IToken<?> parentToken) {
     if (parentToken == null) {
       return;
     }
-    lifecycleStateStore.getParentChildCompletedSeenAt().remove(parentToken);
+    runtimeStateStore.getParentChildCompletedSeenAt().remove(parentToken);
   }
 
   void clearMissingChildSince(IToken<?> childToken) {
-    lifecycleStateStore.getMissingChildSince().remove(childToken);
+    runtimeStateStore.getMissingChildSince().remove(childToken);
   }
 
   Long markMissingChildIfAbsent(IToken<?> childToken, long nowTick) {
-    return lifecycleStateStore.getMissingChildSince().putIfAbsent(childToken, nowTick);
+    return runtimeStateStore.getMissingChildSince().putIfAbsent(childToken, nowTick);
   }
 
   Long getRootCauseLastLogTick(IToken<?> childToken) {
-    return lifecycleStateStore.getDeliveryRootCauseLastLogTick().get(childToken);
+    return runtimeStateStore.getDeliveryRootCauseLastLogTick().get(childToken);
   }
 
   void markRootCauseLastLogTick(IToken<?> childToken, long nowTick) {
-    lifecycleStateStore.getDeliveryRootCauseLastLogTick().put(childToken, nowTick);
+    runtimeStateStore.getDeliveryRootCauseLastLogTick().put(childToken, nowTick);
   }
 
   String putRootCauseSnapshot(IToken<?> childToken, String snapshot) {
-    return lifecycleStateStore.getDeliveryRootCauseSnapshots().put(childToken, snapshot);
+    return runtimeStateStore.getDeliveryRootCauseSnapshots().put(childToken, snapshot);
   }
 
   Integer getParentLastKnownChildCount(IToken<?> parentToken) {
-    return lifecycleStateStore.getParentLastKnownChildCount().get(parentToken);
+    return runtimeStateStore.getParentLastKnownChildCount().get(parentToken);
   }
 
   String getParentLastKnownChildren(IToken<?> parentToken) {
-    return lifecycleStateStore.getParentLastKnownChildren().get(parentToken);
+    return runtimeStateStore.getParentLastKnownChildren().get(parentToken);
   }
 
   Long getParentChildDropLastLogTick(IToken<?> parentToken) {
-    return lifecycleStateStore.getParentChildDropLastLogTick().get(parentToken);
+    return runtimeStateStore.getParentChildDropLastLogTick().get(parentToken);
   }
 
   void markParentChildDropLastLogTick(IToken<?> parentToken, long nowTick) {
-    lifecycleStateStore.getParentChildDropLastLogTick().put(parentToken, nowTick);
+    runtimeStateStore.getParentChildDropLastLogTick().put(parentToken, nowTick);
   }
 
   void setParentChildrenSnapshot(IToken<?> parentToken, int childCount, String childrenState) {
-    lifecycleStateStore.getParentLastKnownChildCount().put(parentToken, Math.max(0, childCount));
-    lifecycleStateStore
+    runtimeStateStore.getParentLastKnownChildCount().put(parentToken, Math.max(0, childCount));
+    runtimeStateStore
         .getParentLastKnownChildren()
         .put(parentToken, childrenState == null ? "[]" : childrenState);
   }
 
   void clearParentChildrenSnapshot(IToken<?> parentToken) {
-    lifecycleStateStore.getParentLastKnownChildCount().remove(parentToken);
-    lifecycleStateStore.getParentLastKnownChildren().remove(parentToken);
-    lifecycleStateStore.getParentChildDropLastLogTick().remove(parentToken);
+    runtimeStateStore.getParentLastKnownChildCount().remove(parentToken);
+    runtimeStateStore.getParentLastKnownChildren().remove(parentToken);
+    runtimeStateStore.getParentChildDropLastLogTick().remove(parentToken);
   }
 
   void clearTrackedChildrenForParent(IStandardRequestManager manager, IToken<?> parentToken) {
-    deliveryChildLifecycleService.clearTrackedChildrenForParent(this, manager, parentToken);
+    deliveryChildGuardService.clearTrackedChildrenForParent(this, manager, parentToken);
   }
 
   CreateShopResolverRecheck getRecheck() {
@@ -601,22 +601,22 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   Long getRetryingReassignAttempt(IToken<?> token) {
-    return lifecycleStateStore.getRetryingReassignAttempts().get(token);
+    return runtimeStateStore.getRetryingReassignAttempts().get(token);
   }
 
   void markRetryingReassignAttempt(IToken<?> token, long nowTick) {
-    lifecycleStateStore.getRetryingReassignAttempts().put(token, nowTick);
+    runtimeStateStore.getRetryingReassignAttempts().put(token, nowTick);
   }
 
   void clearRetryingReassignAttempt(IToken<?> token) {
-    lifecycleStateStore.getRetryingReassignAttempts().remove(token);
+    runtimeStateStore.getRetryingReassignAttempts().remove(token);
   }
 
   void clearRootCauseTracking(IToken<?> childToken) {
-    lifecycleStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
-    lifecycleStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
-    lifecycleStateStore.getDeliveryChildLedger().remove(childToken);
-    lifecycleStateStore.getDeliveryChildLedgerLastLogTick().remove(childToken);
+    runtimeStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
+    runtimeStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
+    runtimeStateStore.getDeliveryChildLedger().remove(childToken);
+    runtimeStateStore.getDeliveryChildLedgerLastLogTick().remove(childToken);
   }
 
   void clearDeliveryChildLedgerForParent(IToken<?> parentToken) {
@@ -624,16 +624,16 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       return;
     }
     for (var entry :
-        java.util.List.copyOf(lifecycleStateStore.getDeliveryChildLedger().entrySet())) {
+        java.util.List.copyOf(runtimeStateStore.getDeliveryChildLedger().entrySet())) {
       CreateShopDeliveryChildLedgerEntry ledger = entry.getValue();
       if (ledger == null || !parentToken.equals(ledger.parentToken)) {
         continue;
       }
       IToken<?> childToken = entry.getKey();
-      lifecycleStateStore.getDeliveryChildLedger().remove(childToken);
-      lifecycleStateStore.getDeliveryChildLedgerLastLogTick().remove(childToken);
-      lifecycleStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
-      lifecycleStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
+      runtimeStateStore.getDeliveryChildLedger().remove(childToken);
+      runtimeStateStore.getDeliveryChildLedgerLastLogTick().remove(childToken);
+      runtimeStateStore.getDeliveryRootCauseSnapshots().remove(childToken);
+      runtimeStateStore.getDeliveryRootCauseLastLogTick().remove(childToken);
     }
   }
 
@@ -646,15 +646,15 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> getDeliveryChildLedger() {
-    return lifecycleStateStore.getDeliveryChildLedger();
+    return runtimeStateStore.getDeliveryChildLedger();
   }
 
   Long getDeliveryLedgerLastLogTick(IToken<?> childToken) {
-    return lifecycleStateStore.getDeliveryChildLedgerLastLogTick().get(childToken);
+    return runtimeStateStore.getDeliveryChildLedgerLastLogTick().get(childToken);
   }
 
   void markDeliveryLedgerLastLogTick(IToken<?> childToken, long nowTick) {
-    lifecycleStateStore.getDeliveryChildLedgerLastLogTick().put(childToken, nowTick);
+    runtimeStateStore.getDeliveryChildLedgerLastLogTick().put(childToken, nowTick);
   }
 
   void observeDeliveryChildLifecycle(
@@ -665,19 +665,19 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       IRequest<?> child,
       IToken<?> assignedResolverToken,
       String source) {
-    deliveryLifecycleLedgerService.observeChild(
+    deliveryChildLedgerService.observeChild(
         this, manager, level, parentToken, childToken, child, assignedResolverToken, source);
   }
 
   void observeDeliveryChildMissing(
       Level level, IToken<?> parentToken, IToken<?> childToken, String source, String detail) {
-    deliveryLifecycleLedgerService.observeMissingChild(
+    deliveryChildLedgerService.observeMissingChild(
         this, level, parentToken, childToken, source, detail);
   }
 
   void observeDeliveryChildCallbackTerminal(
       Level level, IToken<?> parentToken, IToken<?> childToken, String callbackType) {
-    deliveryLifecycleLedgerService.observeCallbackTerminal(
+    deliveryChildLedgerService.observeCallbackTerminal(
         this, level, parentToken, childToken, callbackType);
   }
 
@@ -685,14 +685,14 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (childToken == null) {
       return null;
     }
-    return lifecycleStateStore.getDeliveryChildLedger().get(childToken);
+    return runtimeStateStore.getDeliveryChildLedger().get(childToken);
   }
 
   IToken<?> findPickedUpOrphanChildForParent(IToken<?> parentToken) {
     if (parentToken == null) {
       return null;
     }
-    for (var entry : lifecycleStateStore.getDeliveryChildLedger().entrySet()) {
+    for (var entry : runtimeStateStore.getDeliveryChildLedger().entrySet()) {
       CreateShopDeliveryChildLedgerEntry ledger = entry.getValue();
       if (ledger == null) {
         continue;

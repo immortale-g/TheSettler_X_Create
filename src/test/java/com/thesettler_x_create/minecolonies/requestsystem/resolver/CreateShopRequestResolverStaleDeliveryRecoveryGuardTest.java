@@ -18,7 +18,7 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
     String lifecycleSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildGuardService.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
@@ -26,7 +26,7 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
     String lifecycleStoreSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleStateStore.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRuntimeStateStore.java"));
 
     assertFalse(lifecycleSource.contains("isStaleDeliveryChild("));
     assertFalse(reconcileSource.contains("stale-child-recovery"));
@@ -48,7 +48,7 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
     assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
     assertTrue(reconcileSource.contains("isLocalShopDeliveryChild("));
     assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
-    assertTrue(resolverSource.contains("lifecycleStateStore"));
+    assertTrue(resolverSource.contains("runtimeStateStore"));
     // Recovery service (for duplicate-child cancellation) still exists
     assertTrue(reconcileSource.contains("deliveryChildRecoveryService.recover("));
   }

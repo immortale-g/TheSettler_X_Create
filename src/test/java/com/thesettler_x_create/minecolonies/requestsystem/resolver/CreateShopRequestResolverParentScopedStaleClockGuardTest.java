@@ -18,7 +18,7 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
     String storeSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleStateStore.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRuntimeStateStore.java"));
 
     assertFalse(storeSource.contains("parentDeliveryActiveSince"));
     assertFalse(storeSource.contains("deliveryChildActiveSince"));

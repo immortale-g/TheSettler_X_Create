@@ -36,7 +36,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryRuntimeTest {
     String storeSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleStateStore.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRuntimeStateStore.java"));
     String mutatorSource =
         Files.readString(
             Path.of(

@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
  * One request's diagnostic flow entry in {@link CreateShopRequestStateMachine}: its {@link
  * CreateShopFlowState}, the tick it was created/last progressed, and free-text labels for
  * diagnostics UI. Not the resolver's own request bookkeeping - that lives in {@link
- * CreateShopLifecycleStateStore} and the resolver's pending-delivery tracking.
+ * CreateShopRuntimeStateStore} and the resolver's pending-delivery tracking.
  */
 final class CreateShopFlowRecord {
   private final IToken<?> requestToken;

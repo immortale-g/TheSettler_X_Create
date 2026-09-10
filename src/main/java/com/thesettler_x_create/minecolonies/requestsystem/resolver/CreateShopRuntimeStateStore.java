@@ -4,8 +4,11 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Centralized runtime lifecycle state for pending/cooldown/child tracking. */
-final class CreateShopLifecycleStateStore {
+/**
+ * Centralized in-memory state for the resolver: the pending-delivery tracker, retry/cooldown
+ * counters, and per-parent/per-child bookkeeping maps used for drift detection and diagnostics.
+ */
+final class CreateShopRuntimeStateStore {
   private final CreateShopPendingDeliveryTracker pendingTracker =
       new CreateShopPendingDeliveryTracker();
   private final Map<IToken<?>, Long> retryingReassignAttempts = new ConcurrentHashMap<>();

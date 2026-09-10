@@ -19,19 +19,19 @@ final class CreateShopTickPendingService {
   private final CreateShopPendingRequestProcessorService pendingRequestProcessorService;
   private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
   private final CreateShopTickPendingTelemetryService tickPendingTelemetryService;
-  private final CreateShopLifecycleRehydrateService lifecycleRehydrateService;
+  private final CreateShopFlowStateRehydrateService flowStateRehydrateService;
 
   CreateShopTickPendingService(
       CreateShopPendingTokenCollectorService pendingTokenCollectorService,
       CreateShopPendingRequestProcessorService pendingRequestProcessorService,
       CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService,
       CreateShopTickPendingTelemetryService tickPendingTelemetryService,
-      CreateShopLifecycleRehydrateService lifecycleRehydrateService) {
+      CreateShopFlowStateRehydrateService flowStateRehydrateService) {
     this.pendingTokenCollectorService = pendingTokenCollectorService;
     this.pendingRequestProcessorService = pendingRequestProcessorService;
     this.flowTimeoutCleanupService = flowTimeoutCleanupService;
     this.tickPendingTelemetryService = tickPendingTelemetryService;
-    this.lifecycleRehydrateService = lifecycleRehydrateService;
+    this.flowStateRehydrateService = flowStateRehydrateService;
   }
 
   void tickPendingDeliveries(CreateShopRequestResolver resolver, IRequestManager manager) {
@@ -67,7 +67,7 @@ final class CreateShopTickPendingService {
       return;
     }
     resolver
-        .getTerminalRequestLifecycleService()
+        .getResolverCallbackService()
         .sweepFastOrphanPickedUpRecoveries(resolver, manager, standardManager);
     resolver.reassignResolvableRetryingRequests(standardManager, level);
     resolver.getRecheck().processParentChildRechecks(standardManager, level);
@@ -78,7 +78,7 @@ final class CreateShopTickPendingService {
         pendingTokenCollectorService.collectPendingTokens(
             resolver, standardManager, level, assignments);
     pendingTokens =
-        lifecycleRehydrateService.rehydrateAndFilter(
+        flowStateRehydrateService.rehydrateAndFilter(
             resolver, standardManager, level, pendingTokens);
     if (pendingTokens.isEmpty()) {
       return;

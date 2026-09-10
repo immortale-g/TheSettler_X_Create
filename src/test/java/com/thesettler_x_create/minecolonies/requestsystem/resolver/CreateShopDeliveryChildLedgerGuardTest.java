@@ -12,7 +12,7 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLedgerService.java"));
 
     assertTrue(source.contains("MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL"));
     assertTrue(source.contains("MC_NO_TERMINAL_CALLBACK"));

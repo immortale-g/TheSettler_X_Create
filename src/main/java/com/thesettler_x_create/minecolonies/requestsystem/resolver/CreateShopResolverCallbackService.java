@@ -14,13 +14,17 @@ import java.util.Collection;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
-/** Handles terminal request lifecycle cleanup and resolver completion/cancel transitions. */
-final class CreateShopTerminalRequestLifecycleService {
+/**
+ * Implements the core {@code IRequestResolver} callbacks MineColonies invokes as a request moves
+ * toward and through a terminal state: {@code resolveRequest} plus the assigned/requested
+ * complete/cancel callbacks.
+ */
+final class CreateShopResolverCallbackService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopResolverCooldown cooldown;
   private final CreateShopResolverDiagnostics diagnostics;
 
-  CreateShopTerminalRequestLifecycleService(
+  CreateShopResolverCallbackService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
       CreateShopResolverCooldown cooldown,
       CreateShopResolverDiagnostics diagnostics) {

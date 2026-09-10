@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guard tests for CreateShopLifecycleRehydrateService.
+ * Guard tests for CreateShopFlowStateRehydrateService.
  *
  * <p>After Phase 3.5 the active-child-expansion loop and stale-recovery-arm calls have been
  * removed. The service now only expands via pendingTracker and relies on NBT-restored FlowState as
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 class CreateShopRehydrateServiceGuardTest {
   private static final String SOURCE =
-      "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleRehydrateService.java";
+      "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopFlowStateRehydrateService.java";
 
   @Test
   void reloadWithInflightOrChildrenMarksAtLeastOnePendingNotNewOrder() throws Exception {

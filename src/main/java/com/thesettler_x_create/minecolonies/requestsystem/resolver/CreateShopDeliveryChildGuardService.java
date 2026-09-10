@@ -5,7 +5,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import net.minecraft.world.level.Level;
 
 /**
- * Lifecycle helpers for delivery child requests.
+ * Guards against duplicate or stuck delivery-child requests for a parent.
  *
  * <p>Stale-child detection and forced courier recovery have been removed: once DELIVERY_CREATED is
  * reached, MineColonies owns the delivery. The shop reacts to terminal callbacks rather than
@@ -13,10 +13,10 @@ import net.minecraft.world.level.Level;
  * cancels duplicate delivery children for the same parent (a programming-error guard, not a
  * timeout-based heuristic).
  */
-final class CreateShopDeliveryChildLifecycleService {
+final class CreateShopDeliveryChildGuardService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
-  CreateShopDeliveryChildLifecycleService(
+  CreateShopDeliveryChildGuardService(
       CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.requestStateMutatorService = requestStateMutatorService;
   }

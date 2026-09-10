@@ -9,19 +9,20 @@ import java.util.Set;
 import net.minecraft.world.level.Level;
 
 /**
- * Rehydrates lifecycle state from MineColonies request graph before tick-pending mutation starts.
+ * Rehydrates each candidate request's {@link CreateShopFlowState} before tick-pending mutation
+ * starts, so a reload doesn't lose track of where a request was in its flow.
  *
  * <p>Since Phase 3.2 the StateMachine persists FlowState to NBT. On reload, FlowStates are loaded
  * into {@code StateMachine.pendingRestore} and applied lazily in {@code getOrCreate}. This service
  * uses that restored state as the primary source of truth. The heuristic derivation from the
  * MineColonies request graph is retained as a fallback for saves that predate Phase 3.2.
  */
-final class CreateShopLifecycleRehydrateService {
+final class CreateShopFlowStateRehydrateService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
   private final CreateShopOutstandingNeededService outstandingNeededService;
   private final CreateShopResolverDiagnostics diagnostics;
 
-  CreateShopLifecycleRehydrateService(
+  CreateShopFlowStateRehydrateService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
       CreateShopOutstandingNeededService outstandingNeededService,
       CreateShopResolverDiagnostics diagnostics) {

@@ -14,8 +14,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.items.IItemHandler;
 
-/** Tracks one runtime lifecycle ledger per delivery-child token and emits diagnosis snapshots. */
-final class CreateShopDeliveryLifecycleLedgerService {
+/**
+ * Tracks one diagnostic ledger entry per delivery-child token (first/last-seen ticks, state,
+ * owning resolver) and emits diagnosis snapshots for {@link CreateShopResolverDiagnostics}.
+ */
+final class CreateShopDeliveryChildLedgerService {
   void observeChild(
       CreateShopRequestResolver resolver,
       IStandardRequestManager manager,

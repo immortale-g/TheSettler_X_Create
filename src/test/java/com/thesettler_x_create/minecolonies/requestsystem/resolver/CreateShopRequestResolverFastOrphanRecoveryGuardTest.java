@@ -12,7 +12,7 @@ class CreateShopRequestResolverFastOrphanRecoveryGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopTerminalRequestLifecycleService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopResolverCallbackService.java"));
 
     assertTrue(source.contains("tryFastOrphanPickedUpRecovery(resolver, manager, request)"));
     assertTrue(source.contains("fast-orphan-pickedup-recovery"));

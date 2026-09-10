@@ -16,7 +16,7 @@ class CreateShopRequestResolverTwoPhaseStaleRecoveryGuardTest {
     String lifecycleSource =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLifecycleService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildGuardService.java"));
     String reconcileSource =
         Files.readString(
             Path.of(
