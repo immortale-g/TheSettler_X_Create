@@ -64,13 +64,26 @@ final class CreateShopDeliveryChildRecoveryService {
       manager.updateRequestState(
           childToken, com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED);
       stateUpdated = true;
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
       // Best effort; parent child-link cleanup below still runs.
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] recover: updateRequestState(CANCELLED) failed for child={}: {}",
+            childToken,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
     }
     try {
       parentRequest.removeChild(childToken);
-    } catch (Exception ignored) {
-      // Best effort.
+    } catch (Exception ex) {
+      // Best effort - the child link may already be gone.
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] recover: removeChild failed for parent={} child={}: {}",
+            parentRequest.getId(),
+            childToken,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
     }
     resolver.clearDeliveriesCreated(parentRequest.getId());
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());

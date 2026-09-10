@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -276,8 +277,15 @@ final class CreateShopDeliveryCompletionService {
         parentRequest.removeChild(childToken);
         child.setParent(null);
       }
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
       // Best effort: parent resolution below still checks for active children.
+      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] detachCompletedChild failed for parent={} child={}: {}",
+            parentRequest.getId(),
+            childToken,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
     }
   }
 
