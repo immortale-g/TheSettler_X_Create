@@ -14,6 +14,12 @@ import net.minecraft.world.level.Level;
  * timeout-based heuristic).
  */
 final class CreateShopDeliveryChildGuardService {
+  /**
+   * How long a child token may stay unresolved after an immediate-pickup confirmation before
+   * {@link #shouldDropMissingChild} gives up on it.
+   */
+  private static final long MISSING_CHILD_GRACE_TICKS = 40L;
+
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopDeliveryChildGuardService(
@@ -35,7 +41,7 @@ final class CreateShopDeliveryChildGuardService {
     if (since == null) {
       return false;
     }
-    return now - since >= 40L;
+    return now - since >= MISSING_CHILD_GRACE_TICKS;
   }
 
   void clearTrackedChildrenForParent(
