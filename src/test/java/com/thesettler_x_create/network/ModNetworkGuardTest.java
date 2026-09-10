@@ -44,6 +44,20 @@ class ModNetworkGuardTest {
   }
 
   @Test
+  void getShopBuildingRoutesThroughGetShop() throws Exception {
+    String source =
+        Files.readString(Path.of("src/main/java/com/thesettler_x_create/network/ModNetwork.java"));
+
+    int method = source.indexOf("private static BuildingCreateShop getShopBuilding(");
+    int nextMethod = source.indexOf("private static TileEntityCreateShop getShop(ServerPlayer");
+    assertTrue(method > 0 && nextMethod > method);
+    String body = source.substring(method, nextMethod);
+    // Handlers are allowed to resolve through getShopBuilding(...) instead of getShop(...) only
+    // because it delegates - so the authorization check still happens exactly once, in getShop.
+    assertTrue(body.contains("getShop(context, pos)"));
+  }
+
+  @Test
   void everyHandlerResolvesShopThroughGetShopOrChecksAuthorizationDirectly() throws Exception {
     String source =
         Files.readString(Path.of("src/main/java/com/thesettler_x_create/network/ModNetwork.java"));
@@ -56,11 +70,15 @@ class ModNetworkGuardTest {
       int bodyStart = matcher.end();
       int bodyEnd = findMatchingBraceEnd(source, source.indexOf('{', bodyStart));
       String body = source.substring(bodyStart, bodyEnd);
-      boolean routesThroughGetShop = body.contains("getShop(");
+      // getShopBuilding(...) is a thin delegate over getShop(...) - see the test above, which
+      // pins that delegation so this alternative can't become an authorization bypass.
+      boolean routesThroughGetShop = body.contains("getShop(") || body.contains("getShopBuilding(");
       boolean checksDirectly = body.contains("isAuthorized(");
       assertTrue(
           routesThroughGetShop || checksDirectly,
-          matcher.group(1) + " must resolve its target through getShop(...) or isAuthorized(...)");
+          matcher.group(1)
+              + " must resolve its target through getShop(...), getShopBuilding(...) or"
+              + " isAuthorized(...)");
     }
     // Sanity check: fail loudly instead of silently passing if the handler count ever drops to
     // zero (e.g. a refactor renames the handleXxx convention this test relies on).

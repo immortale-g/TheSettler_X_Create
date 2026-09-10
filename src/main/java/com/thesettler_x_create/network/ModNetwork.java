@@ -91,8 +91,8 @@ public final class ModNetwork {
       SetCreateShopPermaOrePayload payload, IPayloadContext context) {
     context.enqueueWork(
         () -> {
-          TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
+          BuildingCreateShop building = getShopBuilding(context, payload.pos());
+          if (building == null) {
             return;
           }
           building.setPermaOre(payload.oreId(), payload.enabled());
@@ -103,8 +103,8 @@ public final class ModNetwork {
       SetCreateShopPermaWaitPayload payload, IPayloadContext context) {
     context.enqueueWork(
         () -> {
-          TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
+          BuildingCreateShop building = getShopBuilding(context, payload.pos());
+          if (building == null) {
             return;
           }
           building.setPermaWaitFullStack(payload.enabled());
@@ -195,8 +195,8 @@ public final class ModNetwork {
       SetPackagerAddressPayload payload, IPayloadContext context) {
     context.enqueueWork(
         () -> {
-          TileEntityCreateShop shop = getShop(context, payload.hutPos());
-          if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
+          BuildingCreateShop building = getShopBuilding(context, payload.hutPos());
+          if (building == null) {
             return;
           }
           CreateShopOutputBlockEntity obe = building.getOutputBlockEntity();
@@ -277,6 +277,22 @@ public final class ModNetwork {
       return null;
     }
     return getShop(player, pos);
+  }
+
+  /**
+   * Resolves the {@link BuildingCreateShop} behind a hut position, or {@code null} if the packet
+   * does not name one this player may configure.
+   *
+   * <p>Sits next to {@link #getShop(IPayloadContext, BlockPos)} because every handler that wants
+   * the building rather than the tile entity used to spell the same resolve-then-cast chain out
+   * itself; a new handler is now one call instead of a fourth copy (Clean Code Audit a5-2).
+   */
+  private static BuildingCreateShop getShopBuilding(IPayloadContext context, BlockPos pos) {
+    TileEntityCreateShop shop = getShop(context, pos);
+    if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
+      return null;
+    }
+    return building;
   }
 
   private static TileEntityCreateShop getShop(ServerPlayer player, BlockPos pos) {
