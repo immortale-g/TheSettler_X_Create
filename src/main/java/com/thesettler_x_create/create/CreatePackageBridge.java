@@ -9,16 +9,16 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Single chokepoint for reading and building Create's {@link PackageItem} package stacks. The
- * same "check {@code isPackage}, then read its {@code ItemStackHandler} contents" sequence used
- * to be duplicated independently across {@code ShopLostPackageInteraction} (three times),
- * {@code ColonyPackagerBlockEntity}, and {@code CreateShopOutputBlockTestCommands}, and building
- * a new package (the reverse: wrap an item in an {@code ItemStackHandler}, call {@code
+ * Single chokepoint for reading and building Create's {@link PackageItem} package stacks. The same
+ * "check {@code isPackage}, then read its {@code ItemStackHandler} contents" sequence used to be
+ * duplicated independently across {@code ShopLostPackageInteraction} (three times), {@code
+ * ColonyPackagerBlockEntity}, and {@code CreateShopOutputBlockTestCommands}, and building a new
+ * package (the reverse: wrap an item in an {@code ItemStackHandler}, call {@code
  * PackageItem.containing}, then {@code addAddress}) was duplicated once more in {@code
  * CreateShopOutputBlockEntity} - the same anti-pattern as the request-broadcast duplication
  * consolidated in {@link CreateLogisticsBridge}, just for the package-item data shape instead of
- * the request shape. Funneling both directions through here means a future compatibility shim for
- * a Create-addon that changes {@code PackageItem}'s internal layout only has to patch one place.
+ * the request shape. Funneling both directions through here means a future compatibility shim for a
+ * Create-addon that changes {@code PackageItem}'s internal layout only has to patch one place.
  */
 public final class CreatePackageBridge {
   private CreatePackageBridge() {}

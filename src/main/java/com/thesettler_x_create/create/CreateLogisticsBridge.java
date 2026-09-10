@@ -9,9 +9,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Single chokepoint for building a Create stock-network package request and broadcasting it
- * through {@link LogisticsManager}. Every call site that wants to place a package request against
- * a Create logistics network funnels through here instead of independently constructing a {@link
+ * Single chokepoint for building a Create stock-network package request and broadcasting it through
+ * {@link LogisticsManager}. Every call site that wants to place a package request against a Create
+ * logistics network funnels through here instead of independently constructing a {@link
  * PackageOrderWithCrafts} and calling {@code broadcastPackageRequest} itself - that used to be
  * duplicated three times (the grouped broadcast in {@link CreateNetworkFacade}, and the test- and
  * batch-request handlers in {@code ModNetwork}), so a future compatibility shim for Create-addon

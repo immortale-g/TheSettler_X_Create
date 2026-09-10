@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
 class ShopCourierDiagnosticsEntityRepairTypedGuardTest {
 
   private static final Path SOURCE =
-      Path.of("src/main/java/com/thesettler_x_create/minecolonies/building/ShopCourierDiagnostics.java");
+      Path.of(
+          "src/main/java/com/thesettler_x_create/minecolonies/building/ShopCourierDiagnostics.java");
 
   @Test
   void entityRepairMethodsUseTypedMineColoniesCallsNotReflection() throws Exception {

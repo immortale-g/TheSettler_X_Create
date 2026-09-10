@@ -34,8 +34,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   private final java.util.Set<IToken<?>> cancelledRequests =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-  private final CreateShopRuntimeStateStore runtimeStateStore =
-      new CreateShopRuntimeStateStore();
+  private final CreateShopRuntimeStateStore runtimeStateStore = new CreateShopRuntimeStateStore();
   private final java.util.Set<String> deliveryLinkLogged =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
   private final java.util.Set<String> deliveryCreateLogged =
@@ -137,8 +136,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             diagnostics,
             flowStateMachine);
     this.resolverCallbackService =
-        new CreateShopResolverCallbackService(
-            requestStateMutatorService, cooldown, diagnostics);
+        new CreateShopResolverCallbackService(requestStateMutatorService, cooldown, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
             runtimeStateStore.getPendingTracker(),
@@ -240,8 +238,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (standardManager == null) {
       return;
     }
-    resolverCallbackService.sweepFastOrphanPickedUpRecoveries(
-        this, manager, standardManager);
+    resolverCallbackService.sweepFastOrphanPickedUpRecoveries(this, manager, standardManager);
   }
 
   public static void onDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
@@ -623,8 +620,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     if (parentToken == null) {
       return;
     }
-    for (var entry :
-        java.util.List.copyOf(runtimeStateStore.getDeliveryChildLedger().entrySet())) {
+    for (var entry : java.util.List.copyOf(runtimeStateStore.getDeliveryChildLedger().entrySet())) {
       CreateShopDeliveryChildLedgerEntry ledger = entry.getValue();
       if (ledger == null || !parentToken.equals(ledger.parentToken)) {
         continue;

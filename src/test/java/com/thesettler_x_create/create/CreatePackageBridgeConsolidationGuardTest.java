@@ -9,10 +9,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The "check {@code PackageItem.isPackage}, then read its {@code ItemStackHandler} contents"
- * sequence used to be duplicated independently in {@code ShopLostPackageInteraction} (three
- * times), {@code ColonyPackagerBlockEntity}, and {@code CreateShopOutputBlockTestCommands}, and
- * building a new package was duplicated once more in {@code CreateShopOutputBlockEntity}. All five
- * now route through {@link CreatePackageBridge} instead of calling {@code PackageItem} directly.
+ * sequence used to be duplicated independently in {@code ShopLostPackageInteraction} (three times),
+ * {@code ColonyPackagerBlockEntity}, and {@code CreateShopOutputBlockTestCommands}, and building a
+ * new package was duplicated once more in {@code CreateShopOutputBlockEntity}. All five now route
+ * through {@link CreatePackageBridge} instead of calling {@code PackageItem} directly.
  *
  * <p>The package-content reads originally in {@code ShopLostPackageInteraction} were later moved
  * again, to {@code ShopPackageContentMatcher} (Clean Code Audit finding a2-6: that logic was a
@@ -60,7 +60,8 @@ class CreatePackageBridgeConsolidationGuardTest {
   private static void assertNoDirectPackageItemCalls(String path) throws Exception {
     String source = Files.readString(Path.of(path));
     assertTrue(
-        source.contains("CreatePackageBridge."), path + " should route through CreatePackageBridge");
+        source.contains("CreatePackageBridge."),
+        path + " should route through CreatePackageBridge");
     assertFalse(source.contains("PackageItem.isPackage("));
     assertFalse(source.contains("PackageItem.getContents("));
     assertFalse(source.contains("PackageItem.containing("));

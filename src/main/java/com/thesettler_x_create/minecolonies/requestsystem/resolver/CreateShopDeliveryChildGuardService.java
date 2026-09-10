@@ -15,8 +15,8 @@ import net.minecraft.world.level.Level;
  */
 final class CreateShopDeliveryChildGuardService {
   /**
-   * How long a child token may stay unresolved after an immediate-pickup confirmation before
-   * {@link #shouldDropMissingChild} gives up on it.
+   * How long a child token may stay unresolved after an immediate-pickup confirmation before {@link
+   * #shouldDropMissingChild} gives up on it.
    */
   private static final long MISSING_CHILD_GRACE_TICKS = 40L;
 

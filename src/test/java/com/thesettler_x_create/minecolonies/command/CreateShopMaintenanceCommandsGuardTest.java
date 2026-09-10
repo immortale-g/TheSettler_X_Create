@@ -44,8 +44,7 @@ class CreateShopMaintenanceCommandsGuardTest {
     assertTrue(cancellerSource.contains("cancelRequestGraphPostOrder("));
     assertTrue(cancellerSource.contains("cancelSingleRequest("));
     assertTrue(
-        resetSource.contains(
-            "CreateShopLiveDeliveryDrainer.countShopsWithActiveLocalDeliveries("));
+        resetSource.contains("CreateShopLiveDeliveryDrainer.countShopsWithActiveLocalDeliveries("));
     assertTrue(
         resetSource.contains(
             "CreateShopAssignmentReconciler.reconcileAssignmentsAndKickCouriers("));

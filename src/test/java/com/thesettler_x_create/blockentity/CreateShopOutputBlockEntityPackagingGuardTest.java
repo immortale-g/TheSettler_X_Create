@@ -31,7 +31,8 @@ class CreateShopOutputBlockEntityPackagingGuardTest {
         "CreatePackageBridge.buildPackage() call missing");
 
     String bridgeSrc =
-        Files.readString(Path.of("src/main/java/com/thesettler_x_create/create/CreatePackageBridge.java"));
+        Files.readString(
+            Path.of("src/main/java/com/thesettler_x_create/create/CreatePackageBridge.java"));
     assertTrue(
         bridgeSrc.contains("PackageItem.containing("), "PackageItem.containing() call missing");
     assertTrue(

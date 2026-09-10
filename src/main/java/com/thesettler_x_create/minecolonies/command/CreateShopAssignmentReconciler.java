@@ -6,9 +6,9 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.TheSettlerXCreate;
 
 /**
- * Prunes stale/terminal request-resolver assignments and kicks stuck {@code CREATED}-state
- * Delivery requests, as part of {@code reset_live_state}. Extracted from {@link
- * CreateShopResetCommands}, which still owns the drain-round orchestration and the shared {@link
+ * Prunes stale/terminal request-resolver assignments and kicks stuck {@code CREATED}-state Delivery
+ * requests, as part of {@code reset_live_state}. Extracted from {@link CreateShopResetCommands},
+ * which still owns the drain-round orchestration and the shared {@link
  * CreateShopResetCommands#handleGraphException} classifier.
  */
 final class CreateShopAssignmentReconciler {

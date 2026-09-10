@@ -601,7 +601,8 @@ final class ShopCourierDiagnostics {
     if (!(entity instanceof net.minecraft.world.entity.Entity mcEntity)) {
       String uuidInfo = citizenUuid == null ? "<null>" : citizenUuid.toString();
       String lookup = "<n/a>";
-      if (citizenUuid != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+      if (citizenUuid != null
+          && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
         var found = serverLevel.getEntity(citizenUuid);
         lookup =
             found == null

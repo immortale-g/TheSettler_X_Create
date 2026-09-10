@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
  * PackageOrderWithCrafts} and call {@code LogisticsManager.broadcastPackageRequest} directly - the
  * same few lines duplicated once in {@link CreateNetworkFacade} and twice in {@code ModNetwork}
  * (test- and batch-request handlers). That is now consolidated behind {@link
- * CreateLogisticsBridge#broadcastPackageRequest}, so a future Create-addon compatibility shim
- * (e.g. for mixins that change the request shape) only has to patch one place.
+ * CreateLogisticsBridge#broadcastPackageRequest}, so a future Create-addon compatibility shim (e.g.
+ * for mixins that change the request shape) only has to patch one place.
  */
 class CreateLogisticsBridgeConsolidationGuardTest {
 
@@ -34,7 +34,11 @@ class CreateLogisticsBridgeConsolidationGuardTest {
         Files.readString(Path.of("src/main/java/com/thesettler_x_create/network/ModNetwork.java"));
 
     int bridgeCalls = countOccurrences(source, "CreateLogisticsBridge.broadcastPackageRequest(");
-    assertTrue(bridgeCalls == 2, "expected handleTestRequest and handleBatchRequest to both route through the bridge, found " + bridgeCalls + " call(s)");
+    assertTrue(
+        bridgeCalls == 2,
+        "expected handleTestRequest and handleBatchRequest to both route through the bridge, found "
+            + bridgeCalls
+            + " call(s)");
     assertFalse(source.contains("LogisticsManager.broadcastPackageRequest("));
     assertFalse(source.contains("PackageOrderWithCrafts.simple("));
   }

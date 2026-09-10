@@ -90,10 +90,10 @@ final class CreateShopResetCommands {
   /**
    * Classifies a caught exception from request-graph traversal: a MineColonies "stale request
    * graph" condition (see {@link CreateShopCommandSupport#isStaleRequestGraphException}) is
-   * expected - this returns {@code true} and leaves pruning to the caller - anything else is a
-   * real error, which this records into {@code result.errors} and logs before returning {@code
-   * false}. Shared by every {@code reset_live_state} collaborator so none of them hand-roll their
-   * own classify-log-or-ignore block.
+   * expected - this returns {@code true} and leaves pruning to the caller - anything else is a real
+   * error, which this records into {@code result.errors} and logs before returning {@code false}.
+   * Shared by every {@code reset_live_state} collaborator so none of them hand-roll their own
+   * classify-log-or-ignore block.
    */
   static boolean handleGraphException(
       Exception ex, IToken<?> token, String context, ResetLiveStateResult result) {
