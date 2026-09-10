@@ -3,6 +3,7 @@ package com.thesettler_x_create.create;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -169,132 +170,90 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
       return;
     }
     for (ItemStack reserved : reservedStacks) {
-      if (reserved == null || reserved.isEmpty()) {
+      ItemStackDataUtil.mergeIntoList(cachedStacks, reserved);
+    }
+  }
+
+  /** Visits one rack slot during {@link #scanRacks}. Return {@code true} to stop the scan early. */
+  @FunctionalInterface
+  private interface RackSlotVisitor {
+    boolean visit(IItemHandler handler, int slot, ItemStack stack);
+  }
+
+  /**
+   * Shared traversal for every loaded rack in this shop's containers, visiting every occupied slot
+   * of every rack in order until either the containers are exhausted or {@code visitor} asks to
+   * stop early.
+   */
+  private void scanRacks(RackSlotVisitor visitor) {
+    var shop = getReadyShop();
+    if (shop == null) {
+      return;
+    }
+    for (BlockPos pos : shop.getBuilding().getContainers()) {
+      if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
         continue;
       }
-      boolean merged = false;
-      for (ItemStack existing : cachedStacks) {
-        if (ItemStack.isSameItemSameComponents(existing, reserved)) {
-          existing.setCount(existing.getCount() + reserved.getCount());
-          merged = true;
-          break;
-        }
+      BlockEntity entity = shop.getLevel().getBlockEntity(pos);
+      if (!(entity instanceof AbstractTileEntityRack rack)) {
+        continue;
       }
-      if (!merged) {
-        cachedStacks.add(reserved.copy());
+      IItemHandler handler = rack.getItemHandlerCap();
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots(); slot++) {
+        if (visitor.visit(handler, slot, handler.getStackInSlot(slot))) {
+          return;
+        }
       }
     }
   }
 
   private ItemStack tryExtractFromRacks(ItemStack key, int amount, boolean simulate) {
-    var shop = getReadyShop();
-    if (shop == null) {
-      return ItemStack.EMPTY;
-    }
-    int remaining = amount;
-    ItemStack extracted = ItemStack.EMPTY;
-    for (BlockPos pos : shop.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-        continue;
-      }
-      BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        continue;
-      }
-      for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
-        ItemStack stack = handler.getStackInSlot(slot);
-        if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, key)) {
-          continue;
-        }
-        int toTake = Math.min(remaining, stack.getCount());
-        ItemStack taken = handler.extractItem(slot, toTake, simulate);
-        if (taken.isEmpty()) {
-          continue;
-        }
-        if (extracted.isEmpty()) {
-          extracted = taken.copy();
-        } else {
-          extracted.grow(taken.getCount());
-        }
-        remaining -= taken.getCount();
-      }
-      if (remaining <= 0) {
-        break;
-      }
-    }
-    return extracted;
+    int[] remaining = {amount};
+    ItemStack[] extracted = {ItemStack.EMPTY};
+    scanRacks(
+        (handler, slot, stack) -> {
+          if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, key)) {
+            return false;
+          }
+          int toTake = Math.min(remaining[0], stack.getCount());
+          ItemStack taken = handler.extractItem(slot, toTake, simulate);
+          if (!taken.isEmpty()) {
+            if (extracted[0].isEmpty()) {
+              extracted[0] = taken.copy();
+            } else {
+              extracted[0].grow(taken.getCount());
+            }
+            remaining[0] -= taken.getCount();
+          }
+          return remaining[0] <= 0;
+        });
+    return extracted[0];
   }
 
   private int getAvailableFromRacks(ItemStack key) {
-    var shop = getReadyShop();
-    if (shop == null) {
-      return 0;
-    }
-    int total = 0;
-    for (BlockPos pos : shop.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-        continue;
-      }
-      BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        continue;
-      }
-      for (int slot = 0; slot < handler.getSlots(); slot++) {
-        ItemStack stack = handler.getStackInSlot(slot);
-        if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, key)) {
-          continue;
-        }
-        total += stack.getCount();
-      }
-    }
-    return Math.max(0, total);
+    int[] total = {0};
+    scanRacks(
+        (handler, slot, stack) -> {
+          if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, key)) {
+            total[0] += stack.getCount();
+          }
+          return false;
+        });
+    return Math.max(0, total[0]);
   }
 
   private List<ItemStack> getAvailableStacksFromRacks() {
-    var shop = getReadyShop();
-    if (shop == null) {
-      return new ArrayList<>();
-    }
     List<ItemStack> stacks = new ArrayList<>();
-    for (BlockPos pos : shop.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-        continue;
-      }
-      BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        continue;
-      }
-      for (int slot = 0; slot < handler.getSlots(); slot++) {
-        ItemStack stack = handler.getStackInSlot(slot);
-        if (stack.isEmpty()) {
-          continue;
-        }
-        boolean merged = false;
-        for (ItemStack existing : stacks) {
-          if (ItemStack.isSameItemSameComponents(existing, stack)) {
-            existing.grow(stack.getCount());
-            merged = true;
-            break;
+    scanRacks(
+        (handler, slot, stack) -> {
+          if (!stack.isEmpty()) {
+            ItemStackDataUtil.mergeIntoList(stacks, stack);
           }
-        }
-        if (!merged) {
-          ItemStack copy = stack.copy();
-          stacks.add(copy);
-        }
-      }
-    }
+          return false;
+        });
     return stacks;
   }
 
