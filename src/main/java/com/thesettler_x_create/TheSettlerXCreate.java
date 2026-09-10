@@ -2,6 +2,7 @@ package com.thesettler_x_create;
 
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
+import com.minecolonies.api.colony.requestsystem.factory.IFactory;
 import com.minecolonies.api.sounds.EventType;
 import com.minecolonies.api.sounds.ModSoundEvents;
 import com.minecolonies.api.util.Tuple;
@@ -74,44 +75,60 @@ public class TheSettlerXCreate {
     event.enqueueWork(
         () -> {
           LOGGER.info("[CreateShop] debugLogging = {}", Config.DEBUG_LOGGING.getAsBoolean());
-          try {
-            StandardFactoryController.getInstance()
-                .registerNewFactory(new CreateShopRequestResolverFactory());
-          } catch (IllegalArgumentException ignored) {
-            // Ignore duplicate factory registration across reloads.
-          }
-          try {
-            // Legacy compatibility: keep requester factory 3001 deserializable for old saves.
-            StandardFactoryController.getInstance().registerNewFactory(new SafeRequesterFactory());
-          } catch (IllegalArgumentException ignored) {
-            // Ignore duplicate factory registration across reloads.
-          }
-          try {
-            StandardFactoryController.getInstance()
-                .registerNewFactory(new CreateShopDeliveryRequesterFactory());
-          } catch (IllegalArgumentException ignored) {
-            // Ignore duplicate factory registration across reloads.
-          }
+          registerRequestSystemFactories();
           CreatePlacementHandlers.register();
-          // Ensure Create Shop has citizen sound mappings to avoid NPEs in SoundUtils.
-          Map<String, Map<EventType, List<Tuple<SoundEvent, SoundEvent>>>> sounds =
-              ModSoundEvents.CITIZEN_SOUND_EVENTS;
-          if (sounds == null || sounds.containsKey("createshop")) {
-            return;
-          }
-          Map<EventType, List<Tuple<SoundEvent, SoundEvent>>> base = sounds.get("deliveryman");
-          if (base == null) {
-            base = sounds.get("builder");
-          }
-          if (base == null && !sounds.isEmpty()) {
-            base = sounds.values().iterator().next();
-          }
-          if (base != null) {
-            sounds.put("createshop", base);
-          }
+          adoptCitizenSoundsForCreateShop();
         });
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       LOGGER.info("TheSettler_x_Create common setup complete");
+    }
+  }
+
+  /**
+   * Registers this mod's request-system factories with MineColonies' {@link
+   * StandardFactoryController}.
+   *
+   * <p>Each registration is individually tolerant of {@link IllegalArgumentException}: the
+   * controller rejects a duplicate id, which is exactly what happens when common setup runs again
+   * across a reload, and is harmless - the factory from the first run is still registered.
+   */
+  private static void registerRequestSystemFactories() {
+    registerFactoryIgnoringDuplicates(new CreateShopRequestResolverFactory());
+    // Legacy compatibility: keep requester factory 3001 deserializable for old saves.
+    registerFactoryIgnoringDuplicates(new SafeRequesterFactory());
+    registerFactoryIgnoringDuplicates(new CreateShopDeliveryRequesterFactory());
+  }
+
+  private static void registerFactoryIgnoringDuplicates(IFactory<?, ?> factory) {
+    try {
+      StandardFactoryController.getInstance().registerNewFactory(factory);
+    } catch (IllegalArgumentException ignored) {
+      // Ignore duplicate factory registration across reloads.
+    }
+  }
+
+  /**
+   * Gives the {@code createshop} citizen job an entry in MineColonies' citizen-sound map by reusing
+   * another job's sounds, because {@code SoundUtils} throws an NPE on a job it has no mapping for.
+   *
+   * <p>Prefers the deliveryman's sounds (closest job in behaviour), then the builder's, then
+   * whatever is present - the point is only that the lookup succeeds.
+   */
+  private static void adoptCitizenSoundsForCreateShop() {
+    Map<String, Map<EventType, List<Tuple<SoundEvent, SoundEvent>>>> sounds =
+        ModSoundEvents.CITIZEN_SOUND_EVENTS;
+    if (sounds == null || sounds.containsKey("createshop")) {
+      return;
+    }
+    Map<EventType, List<Tuple<SoundEvent, SoundEvent>>> base = sounds.get("deliveryman");
+    if (base == null) {
+      base = sounds.get("builder");
+    }
+    if (base == null && !sounds.isEmpty()) {
+      base = sounds.values().iterator().next();
+    }
+    if (base != null) {
+      sounds.put("createshop", base);
     }
   }
 
