@@ -283,13 +283,7 @@ class ShopInflightLedger {
       if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
+      if (!matchesInflightTuple(entry, requester, destination, requestedAt)) {
         continue;
       }
       remaining += Math.max(0, entry.remaining);
@@ -526,13 +520,7 @@ class ShopInflightLedger {
       if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
+      if (!matchesInflightTuple(entry, requester, destination, requestedAt)) {
         continue;
       }
       removed += Math.max(0, entry.remaining);
@@ -550,13 +538,7 @@ class ShopInflightLedger {
       if (!matchesForInflightLookup(entry.stackKey, stackKey, requireExactItemMatch)) {
         continue;
       }
-      if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
-        continue;
-      }
-      if (!destination.isEmpty() && !destination.equals(entry.address)) {
-        continue;
-      }
-      if (requestedAt > 0L && entry.requestedAt != requestedAt) {
+      if (!matchesInflightTuple(entry, requester, destination, requestedAt)) {
         continue;
       }
       int used = Math.min(remaining, entry.remaining);
@@ -690,6 +672,24 @@ class ShopInflightLedger {
       return matches(entryStack, stackKey);
     }
     return matchesForInflightRecovery(entryStack, stackKey);
+  }
+
+  /**
+   * The requester/destination/requestedAt half of an inflight lookup - shared by {@link
+   * #getInflightRemaining(ItemStack, String, String, long)}, {@link #cancelInflightMatches}, and
+   * {@link #consumeInflightMatches}, each of which still does its own item-matching call (see
+   * {@link #matchesForInflightLookup}) right before this, since the two matches vary independently
+   * (a caller may want loose item matching with a strict tuple filter, or vice versa).
+   */
+  private static boolean matchesInflightTuple(
+      InflightEntry entry, String requester, String destination, long requestedAt) {
+    if (!requester.isEmpty() && !requester.equals(entry.requesterName)) {
+      return false;
+    }
+    if (!destination.isEmpty() && !destination.equals(entry.address)) {
+      return false;
+    }
+    return requestedAt <= 0L || entry.requestedAt == requestedAt;
   }
 
   private static boolean containsKey(List<ItemStack> keys, ItemStack key) {
