@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import net.minecraft.network.chat.MutableComponent;
 
 /**
@@ -38,8 +39,7 @@ public final class SafeRequester implements IRequester {
 
   @Override
   public void onRequestedRequestComplete(final IRequestManager manager, final IRequest<?> request) {
-    com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver
-        .onDeliveryComplete(manager, request);
+    CreateShopRequestResolver.onDeliveryComplete(manager, request);
     if (delegate == null) {
       return;
     }
@@ -53,8 +53,7 @@ public final class SafeRequester implements IRequester {
   @Override
   public void onRequestedRequestCancelled(
       final IRequestManager manager, final IRequest<?> request) {
-    com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver
-        .onDeliveryCancelled(manager, request);
+    CreateShopRequestResolver.onDeliveryCancelled(manager, request);
     if (delegate == null) {
       return;
     }

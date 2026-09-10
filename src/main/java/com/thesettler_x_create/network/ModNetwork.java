@@ -9,6 +9,7 @@ import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
+import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateLogisticsBridge;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -198,8 +199,7 @@ public final class ModNetwork {
           if (shop == null || !(shop.getBuilding() instanceof BuildingCreateShop building)) {
             return;
           }
-          com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity obe =
-              building.getOutputBlockEntity();
+          CreateShopOutputBlockEntity obe = building.getOutputBlockEntity();
           if (obe != null) {
             obe.setPackageAddress(payload.address());
           }

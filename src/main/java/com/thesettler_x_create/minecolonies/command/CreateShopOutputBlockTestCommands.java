@@ -296,8 +296,7 @@ final class CreateShopOutputBlockTestCommands {
         continue;
       }
       for (var entry : bm.getBuildings().entrySet()) {
-        if (!(entry.getValue()
-            instanceof com.thesettler_x_create.minecolonies.building.BuildingCreateShop shop)) {
+        if (!(entry.getValue() instanceof BuildingCreateShop shop)) {
           continue;
         }
         shops++;

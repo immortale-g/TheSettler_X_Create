@@ -7,6 +7,7 @@ import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.thesettler_x_create.block.ColonyGaugeBlock;
 import com.thesettler_x_create.init.ModBlockEntities;
+import com.thesettler_x_create.init.ModItems;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
@@ -207,10 +208,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
       Block.popResource(
           level,
           worldPosition,
-          com.thesettler_x_create.init.ModItems.COLONY_GAUGE
-              .get()
-              .getDefaultInstance()
-              .copyWithCount(count - 1));
+          ModItems.COLONY_GAUGE.get().getDefaultInstance().copyWithCount(count - 1));
   }
 
   public VoxelShape getShape() {
