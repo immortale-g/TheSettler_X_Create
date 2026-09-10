@@ -9,19 +9,6 @@ class CreateShopWorkerAvailabilityGateTest {
   private final CreateShopWorkerAvailabilityGate gate = new CreateShopWorkerAvailabilityGate();
 
   @Test
-  void defersNetworkOrderWhenWorkerUnavailableAndNeedPositive() {
-    assertTrue(gate.shouldDeferNetworkOrder(false, 1));
-    assertTrue(gate.shouldDeferNetworkOrder(false, 64));
-    assertFalse(gate.shouldDeferNetworkOrder(true, 64));
-  }
-
-  @Test
-  void doesNotDeferWhenNothingNeeded() {
-    assertFalse(gate.shouldDeferNetworkOrder(false, 0));
-    assertFalse(gate.shouldDeferNetworkOrder(true, 0));
-  }
-
-  @Test
   void resumesPendingWheneverPendingIsPositive() {
     assertTrue(gate.shouldResumePending(true, 1));
     assertTrue(gate.shouldResumePending(false, 10));
@@ -44,15 +31,13 @@ class CreateShopWorkerAvailabilityGateTest {
   }
 
   @Test
-  void transitionUnavailableToAvailableStopsNetworkDeferral() {
+  void transitionUnavailableToAvailableStopsPendingHold() {
     int pending = 4;
 
     assertTrue(gate.shouldKeepPendingState(false, pending));
     assertTrue(gate.shouldResumePending(false, pending));
-    assertTrue(gate.shouldDeferNetworkOrder(false, pending));
 
     assertFalse(gate.shouldKeepPendingState(true, pending));
     assertTrue(gate.shouldResumePending(true, pending));
-    assertFalse(gate.shouldDeferNetworkOrder(true, pending));
   }
 }
