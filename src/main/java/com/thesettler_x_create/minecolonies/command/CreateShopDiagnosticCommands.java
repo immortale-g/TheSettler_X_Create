@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.buildings.workerbuildings.PostBox;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.CreateNetworkFacade;
@@ -227,7 +228,7 @@ final class CreateShopDiagnosticCommands {
     if (building instanceof IWareHouse && !(building instanceof BuildingCreateShop)) {
       return 0; // Warehouse first.
     }
-    if (building != null && "PostBox".equals(building.getClass().getSimpleName())) {
+    if (building instanceof PostBox) {
       return 1; // Then PostBox.
     }
     return -1; // Reject: no other building is an eligible live-test target.
