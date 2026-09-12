@@ -31,6 +31,9 @@ import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -275,12 +278,8 @@ public class BuildingCreateShop extends AbstractBuilding {
     ensurePickupLink();
   }
 
-  @Override
-  public void onUpgradeComplete(int newLevel) {
-    super.onUpgradeComplete(newLevel);
-    ensureWarehouseRegistration();
-    ensurePickupLink();
-  }
+  // No onUpgradeComplete override: its signature differs between MineColonies versions, and
+  // onColonyTick already re-runs ensureWarehouseRegistration and ensurePickupLink.
 
   @Override
   public void onColonyTick(IColony colony) {
@@ -967,16 +966,107 @@ public class BuildingCreateShop extends AbstractBuilding {
    * location.
    */
   boolean createNativeHutPickupRequest(int pickupPriority) {
+    if (usesQuantityForcePickupApi()) {
+      // The (quantity, force) API no longer takes a priority; force picks the highest building
+      // priority, which is the closest match to the player action priority used below.
+      return createPickupRequest(NATIVE_HUT_PICKUP_QUANTITY, true);
+    }
     int effectivePriority =
         Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false));
     return createPickupRequest(effectivePriority);
   }
 
-  @Override
+  /** Same quantity MineColonies passes for its own forced pickups (pickup button, stash). */
+  private static final int NATIVE_HUT_PICKUP_QUANTITY = 64;
+
+  /*
+   * MineColonies 1.1.1368 replaced AbstractBuilding#createPickupRequest(int priority) with
+   * createPickupRequest(int quantity, boolean force). Both overloads are declared below so the JVM
+   * dispatches whichever one the installed MineColonies calls. The super calls go through method
+   * handles because only one of the two exists at compile time (pinned build or latest check), and
+   * neither overload carries @Override for the same reason.
+   */
+  static final class SuperPickupRequest {
+    // Kept out of BuildingCreateShop's static init so the lookup works without initializing
+    // AbstractBuilding, which unit tests cannot do.
+    @Nullable static final MethodHandle PRIORITY = find(int.class);
+    @Nullable static final MethodHandle QUANTITY_FORCE = find(int.class, boolean.class);
+
+    private SuperPickupRequest() {}
+
+    @Nullable
+    private static MethodHandle find(Class<?>... parameterTypes) {
+      try {
+        return MethodHandles.privateLookupIn(BuildingCreateShop.class, MethodHandles.lookup())
+            .findSpecial(
+                AbstractBuilding.class,
+                "createPickupRequest",
+                MethodType.methodType(boolean.class, parameterTypes),
+                BuildingCreateShop.class);
+      } catch (NoSuchMethodException | IllegalAccessException ex) {
+        return null;
+      }
+    }
+  }
+
+  static boolean usesQuantityForcePickupApi() {
+    return SuperPickupRequest.QUANTITY_FORCE != null;
+  }
+
+  /** Pickup entry point of MineColonies builds before 1.1.1368. */
   public boolean createPickupRequest(int pickupPriority) {
+    if (hasActivePickupRequestAfterRepair()) {
+      return false;
+    }
+    try {
+      return (boolean)
+          requireSuperHandle(SuperPickupRequest.PRIORITY, "(int)")
+              .invokeExact(this, pickupPriority);
+    } catch (RuntimeException | Error ex) {
+      throw ex;
+    } catch (Throwable ex) {
+      throw new IllegalStateException(ex);
+    }
+  }
+
+  /**
+   * Pickup entry point of MineColonies 1.1.1368 and later, where the building derives the priority
+   * from {@code force} itself.
+   */
+  public boolean createPickupRequest(int quantity, boolean force) {
+    if (hasActivePickupRequestAfterRepair()) {
+      return false;
+    }
+    try {
+      return (boolean)
+          requireSuperHandle(SuperPickupRequest.QUANTITY_FORCE, "(int, boolean)")
+              .invokeExact(this, quantity, force);
+    } catch (RuntimeException | Error ex) {
+      throw ex;
+    } catch (Throwable ex) {
+      throw new IllegalStateException(ex);
+    }
+  }
+
+  private static MethodHandle requireSuperHandle(@Nullable MethodHandle handle, String signature) {
+    if (handle == null) {
+      throw new IllegalStateException(
+          "createPickupRequest" + signature + " does not exist in this MineColonies version");
+    }
+    return handle;
+  }
+
+  /**
+   * Cleans up the hut's open pickup tokens before MineColonies decides whether to create a new
+   * pickup: terminal and stale tokens are released, live ones get their resolver assignment
+   * repaired.
+   *
+   * @return true if a live pickup request remains, so no new one should be created
+   */
+  private boolean hasActivePickupRequestAfterRepair() {
     if (!(getColony() != null
         && getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
-      return super.createPickupRequest(pickupPriority);
+      return false;
     }
 
     boolean activePickupRequest = false;
@@ -1025,10 +1115,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       }
     }
 
-    if (activePickupRequest) {
-      return false;
-    }
-    return super.createPickupRequest(pickupPriority);
+    return activePickupRequest;
   }
 
   private void repairOpenPickupRequest(

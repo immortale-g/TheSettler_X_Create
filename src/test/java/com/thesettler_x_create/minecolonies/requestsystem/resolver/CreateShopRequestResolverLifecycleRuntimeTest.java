@@ -78,8 +78,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
 
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
-    resolver.markDeliveriesCreated(parentToken);
-    resolver.markParentChildCompletedSeen(parentToken, level.getGameTime());
+    resolver.getPendingTracker().markDeliveryStarted(parentToken);
     resolver.scheduleParentChildRecheckAtForTest(parentToken, 10_100L);
 
     IRequest<IDeliverable> parentRequest = (IRequest<IDeliverable>) mock(IRequest.class);
@@ -92,7 +91,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     resolver.onRequestedRequestComplete(manager, parentRequest);
 
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
-    assertFalse(resolver.hasDeliveriesCreated(parentToken));
+    assertFalse(resolver.getPendingTracker().hasDeliveryStarted(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
   }
 

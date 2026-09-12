@@ -2,7 +2,10 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
@@ -28,11 +31,9 @@ class CreateShopRequestResolverCallbacksTest {
   }
 
   @Test
-  void deliveryCompleteClearsParentDeliveryFlag() throws Exception {
+  void deliveryCompleteLeavesTheChildLinkedSoMineColoniesResolvesTheParent() throws Exception {
     IToken<?> deliveryToken = mock(IToken.class);
     IToken<?> parentToken = mock(IToken.class);
-
-    resolver.markDeliveriesCreated(parentToken);
 
     @SuppressWarnings("unchecked")
     IRequest<IDeliverable> deliveryRequest = (IRequest<IDeliverable>) mock(IRequest.class);
@@ -45,16 +46,15 @@ class CreateShopRequestResolverCallbacksTest {
         new Class<?>[] {IRequestManager.class, IRequest.class},
         new Object[] {null, deliveryRequest});
 
-    assertFalse(resolver.hasDeliveriesCreated(parentToken));
+    verify(deliveryRequest, never()).setParent(any());
   }
 
   @Test
   void assignedRequestCancelClearsPendingAndDeliveryFlags() {
     IToken<?> parentToken = mock(IToken.class);
 
-    resolver.markDeliveriesCreated(parentToken);
+    resolver.getPendingTracker().markDeliveryStarted(parentToken);
     resolver.getPendingTracker().setPendingCount(parentToken, 5);
-    resolver.markParentChildCompletedSeen(parentToken, 0L);
 
     @SuppressWarnings("unchecked")
     IRequest<IDeliverable> request = (IRequest<IDeliverable>) mock(IRequest.class);
@@ -67,7 +67,7 @@ class CreateShopRequestResolverCallbacksTest {
     resolver.onAssignedRequestCancelled(manager, request);
 
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
-    assertFalse(resolver.hasDeliveriesCreated(parentToken));
+    assertFalse(resolver.getPendingTracker().hasDeliveryStarted(parentToken));
   }
 
   private void invokePrivate(String name, Class<?>[] signature, Object[] args) throws Exception {

@@ -36,7 +36,9 @@ done validating.
 | MineColonies | 1.1.1264 or newer |
 | JEI | 19.21.0 or newer, optional, client side |
 
-Structurize, BlockUI, Multi-Piston and Domum Ornamentum come in transitively through MineColonies.
+| Structurize | 1.0.807 or newer |
+
+BlockUI, Multi-Piston and Domum Ornamentum come in transitively through MineColonies.
 
 ## What it adds
 
@@ -57,12 +59,34 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how these fit together.
 ./gradlew build
 ```
 
-The jar lands in `build/libs/`. Runtime dependencies are expected in `libs/`; the versions there are
-what the build and the test suite are validated against.
+The jar lands in `build/libs/`. `build` also runs the tests, Spotless and `testModernStructurize`.
+
+### Dependency versions
+
+MineColonies, Structurize, Create and the other mods are pulled from Maven at the exact versions in
+the `Dependency Versions` section of `gradle.properties`. These are the versions the build and the
+test suite are validated against. `minecolonies_version` and `structurize_version` also end up as
+the minimum versions in `neoforge.mods.toml`, so raising them raises what players need.
+
+Structurize 1.0.808 changed the placement handler API. The mod is compiled against
+`structurize_compile_version` (new API) but runs its normal tests on `structurize_version` (old
+API); `testModernStructurize` repeats the placement handler compat test on the new API.
+
+To try other versions without editing the file, override them on the command line:
 
 ```
-./gradlew test spotlessCheck
+./gradlew test -Pminecolonies_version=1.1.1368-1.21.1 -Pstructurize_version=1.0.832-1.21.1 \
+  -Pstructurize_compile_version=1.0.832-1.21.1 -Pstructurize_api=modern
 ```
+
+Jars in `libs/` are only added to the dev client as optional extra mods.
+
+### Latest release check
+
+The `Compat (latest releases)` workflow runs daily and on demand. It asks
+`.github/scripts/resolve-latest-deps.sh` for the newest MineColonies, Structurize and Create
+releases and compiles and tests against them. It is an early warning for upstream API breaks, not a
+release gate: the pinned build stays the reference.
 
 Spotless enforces google-java-format. If the build fails with
 `Spotless JVM-local cache is stale`, delete `.gradle/configuration-cache` and run again.

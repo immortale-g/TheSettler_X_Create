@@ -8,8 +8,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Guards the two halves of the repeated re-delivery fix: outstanding amounts subtract what was
- * already delivered, and the post-completion recovery closes the parent instead of falling through
- * into another order.
+ * already delivered, and a fully delivered parent is closed instead of ordering again.
  */
 class CreateShopRepeatedRedeliveryGuardTest {
   @Test
@@ -26,20 +25,15 @@ class CreateShopRepeatedRedeliveryGuardTest {
   }
 
   @Test
-  void postCompletionRecoveryResolvesTheParentInsteadOfReorderingWhenNothingIsOutstanding()
-      throws Exception {
+  void fullyDeliveredParentIsResolvedWithoutCountingReservations() throws Exception {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingRequestProcessorService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopTerminalRequestLifecycleService.java"));
 
-    assertTrue(source.contains("outstandingNeededService.compute(request, deliverable, 0)"));
-    assertTrue(source.contains("if (outstandingAfterCompletion <= 0) {"));
-    assertTrue(source.contains("recover:delivery-completed-fully"));
-    assertTrue(source.contains("tickPending:recover-delivery-completed-fully"));
-    assertTrue(source.contains("resolver.releaseReservation(manager, request);"));
+    assertTrue(source.contains("outstandingNeededService.compute(request, deliverable, 0) > 0"));
     assertTrue(
-        source.contains(
-            "standardManager.updateRequestState(request.getId(), RequestState.RESOLVED)"));
+        source.contains("manager.updateRequestState(request.getId(), RequestState.RESOLVED)"));
+    assertTrue(source.contains("resolver.releaseReservation(manager, request);"));
   }
 }

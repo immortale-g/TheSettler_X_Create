@@ -14,7 +14,7 @@ class CreateShopPendingDeliveryTrackerStartedGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingDeliveryTracker.java"));
 
-    assertTrue(source.contains("state.setDeliveryStarted(true)"));
+    assertTrue(source.contains("getOrCreate(token).setDeliveryStarted(true)"));
     assertTrue(source.contains("boolean hasDeliveryStarted(IToken<?> token)"));
     assertTrue(source.contains("!state.isDeliveryStarted()"));
   }

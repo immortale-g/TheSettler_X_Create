@@ -67,9 +67,7 @@ final class CreateShopRetryingReassignService {
                 == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
           continue;
         }
-        boolean deliveryWindowHold =
-            resolver.getPendingTracker().hasDeliveryStarted(requestToken)
-                && !resolver.hasParentChildCompletedSeen(requestToken);
+        boolean deliveryWindowHold = resolver.getPendingTracker().hasDeliveryStarted(requestToken);
         @SuppressWarnings("unchecked")
         IRequest<? extends IDeliverable> casted = (IRequest<? extends IDeliverable>) request;
         if (!deliveryWindowHold && !resolver.canResolveRequest(manager, casted)) {

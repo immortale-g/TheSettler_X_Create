@@ -16,7 +16,6 @@ class CreateShopRequestResolverRetryingHoldReassignGuardTest {
 
     assertTrue(source.contains("boolean deliveryWindowHold ="));
     assertTrue(source.contains("resolver.getPendingTracker().hasDeliveryStarted(requestToken)"));
-    assertTrue(source.contains("!resolver.hasParentChildCompletedSeen(requestToken)"));
     assertTrue(
         source.contains(
             "if (!deliveryWindowHold && !resolver.canResolveRequest(manager, casted))"));

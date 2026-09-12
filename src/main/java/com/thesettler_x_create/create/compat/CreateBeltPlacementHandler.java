@@ -1,6 +1,7 @@
 package com.thesettler_x_create.create.compat;
 
 import com.ldtteam.structurize.api.RotationMirror;
+import com.ldtteam.structurize.placement.IPlacementContext;
 import com.ldtteam.structurize.placement.handlers.placement.IPlacementHandler;
 import com.ldtteam.structurize.placement.handlers.placement.PlacementHandlers;
 import com.simibubi.create.content.kinetics.belt.BeltBlock;
@@ -16,10 +17,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Tuple;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,6 +39,10 @@ import org.jetbrains.annotations.Nullable;
  * riding the belt at scan time aren't accounted for — that only matters for a belt captured live
  * from the world, not a hand-authored building blueprint) also needs a full run before it can
  * report an accurate total, for the same reason.
+ *
+ * <p>Structurize 1.0.808 replaced the placement signatures with {@link IPlacementContext} variants.
+ * This handler implements both sets, so one jar works with MineColonies before and after that
+ * change; each Structurize version only ever calls the set its own interface declares.
  */
 public class CreateBeltPlacementHandler implements IPlacementHandler {
   private static final ResourceLocation BELT_ID =
@@ -58,13 +65,40 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
     return BELT_ID.equals(BuiltInRegistries.BLOCK.getKey(blockState.getBlock()));
   }
 
+  // Structurize 1.0.808 and newer.
   @Override
   public List<ItemStack> getRequiredItems(
       Level level,
       BlockPos blockPos,
       BlockState blockState,
       @Nullable CompoundTag tileEntityData,
+      IPlacementContext placementContext) {
+    return requiredItems(blockPos, blockState, tileEntityData);
+  }
+
+  // Structurize 1.0.807 and older. Not an override when compiling against the newer API, but it is
+  // the method older Structurize versions call. Keep the signature exact.
+  public List<ItemStack> getRequiredItems(
+      Level level,
+      BlockPos blockPos,
+      BlockState blockState,
+      @Nullable CompoundTag tileEntityData,
       boolean complete) {
+    return requiredItems(blockPos, blockState, tileEntityData);
+  }
+
+  // Structurize 1.0.808 and newer. Same comparison as Structurize's own general block handler.
+  @Override
+  public boolean doesWorldStateMatchBlueprintState(
+      BlockState worldState,
+      BlockState blueprintState,
+      @Nullable Tuple<BlockEntity, CompoundTag> blockEntityData,
+      IPlacementContext placementContext) {
+    return worldState.equals(blueprintState);
+  }
+
+  private List<ItemStack> requiredItems(
+      BlockPos blockPos, BlockState blockState, @Nullable CompoundTag tileEntityData) {
     if (tileEntityData == null) {
       return List.of();
     }
@@ -93,7 +127,18 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
     return combined;
   }
 
+  // Structurize 1.0.808 and newer.
   @Override
+  public ActionProcessingResult handle(
+      Level level,
+      BlockPos blockPos,
+      BlockState blockState,
+      @Nullable CompoundTag tileEntityData,
+      IPlacementContext placementContext) {
+    return place(level, blockPos, blockState, tileEntityData, placementContext.getRotationMirror());
+  }
+
+  // Structurize 1.0.807 and older, see getRequiredItems.
   public ActionProcessingResult handle(
       Level level,
       BlockPos blockPos,
@@ -101,6 +146,15 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
       @Nullable CompoundTag tileEntityData,
       boolean complete,
       BlockPos centerPos,
+      RotationMirror rotationMirror) {
+    return place(level, blockPos, blockState, tileEntityData, rotationMirror);
+  }
+
+  private ActionProcessingResult place(
+      Level level,
+      BlockPos blockPos,
+      BlockState blockState,
+      @Nullable CompoundTag tileEntityData,
       RotationMirror rotationMirror) {
     if (tileEntityData == null) {
       return ActionProcessingResult.DENY;

@@ -15,12 +15,11 @@ class CreateShopRequestResolverDeliveryWindowHoldGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestValidator.java"));
 
     assertTrue(
-        source.contains("boolean holdDeliveryWindow = deliveryWindowOpen && !completionSeen;"));
+        source.contains(
+            "request.hasChildren() || resolver.getPendingTracker().hasDeliveryStarted(request.getId())"));
     assertTrue(
         source.contains(
             "cooldown.isRequestOnCooldown(level, request.getId()) && !holdDeliveryWindow"));
-    assertTrue(
-        source.contains("resolver.hasDeliveriesCreated(request.getId()) && !holdDeliveryWindow"));
     assertTrue(source.contains("canResolve=true (hold delivery window, needed<=0"));
     assertTrue(source.contains("canResolve=true (hold delivery window, available<=0"));
   }

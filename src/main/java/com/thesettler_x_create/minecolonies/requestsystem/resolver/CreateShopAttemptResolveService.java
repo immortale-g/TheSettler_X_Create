@@ -101,10 +101,6 @@ final class CreateShopAttemptResolveService {
       }
       return Lists.newArrayList();
     }
-    if (resolver.hasDeliveriesCreated(request.getId())) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:deliveries-created");
-      return Lists.newArrayList();
-    }
     IDeliverable deliverable = request.getRequest();
     chain.sanitizeRequestChain(manager, request);
 
@@ -141,20 +137,6 @@ final class CreateShopAttemptResolveService {
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
-    if (needed > 0 && resolver.getPendingTracker().hasDeliveryStarted(request.getId())) {
-      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-          resolver, level, request.getId(), needed);
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:block-auto-reorder-started");
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:block-auto-reorder-started");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve blocked auto-reorder (started-order) request={} needed={} reserved={}",
-            request.getId(),
-            needed,
-            reservedForRequest);
-      }
-      return Lists.newArrayList();
-    }
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
     if (needed <= 0) {

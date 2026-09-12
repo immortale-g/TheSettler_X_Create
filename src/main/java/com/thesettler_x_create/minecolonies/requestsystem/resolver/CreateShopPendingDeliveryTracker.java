@@ -8,8 +8,10 @@ import java.util.concurrent.TimeUnit;
 import net.minecraft.world.level.Level;
 
 final class CreateShopPendingDeliveryTracker {
+  // Entries are mutated in place, which Guava does not count as a write. expireAfterWrite therefore
+  // dropped live entries five minutes after creation, mid-delivery. Expire on inactivity instead.
   private final Cache<IToken<?>, CreateShopPendingDeliveryState> pending =
-      CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
+      CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
   CreateShopPendingDeliveryState getOrCreate(IToken<?> token) {
     CreateShopPendingDeliveryState state = pending.getIfPresent(token);
@@ -74,23 +76,13 @@ final class CreateShopPendingDeliveryTracker {
     }
   }
 
-  boolean isDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
-    return state != null && state.isDeliveryCreated();
-  }
-
-  void markDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = getOrCreate(token);
-    state.setDeliveryCreated(true);
-    state.setDeliveryStarted(true);
-  }
-
-  void clearDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
-    if (state != null) {
-      state.setDeliveryCreated(false);
-      pruneIfEmpty(token, state);
-    }
+  /**
+   * Latches that the shop handed out a delivery for this request, so the request stays with the
+   * shop while MineColonies reassigns it (for example after a cancelled delivery child). Whether a
+   * delivery is currently open is read from the request graph, not from here.
+   */
+  void markDeliveryStarted(IToken<?> token) {
+    getOrCreate(token).setDeliveryStarted(true);
   }
 
   boolean hasDeliveryStarted(IToken<?> token) {
@@ -120,7 +112,6 @@ final class CreateShopPendingDeliveryTracker {
       return false;
     }
     return state.getPendingCount() > 0
-        || state.isDeliveryCreated()
         || state.isDeliveryStarted()
         || state.getCooldownUntil() > 0L;
   }
@@ -138,7 +129,6 @@ final class CreateShopPendingDeliveryTracker {
       return;
     }
     if (state.getPendingCount() <= 0
-        && !state.isDeliveryCreated()
         && !state.isDeliveryStarted()
         && state.getCooldownUntil() <= 0L) {
       pending.invalidate(token);

@@ -16,7 +16,6 @@ class CreateShopPendingRequestGateOwnershipHandoffGuardTest {
 
     assertTrue(source.contains("skip:ownership-handoff-active-delivery"));
     assertTrue(source.contains("request.hasChildren()"));
-    assertTrue(source.contains("resolver.hasDeliveriesCreated(request.getId())"));
     assertTrue(source.contains("resolver.getPendingTracker().hasDeliveryStarted(request.getId())"));
     assertTrue(source.contains("!terminal && activeDeliveryWindow"));
     assertTrue(source.contains("tryReassignFromRetryingOwner(standardManager, request)"));
