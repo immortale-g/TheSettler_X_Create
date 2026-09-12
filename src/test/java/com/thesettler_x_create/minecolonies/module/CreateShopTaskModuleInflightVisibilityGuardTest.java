@@ -17,9 +17,6 @@ class CreateShopTaskModuleInflightVisibilityGuardTest {
 
     assertTrue(
         moduleSource.contains(
-            "if (resolver.hasParentChildCompletedSeen(token) && !request.hasChildren()) {"));
-    assertTrue(
-        moduleSource.contains(
             "if (request.getState() != RequestState.IN_PROGRESS && !request.hasChildren()) {"));
   }
 }

@@ -85,7 +85,6 @@ final class CreateShopDeliveryChildRecoveryService {
             ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       }
     }
-    resolver.clearDeliveriesCreated(parentRequest.getId());
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());
     requestStateMutatorService.openDeliveryWindow(
         resolver, level, parentRequest.getId(), childToken, Math.max(currentPending, childCount));

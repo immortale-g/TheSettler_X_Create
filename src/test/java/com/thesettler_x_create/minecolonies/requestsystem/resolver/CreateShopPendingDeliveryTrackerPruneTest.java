@@ -47,33 +47,16 @@ class CreateShopPendingDeliveryTrackerPruneTest {
   }
 
   @Test
-  void setPendingCountToZeroDoesNotPruneWhenDeliveryCreated() {
+  void setPendingCountToZeroDoesNotPruneWhenDeliveryStarted() {
     IToken<?> tok = token("prune-b");
     tracker.setPendingCount(tok, 3);
-    tracker.markDeliveryCreated(tok);
-    assertTrue(tracker.isDeliveryCreated(tok));
+    tracker.markDeliveryStarted(tok);
     assertTrue(tracker.hasDeliveryStarted(tok));
 
     tracker.setPendingCount(tok, 0);
 
-    // Entry must survive because deliveryCreated and deliveryStarted are still true.
-    assertTrue(tracker.isDeliveryCreated(tok));
-    assertTrue(tracker.getTokens().contains(tok));
-  }
-
-  @Test
-  void clearDeliveryCreatedKeepsEntryAliveWhenDeliveryStartedIsSet() {
-    IToken<?> tok = token("prune-c");
-    tracker.markDeliveryCreated(tok);
-    assertTrue(tracker.isDeliveryCreated(tok));
+    // Entry must survive because deliveryStarted is still true.
     assertTrue(tracker.hasDeliveryStarted(tok));
-
-    tracker.clearDeliveryCreated(tok);
-
-    // deliveryCreated is now false, but deliveryStarted must still be true.
-    assertFalse(tracker.isDeliveryCreated(tok));
-    assertTrue(tracker.hasDeliveryStarted(tok));
-    // Entry must NOT be pruned while deliveryStarted is true.
     assertTrue(tracker.getTokens().contains(tok));
   }
 
@@ -103,9 +86,9 @@ class CreateShopPendingDeliveryTrackerPruneTest {
   }
 
   @Test
-  void isActiveReturnsTrueWhenDeliveryCreatedEvenWithZeroPending() {
+  void isActiveReturnsTrueWhenDeliveryStartedEvenWithZeroPending() {
     IToken<?> tok = token("active-b");
-    tracker.markDeliveryCreated(tok);
+    tracker.markDeliveryStarted(tok);
     tracker.setPendingCount(tok, 0);
     assertTrue(tracker.isActive(tok));
   }

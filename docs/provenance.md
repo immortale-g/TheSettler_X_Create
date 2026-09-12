@@ -38,6 +38,13 @@ remains under review, `finalizeOrphanDeliveryChild`, which clears a warehouse qu
 matching courier task when a delivery child has been orphaned; it is scoped to recovery and is
 tracked for removal or narrowing before 1.0.
 
+**Parents are closed through MineColonies.** A completed delivery child stays linked to its parent,
+so `RequestHandler#onRequestCompleted` calls the resolver's `resolveRequest` once no child is open.
+The resolver resolves the parent only when the delivered amount covers the request, the same split
+MineColonies uses for crafters. Until 0.3.2 the completion callback detached the child first, which
+made MineColonies skip that call. The shop then closed parents from its own tick, and gaps in that
+replacement left fully delivered requests open and blocked top-ups after partial deliveries.
+
 **Storage scope.** Capacity planning and delivery reservation use rack-registered containers only.
 Hut inventory is a transfer target, not a capacity source, so blocked rack states are not hidden by
 hut buffer space.

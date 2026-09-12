@@ -1,0 +1,35 @@
+name: Compat (latest releases)
+
+# Early warning only. Compiles and tests against the newest MineColonies, Structurize and Create
+# releases instead of the pinned versions, so upstream API breaks show up here before players hit
+# them. A red run does not block anything; it means an adapter or a version bump is needed.
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  compat-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve latest dependency releases
+        id: deps
+        run: |
+          args=$(bash .github/scripts/resolve-latest-deps.sh)
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+          echo "Testing with: $args" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compile and test against latest releases
+        run: ./gradlew compileJava test testModernStructurize ${{ steps.deps.outputs.args }}

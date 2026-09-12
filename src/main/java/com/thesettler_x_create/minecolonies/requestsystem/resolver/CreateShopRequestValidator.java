@@ -39,12 +39,10 @@ final class CreateShopRequestValidator {
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IRequest<? extends IDeliverable> request) {
-    boolean deliveryWindowOpen =
-        request.hasChildren()
-            || resolver.hasDeliveriesCreated(request.getId())
-            || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
-    boolean holdDeliveryWindow = deliveryWindowOpen && !completionSeen;
+    // Once the shop handed out a delivery the request stays with the shop, also while MineColonies
+    // reassigns it after a cancelled child.
+    boolean holdDeliveryWindow =
+        request.hasChildren() || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
     if (request.getState()
         == com.minecolonies.api.colony.requestsystem.request.RequestState.CANCELLED) {
       resolver.markCancelledRequest(request.getId());
@@ -74,9 +72,6 @@ final class CreateShopRequestValidator {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] canResolve=false (request already ordered)");
       }
-      return false;
-    }
-    if (resolver.hasDeliveriesCreated(request.getId()) && !holdDeliveryWindow) {
       return false;
     }
     if (request.getRequester().getLocation().equals(resolver.getLocation())) {
@@ -148,11 +143,8 @@ final class CreateShopRequestValidator {
       if (holdDeliveryWindow) {
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] canResolve=true (hold delivery window, needed<=0, reserved={}, children={}, deliveryCreated={}, deliveryStarted={})",
-              reservedForRequest,
-              request.hasChildren(),
-              resolver.hasDeliveriesCreated(request.getId()),
-              resolver.getPendingTracker().hasDeliveryStarted(request.getId()));
+              "[CreateShop] canResolve=true (hold delivery window, needed<=0, reserved={})",
+              reservedForRequest);
         }
         return true;
       }

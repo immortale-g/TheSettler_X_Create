@@ -52,21 +52,6 @@ final class CreateShopRequestStateMutatorService {
     markOrderedWithPendingAtLeastOne(resolver, level, parentToken, Math.max(1, pendingCount));
   }
 
-  void closeDeliveryWindow(
-      CreateShopRequestResolver resolver, IToken<?> parentToken, IToken<?> childToken) {
-    if (resolver == null) {
-      return;
-    }
-    if (parentToken != null) {
-      resolver.clearDeliveriesCreated(parentToken);
-    }
-  }
-
-  void completeDeliveryWindow(
-      CreateShopRequestResolver resolver, IToken<?> parentToken, IToken<?> childToken) {
-    // No stale-clock cleanup needed — those maps have been removed.
-  }
-
   void clearMissingChild(CreateShopRequestResolver resolver, IToken<?> childToken) {
     if (resolver == null || childToken == null) {
       return;
@@ -106,8 +91,6 @@ final class CreateShopRequestStateMutatorService {
       return;
     }
     clearOrderedAndPending(resolver, token);
-    resolver.clearDeliveriesCreated(token);
-    resolver.clearParentChildCompletedSeen(token);
     resolver.clearParentChildrenSnapshot(token);
     resolver.clearDeliveryChildLedgerForParent(token);
     resolver.clearMissingChildSince(token);

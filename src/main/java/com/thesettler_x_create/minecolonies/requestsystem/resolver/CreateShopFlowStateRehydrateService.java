@@ -66,31 +66,32 @@ final class CreateShopFlowStateRehydrateService {
         active.add(token);
         continue;
       }
+      // Fully delivered but still open: MineColonies only asks resolveRequest when a child
+      // completes, so a request that missed that call (worlds saved while parents were detached, or
+      // a child that vanished without callback) would otherwise never close.
+      if (resolver
+          .getResolverCallbackService()
+          .finishIfDelivered(resolver, manager, request, "rehydrate")) {
+        continue;
+      }
 
       // Fast path: trigger lazy NBT-restore and check if a FlowState was persisted for this token.
       // getOrCreate consumes the pendingRestore entry if present, giving us the restored state.
       CreateShopFlowRecord flowRecord = resolver.getFlowStateMachine().getOrCreate(token, now);
       CreateShopFlowState restoredState = flowRecord.getState();
+      // Pending counts are not forced here: the tick derives them from the request itself
+      // (requested minus delivered minus reserved), and an open delivery child keeps the request
+      // active on its own. Forcing a pending unit used to keep finished requests alive forever.
       if (restoredState != CreateShopFlowState.NEW && !restoredState.isTerminal()) {
         // State was restored from NBT — no heuristic derivation needed.
-        int currentPending = Math.max(0, resolver.getPendingTracker().getPendingCount(token));
-        requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-            resolver, level, token, Math.max(1, currentPending));
-        diagnostics.recordPendingSource(token, "rehydrate:nbt-restored");
         resolver.touchFlow(token, now, "rehydrate:nbt-restored");
         active.add(token);
         continue;
       }
 
       // Heuristic fallback for saves without FlowStates NBT (pre-Phase-3.2 worlds).
-      if (request.hasChildren()
-          || resolver.hasDeliveriesCreated(token)
-          || resolver.getPendingTracker().hasDeliveryStarted(token)) {
-        int currentPending = Math.max(0, resolver.getPendingTracker().getPendingCount(token));
-        requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-            resolver, level, token, Math.max(1, currentPending));
-        diagnostics.recordPendingSource(token, "rehydrate:inflight-or-children-or-started");
-        resolver.touchFlow(token, now, "rehydrate:inflight-or-children-or-started");
+      if (request.hasChildren() || resolver.getPendingTracker().hasDeliveryStarted(token)) {
+        resolver.touchFlow(token, now, "rehydrate:children-or-started");
         active.add(token);
         continue;
       }

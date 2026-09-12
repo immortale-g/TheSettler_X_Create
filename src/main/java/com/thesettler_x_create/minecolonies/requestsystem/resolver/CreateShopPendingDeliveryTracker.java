@@ -13,13 +13,12 @@ import net.minecraft.world.level.Level;
  * abandoned request still eventually gets swept.
  */
 final class CreateShopPendingDeliveryTracker {
-  // 5 minutes was too short for a slow courier leg (traffic jam, sleep cycle) to survive without
-  // the cache entry expiring mid-flight; ROADMAP.md Phase 4.3 already flagged this and proposed
-  // 30 minutes. request.hasChildren() covers the case where a native MineColonies child delivery
-  // already exists, so this TTL only matters for requests still waiting on a slower Create-network
-  // leg with no child yet.
+  // Entries are mutated in place, which Guava does not count as a write, so expireAfterWrite
+  // dropped
+  // live entries mid-delivery. Expire on inactivity instead. 30 minutes leaves room for a slow
+  // courier leg (traffic jam, sleep cycle) with no activity on the entry.
   private final Cache<IToken<?>, CreateShopPendingDeliveryState> pending =
-      CacheBuilder.newBuilder().expireAfterWrite(30, TimeUnit.MINUTES).build();
+      CacheBuilder.newBuilder().expireAfterAccess(30, TimeUnit.MINUTES).build();
 
   CreateShopPendingDeliveryState getOrCreate(IToken<?> token) {
     CreateShopPendingDeliveryState state = pending.getIfPresent(token);
@@ -84,23 +83,13 @@ final class CreateShopPendingDeliveryTracker {
     }
   }
 
-  boolean isDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
-    return state != null && state.isDeliveryCreated();
-  }
-
-  void markDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = getOrCreate(token);
-    state.setDeliveryCreated(true);
-    state.setDeliveryStarted(true);
-  }
-
-  void clearDeliveryCreated(IToken<?> token) {
-    CreateShopPendingDeliveryState state = pending.getIfPresent(token);
-    if (state != null) {
-      state.setDeliveryCreated(false);
-      pruneIfEmpty(token, state);
-    }
+  /**
+   * Latches that the shop handed out a delivery for this request, so the request stays with the
+   * shop while MineColonies reassigns it (for example after a cancelled delivery child). Whether a
+   * delivery is currently open is read from the request graph, not from here.
+   */
+  void markDeliveryStarted(IToken<?> token) {
+    getOrCreate(token).setDeliveryStarted(true);
   }
 
   boolean hasDeliveryStarted(IToken<?> token) {
@@ -130,7 +119,6 @@ final class CreateShopPendingDeliveryTracker {
       return false;
     }
     return state.getPendingCount() > 0
-        || state.isDeliveryCreated()
         || state.isDeliveryStarted()
         || state.getCooldownUntil() > 0L;
   }
@@ -148,7 +136,6 @@ final class CreateShopPendingDeliveryTracker {
       return;
     }
     if (state.getPendingCount() <= 0
-        && !state.isDeliveryCreated()
         && !state.isDeliveryStarted()
         && state.getCooldownUntil() <= 0L) {
       pending.invalidate(token);

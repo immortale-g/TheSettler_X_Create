@@ -44,11 +44,17 @@ replaces the workflow. The module and its GUI tab still exist but are inert.
 3. If it can supply, it orders the shortfall from the network and reserves the incoming goods.
 4. When goods are in the racks it creates a MineColonies delivery child and hands off.
 5. MineColonies owns the delivery from that point. The shop reacts to terminal callbacks only.
-6. Completion or cancellation releases or consumes the reservation and closes the parent request.
+6. Completion consumes the reservation, cancellation releases it. The child stays linked to the
+   parent so MineColonies can run its own parent handling.
+7. Once the parent has no open child, MineColonies calls `resolveRequest`. Like a crafter, the shop
+   resolves the parent only when the delivered amount covers the request. Otherwise the parent
+   stays `IN_PROGRESS` and the tick orders and delivers the rest.
 
 Step 5 is a hard boundary, drawn in Phase 3.5 (`e2387bd`). The shop does not finish, cancel or
 otherwise steer courier tasks. See the "No courier injection" constraint in
-[docs/provenance.md](docs/provenance.md).
+[docs/provenance.md](docs/provenance.md). Steps 6 and 7 are the matching boundary for parents,
+restored in 0.3.3: `CreateShopResolverCallbackService#finishIfDelivered` is the only place
+that resolves a parent.
 
 ## Key modules
 

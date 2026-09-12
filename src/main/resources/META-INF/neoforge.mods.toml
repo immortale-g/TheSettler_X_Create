@@ -98,7 +98,15 @@ Example mod description.
 [[dependencies.${mod_id}]]
     modId="minecolonies"
     type="required"
-    versionRange="[1.1.1264-1.21.1-snapshot,)"
+    # Filled from gradle.properties, so the declared minimum is the version the build was tested with.
+    versionRange="[${minecolonies_version},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="structurize"
+    type="required"
+    versionRange="[${structurize_version},)"
     ordering="NONE"
     side="BOTH"
 

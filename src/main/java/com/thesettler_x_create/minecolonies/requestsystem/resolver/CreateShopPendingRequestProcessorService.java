@@ -3,7 +3,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
@@ -27,7 +26,6 @@ final class CreateShopPendingRequestProcessorService {
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
-  private final CreateShopOutstandingNeededService outstandingNeededService;
 
   CreateShopPendingRequestProcessorService(
       CreateShopPendingRequestGateService pendingRequestGateService,
@@ -38,8 +36,7 @@ final class CreateShopPendingRequestProcessorService {
       CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
       CreateShopPostCreationUpdateService postCreationUpdateService,
       CreateShopResolverDiagnostics diagnostics,
-      CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopOutstandingNeededService outstandingNeededService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.pendingRequestGateService = pendingRequestGateService;
     this.childReconciliationService = childReconciliationService;
     this.pendingStateDecisionService = pendingStateDecisionService;
@@ -49,7 +46,6 @@ final class CreateShopPendingRequestProcessorService {
     this.postCreationUpdateService = postCreationUpdateService;
     this.diagnostics = diagnostics;
     this.requestStateMutatorService = requestStateMutatorService;
-    this.outstandingNeededService = outstandingNeededService;
   }
 
   void processToken(
@@ -93,8 +89,6 @@ final class CreateShopPendingRequestProcessorService {
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     boolean onCooldown = resolver.getCooldown().isRequestOnCooldown(level, request.getId());
-    boolean deliveryStarted = resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
     if (request.hasChildren()) {
       diagnostics.logPendingReasonChange(request.getId(), "skip:has-children");
       java.util.Collection<IToken<?>> children =
@@ -139,9 +133,6 @@ final class CreateShopPendingRequestProcessorService {
       if (childResult.missing() > 0) {
         return;
       }
-      if (!childResult.hasActiveChildren()) {
-        // Delivery-child tracking is now MineColonies' responsibility; no local clocks to clear.
-      }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
         return;
       }
@@ -169,122 +160,9 @@ final class CreateShopPendingRequestProcessorService {
         }
       }
     }
-    if (previousChildCount != null
-        && previousChildCount > 0
-        && !request.hasChildren()
-        && deliveryStarted
-        && !completionSeen) {
-      IToken<?> pickedUpOrphanChild = resolver.findPickedUpOrphanChildForParent(request.getId());
-      if (pickedUpOrphanChild != null) {
-        resolver.markParentChildCompletedSeen(request.getId(), level.getGameTime());
-        resolver.observeDeliveryChildCallbackTerminal(
-            level, request.getId(), pickedUpOrphanChild, "orphan-pickedup-recovery");
-        requestStateMutatorService.finalizeOrphanDeliveryChild(
-            resolver, standardManager, pickedUpOrphanChild, "orphan-pickedup-recovery");
-        requestStateMutatorService.completeDeliveryWindow(
-            resolver, request.getId(), pickedUpOrphanChild);
-        requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
-        resolver.clearDeliveriesCreated(request.getId());
-        diagnostics.logPendingReasonChange(request.getId(), "recover:orphan-pickedup-child");
-        resolver.touchFlow(
-            request.getId(), level.getGameTime(), "tickPending:recover-orphan-pickedup");
-        try {
-          standardManager.updateRequestState(request.getId(), RequestState.RESOLVED);
-        } catch (Exception ignored) {
-          // Best effort; local cleanup already prevents drift.
-        }
-        requestStateMutatorService.clearPendingTokenState(
-            resolver, standardManager, request.getId(), true);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} recovered orphan picked-up child={} -> parent resolved",
-              requestIdLog,
-              pickedUpOrphanChild);
-        }
-        return;
-      }
-      int heldPending = Math.max(1, resolver.getPendingTracker().getPendingCount(request.getId()));
-      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-          resolver, level, request.getId(), heldPending);
-      diagnostics.logPendingReasonChange(request.getId(), "wait:child-dropped-without-callback");
-      resolver.touchFlow(request.getId(), level.getGameTime(), "tickPending:wait-child-callback");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} waiting (child dropped without callback, prevChildCount={}, pending={})",
-            requestIdLog,
-            previousChildCount,
-            heldPending);
-      }
-      return;
-    }
     requestStateMutatorService.setParentChildrenSnapshot(resolver, request.getId(), 0, "[]");
-    if (resolver.hasDeliveriesCreated(request.getId())) {
-      if (completionSeen) {
-        resolver.clearDeliveriesCreated(request.getId());
-        // Deliberately without the reservation offset: only the delivered amount decides whether
-        // this request is done. Counting a reservation here would close a request whose Create
-        // network top-up is still sitting in the shop rack waiting for its own delivery.
-        int outstandingAfterCompletion = outstandingNeededService.compute(request, deliverable, 0);
-        if (outstandingAfterCompletion <= 0) {
-          // Everything this request asked for was delivered, but MineColonies never pushed the
-          // parent to a terminal state (the child left the warehouse queue without a terminal
-          // callback). Close it here instead of falling through into another order/delivery.
-          diagnostics.logPendingReasonChange(request.getId(), "recover:delivery-completed-fully");
-          resolver.touchFlow(
-              request.getId(), level.getGameTime(), "tickPending:recover-delivery-completed-fully");
-          try {
-            standardManager.updateRequestState(request.getId(), RequestState.RESOLVED);
-          } catch (Exception ignored) {
-            // Best effort; the local cleanup below already stops the re-order loop.
-          }
-          resolver.releaseReservation(manager, request);
-          requestStateMutatorService.clearPendingTokenState(
-              resolver, standardManager, request.getId(), true);
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} recover (delivery completed, nothing outstanding) -> parent resolved",
-                requestIdLog);
-          }
-          return;
-        }
-        diagnostics.logPendingReasonChange(
-            request.getId(), "recover:delivery-created-after-completion");
-        resolver.touchFlow(
-            request.getId(), level.getGameTime(), "tickPending:recover-delivery-after-completion");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} recover (deliveryCreated latched after completionSeen, pending={})",
-              requestIdLog,
-              resolver.getPendingTracker().getPendingCount(request.getId()));
-        }
-      } else if (!request.hasChildren() && deliveryStarted && !completionSeen) {
-        resolver.clearDeliveriesCreated(request.getId());
-        int heldPending =
-            Math.max(1, resolver.getPendingTracker().getPendingCount(request.getId()));
-        requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-            resolver, level, request.getId(), heldPending);
-        diagnostics.logPendingReasonChange(
-            request.getId(), "recover:delivery-created-without-child");
-        resolver.touchFlow(
-            request.getId(), level.getGameTime(), "tickPending:recover-delivery-created");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} recover (deliveryCreated without child, pending={})",
-              requestIdLog,
-              heldPending);
-        }
-      } else {
-        diagnostics.logPendingReasonChange(request.getId(), "wait:delivery-in-progress");
-        resolver.touchFlow(
-            request.getId(), level.getGameTime(), "tickPending:delivery-in-progress");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} waiting (delivery in progress, topup blocked)",
-              requestIdLog);
-        }
-        return;
-      }
-    }
+    // No delivery child is open here. Closing the parent is MineColonies' call via resolveRequest
+    // once the last child completes, so this tick only orders and delivers what is still missing.
 
     if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(

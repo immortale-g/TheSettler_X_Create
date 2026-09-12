@@ -20,7 +20,22 @@ group = mod_group_id
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     mavenCentral()
-    maven { url = 'https://maven.createmod.net/' } // Flywheel, Catnip
+    maven { url = 'https://maven.createmod.net/' } // Flywheel, Ponder (includes Catnip)
+    maven {
+        // MineColonies, Structurize, BlockUI, Domum Ornamentum, MultiPiston
+        url = 'https://ldtteam.jfrog.io/artifactory/modding/'
+        content { includeGroup 'com.ldtteam' }
+    }
+    maven {
+        // JEI
+        url = 'https://maven.blamejared.com/'
+        content { includeGroup 'mezz.jei' }
+    }
+    exclusiveContent {
+        // Create release builds. maven.createmod.net only carries CI builds, not the release files.
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
 }
 
 base {
@@ -88,6 +103,8 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    // Structurize at structurize_compile_version (IPlacementContext API), for testModernStructurize.
+    modernStructurize
 }
 
 configurations.configureEach {
@@ -104,10 +121,45 @@ dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
     // Flywheel API — needed to compile against Create's API classes that expose Flywheel types
     compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-1.21.1:1.0.6"
-    // Load local mod jars from ./libs for runtime and compile classpath.
-    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
-    testImplementation fileTree(dir: 'libs', include: ['*.jar'])
-    localRuntime fileTree(dir: 'libs', include: ['*.jar'])
+    // Mod dependencies, versions in gradle.properties. Mod jars carry no usable POM dependencies
+    // (nested libraries ship inside them via jar-in-jar), so every one is non-transitive.
+    def modDeps = [
+            "com.ldtteam:minecolonies:${minecolonies_version}",
+            "com.ldtteam:blockui:${blockui_version}",
+            // MineColonies' warehouse block entity implements a Domum Ornamentum interface.
+            "com.ldtteam:domum-ornamentum:${domum_ornamentum_version}:main",
+            "maven.modrinth:create:${create_version}",
+            "net.createmod.ponder:ponder-neoforge:${ponder_version}",
+            "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}",
+    ]
+    modDeps.each { dep ->
+        compileOnly(dep) { transitive = false }
+        testImplementation(dep) { transitive = false }
+    }
+    // Ponder ships inside the Create jar, so only MineColonies' own requirements are added at runtime.
+    [
+            "com.ldtteam:minecolonies:${minecolonies_version}",
+            "com.ldtteam:blockui:${blockui_version}",
+            "com.ldtteam:domum-ornamentum:${domum_ornamentum_version}:main",
+            "com.ldtteam:multipiston:${multipiston_version}",
+            "maven.modrinth:create:${create_version}",
+            "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}",
+    ].each { dep -> localRuntime(dep) { transitive = false } }
+
+    // Structurize 1.0.808 replaced the IPlacementHandler signatures with IPlacementContext variants.
+    // The placement handlers implement both, so they compile against the newer API while the dev
+    // client and the regular tests run structurize_version. testModernStructurize covers the other.
+    compileOnly("com.ldtteam:structurize:${structurize_compile_version}") { transitive = false }
+    testImplementation("com.ldtteam:structurize:${structurize_version}") { transitive = false }
+    localRuntime("com.ldtteam:structurize:${structurize_version}") { transitive = false }
+    modernStructurize("com.ldtteam:structurize:${structurize_compile_version}") { transitive = false }
+
+    // Optional extra mods for the dev client only (e.g. JourneyMap, Carry On). Anything managed above
+    // is excluded so a stale copy in ./libs cannot load twice.
+    localRuntime fileTree(dir: 'libs', include: ['*.jar'], exclude: [
+            'minecolonies-*.jar', 'structurize-*.jar', 'blockui-*.jar', 'domum-ornamentum-*.jar',
+            'multipiston-*.jar', 'create-1.21.1-*.jar', 'ponder-*.jar', 'jei-*.jar',
+    ])
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
@@ -151,6 +203,8 @@ tasks.withType(ProcessResources).configureEach {
             mod_name               : mod_name,
             mod_license            : mod_license,
             mod_version            : mod_version,
+            minecolonies_version   : minecolonies_version,
+            structurize_version    : structurize_version,
     ]
     inputs.properties replaceProperties
 
@@ -247,6 +301,28 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+}
+
+// The regular test run uses structurize_version, whose placement API is named by structurize_api.
+tasks.named('test', Test) {
+    systemProperty 'thesettler.structurizeApi', structurize_api
+}
+
+// Reruns the placement compat tests with structurize_compile_version, so the IPlacementContext path
+// is exercised even while structurize_version is still on the legacy API.
+tasks.register('testModernStructurize', Test) {
+    description = 'Runs the Structurize placement compat tests against the IPlacementContext API.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = configurations.modernStructurize +
+            sourceSets.test.runtimeClasspath.filter { !it.name.startsWith('structurize-') }
+    filter {
+        includeTestsMatching 'com.thesettler_x_create.create.compat.StructurizePlacementApiCompatTest'
+    }
+    systemProperty 'thesettler.structurizeApi', 'modern'
+}
+tasks.named('check') {
+    dependsOn 'testModernStructurize'
 }
 
 spotless {

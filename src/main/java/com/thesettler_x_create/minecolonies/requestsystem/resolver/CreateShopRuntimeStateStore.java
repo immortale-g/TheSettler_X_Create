@@ -18,7 +18,6 @@ final class CreateShopRuntimeStateStore {
   private final Map<IToken<?>, Long> parentChildDropLastLogTick = new ConcurrentHashMap<>();
   private final Map<IToken<?>, String> deliveryRootCauseSnapshots = new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> deliveryRootCauseLastLogTick = new ConcurrentHashMap<>();
-  private final Map<IToken<?>, Long> parentChildCompletedSeenAt = new ConcurrentHashMap<>();
   private final Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> deliveryChildLedger =
       new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> deliveryChildLedgerLastLogTick = new ConcurrentHashMap<>();
@@ -53,10 +52,6 @@ final class CreateShopRuntimeStateStore {
 
   Map<IToken<?>, Long> getDeliveryRootCauseLastLogTick() {
     return deliveryRootCauseLastLogTick;
-  }
-
-  Map<IToken<?>, Long> getParentChildCompletedSeenAt() {
-    return parentChildCompletedSeenAt;
   }
 
   Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> getDeliveryChildLedger() {

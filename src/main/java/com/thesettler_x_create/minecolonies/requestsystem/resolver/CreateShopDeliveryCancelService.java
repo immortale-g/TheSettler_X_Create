@@ -47,7 +47,6 @@ final class CreateShopDeliveryCancelService {
     if (parentToken == null) {
       return;
     }
-    requestStateMutatorService.closeDeliveryWindow(resolver, parentToken, childToken);
     UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
     ItemStack stack = delivery.getStack().copy();
 

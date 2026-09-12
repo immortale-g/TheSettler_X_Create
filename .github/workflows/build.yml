@@ -1,5 +1,7 @@
 name: Build
 
+# Builds against the pinned dependency versions from gradle.properties. `check` also runs
+# testModernStructurize, so both Structurize placement handler APIs are covered.
 on: [push, pull_request]
 
 jobs:
@@ -23,3 +25,9 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew build
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: thesettler_x_create
+          path: build/libs/*.jar

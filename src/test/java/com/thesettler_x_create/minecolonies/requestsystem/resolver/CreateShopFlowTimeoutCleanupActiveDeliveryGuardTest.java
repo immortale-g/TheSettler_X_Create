@@ -16,9 +16,8 @@ class CreateShopFlowTimeoutCleanupActiveDeliveryGuardTest {
 
     assertTrue(source.contains("timeout-cleanup:skip-active-delivery"));
     assertTrue(source.contains("timeout-cleanup:skip-runtime-active"));
-    // Since Phase 3.5 the parentDeliveryActiveSince map is removed; runtime window now uses
-    // hasDeliveriesCreated and hasDeliveryStarted only.
-    assertTrue(source.contains("resolver.hasDeliveriesCreated(token)"));
+    // An open delivery child or a delivery the shop already handed out keeps the lifecycle alive.
     assertTrue(source.contains("resolver.getPendingTracker().hasDeliveryStarted(token)"));
+    assertTrue(source.contains("!terminal && (request.hasChildren() || deliveryStarted)"));
   }
 }
