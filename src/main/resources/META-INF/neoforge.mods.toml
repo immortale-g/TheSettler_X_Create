@@ -91,7 +91,7 @@ Example mod description.
 [[dependencies.${mod_id}]]
     modId="create"
     type="required"
-    versionRange="6.0.8"
+    versionRange="[6.0.10,)"
     ordering="NONE"
     side="BOTH"
 
