@@ -27,6 +27,7 @@ final class CreateShopPendingRequestProcessorService {
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopOutstandingNeededService outstandingNeededService;
 
   CreateShopPendingRequestProcessorService(
       CreateShopPendingRequestGateService pendingRequestGateService,
@@ -37,7 +38,8 @@ final class CreateShopPendingRequestProcessorService {
       CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
       CreateShopPostCreationUpdateService postCreationUpdateService,
       CreateShopResolverDiagnostics diagnostics,
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopOutstandingNeededService outstandingNeededService) {
     this.pendingRequestGateService = pendingRequestGateService;
     this.childReconciliationService = childReconciliationService;
     this.pendingStateDecisionService = pendingStateDecisionService;
@@ -47,6 +49,7 @@ final class CreateShopPendingRequestProcessorService {
     this.postCreationUpdateService = postCreationUpdateService;
     this.diagnostics = diagnostics;
     this.requestStateMutatorService = requestStateMutatorService;
+    this.outstandingNeededService = outstandingNeededService;
   }
 
   void processToken(
@@ -218,6 +221,32 @@ final class CreateShopPendingRequestProcessorService {
     if (resolver.hasDeliveriesCreated(request.getId())) {
       if (completionSeen) {
         resolver.clearDeliveriesCreated(request.getId());
+        // Deliberately without the reservation offset: only the delivered amount decides whether
+        // this request is done. Counting a reservation here would close a request whose Create
+        // network top-up is still sitting in the shop rack waiting for its own delivery.
+        int outstandingAfterCompletion = outstandingNeededService.compute(request, deliverable, 0);
+        if (outstandingAfterCompletion <= 0) {
+          // Everything this request asked for was delivered, but MineColonies never pushed the
+          // parent to a terminal state (the child left the warehouse queue without a terminal
+          // callback). Close it here instead of falling through into another order/delivery.
+          diagnostics.logPendingReasonChange(request.getId(), "recover:delivery-completed-fully");
+          resolver.touchFlow(
+              request.getId(), level.getGameTime(), "tickPending:recover-delivery-completed-fully");
+          try {
+            standardManager.updateRequestState(request.getId(), RequestState.RESOLVED);
+          } catch (Exception ignored) {
+            // Best effort; the local cleanup below already stops the re-order loop.
+          }
+          resolver.releaseReservation(manager, request);
+          requestStateMutatorService.clearPendingTokenState(
+              resolver, standardManager, request.getId(), true);
+          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[CreateShop] tickPending: {} recover (delivery completed, nothing outstanding) -> parent resolved",
+                requestIdLog);
+          }
+          return;
+        }
         diagnostics.logPendingReasonChange(
             request.getId(), "recover:delivery-created-after-completion");
         resolver.touchFlow(
