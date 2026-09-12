@@ -688,6 +688,18 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
   }
 
+  /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
+  public Set<java.util.UUID> getGaugeReservationRequestIds() {
+    Set<java.util.UUID> ids = new java.util.HashSet<>();
+    for (GaugePackagingTask task : gaugePackagingQueue) {
+      ids.add(task.requestId());
+    }
+    for (GaugePackagingTask task : pendingGaugeRequests.values()) {
+      ids.add(task.requestId());
+    }
+    return ids;
+  }
+
   public boolean hasGaugeTask() {
     return !gaugePackagingQueue.isEmpty();
   }

@@ -28,7 +28,6 @@ public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_RESERVATIONS = "Reservations";
   private static final String TAG_INFLIGHT = "Inflight";
   private static final String TAG_INFLIGHT_BASELINES = "InflightBaselines";
-  private static final long RESERVATION_TTL = 20L * 60L * 5L;
   private static final int MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE = 2;
 
   private final IItemHandler itemHandler = new VirtualCreateNetworkItemHandler(this);
@@ -37,6 +36,10 @@ public class CreateShopBlockEntity extends BlockEntity {
   private final List<BaselineEntry> inflightBaselines = new ArrayList<>();
   private BlockPos shopPos;
   private long lastInflightLogTime;
+
+  // Saved expiry times can be older than the saved game time (the chunk is not re-saved on every
+  // refresh), so loaded reservations get a fresh TTL once the level is available.
+  private boolean rebaseLoadedReservationExpiry;
 
   public CreateShopBlockEntity(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_PICKUP.get(), pos, state);
@@ -91,6 +94,38 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (reservations.remove(requestId) != null) {
       setChanged();
     }
+  }
+
+  /**
+   * Keeps the reservations of still-active requests from expiring. Called every resolver tick with
+   * the ids of requests that are known to be alive; everything else keeps its normal expiry.
+   *
+   * @return number of reservations whose expiry was extended
+   */
+  public int refreshReservations(java.util.Set<UUID> activeRequestIds) {
+    if (!ensureServerThread("refreshReservations")) {
+      return 0;
+    }
+    rebaseLoadedReservationExpiryIfNeeded();
+    if (activeRequestIds == null || activeRequestIds.isEmpty() || reservations.isEmpty()) {
+      return 0;
+    }
+    long now = getGameTimeSafe();
+    int refreshed = 0;
+    for (Reservation reservation : reservations.values()) {
+      if (!activeRequestIds.contains(reservation.requestId)) {
+        continue;
+      }
+      long expires = ReservationExpiryPolicy.keepAliveExpiry(reservation.expiresAtGameTime, now);
+      if (expires != reservation.expiresAtGameTime) {
+        reservation.expiresAtGameTime = expires;
+        refreshed++;
+      }
+    }
+    if (refreshed > 0) {
+      setChanged();
+    }
+    return refreshed;
   }
 
   /** Returns total reserved count for a stack key. */
@@ -635,11 +670,12 @@ public class CreateShopBlockEntity extends BlockEntity {
     if (!ensureServerThread("cleanExpired")) {
       return;
     }
+    rebaseLoadedReservationExpiryIfNeeded();
     long now = getGameTimeSafe();
     Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
     while (iterator.hasNext()) {
       Reservation reservation = iterator.next().getValue();
-      if (reservation.expiresAtGameTime <= now) {
+      if (ReservationExpiryPolicy.isExpired(reservation.expiresAtGameTime, now)) {
         iterator.remove();
       }
     }
@@ -732,8 +768,20 @@ public class CreateShopBlockEntity extends BlockEntity {
     TheSettlerXCreate.LOGGER.info("[CreateShop] inflight overdue: {}", String.join(" | ", entries));
   }
 
+  private void rebaseLoadedReservationExpiryIfNeeded() {
+    if (!rebaseLoadedReservationExpiry || level == null) {
+      return;
+    }
+    rebaseLoadedReservationExpiry = false;
+    long now = getGameTimeSafe();
+    for (Reservation reservation : reservations.values()) {
+      reservation.expiresAtGameTime =
+          ReservationExpiryPolicy.loadedExpiry(reservation.expiresAtGameTime, now);
+    }
+  }
+
   private long getExpireTime() {
-    return getGameTimeSafe() + RESERVATION_TTL;
+    return ReservationExpiryPolicy.newExpiry(getGameTimeSafe());
   }
 
   private long getGameTimeSafe() {
@@ -916,6 +964,7 @@ public class CreateShopBlockEntity extends BlockEntity {
         }
       }
     }
+    rebaseLoadedReservationExpiry = !reservations.isEmpty();
     inflightEntries.clear();
     if (tag.contains(TAG_INFLIGHT)) {
       var list = tag.getList(TAG_INFLIGHT, net.minecraft.nbt.Tag.TAG_COMPOUND);
