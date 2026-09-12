@@ -166,7 +166,9 @@ public class StockLinkLinkerItem extends Item {
       tooltip.add(
           Component.translatable(
               "com.thesettler_x_create.item.network_link_tuner.tooltip.stored_network",
-              tag.getUUID(FREQ_TAG)));
+              // TranslatableContents only accepts Component, Number, Boolean or String, so a raw
+              // UUID throws while the tooltip is being built and takes the client down with it.
+              tag.getUUID(FREQ_TAG).toString()));
       tooltip.add(
           Component.translatable("com.thesettler_x_create.item.network_link_tuner.tooltip.apply"));
       tooltip.add(
