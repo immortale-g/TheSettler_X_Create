@@ -42,7 +42,7 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLedgerService.java"));
 
     // EntityAIWorkDeliveryman sets the marker right before gathering and drops it only when the
     // gather failed, so re-adding it here would resolve deliveries whose goods never moved.
