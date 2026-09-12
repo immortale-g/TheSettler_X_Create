@@ -103,16 +103,12 @@ final class CreateShopDeliveryLifecycleLedgerService {
         entry.lastCourierAtTargetMatchCount = snapshot.courierAtTargetMatchCount();
       }
     }
-    if (state == RequestState.IN_PROGRESS
-        && !snapshot.queueContains()
-        && snapshot.courierTaskMatchCount() > 0
-        && snapshot.courierAtTargetMatchCount() > 0) {
-      int forced = forceFinishMatchingCourierTasks(manager, childToken);
-      if (forced > 0) {
-        entry.diagnosisCode = "FORCE_FINISH_AT_TARGET";
-        entry.diagnosisDetail = "force-finished stuck courier task count=" + forced;
-      }
-    }
+    // No force-finishing of courier tasks here. MineColonies owns the delivery lifecycle past
+    // DELIVERY_CREATED, and guessing that someone else's delivery is done can only be wrong in the
+    // expensive direction: it reports success, consumes the reservation, resolves the parent, and
+    // the request comes straight back as a new order. The old heuristic finished a task whenever a
+    // courier stood within two blocks of the delivery target, which is where warehouse couriers
+    // idle anyway, so it fired before the courier had even walked to the shop.
     if (snapshot.courierTaskMatchCount() > 0 && entry.pickupConfirmedAtTick < 0L) {
       entry.pickupConfirmedAtTick = now;
       entry.diagnosisCode = "COURIER_PICKUP_CONFIRMED";
@@ -136,7 +132,12 @@ final class CreateShopDeliveryLifecycleLedgerService {
     // Diagnose stalled non-terminal children.
     if (state == RequestState.IN_PROGRESS && entry.inProgressSeenAtTick > 0L) {
       long inProgressAge = now - entry.inProgressSeenAtTick;
-      if (!snapshot.queueContains() && inProgressAge >= 100L) {
+      // A courier holding the task is the reason the token left the warehouse queue: MineColonies
+      // dequeues on pickup. Only report a dequeue without terminal when nobody has the task, or
+      // every normal courier walk longer than five seconds reads as an anomaly.
+      if (!snapshot.queueContains()
+          && snapshot.courierTaskMatchCount() <= 0
+          && inProgressAge >= 100L) {
         entry.diagnosisCode = "MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL";
         entry.diagnosisDetail =
             "inProgressAge="
@@ -284,55 +285,6 @@ final class CreateShopDeliveryLifecycleLedgerService {
         courierCarryMatches,
         courierAtSourceMatches,
         courierAtTargetMatches);
-  }
-
-  private int forceFinishMatchingCourierTasks(
-      IStandardRequestManager manager, IToken<?> childToken) {
-    if (manager == null || childToken == null) {
-      return 0;
-    }
-    int forced = 0;
-    try {
-      var buildingManager =
-          manager.getColony() == null ? null : manager.getColony().getServerBuildingManager();
-      if (buildingManager == null || buildingManager.getBuildings() == null) {
-        return 0;
-      }
-      for (var entry : buildingManager.getBuildings().entrySet()) {
-        Object building = entry.getValue();
-        if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
-          continue;
-        }
-        var warehouse = (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
-        var couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
-        if (couriers == null || couriers.getAssignedCitizen() == null) {
-          continue;
-        }
-        for (var citizen : couriers.getAssignedCitizen()) {
-          if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
-            continue;
-          }
-          IRequest<?> currentTask;
-          try {
-            currentTask = job.getCurrentTask();
-          } catch (Exception ignored) {
-            currentTask = null;
-          }
-          if (currentTask == null || !childToken.equals(currentTask.getId())) {
-            continue;
-          }
-          try {
-            job.finishRequest(true);
-            forced++;
-          } catch (Exception ignored) {
-            // Best effort only.
-          }
-        }
-      }
-    } catch (Exception ignored) {
-      return forced;
-    }
-    return forced;
   }
 
   private int ensureOngoingDeliveryMarker(IStandardRequestManager manager, IToken<?> childToken) {
