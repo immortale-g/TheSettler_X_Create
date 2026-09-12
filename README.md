@@ -1,77 +1,91 @@
-Installation information
+# TheSettler_x_Create
 
-## ⚠️ Known Issue – Colony marked as “Abandoned” after updating to 0.0.12
+A bridge between [MineColonies](https://www.curseforge.com/minecraft/mc-mods/minecolonies) and
+[Create](https://www.curseforge.com/minecraft/mc-mods/create). The mod adds a Create Shop hut that
+registers as a request resolver inside the colony: when a colonist or building asks for something the
+colony cannot cover, the shop orders it from a Create stock network and a courier delivers it.
 
-**Affected versions:**
-Updating from **0.0.11 → 0.0.12**
+Colonist requests keep their normal MineColonies lifecycle throughout. The shop is a supply source,
+not a replacement for the request system.
 
-### Description
-When updating an existing world from version `0.0.11` to `0.0.12`, some players may experience their colony being marked as **abandoned** or appearing to be missing.
-
-This is caused by a serialization compatibility issue with legacy request data.
-Version `0.0.12` no longer registers a request factory that existed in `0.0.11`, which prevents certain saved request objects from being properly deserialized during world load.
-
-As a result, MineColonies may fail to fully restore the colony state.
+Minecraft 1.21.1, NeoForge. MIT licensed.
 
 ---
 
-### Temporary Workaround
+## Status
 
-If you already updated and encounter this issue:
+Early and experimental. Expect updates, reworks and the occasional breakage.
 
-1. Restore your world **from a backup created before updating to 0.0.12**
-2. Reinstall **0.0.11**
-3. Load the restored backup world
-4. Properly save and close the game
-5. Wait for the upcoming compatibility patch before updating again
+- Back up your world before installing or updating.
+- Not recommended for important long-term saves yet.
+- Removing the mod from an active world can break it. Run `/thesettlerxcreate prepare_uninstall`
+  first (available since `0.0.12`).
+- Dedicated server support is progressing, but broader real-world validation is still ongoing.
 
----
+Debug logging is **on by default** so request and delivery flows can be traced during testing.
+Turn it off in `config/thesettler_x_create-common.toml` with `debugLogging = false` once you are
+done validating.
 
-### Fix Status
-This issue will be resolved in the next patch release (0.0.13+), which restores backward compatibility for legacy request serialization.
+## Requirements
 
----
+| | Version |
+|---|---|
+| Minecraft | 1.21.1 |
+| NeoForge | 21.1.219 or newer |
+| Create | 6.0.10 or newer |
+| MineColonies | 1.1.1264 or newer |
+| JEI | 19.21.0 or newer, optional, client side |
 
-### Recommendation
-**Always create a full world backup before updating between minor versions.**
+Structurize, BlockUI, Multi-Piston and Domum Ornamentum come in transitively through MineColonies.
 
-## ⚠ Disclaimer
+## What it adds
 
-This mod has been tested on the **client side only**.
-It has **not** been tested in a dedicated server environment.
+| | |
+|---|---|
+| Create Shop Hut | The building, with its own Create Shopkeeper colonist |
+| Create Shop Pickup | The shop's interface to the logistics network |
+| Create Shop Output | Ships colony goods back out to a package address |
+| Colony Gauge | Requests items from the colony, mounted on a Colony Packager |
+| Colony Packager | Paired with the Colony Gauge; the two only work with each other |
+| Network Link Tuner | Copies a stock network from a Stock Ticker or Checker onto the hut |
 
-If you choose to install or run this mod on a server, you do so **at your own risk**.
-Compatibility issues, unexpected behavior, or even world corruption may occur.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how these fit together.
 
-Please make sure to create proper backups before installing this mod on any server.
+## Building from source
 
-Project Positioning
-===================
+```
+./gradlew build
+```
 
-TheSettler_X_Create is built on top of the public MineColonies and Create APIs. The overall architecture (resolver
-factories, request handlers, logistics summaries) necessarily follows the patterns dictated by those APIs. Similar
-structure across mods is expected when integrating with MineColonies and Create; it is not evidence of code copying.
+The jar lands in `build/libs/`. Runtime dependencies are expected in `libs/`; the versions there are
+what the build and the test suite are validated against.
 
-Differentiators in this project include perma-request workflows, belt blueprint placement logic, Create Shop
-pickup/output blocks with reservation handling, and Create-specific courier integration.
+```
+./gradlew test spotlessCheck
+```
 
-This mod is designed as a bridge/adapter layer: the Create Shop uses MineColonies standard hut windows and
-module tabs, while Create integration lives behind the adapter components.
+Spotless enforces google-java-format. If the build fails with
+`Spotless JVM-local cache is stale`, delete `.gradle/configuration-cache` and run again.
 
-Provenance / Attribution
-========================
-This project is developed independently using only public APIs from MineColonies and Create. No third-party
-bridge code is included. If external references or ideas are used in the future, they will be credited in
-`docs/provenance.md`.
+## Documentation
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+| Document | Contents |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Module layout, core concepts, request flow |
+| [docs/provenance.md](docs/provenance.md) | Independent authorship, design constraints |
+| [docs/adr/](docs/adr/) | Architecture decision records |
+| [ROADMAP.md](ROADMAP.md) | Cleanup and hardening plan |
+| [docs/test_tasks_refactor.md](docs/test_tasks_refactor.md) | Manual test procedure for lifecycle work |
+| [AGENTS.md](AGENTS.md) | Working rules for contributors and coding agents |
 
-Additional Resources:
-==========
-Community Documentation: https://docs.neoforged.net/
-NeoForged Discord: https://discord.neoforged.net/
+## Provenance
+
+Developed independently against the public MineColonies and Create APIs. No third-party bridge code
+is included. Details and the design constraints that follow from those APIs are in
+[docs/provenance.md](docs/provenance.md).
+
+## Mappings
+
+The MDK is configured to use the official Mojang mapping names for methods and fields. Those names
+are covered by a specific license; the reference copy is at
+<https://github.com/NeoForged/NeoForm/blob/main/Mojang.md>.

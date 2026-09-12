@@ -1,59 +1,97 @@
 # Architecture
 
 ## Purpose
-TheSettler_X_Create extends MineColonies with a Create-based shop building that can fulfill requests using Create stock networks and warehouse racks. The mod adds a Create Shop building, custom request resolver logic, and helper blocks to integrate the Create logistics system with MineColonies deliveries.
 
-## Provenance and API Constraints
-The module layout and class patterns in this project are constrained by the MineColonies request system and Create
-logistics APIs. Resolver factories, token-based serialization, and logistics summary calls follow the canonical
-patterns those APIs expect. Similar structure across mods that integrate with MineColonies and Create is therefore
-expected and does not imply shared code.
+TheSettler_X_Create extends MineColonies with a Create-based shop building that fulfils colony
+requests from Create stock networks and from its own racks. The mod adds the Create Shop building
+and its colonist, a request resolver, helper blocks for pickup and output, and the Colony
+Gauge/Packager pair for requesting colony goods from the Create side.
 
-TheSettler_X_Create differentiates itself through Create Shop-specific behavior (perma requests, belt blueprint
-placement, pickup/output block reservation logic, and Create network routing).
+## Provenance and API constraints
 
-## Core Concepts
-- Create Shop building: a MineColonies building with its own request resolver that can fulfill requests from Create stock or racks.
-- Output and pickup blocks: custom block entities used to coordinate deliveries and reservations.
-- Request resolver: integrates with MineColonies request system to determine if the shop can satisfy a request and to create delivery requests.
-- Create network facade: abstracts access to Create stock network inventory and package requests.
-- Perma request: a curated, persistent request list for ore-tagged blocks, gated by building level.
+The module layout and class patterns are constrained by the MineColonies request system and the
+Create logistics API. Resolver factories, token-based serialization and logistics summary calls
+follow the canonical patterns those APIs expect. Similar structure across mods integrating the same
+APIs is therefore expected and does not imply shared code. See [docs/provenance.md](docs/provenance.md).
 
-## High-Level Flow
+The mod differentiates itself through Create Shop specific behaviour: the Colony Gauge/Packager
+pair, pickup and output block reservation logic, Create network routing, and Structurize placement
+handlers for Create blocks the colony builder cannot otherwise place.
+
+## Core concepts
+
+- **Create Shop building** — a MineColonies building with its own request resolver, able to fulfil
+  requests from Create stock or from its racks.
+- **Pickup and output blocks** — block entities that coordinate deliveries, reservations and the
+  packaging of fulfilled requests.
+- **Request resolver** — decides whether the shop can satisfy a request, orders from the network,
+  and creates the delivery children.
+- **Create network facade** — abstracts Create stock network inventory and package requests.
+- **Colony Gauge and Colony Packager** — a matched pair, mounted on the container to be refilled.
+  They request from the Colony Warehouse the way a Create stock gauge requests from a stock network.
+  They are deliberately not interoperable with Create's own gauges and packagers.
+- **Inflight tracking** — a mod-side record of what was ordered from the network but has not yet
+  arrived, persisted across reloads.
+
+Perma requests (a curated ore-tag request list, gated by building level) are **disabled as of
+0.3.0**. `BuildingCreateShop.canUsePermaRequests()` returns `false` and the Gauge/Packager pair
+replaces the workflow. The module and its GUI tab still exist but are inert.
+
+## High-level flow
+
 1. MineColonies issues a deliverable request.
-2. Create Shop resolver checks eligibility, stock availability, and reservation state.
-3. If available, it creates delivery requests and reserves stock.
-4. Delivery completion or cancellation releases or updates reservations.
+2. The Create Shop resolver checks ownership, worker availability, outstanding amount and stock.
+3. If it can supply, it orders the shortfall from the network and reserves the incoming goods.
+4. When goods are in the racks it creates a MineColonies delivery child and hands off.
+5. MineColonies owns the delivery from that point. The shop reacts to terminal callbacks only.
+6. Completion or cancellation releases or consumes the reservation and closes the parent request.
 
-## Key Modules
-- `com.thesettler_x_create.minecolonies.building.BuildingCreateShop`
-  Handles building behavior, resolver setup, perma requests, and blueprint-related behavior.
-- `com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver`
-  Implements the Create Shop request resolution and delivery creation logic.
-- `com.thesettler_x_create.create.CreateNetworkFacade`
-  Encapsulates Create network summary and package request operations.
-- `com.thesettler_x_create.blockentity.CreateShopBlockEntity`
-  Stores reservation data and exposes item handlers for MineColonies interaction.
-- `com.thesettler_x_create.minecolonies.requestsystem.CreateShopResolverInjector`
-  Ensures shop resolvers are registered in the MineColonies request system.
+Step 5 is a hard boundary, drawn in Phase 3.5 (`e2387bd`). The shop does not finish, cancel or
+otherwise steer courier tasks. See the "No courier injection" constraint in
+[docs/provenance.md](docs/provenance.md).
 
-## Data and State
-- Reservations are tracked in `CreateShopBlockEntity` keyed by request UUID.
-- Resolver state is instance-based per shop resolver to avoid cross-colony leaks.
-- Cooldowns and debug logging gates live in `Config`.
+## Key modules
+
+| Module | Responsibility |
+|---|---|
+| `minecolonies.building.BuildingCreateShop` | Building behaviour, resolver setup, gauge requests, blueprint behaviour. Delegates to roughly twenty `Shop*` collaborators. |
+| `minecolonies.requestsystem.resolver.CreateShopRequestResolver` | Entry point for resolution and delivery creation. |
+| `minecolonies.requestsystem.resolver.*Service` | The resolver is split into single-purpose services: pending token collection, state decision, reservation sync, top-up, delivery creation, child reconciliation, terminal lifecycle, diagnostics ledger. Lifecycle writes go through `CreateShopRequestStateMutatorService`; runtime state lives in `CreateShopLifecycleStateStore`. |
+| `minecolonies.requestsystem.requesters.*` | `CreateShopDeliveryRequester` routes delivery callbacks back to the owning resolver. `SafeRequester` is a deserialization shim only. |
+| `create.CreateNetworkFacade` | Create network summaries and package requests. |
+| `create.compat.CreatePlacementHandlers` | Structurize placement handlers for Create belts and for encased shafts and cogwheels, which have no item of their own. |
+| `blockentity.CreateShopBlockEntity` | Reservation and inflight data, item handlers for MineColonies interaction. |
+| `block.ColonyGaugeBlock`, `block.ColonyPackagerBlock` | The colony-side request panel pair, built on Create's `FactoryPanelBlock` slot model. |
+
+## Data and state
+
+- Reservations are tracked in `CreateShopBlockEntity`, keyed by request UUID.
+- Resolver runtime state is instance-scoped per shop resolver to avoid cross-colony leaks.
+- Outstanding amounts are derived from the request, its reservation, and what MineColonies already
+  recorded as delivered via `IRequest#getDeliveries()`. Ignoring the delivered part caused the
+  repeated re-delivery bug fixed in 0.3.2.
+- Cooldowns and debug gates live in `Config`.
 
 ## Configuration
-- `Config` defines cooldowns, perma request level gating, debug logging flags, and related behavior.
-- Debug logging is gated via `Config.DEBUG_LOGGING` and per-feature cooldowns.
 
-## Assets and Blueprints
-- Blueprints are stored in resources under `assets/structurize/scan` for jar distribution.
-- Local scans reside in the MineColonies/Structurize scan directories during development.
+`Config` defines cooldowns, the gauge building-level gate, chat message toggles and debug logging
+flags. Debug logging is gated through `Config.DEBUG_LOGGING` with per-feature cooldowns, and is on
+by default.
 
-## Build and Distribution
-- Gradle builds the mod jar and includes resources from `src/main/resources`.
-- MineColonies and Create are runtime dependencies and are expected on the client or server.
+## Assets and blueprints
 
-## Known Integration Points
-- MineColonies request lifecycle callbacks are used to track delivery completion and cancellation.
-- Create logistics API is used to query summaries and broadcast package requests.
+Blueprints ship in `src/main/resources/blueprints/thesettler_x_create/`. Local scans live in the
+MineColonies and Structurize scan directories during development.
+
+## Build and distribution
+
+Gradle builds the mod jar and includes resources from `src/main/resources`. MineColonies and Create
+are required at runtime on both sides; JEI is an optional client-side integration. Runtime jars used
+for compilation and tests live in `libs/`.
+
+## Known integration points
+
+- MineColonies request lifecycle callbacks drive delivery completion and cancellation handling.
+- The Create logistics API is used for stock summaries and package request broadcasts.
+- Structurize `IPlacementHandler` registration teaches the colony builder about Create blocks.
+- MineColonies interaction handlers carry the lost-package and rack-capacity prompts.
