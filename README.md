@@ -73,10 +73,8 @@ Spotless enforces google-java-format. If the build fails with
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Module layout, core concepts, request flow |
 | [docs/provenance.md](docs/provenance.md) | Independent authorship, design constraints |
-| [docs/adr/](docs/adr/) | Architecture decision records |
-| [ROADMAP.md](ROADMAP.md) | Cleanup and hardening plan |
+| [ROADMAP.md](ROADMAP.md) | Status, open items for 1.0, and the state-drift analysis behind them |
 | [docs/test_tasks_refactor.md](docs/test_tasks_refactor.md) | Manual test procedure for lifecycle work |
-| [AGENTS.md](AGENTS.md) | Working rules for contributors and coding agents |
 
 ## Provenance
 

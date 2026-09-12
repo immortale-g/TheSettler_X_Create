@@ -17,11 +17,14 @@ credited here (with source and scope), along with the corresponding implementati
 
 **API-driven integration.** Request resolution and logistics flows follow MineColonies/Create
 contracts. The mod observes, diagnoses, and extends native behavior — it does not replace or bypass
+MineColonies internals. The adapter is deliberately thin, so upstream API changes can be absorbed
+in the adapter components without redesigning the mod. No mixins, and no reflection on private
 MineColonies internals.
 
 **Serialization stability.** NBT keys and request-system IDs remain stable across versions unless
-an explicit migration is provided. `SafeRequester` (factory 3001) is retained as a deserialization
-shim for saves predating its removal; it is not used for new requests.
+an explicit migration is provided. Changing a key or an ID is a breaking change and must ship with
+backward-compatible reads and a documented rationale. `SafeRequester` (factory 3001) is retained as
+a deserialization shim for saves predating its removal; it is not used for new requests.
 
 **No courier injection.** Delivery dispatch goes through the MineColonies warehouse queue only.
 The mod does not assign jobs to couriers or maintain a parallel assignment structure, and it does
