@@ -1,5 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -20,6 +21,30 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     assertTrue(source.contains("COURIER_QUEUE_HANDOFF_PENDING"));
     assertTrue(source.contains("CreateShopDeliveryManager.nudgeDeliverymen(manager, childToken)"));
     assertTrue(source.contains("delivery-child-ledger source="));
+  }
+
+  @Test
+  void ledgerNeverFinishesCourierTasksItself() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+
+    // Force-finishing a foreign delivery reports success without moving a single item: the
+    // reservation is consumed, the parent resolves, and MineColonies re-requests the shortfall.
+    assertFalse(source.contains("FORCE_FINISH_AT_TARGET"));
+    assertFalse(source.contains("forceFinishMatchingCourierTasks"));
+    assertFalse(source.contains("finishRequest(true)"));
+  }
+
+  @Test
+  void dequeueDiagnosisIgnoresDeliveriesACourierIsCarrying() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+
+    assertTrue(source.contains("&& snapshot.courierTaskMatchCount() <= 0"));
   }
 
   @Test
