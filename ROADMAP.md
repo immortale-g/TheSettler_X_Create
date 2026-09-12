@@ -1,7 +1,37 @@
 # TheSettler_x_Create – Cleanup & Improvement Roadmap
 
-Erstellt nach Code-Analyse, Juni 2026.
-Keine Änderungen wurden vorgenommen. Dies ist eine reine Analyse und Planung.
+Erstellt nach Code-Analyse, Juni 2026. Der Analyseteil unten ist der Stand von damals und wird
+bewusst nicht umgeschrieben, damit die Begründungen nachvollziehbar bleiben.
+
+## Status, Stand 2026-09-12
+
+| Phase | Stand |
+|-------|-------|
+| 1 – Safe Cleanup | Abgeschlossen |
+| 2 – Test-Coverage | Abgeschlossen |
+| 3 – State-Drift-Fix | Abgeschlossen, Systemgrenze bei `DELIVERY_CREATED` gezogen (`e2387bd`) |
+| 4 – Guard-Konsolidierung | Abgeschlossen |
+| 5 – Server-Testing | Läuft weiter, keine abschließende Validierung |
+
+Danach nicht mehr als nummerierte Phasen geführt: 0.3.0-Release mit Colony Gauge und Packager,
+Placement-Handler als 0.3.1, `BuildingCreateShop`-Refaktor in `Shop*`-Collaborators, Konsolidierung
+der Create-Logistik (`CreateLogisticsBridge`, `CreatePackageBridge`), laufender Clean-Code-Audit auf
+`fix/pre-1.0-hardening`.
+
+In 0.3.2 kamen vier Korrekturen am Request-Lebenszyklus dazu: Restbedarf berücksichtigt gelieferte
+Mengen, der Tooltip-Crash des Network Link Tuners, und zwei entfernte Eingriffe in fremde
+Kurier-Tasks (Force-Finish und Ongoing-Marker).
+
+### Offen für 1.0
+
+- `finalizeOrphanDeliveryChild` und `CreateShopDeliveryChildRecoveryService` greifen weiterhin in
+  Warehouse-Queue und Kurier-Tasks ein. Vor dem Entfernen prüfen, ob die Probleme von damals noch
+  reproduzierbar sind.
+- `ShopCourierDiagnostics` verändert per Reflection Citizen-Zustand, sobald `debugLogging` an ist.
+  Eine Diagnose darf nur beobachten.
+- `pickupConfirmedAtTick` wird gesetzt, sobald ein Kurier die Aufgabe hat, nicht wenn er die Ware
+  trägt. Zwei Recovery-Pfade hängen an diesem Flag.
+- `debugLogging` steht per Default auf `true`. Für ein 1.0-Release auf `false` setzen.
 
 ---
 
