@@ -24,7 +24,16 @@ an explicit migration is provided. `SafeRequester` (factory 3001) is retained as
 shim for saves predating its removal; it is not used for new requests.
 
 **No courier injection.** Delivery dispatch goes through the MineColonies warehouse queue only.
-The mod does not assign jobs to couriers directly or maintain a parallel assignment structure.
+The mod does not assign jobs to couriers or maintain a parallel assignment structure, and it does
+not decide when a delivery is finished. MineColonies owns the delivery lifecycle from
+`DELIVERY_CREATED` onward; the shop reacts to terminal callbacks.
+
+Two earlier violations of this constraint were removed in 0.3.2: a heuristic that called
+`finishRequest` on a courier task it judged stuck, and a patch that re-added tokens to the courier's
+ongoing-delivery set. Both reported deliveries as complete without any item moving. One path
+remains under review, `finalizeOrphanDeliveryChild`, which clears a warehouse queue entry and the
+matching courier task when a delivery child has been orphaned; it is scoped to recovery and is
+tracked for removal or narrowing before 1.0.
 
 **Storage scope.** Capacity planning and delivery reservation use rack-registered containers only.
 Hut inventory is a transfer target, not a capacity source, so blocked rack states are not hidden by
@@ -41,10 +50,15 @@ server reloads. Keeping these two stores consistent is the primary design challe
 of most hardening work in the codebase.
 
 The resolver system (`minecolonies/requestsystem/resolver/`) is split into focused single-purpose
-services rather than a central resolver class. Each service owns one concern (pending token
-collection, delivery creation, child reconciliation, etc.) and communicates through
-`CreateShopRequestStateMutatorService` for lifecycle writes and `CreateShopLifecycleStateStore`
-for runtime state. This split is a local refactor; no external implementations are adapted.
+services rather than a central resolver class, currently around fifty of them. Each service owns one
+concern (pending token collection, delivery creation, child reconciliation, etc.) and communicates
+through `CreateShopRequestStateMutatorService` for lifecycle writes and
+`CreateShopLifecycleStateStore` for runtime state. `BuildingCreateShop` is split the same way into
+`Shop*` collaborators. Both splits are local refactors; no external implementations are adapted.
+
+Outstanding amounts are derived from the MineColonies request itself, including what it already
+recorded as delivered through `IRequest#getDeliveries()`, rather than from a parallel counter. The
+mod keeps no shadow ledger of what the colony believes it has received.
 
 Lost-package recovery (overdue notices, reorder, handover, cancel) is implemented entirely through
 MineColonies interaction handlers and standard request-state transitions. The interaction system

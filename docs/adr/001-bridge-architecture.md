@@ -15,6 +15,7 @@ and reduce risk during upstream updates.
 
 ## Consequences
 - The code structure resembles other mods integrating the same APIs.
-- The adapter layer remains focused on Create Shop behavior (perma requests, belt handling, pickup/output
-  reservations) rather than rewriting the MineColonies request system.
+- The adapter layer remains focused on Create Shop behavior (the Colony Gauge/Packager pair, Create
+  block placement handling, pickup/output reservations) rather than rewriting the MineColonies
+  request system. Perma requests were part of this list until they were disabled in 0.3.0.
 - Upstream API changes can be addressed locally in adapter components without redesigning the mod.
