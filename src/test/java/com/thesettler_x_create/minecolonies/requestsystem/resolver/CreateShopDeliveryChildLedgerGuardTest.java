@@ -38,6 +38,19 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
   }
 
   @Test
+  void ledgerLeavesTheOngoingDeliveryMarkerToMineColonies() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+
+    // EntityAIWorkDeliveryman sets the marker right before gathering and drops it only when the
+    // gather failed, so re-adding it here would resolve deliveries whose goods never moved.
+    assertFalse(source.contains("addConcurrentDelivery"));
+    assertFalse(source.contains("ensureOngoingDeliveryMarker"));
+  }
+
+  @Test
   void dequeueDiagnosisIgnoresDeliveriesACourierIsCarrying() throws Exception {
     String source =
         Files.readString(
