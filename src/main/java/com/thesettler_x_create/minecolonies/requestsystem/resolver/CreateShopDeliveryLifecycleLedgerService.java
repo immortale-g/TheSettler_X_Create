@@ -76,14 +76,11 @@ final class CreateShopDeliveryLifecycleLedgerService {
     entry.lastCourierCarryMatchCount = snapshot.courierCarryMatchCount();
     entry.lastCourierAtSourceMatchCount = snapshot.courierAtSourceMatchCount();
     entry.lastCourierAtTargetMatchCount = snapshot.courierAtTargetMatchCount();
-    if (state == RequestState.IN_PROGRESS && snapshot.courierTaskMatchCount() > 0) {
-      int patched = ensureOngoingDeliveryMarker(manager, childToken);
-      if (patched > 0) {
-        entry.diagnosisCode = "ONGOING_MARKER_PATCHED";
-        entry.diagnosisDetail =
-            "courier-task matched, ongoing delivery marker ensured count=" + patched;
-      }
-    }
+    // MineColonies maintains the ongoing-delivery marker itself: EntityAIWorkDeliveryman adds it
+    // immediately before gathering, keeps it on the success path, and removes it only when the
+    // gather failed. The set is persisted in NBT, so a reload does not lose it. Re-adding it from
+    // here only ever covered states MineColonies deliberately leaves unmarked, which would resolve
+    // a delivery whose goods never moved.
     if (state == RequestState.IN_PROGRESS
         && snapshot.queueContains()
         && snapshot.courierCount() > 0
@@ -285,50 +282,6 @@ final class CreateShopDeliveryLifecycleLedgerService {
         courierCarryMatches,
         courierAtSourceMatches,
         courierAtTargetMatches);
-  }
-
-  private int ensureOngoingDeliveryMarker(IStandardRequestManager manager, IToken<?> childToken) {
-    if (manager == null || childToken == null) {
-      return 0;
-    }
-    int patched = 0;
-    try {
-      var buildingManager =
-          manager.getColony() == null ? null : manager.getColony().getServerBuildingManager();
-      if (buildingManager == null || buildingManager.getBuildings() == null) {
-        return 0;
-      }
-      for (var entry : buildingManager.getBuildings().entrySet()) {
-        Object building = entry.getValue();
-        if (!CreateShopWarehouseFilter.isRelevantWarehouse(building)) {
-          continue;
-        }
-        var warehouse = (com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse) building;
-        var couriers = warehouse.getModule(BuildingModules.WAREHOUSE_COURIERS);
-        if (couriers == null || couriers.getAssignedCitizen() == null) {
-          continue;
-        }
-        for (var citizen : couriers.getAssignedCitizen()) {
-          if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
-            continue;
-          }
-          IRequest<?> currentTask;
-          try {
-            currentTask = job.getCurrentTask();
-          } catch (Exception ignored) {
-            currentTask = null;
-          }
-          if (currentTask == null || !childToken.equals(currentTask.getId())) {
-            continue;
-          }
-          job.addConcurrentDelivery(childToken);
-          patched++;
-        }
-      }
-    } catch (Exception ignored) {
-      return patched;
-    }
-    return patched;
   }
 
   private boolean hasCourierCarryingStack(
