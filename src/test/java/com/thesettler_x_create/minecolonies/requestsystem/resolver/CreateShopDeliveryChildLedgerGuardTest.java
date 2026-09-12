@@ -28,7 +28,7 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLedgerService.java"));
 
     // Force-finishing a foreign delivery reports success without moving a single item: the
     // reservation is consumed, the parent resolves, and MineColonies re-requests the shortfall.
@@ -42,7 +42,7 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
     String source =
         Files.readString(
             Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryLifecycleLedgerService.java"));
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryChildLedgerService.java"));
 
     assertTrue(source.contains("&& snapshot.courierTaskMatchCount() <= 0"));
   }
