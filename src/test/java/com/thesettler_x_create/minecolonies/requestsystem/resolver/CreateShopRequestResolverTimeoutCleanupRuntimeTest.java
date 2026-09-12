@@ -65,16 +65,14 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
 
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
     resolver.getPendingTracker().setCooldown(level, parentToken, 200L);
-    resolver.markDeliveriesCreated(parentToken);
-    // Since Phase 3.5, parentDeliveryActiveSince and deliveryChildActiveSince are removed.
-    // The active-delivery window is now signalled solely by hasDeliveriesCreated.
+    resolver.getPendingTracker().markDeliveryStarted(parentToken);
 
     invokeProcessTimedOutFlows(manager, level);
 
     assertFalse(resolver.reservationReleased);
     assertEquals(3, resolver.getPendingTracker().getPendingCount(parentToken));
     assertTrue(resolver.getCooldown().isOrdered(parentToken));
-    assertTrue(resolver.hasDeliveriesCreated(parentToken));
+    assertTrue(resolver.getPendingTracker().hasDeliveryStarted(parentToken));
   }
 
   @Test
@@ -104,7 +102,7 @@ class CreateShopRequestResolverTimeoutCleanupRuntimeTest {
     assertEquals(parentToken, resolver.releasedToken);
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
-    assertFalse(resolver.hasDeliveriesCreated(parentToken));
+    assertFalse(resolver.getPendingTracker().hasDeliveryStarted(parentToken));
   }
 
   private void invokeProcessTimedOutFlows(IStandardRequestManager manager, Level level)

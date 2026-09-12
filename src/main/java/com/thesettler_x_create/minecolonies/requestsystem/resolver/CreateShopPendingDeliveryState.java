@@ -2,7 +2,6 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 final class CreateShopPendingDeliveryState {
   private int pendingCount;
-  private boolean deliveryCreated;
   private boolean deliveryStarted;
   private long cooldownUntil;
   private String reason;
@@ -13,14 +12,6 @@ final class CreateShopPendingDeliveryState {
 
   void setPendingCount(int pendingCount) {
     this.pendingCount = pendingCount;
-  }
-
-  boolean isDeliveryCreated() {
-    return deliveryCreated;
-  }
-
-  void setDeliveryCreated(boolean deliveryCreated) {
-    this.deliveryCreated = deliveryCreated;
   }
 
   boolean isDeliveryStarted() {

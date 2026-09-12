@@ -1,5 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -18,17 +19,23 @@ class CreateShopRehydrateServiceGuardTest {
       "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopLifecycleRehydrateService.java";
 
   @Test
-  void reloadWithInflightOrChildrenMarksAtLeastOnePendingNotNewOrder() throws Exception {
+  void reloadKeepsActiveRequestsWithoutForcingAPendingUnit() throws Exception {
     String source = Files.readString(Path.of(SOURCE));
 
-    // Active delivery window (children / delivery created / delivery started) must mark pending
-    // using markOrderedWithPendingAtLeastOne — never create a new order directly.
-    assertTrue(source.contains("request.hasChildren()"));
-    assertTrue(source.contains("resolver.hasDeliveriesCreated(token)"));
-    assertTrue(source.contains("resolver.getPendingTracker().hasDeliveryStarted(token)"));
-    assertTrue(source.contains("markOrderedWithPendingAtLeastOne("));
-    assertTrue(source.contains("rehydrate:inflight-or-children-or-started"));
-    assertTrue(source.contains("Math.max(1, currentPending)"));
+    // Forcing pending >= 1 every tick kept fully delivered requests alive forever. Active requests
+    // are only kept in the set; the tick derives the pending amount from the request itself.
+    assertTrue(source.contains("request.hasChildren() || resolver.getPendingTracker()"));
+    assertTrue(source.contains("rehydrate:children-or-started"));
+    assertTrue(source.contains("rehydrate:nbt-restored"));
+    assertFalse(source.contains("markOrderedWithPendingAtLeastOne("));
+  }
+
+  @Test
+  void fullyDeliveredOpenRequestsAreFinishedOnRehydrate() throws Exception {
+    String source = Files.readString(Path.of(SOURCE));
+
+    // Worlds saved while parents were detached never get another resolveRequest call.
+    assertTrue(source.contains(".finishIfDelivered(resolver, manager, request, \"rehydrate\")"));
   }
 
   @Test

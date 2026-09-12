@@ -17,49 +17,90 @@ import org.jetbrains.annotations.NotNull;
 /** Handles terminal request lifecycle cleanup and resolver completion/cancel transitions. */
 final class CreateShopTerminalRequestLifecycleService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
-  private final CreateShopResolverCooldown cooldown;
+  private final CreateShopOutstandingNeededService outstandingNeededService;
   private final CreateShopResolverDiagnostics diagnostics;
 
   CreateShopTerminalRequestLifecycleService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
-      CreateShopResolverCooldown cooldown,
+      CreateShopOutstandingNeededService outstandingNeededService,
       CreateShopResolverDiagnostics diagnostics) {
     this.requestStateMutatorService = requestStateMutatorService;
-    this.cooldown = cooldown;
+    this.outstandingNeededService = outstandingNeededService;
     this.diagnostics = diagnostics;
   }
 
+  /**
+   * MineColonies calls this whenever the request has no open children: right after {@code
+   * attemptResolve} returned without a delivery (the Create order is still on its way) and again
+   * each time the last delivery child completed. Like a crafter, the shop only finishes the request
+   * once everything was delivered; otherwise the request stays IN_PROGRESS and the tick orders and
+   * delivers the rest.
+   */
   void resolveRequest(
       CreateShopRequestResolver resolver,
       @NotNull IRequestManager manager,
       @NotNull IRequest<? extends IDeliverable> request) {
-    if (tryFastOrphanPickedUpRecovery(resolver, manager, request)) {
-      return;
-    }
-    Level level = manager.getColony().getWorld();
-    boolean ordered = cooldown.isOrdered(request.getId());
-    boolean onCooldown = cooldown.isRequestOnCooldown(level, request.getId());
-    if (ordered || onCooldown) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolveRequest skip parent={} ordered={} cooldown={}",
-            request.getId(),
-            ordered,
-            onCooldown);
-      }
-      if (manager instanceof IStandardRequestManager standardManager) {
-        diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest-skip");
-      }
-      return;
-    }
-    resolver.resolveViaWarehouse(manager, request);
+    boolean finished = finishIfDelivered(resolver, manager, request, "resolveRequest");
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] resolveRequest parent={} state={}", request.getId(), request.getState());
+          "[CreateShop] resolveRequest parent={} finished={} state={}",
+          request.getId(),
+          finished,
+          request.getState());
     }
     if (manager instanceof IStandardRequestManager standardManager) {
       diagnostics.logRequestStateChange(standardManager, request.getId(), "resolveRequest");
     }
+  }
+
+  /**
+   * The single place that closes a Create Shop parent request. It only resolves when no delivery
+   * child is open and the delivered amount covers the request. Reservations are deliberately not
+   * counted: stock sitting in the shop rack is not delivered yet.
+   */
+  boolean finishIfDelivered(
+      CreateShopRequestResolver resolver,
+      IRequestManager manager,
+      IRequest<?> request,
+      String source) {
+    if (resolver == null
+        || manager == null
+        || request == null
+        || !(request.getRequest() instanceof IDeliverable deliverable)
+        || CreateShopRequestResolver.isTerminalRequestState(request.getState())
+        || request.hasChildren()) {
+      return false;
+    }
+    if (outstandingNeededService.compute(request, deliverable, 0) > 0) {
+      return false;
+    }
+    try {
+      manager.updateRequestState(request.getId(), RequestState.RESOLVED);
+    } catch (Exception ex) {
+      if (isDebugLoggingEnabledSafe()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] finish parent={} source={} failed: {}",
+            request.getId(),
+            source,
+            ex.getMessage() == null ? "<null>" : ex.getMessage());
+      }
+      return false;
+    }
+    resolver.transitionFlow(
+        manager,
+        request,
+        CreateShopFlowState.REQUEST_COMPLETED,
+        source + ":parent-resolved",
+        "",
+        0,
+        "com.thesettler_x_create.message.createshop.flow_request_completed");
+    resolver.releaseReservation(manager, request);
+    requestStateMutatorService.clearPendingTokenState(resolver, request.getId(), true);
+    if (isDebugLoggingEnabledSafe()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] finish parent={} source={} -> resolved", request.getId(), source);
+    }
+    return true;
   }
 
   void onAssignedRequestBeingCancelled(
@@ -136,20 +177,14 @@ final class CreateShopTerminalRequestLifecycleService {
     IStandardRequestManager standardManager =
         CreateShopRequestResolver.unwrapStandardManager(manager);
     boolean graphActiveChild = hasActiveNonTerminalChildInGraph(standardManager, request.getId());
-    boolean deliveryStarted = resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
-    boolean completionGateOpen = !deliveryStarted || completionSeen;
-    if (!terminal || graphActiveChild || !completionGateOpen) {
+    if (!terminal || graphActiveChild) {
       if (isDebugLoggingEnabledSafe()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] terminal cleanup skipped token={} state={} terminal={} graphActiveChild={} completionGateOpen={} deliveryStarted={} completionSeen={}",
+            "[CreateShop] terminal cleanup skipped token={} state={} terminal={} graphActiveChild={}",
             request.getId(),
             request.getState(),
             terminal,
-            graphActiveChild,
-            completionGateOpen,
-            deliveryStarted,
-            completionSeen);
+            graphActiveChild);
       }
       return;
     }
@@ -314,11 +349,6 @@ final class CreateShopTerminalRequestLifecycleService {
     if (request.hasChildren()) {
       return false;
     }
-    boolean deliveryStarted = resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-    boolean completionSeen = resolver.hasParentChildCompletedSeen(request.getId());
-    if (!deliveryStarted || completionSeen) {
-      return false;
-    }
     IStandardRequestManager standardManager =
         CreateShopRequestResolver.unwrapStandardManager(manager);
     if (hasActiveNonTerminalChildInGraph(standardManager, request.getId())) {
@@ -344,30 +374,20 @@ final class CreateShopTerminalRequestLifecycleService {
       }
     }
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
-    long nowTick = level == null ? 0L : level.getGameTime();
-    resolver.markParentChildCompletedSeen(request.getId(), nowTick);
     resolver.observeDeliveryChildCallbackTerminal(
         level, request.getId(), orphanChild, "fast-orphan-pickedup-recovery");
     requestStateMutatorService.finalizeOrphanDeliveryChild(
         resolver, standardManager, orphanChild, "fast-orphan-pickedup-recovery");
-    requestStateMutatorService.completeDeliveryWindow(resolver, request.getId(), orphanChild);
-    requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
-    resolver.clearDeliveriesCreated(request.getId());
-    resolver.releaseReservation(manager, request);
-    try {
-      if (standardManager != null) {
-        standardManager.updateRequestState(request.getId(), RequestState.RESOLVED);
-      }
-    } catch (Exception ignored) {
-      // Best effort; local cleanup already executed.
-    }
-    requestStateMutatorService.clearPendingTokenState(
-        resolver, standardManager, request.getId(), true);
+    // The orphan never reached MineColonies' completion callback, so MineColonies will not ask us
+    // to resolve the parent. Run the same completion check it would have triggered.
+    boolean finished =
+        finishIfDelivered(resolver, manager, request, "fast-orphan-pickedup-recovery");
     if (isDebugLoggingEnabledSafe()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] fast orphan picked-up recovery parent={} child={} -> resolved",
+          "[CreateShop] fast orphan picked-up recovery parent={} child={} finished={}",
           request.getId(),
-          orphanChild);
+          orphanChild,
+          finished);
     }
     return true;
   }

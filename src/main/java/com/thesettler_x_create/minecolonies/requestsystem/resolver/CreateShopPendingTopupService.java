@@ -13,7 +13,6 @@ import net.minecraft.world.level.Level;
 
 /** Handles pending top-up ordering decisions for resolver tick reconciliation. */
 final class CreateShopPendingTopupService {
-  private final CreateShopPendingDeliveryTracker pendingTracker;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMachine flowStateMachine;
   private final CreateShopStockResolver stockResolver;
@@ -21,13 +20,11 @@ final class CreateShopPendingTopupService {
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopPendingTopupService(
-      CreateShopPendingDeliveryTracker pendingTracker,
       CreateShopResolverDiagnostics diagnostics,
       CreateShopRequestStateMachine flowStateMachine,
       CreateShopStockResolver stockResolver,
       CreateShopResolverMessaging messaging,
       CreateShopRequestStateMutatorService requestStateMutatorService) {
-    this.pendingTracker = pendingTracker;
     this.diagnostics = diagnostics;
     this.flowStateMachine = flowStateMachine;
     this.stockResolver = stockResolver;
@@ -56,24 +53,10 @@ final class CreateShopPendingTopupService {
             0,
             pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailableForRequest));
 
+    // Only reached while no delivery child is open. A completed partial delivery is already
+    // subtracted from pendingCount, and Create orders still on their way are covered by their
+    // reservation and the inflight check below, so only the real remainder is ordered.
     if (workerWorking && topupNeeded > 0) {
-      if (pendingTracker.hasDeliveryStarted(request.getId())) {
-        requestStateMutatorService.markOrderedWithPending(
-            resolver, level, request.getId(), pendingCount);
-        diagnostics.recordPendingSource(request.getId(), "tickPending:block-auto-reorder-started");
-        flowStateMachine.touch(
-            request.getId(), level.getGameTime(), "tickPending:block-auto-reorder-started");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} network topup blocked (started-order, pending={}, reserved={}, rack={})",
-              requestIdLog,
-              pendingCount,
-              reservedForRequest,
-              rackAvailableForRequest);
-        }
-        return;
-      }
-
       String requesterName = messaging.resolveRequesterName(manager, request);
       int inflightRemaining =
           pickup.getInflightRemaining(

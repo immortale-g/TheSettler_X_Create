@@ -22,6 +22,10 @@ In 0.3.2 kamen vier Korrekturen am Request-Lebenszyklus dazu: Restbedarf berück
 Mengen, der Tooltip-Crash des Network Link Tuners, und zwei entfernte Eingriffe in fremde
 Kurier-Tasks (Force-Finish und Ongoing-Marker).
 
+0.3.3 gibt den Abschluss von Parent-Requests an MineColonies zurück. Fertige Lieferungs-Childs
+werden nicht mehr abgekoppelt, `resolveRequest` schließt nur bei vollständig geliefertem Bedarf, und
+der Pending-Tracker verliert seinen Zustand nicht mehr fünf Minuten nach dem Anlegen.
+
 ### Offen für 1.0
 
 - `finalizeOrphanDeliveryChild` und `CreateShopDeliveryChildRecoveryService` greifen weiterhin in

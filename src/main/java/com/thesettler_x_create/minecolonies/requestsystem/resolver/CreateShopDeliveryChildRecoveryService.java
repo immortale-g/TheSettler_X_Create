@@ -72,7 +72,6 @@ final class CreateShopDeliveryChildRecoveryService {
     } catch (Exception ignored) {
       // Best effort.
     }
-    resolver.clearDeliveriesCreated(parentRequest.getId());
     int currentPending = resolver.getPendingTracker().getPendingCount(parentRequest.getId());
     requestStateMutatorService.openDeliveryWindow(
         resolver, level, parentRequest.getId(), childToken, Math.max(currentPending, childCount));

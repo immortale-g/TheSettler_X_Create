@@ -100,8 +100,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.flowTimeoutCleanupService =
         new CreateShopFlowTimeoutCleanupService(requestStateMutatorService);
     this.deliveryCompletionService =
-        new CreateShopDeliveryCompletionService(
-            requestStateMutatorService, deliveryManager, diagnostics, recheck);
+        new CreateShopDeliveryCompletionService(deliveryManager, diagnostics, recheck);
     this.pendingStateDecisionService =
         new CreateShopPendingStateDecisionService(
             requestStateMutatorService,
@@ -138,15 +137,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             flowStateMachine);
     this.terminalRequestLifecycleService =
         new CreateShopTerminalRequestLifecycleService(
-            requestStateMutatorService, cooldown, diagnostics);
+            requestStateMutatorService, outstandingNeededService, diagnostics);
     this.pendingTopupService =
         new CreateShopPendingTopupService(
-            lifecycleStateStore.getPendingTracker(),
-            diagnostics,
-            flowStateMachine,
-            stockResolver,
-            messaging,
-            requestStateMutatorService);
+            diagnostics, flowStateMachine, stockResolver, messaging, requestStateMutatorService);
     this.pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
@@ -167,8 +161,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingDeliveryCreationService,
             postCreationUpdateService,
             diagnostics,
-            requestStateMutatorService,
-            outstandingNeededService);
+            requestStateMutatorService);
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,
@@ -366,18 +359,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     }
   }
 
-  boolean hasDeliveriesCreated(IToken<?> token) {
-    return lifecycleStateStore.getPendingTracker().isDeliveryCreated(token);
-  }
-
-  void markDeliveriesCreated(IToken<?> token) {
-    lifecycleStateStore.getPendingTracker().markDeliveryCreated(token);
-  }
-
-  void clearDeliveriesCreated(IToken<?> token) {
-    lifecycleStateStore.getPendingTracker().clearDeliveryCreated(token);
-  }
-
   String tryDescribeResolver(Object resolver) {
     return resolver == null ? "<none>" : resolver.getClass().getSimpleName();
   }
@@ -513,25 +494,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return terminalRequestLifecycleService;
   }
 
-  void markParentChildCompletedSeen(IToken<?> parentToken, long tick) {
-    if (parentToken == null) {
-      return;
-    }
-    lifecycleStateStore.getParentChildCompletedSeenAt().put(parentToken, tick);
-  }
-
-  public boolean hasParentChildCompletedSeen(IToken<?> parentToken) {
-    return parentToken != null
-        && lifecycleStateStore.getParentChildCompletedSeenAt().containsKey(parentToken);
-  }
-
-  void clearParentChildCompletedSeen(IToken<?> parentToken) {
-    if (parentToken == null) {
-      return;
-    }
-    lifecycleStateStore.getParentChildCompletedSeenAt().remove(parentToken);
-  }
-
   void clearMissingChildSince(IToken<?> childToken) {
     lifecycleStateStore.getMissingChildSince().remove(childToken);
   }
@@ -640,10 +602,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   void touchFlow(IToken<?> requestToken, long nowTick, String detail) {
     flowStateMachine.touch(requestToken, nowTick, detail);
-  }
-
-  void resolveViaWarehouse(IRequestManager manager, IRequest<? extends IDeliverable> request) {
-    super.resolveRequest(manager, request);
   }
 
   Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> getDeliveryChildLedger() {

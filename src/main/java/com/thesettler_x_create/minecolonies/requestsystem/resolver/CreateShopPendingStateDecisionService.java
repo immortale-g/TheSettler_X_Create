@@ -36,13 +36,6 @@ final class CreateShopPendingStateDecisionService {
     int trackedPending = Math.max(0, resolver.getPendingTracker().getPendingCount(request.getId()));
     int derivedPending = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     int pendingCount = Math.max(0, Math.max(reservedForRequest, derivedPending));
-    boolean inflightWindow =
-        request.hasChildren()
-            || resolver.hasDeliveriesCreated(request.getId())
-            || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-    if (inflightWindow && pendingCount > 0) {
-      pendingCount = Math.max(1, Math.max(trackedPending, pendingCount));
-    }
     if (pendingCount != trackedPending) {
       requestStateMutatorService.markOrderedWithPending(
           resolver, null, request.getId(), pendingCount);
@@ -72,11 +65,7 @@ final class CreateShopPendingStateDecisionService {
     }
     if (pendingCount <= 0) {
       boolean parentTerminal = CreateShopRequestResolver.isTerminalRequestState(request.getState());
-      boolean deliveryWindowOpen =
-          request.hasChildren()
-              || resolver.hasDeliveriesCreated(request.getId())
-              || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
-      if (onCooldown && parentTerminal && !deliveryWindowOpen) {
+      if (onCooldown && parentTerminal && !request.hasChildren()) {
         requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
         diagnostics.logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
         if (Config.DEBUG_LOGGING.getAsBoolean()) {

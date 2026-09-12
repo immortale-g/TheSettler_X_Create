@@ -16,6 +16,6 @@ class CreateShopRequestResolverStaleCooldownRecoveryGuardTest {
 
     assertTrue(source.contains("recover:stale-cooldown-no-pending"));
     assertTrue(source.contains("cleared stale cooldown (no pending/no children)"));
-    assertTrue(source.contains("if (onCooldown && parentTerminal && !deliveryWindowOpen)"));
+    assertTrue(source.contains("if (onCooldown && parentTerminal && !request.hasChildren())"));
   }
 }

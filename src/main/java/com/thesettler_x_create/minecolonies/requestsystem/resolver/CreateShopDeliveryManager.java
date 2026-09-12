@@ -104,7 +104,7 @@ final class CreateShopDeliveryManager {
         // Do not fail delivery creation for debug output.
       }
     }
-    if (resolver.hasDeliveriesCreated(request.getId())) {
+    if (request.hasChildren()) {
       return Lists.newArrayList();
     }
     Delivery delivery =
@@ -179,7 +179,7 @@ final class CreateShopDeliveryManager {
       return Lists.newArrayList();
     }
     request.addDelivery(selected.copy());
-    resolver.markDeliveriesCreated(request.getId());
+    resolver.getPendingTracker().markDeliveryStarted(request.getId());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       String key = token.toString();
       if (resolver.markDeliveryCreateLogged(key)) {

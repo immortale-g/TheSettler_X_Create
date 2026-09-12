@@ -34,9 +34,7 @@ final class CreateShopPendingRequestGateService {
     if (!ownership.isRequestOwnedByLocalResolver(standardManager, request)) {
       boolean terminal = CreateShopRequestResolver.isTerminalRequestState(request.getState());
       boolean activeDeliveryWindow =
-          request.hasChildren()
-              || resolver.hasDeliveriesCreated(request.getId())
-              || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
+          request.hasChildren() || resolver.getPendingTracker().hasDeliveryStarted(request.getId());
       if (!terminal && activeDeliveryWindow) {
         String ownershipSnapshot = buildOwnershipSnapshot(standardManager, request);
         boolean reassigned = tryReassignFromRetryingOwner(standardManager, request);

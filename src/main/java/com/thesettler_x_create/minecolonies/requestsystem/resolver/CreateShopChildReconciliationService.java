@@ -99,10 +99,6 @@ final class CreateShopChildReconciliationService {
             if (terminalChild) {
               request.removeChild(childToken);
               requestStateMutatorService.clearMissingChild(resolver, childToken);
-              requestStateMutatorService.completeDeliveryWindow(
-                  resolver, request.getId(), childToken);
-              resolver.markParentChildCompletedSeen(
-                  request.getId(), level == null ? 0L : level.getGameTime());
               continue;
             }
             if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
@@ -282,25 +278,23 @@ final class CreateShopChildReconciliationService {
       }
     }
     parentRequest.removeChild(childToken);
-    resolver.markParentChildCompletedSeen(parentRequest.getId(), level.getGameTime());
     resolver.observeDeliveryChildCallbackTerminal(
         level, parentRequest.getId(), childToken, "immediate-missing-after-pickup");
     requestStateMutatorService.finalizeOrphanDeliveryChild(
         resolver, standardManager, childToken, "immediate-missing-after-pickup");
-    requestStateMutatorService.completeDeliveryWindow(resolver, parentRequest.getId(), childToken);
-    try {
-      standardManager.updateRequestState(parentRequest.getId(), RequestState.RESOLVED);
-    } catch (Exception ignored) {
-      // Best effort; local state cleanup still prevents resolver-side reorders.
-    }
-    requestStateMutatorService.clearPendingTokenState(
-        resolver, standardManager, parentRequest.getId(), true);
+    // The vanished child never triggers MineColonies' resolveRequest, so run the same check here.
+    boolean finished =
+        resolver
+            .getTerminalRequestLifecycleService()
+            .finishIfDelivered(
+                resolver, standardManager, parentRequest, "immediate-missing-after-pickup");
     if (resolver.isDebugLoggingEnabled()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] tickPending: {} immediate recovery (missing+pickupConfirmed) parent={} child={} -> resolved",
+          "[CreateShop] tickPending: {} immediate recovery (missing+pickupConfirmed) parent={} child={} finished={}",
           requestIdLog,
           parentRequest.getId(),
-          childToken);
+          childToken,
+          finished);
     }
     return true;
   }
