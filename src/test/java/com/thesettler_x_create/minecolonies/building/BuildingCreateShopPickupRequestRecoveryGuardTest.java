@@ -15,6 +15,7 @@ class BuildingCreateShopPickupRequestRecoveryGuardTest {
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
     assertTrue(source.contains("public boolean createPickupRequest(int pickupPriority)"));
+    assertTrue(source.contains("public boolean createPickupRequest(int quantity, boolean force)"));
     assertTrue(source.contains("getOpenRequestsByRequestableType().get(TypeConstants.PICKUP)"));
     assertTrue(source.contains("if (!(request.getRequest() instanceof Pickup))"));
     assertTrue(source.contains("super.onRequestedRequestCancelled(standard, request);"));
@@ -24,6 +25,8 @@ class BuildingCreateShopPickupRequestRecoveryGuardTest {
     assertTrue(source.contains("resolver instanceof PickupRequestResolver"));
     assertTrue(source.contains("pruneStalePickupRequestToken(token, \"lookup-failed\")"));
     assertTrue(source.contains("pruneStalePickupRequestToken(token, \"missing-request\")"));
-    assertTrue(source.contains("return super.createPickupRequest(pickupPriority);"));
+    assertTrue(source.contains("private boolean hasActivePickupRequestAfterRepair()"));
+    assertTrue(source.contains(".invokeExact(this, pickupPriority);"));
+    assertTrue(source.contains(".invokeExact(this, quantity, force);"));
   }
 }

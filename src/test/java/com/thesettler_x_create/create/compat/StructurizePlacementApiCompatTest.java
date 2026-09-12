@@ -43,17 +43,36 @@ class StructurizePlacementApiCompatTest {
   }
 
   @Test
-  void legacyStructurizeCanUseTheBeltHandler() {
+  void legacyStructurizeCanUseTheBeltHandler() throws Exception {
     assumeFalse(modernRun());
     IPlacementHandler handler = new CreateBeltPlacementHandler();
     Level level = mock(Level.class);
-    // Without tile entity data both paths return before touching the state, so no bootstrap needed.
-    BlockState state = null;
+    // Called reflectively through the interface so this test also compiles when the latest compat
+    // check puts a modern Structurize on the classpath.
+    Method requiredItems =
+        IPlacementHandler.class.getMethod(
+            "getRequiredItems",
+            Level.class,
+            BlockPos.class,
+            BlockState.class,
+            net.minecraft.nbt.CompoundTag.class,
+            boolean.class);
+    Method handle =
+        IPlacementHandler.class.getMethod(
+            "handle",
+            Level.class,
+            BlockPos.class,
+            BlockState.class,
+            net.minecraft.nbt.CompoundTag.class,
+            boolean.class,
+            BlockPos.class,
+            com.ldtteam.structurize.api.RotationMirror.class);
 
-    assertEquals(List.of(), handler.getRequiredItems(level, BlockPos.ZERO, state, null, false));
+    // Without tile entity data both paths return before touching the state, so no bootstrap needed.
+    assertEquals(List.of(), requiredItems.invoke(handler, level, BlockPos.ZERO, null, null, false));
     assertEquals(
         IPlacementHandler.ActionProcessingResult.DENY,
-        handler.handle(level, BlockPos.ZERO, state, null, false, BlockPos.ZERO, null));
+        handle.invoke(handler, level, BlockPos.ZERO, null, null, false, BlockPos.ZERO, null));
   }
 
   @Test

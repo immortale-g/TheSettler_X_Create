@@ -25,6 +25,9 @@ Kurier-Tasks (Force-Finish und Ongoing-Marker).
 0.3.3 gibt den Abschluss von Parent-Requests an MineColonies zurück. Fertige Lieferungs-Childs
 werden nicht mehr abgekoppelt, `resolveRequest` schließt nur bei vollständig geliefertem Bedarf, und
 der Pending-Tracker verliert seinen Zustand nicht mehr fünf Minuten nach dem Anlegen.
+Außerdem läuft 0.3.3 mit alten und neuen Structurize-Placement-Handlern (ab 1.0.808) und mit der
+geänderten Pickup-API von MineColonies 1.1.1368. Die Abhängigkeiten sind fest über Maven gepinnt, ein
+täglicher Workflow testet gegen die neuesten Releases.
 
 ### Offen für 1.0
 

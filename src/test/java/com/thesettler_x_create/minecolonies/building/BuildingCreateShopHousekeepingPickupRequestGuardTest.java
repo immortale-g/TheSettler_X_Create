@@ -30,6 +30,8 @@ class BuildingCreateShopHousekeepingPickupRequestGuardTest {
             "Math.max(pickupPriority, AbstractDeliverymanRequestable.getPlayerActionPriority(false))"));
     assertTrue(buildingSource.contains("return createPickupRequest(effectivePriority);"));
     assertTrue(
+        buildingSource.contains("return createPickupRequest(NATIVE_HUT_PICKUP_QUANTITY, true);"));
+    assertTrue(
         orchestratorSource.contains(
             "housekeeping pickup request priority={} created={} hutHasItems={}"));
     assertTrue(buildingSource.contains("source is the building requester's hut"));
