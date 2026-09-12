@@ -167,7 +167,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingDeliveryCreationService,
             postCreationUpdateService,
             diagnostics,
-            requestStateMutatorService);
+            requestStateMutatorService,
+            outstandingNeededService);
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,
