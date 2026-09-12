@@ -98,7 +98,7 @@ Example mod description.
 [[dependencies.${mod_id}]]
     modId="minecolonies"
     type="required"
-    versionRange="1.1.1264-1.21.1-snapshot"
+    versionRange="[1.1.1264-1.21.1-snapshot,)"
     ordering="NONE"
     side="BOTH"
 
