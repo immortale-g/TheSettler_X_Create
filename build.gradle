@@ -105,7 +105,12 @@ dependencies {
     // Flywheel API — needed to compile against Create's API classes that expose Flywheel types
     compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-1.21.1:1.0.6"
     // Load local mod jars from ./libs for runtime and compile classpath.
-    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+    // Structurize is the exception: 1.0.808 replaced the IPlacementHandler signatures with
+    // IPlacementContext variants. Our placement handlers implement both, so they are compiled
+    // against the newer API from ./libs/compile (not loaded at runtime), while the dev client and
+    // the tests keep running the older Structurize from ./libs and exercise the legacy path.
+    compileOnly fileTree(dir: 'libs', include: ['*.jar'], exclude: ['structurize-*.jar'])
+    compileOnly fileTree(dir: 'libs/compile', include: ['structurize-*.jar'])
     testImplementation fileTree(dir: 'libs', include: ['*.jar'])
     localRuntime fileTree(dir: 'libs', include: ['*.jar'])
 
@@ -247,6 +252,24 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+}
+
+// The regular test run uses the older Structurize from ./libs (legacy placement API). This run swaps
+// in the newer one from ./libs/compile so the IPlacementContext path is exercised as well.
+def modernStructurizeJars = fileTree(dir: 'libs/compile', include: ['structurize-*.jar'])
+tasks.register('testModernStructurize', Test) {
+    description = 'Runs the Structurize placement compat tests against the IPlacementContext API.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = files(modernStructurizeJars) +
+            sourceSets.test.runtimeClasspath.filter { !it.name.startsWith('structurize-') }
+    filter {
+        includeTestsMatching 'com.thesettler_x_create.create.compat.StructurizePlacementApiCompatTest'
+    }
+    systemProperty 'thesettler.structurizeApi', 'modern'
+}
+tasks.named('check') {
+    dependsOn 'testModernStructurize'
 }
 
 spotless {

@@ -1,5 +1,6 @@
 package com.thesettler_x_create.create.compat;
 
+import com.ldtteam.structurize.placement.IPlacementContext;
 import com.ldtteam.structurize.placement.handlers.placement.PlacementHandlers;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,10 @@ import org.jetbrains.annotations.Nullable;
  * maps each composite block id to the real item that actually builds it; placement mechanics (a
  * plain block+NBT set) are otherwise unaffected, so placement itself is delegated to Structurize's
  * own {@link PlacementHandlers.GeneralBlockPlacementHandler}.
+ *
+ * <p>Structurize 1.0.808 replaced the placement signatures with {@link IPlacementContext} variants,
+ * so the required-item override exists in both forms; each Structurize version only calls the one
+ * its own interface declares.
  */
 public class CompositeBlockItemRemapHandler extends PlacementHandlers.GeneralBlockPlacementHandler {
   private final Map<ResourceLocation, ResourceLocation> blockIdToRequiredItemId;
@@ -37,13 +42,29 @@ public class CompositeBlockItemRemapHandler extends PlacementHandlers.GeneralBlo
         BuiltInRegistries.BLOCK.getKey(blockState.getBlock()));
   }
 
+  // Structurize 1.0.808 and newer.
   @Override
   public List<ItemStack> getRequiredItems(
       Level level,
       BlockPos blockPos,
       BlockState blockState,
       @Nullable CompoundTag tileEntityData,
+      IPlacementContext placementContext) {
+    return requiredItems(blockState);
+  }
+
+  // Structurize 1.0.807 and older. Not an override when compiling against the newer API, but it is
+  // the method older Structurize versions call. Keep the signature exact.
+  public List<ItemStack> getRequiredItems(
+      Level level,
+      BlockPos blockPos,
+      BlockState blockState,
+      @Nullable CompoundTag tileEntityData,
       boolean complete) {
+    return requiredItems(blockState);
+  }
+
+  private List<ItemStack> requiredItems(BlockState blockState) {
     ResourceLocation itemId =
         blockIdToRequiredItemId.get(BuiltInRegistries.BLOCK.getKey(blockState.getBlock()));
     if (itemId == null) {
