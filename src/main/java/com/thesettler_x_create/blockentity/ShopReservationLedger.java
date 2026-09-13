@@ -19,10 +19,13 @@ import net.minecraft.world.item.ItemStack;
  */
 class ShopReservationLedger {
   private static final String TAG_RESERVATIONS = "Reservations";
-  private static final long RESERVATION_TTL = 20L * 60L * 5L;
 
   private final CreateShopBlockEntity owner;
   private final Map<UUID, Reservation> reservations = new HashMap<>();
+
+  // Saved expiry times can be older than the saved game time (the chunk is not re-saved on every
+  // refresh), so loaded reservations get a fresh TTL once the level is available.
+  private boolean rebaseLoadedReservationExpiry;
 
   ShopReservationLedger(CreateShopBlockEntity owner) {
     this.owner = owner;
@@ -62,6 +65,38 @@ class ShopReservationLedger {
     if (reservations.remove(requestId) != null) {
       owner.setChanged();
     }
+  }
+
+  /**
+   * Keeps the reservations of still-active requests from expiring. Called every resolver tick with
+   * the ids of requests that are known to be alive; everything else keeps its normal expiry.
+   *
+   * @return number of reservations whose expiry was extended
+   */
+  int refreshReservations(java.util.Set<UUID> activeRequestIds) {
+    if (!owner.ensureServerThread("refreshReservations")) {
+      return 0;
+    }
+    rebaseLoadedReservationExpiryIfNeeded();
+    if (activeRequestIds == null || activeRequestIds.isEmpty() || reservations.isEmpty()) {
+      return 0;
+    }
+    long now = owner.getGameTimeSafe();
+    int refreshed = 0;
+    for (Reservation reservation : reservations.values()) {
+      if (!activeRequestIds.contains(reservation.requestId)) {
+        continue;
+      }
+      long expires = ReservationExpiryPolicy.keepAliveExpiry(reservation.expiresAtGameTime, now);
+      if (expires != reservation.expiresAtGameTime) {
+        reservation.expiresAtGameTime = expires;
+        refreshed++;
+      }
+    }
+    if (refreshed > 0) {
+      owner.setChanged();
+    }
+    return refreshed;
   }
 
   /** Returns total reserved count for a stack key. */
@@ -173,6 +208,7 @@ class ShopReservationLedger {
         // Ignore malformed reservation keys.
       }
     }
+    rebaseLoadedReservationExpiry = !reservations.isEmpty();
   }
 
   void save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
@@ -192,18 +228,31 @@ class ShopReservationLedger {
     if (!owner.ensureServerThread("cleanExpired")) {
       return;
     }
+    rebaseLoadedReservationExpiryIfNeeded();
     long now = owner.getGameTimeSafe();
     Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
     while (iterator.hasNext()) {
       Reservation reservation = iterator.next().getValue();
-      if (reservation.expiresAtGameTime <= now) {
+      if (ReservationExpiryPolicy.isExpired(reservation.expiresAtGameTime, now)) {
         iterator.remove();
       }
     }
   }
 
+  private void rebaseLoadedReservationExpiryIfNeeded() {
+    if (!rebaseLoadedReservationExpiry || !owner.hasLevel()) {
+      return;
+    }
+    rebaseLoadedReservationExpiry = false;
+    long now = owner.getGameTimeSafe();
+    for (Reservation reservation : reservations.values()) {
+      reservation.expiresAtGameTime =
+          ReservationExpiryPolicy.loadedExpiry(reservation.expiresAtGameTime, now);
+    }
+  }
+
   private long getExpireTime() {
-    return owner.getGameTimeSafe() + RESERVATION_TTL;
+    return ReservationExpiryPolicy.newExpiry(owner.getGameTimeSafe());
   }
 
   private static boolean matches(ItemStack a, ItemStack b) {

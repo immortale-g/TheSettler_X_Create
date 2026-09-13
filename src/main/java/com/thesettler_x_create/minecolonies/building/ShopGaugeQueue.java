@@ -241,6 +241,18 @@ final class ShopGaugeQueue {
     }
   }
 
+  /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
+  java.util.Set<java.util.UUID> getGaugeReservationRequestIds() {
+    java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+    for (GaugePackagingTask task : gaugePackagingQueue) {
+      ids.add(task.requestId());
+    }
+    for (GaugePackagingTask task : pendingGaugeRequests.values()) {
+      ids.add(task.requestId());
+    }
+    return ids;
+  }
+
   boolean hasGaugeTask() {
     return !gaugePackagingQueue.isEmpty();
   }

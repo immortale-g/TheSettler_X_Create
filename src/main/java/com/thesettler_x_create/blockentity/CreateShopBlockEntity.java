@@ -64,6 +64,16 @@ public class CreateShopBlockEntity extends BlockEntity {
     reservationLedger.release(requestId);
   }
 
+  /**
+   * Keeps the reservations of still-active requests from expiring. Called every resolver tick with
+   * the ids of requests that are known to be alive; everything else keeps its normal expiry.
+   *
+   * @return number of reservations whose expiry was extended
+   */
+  public int refreshReservations(java.util.Set<UUID> activeRequestIds) {
+    return reservationLedger.refreshReservations(activeRequestIds);
+  }
+
   /** Returns total reserved count for a stack key. */
   public int getReservedFor(ItemStack key) {
     return reservationLedger.getReservedFor(key);

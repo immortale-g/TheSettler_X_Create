@@ -29,6 +29,10 @@ Außerdem läuft 0.3.3 mit alten und neuen Structurize-Placement-Handlern (ab 1.
 geänderten Pickup-API von MineColonies 1.1.1368. Die Abhängigkeiten sind fest über Maven gepinnt, ein
 täglicher Workflow testet gegen die neuesten Releases.
 
+0.3.4 hält Pickup-Reservierungen am Leben, solange ihr Request offen ist. Vorher verfielen sie fest
+nach fünf Minuten. Große Requests, die stackweise ausgeliefert werden, bestellten den Rest dann
+erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen eine frische Frist.
+
 ### Offen für 1.0
 
 - `finalizeOrphanDeliveryChild` und `CreateShopDeliveryChildRecoveryService` greifen weiterhin in
