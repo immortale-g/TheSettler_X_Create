@@ -31,8 +31,30 @@ public class CreateShopBlockEntity extends BlockEntity {
   private static final String TAG_SHOP_POS = "ShopPos";
 
   private final IItemHandler itemHandler = new VirtualCreateNetworkItemHandler(this);
+  private final LedgerHost ledgerHost =
+      new LedgerHost() {
+        @Override
+        public boolean ensureServerThread(String action) {
+          return CreateShopBlockEntity.this.ensureServerThread(action);
+        }
+
+        @Override
+        public long gameTime() {
+          return getGameTimeSafe();
+        }
+
+        @Override
+        public boolean hasLevel() {
+          return CreateShopBlockEntity.this.hasLevel();
+        }
+
+        @Override
+        public void markChanged() {
+          setChanged();
+        }
+      };
   private final ShopReservationLedger reservationLedger = new ShopReservationLedger(this);
-  private final ShopInflightLedger inflightLedger = new ShopInflightLedger(this);
+  private final ShopInflightLedger inflightLedger = new ShopInflightLedger(ledgerHost);
   private BlockPos shopPos;
 
   public CreateShopBlockEntity(BlockPos pos, BlockState state) {
