@@ -1,5 +1,8 @@
 package com.thesettler_x_create.stock;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Stock arithmetic of the Create Shop in one place: how much is free in the racks, what can still
  * be reserved, how much has to be ordered from the Create network.
@@ -68,6 +71,22 @@ public final class ShopStockAccounting {
   /** Stock left after reservations. */
   public static int unreservedStock(int stock, int reserved) {
     return Math.max(0, stock - reserved);
+  }
+
+  /**
+   * Splits an amount into delivery sizes of at most one stack each, the way MineColonies' warehouse
+   * hands out one delivery per stack. A delivery stack larger than the item's stack size would not
+   * survive being saved.
+   *
+   * @return the chunk sizes in order; empty when there is nothing to deliver
+   */
+  public static List<Integer> deliveryChunks(int amount, int maxStackSize) {
+    List<Integer> chunks = new ArrayList<>();
+    int perChunk = Math.max(1, maxStackSize);
+    for (int remaining = amount; remaining > 0; remaining -= perChunk) {
+      chunks.add(Math.min(remaining, perChunk));
+    }
+    return chunks;
   }
 
   /**

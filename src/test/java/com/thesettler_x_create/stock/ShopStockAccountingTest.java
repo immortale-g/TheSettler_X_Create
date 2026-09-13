@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ShopStockAccountingTest {
@@ -72,6 +73,17 @@ class ShopStockAccountingTest {
   void unreservedStockNeverGoesNegative() {
     assertEquals(24, ShopStockAccounting.unreservedStock(64, 40));
     assertEquals(0, ShopStockAccounting.unreservedStock(32, 40));
+  }
+
+  @Test
+  void deliveryChunksAreAtMostOneStackEach() {
+    assertEquals(List.of(64, 64, 64, 64), ShopStockAccounting.deliveryChunks(256, 64));
+    assertEquals(List.of(64, 36), ShopStockAccounting.deliveryChunks(100, 64));
+    assertEquals(List.of(16, 16, 1), ShopStockAccounting.deliveryChunks(33, 16));
+    assertEquals(List.of(1, 1), ShopStockAccounting.deliveryChunks(2, 1));
+    assertEquals(List.of(), ShopStockAccounting.deliveryChunks(0, 64));
+    // A broken stack size must not loop forever.
+    assertEquals(List.of(1, 1, 1), ShopStockAccounting.deliveryChunks(3, 0));
   }
 
   @Test

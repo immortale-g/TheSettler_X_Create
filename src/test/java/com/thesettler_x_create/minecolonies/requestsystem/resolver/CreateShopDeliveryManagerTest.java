@@ -46,16 +46,44 @@ class CreateShopDeliveryManagerTest {
     assertFalse(CreateShopDeliveryManager.isSelfLoopDeliveryTarget(pickupLevel, startPos, null));
   }
 
+  /**
+   * All deliveries of a request start at the shop hut and are created in one go. Rack positions as
+   * start split one request into one courier trip per rack, and a single child per request made
+   * large orders run one stack after the other.
+   */
   @Test
-  void deliveryCreationPrefersRackPositionAsStartLocationForNormalShopDeliveries()
-      throws Exception {
+  void deliveryCreationStartsAtTheHutAndCreatesEveryPlannedStack() throws Exception {
     String source =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryManager.java"));
 
-    assertTrue(source.contains("BlockPos startPos = pickup.getBlockPos();"));
-    assertTrue(source.contains("if (entry.getB() != null) {"));
-    assertTrue(source.contains("startPos = entry.getB();"));
+    assertTrue(source.contains("BlockPos startPos = shop.getLocation().getInDimensionLocation();"));
+    assertTrue(source.contains("CreateShopDeliveryPlanner.toDeliveryStacks(stacks)"));
+    assertTrue(source.contains("for (ItemStack deliveryStack : deliveryStacks) {"));
+    assertFalse(source.contains("startPos = entry.getB();"));
+    assertFalse(source.contains("if (request.hasChildren()) {"));
+  }
+
+  /** The callers skip requests with open children, which is why the manager no longer checks. */
+  @Test
+  void callersOnlyPlanDeliveriesForRequestsWithoutOpenChildren() throws Exception {
+    String attemptResolve =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopAttemptResolveService.java"));
+    String pendingProcessor =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopPendingRequestProcessorService.java"));
+
+    int attemptGuard = attemptResolve.indexOf("if (request.hasChildren()) {");
+    int attemptCreate = attemptResolve.indexOf("deliveryManager.createDeliveriesFromStacks(");
+    assertTrue(attemptGuard >= 0 && attemptGuard < attemptCreate);
+
+    int pendingGuard =
+        pendingProcessor.indexOf("if (childResult.hasActiveChildren() || request.hasChildren()) {");
+    int pendingCreate = pendingProcessor.indexOf("pendingDeliveryCreationService.process(");
+    assertTrue(pendingGuard >= 0 && pendingGuard < pendingCreate);
   }
 }

@@ -23,6 +23,7 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.requesters.CreateShopDeliveryRequester;
+import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
 
 /** Delivery creation and courier enqueue helpers for Create Shop resolver. */
 final class CreateShopDeliveryManager {
@@ -40,43 +42,36 @@ final class CreateShopDeliveryManager {
     this.resolver = resolver;
   }
 
+  /**
+   * Creates one delivery child per planned stack, all at once, the way MineColonies' warehouse
+   * does.
+   *
+   * <p>Every delivery starts at the shop hut instead of the rack a stack happens to lie in. The
+   * courier then takes the items out of the hut's combined rack inventory, and MineColonies gathers
+   * all deliveries with the same start and target in one trip. Since MineColonies 1.1.1368 a
+   * courier collects every delivery to one target but only gathers the ones sharing a start, so
+   * rack positions would turn into one trip per rack. Callers only plan stock that is not covered
+   * by an open child yet.
+   *
+   * @return the created delivery tokens; creation stops at the first delivery that fails
+   */
   List<IToken<?>> createDeliveriesFromStacks(
       IRequestManager manager,
       IRequest<?> request,
       List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> stacks,
       CreateShopBlockEntity pickup) {
-    if (manager == null || pickup == null || stacks == null) {
+    if (manager == null || request == null || pickup == null || stacks == null) {
       return Lists.newArrayList();
     }
-    BlockPos startPos = pickup.getBlockPos();
-    ItemStack selected = null;
-    for (var entry : stacks) {
-      if (entry == null) {
-        continue;
-      }
-      ItemStack stack = entry.getA();
-      if (stack.isEmpty()) {
-        continue;
-      }
-      selected = stack.copy();
-      if (entry.getB() != null) {
-        startPos = entry.getB();
-      }
-      break;
-    }
-    if (selected == null) {
-      return Lists.newArrayList();
-    }
-    var factory = manager.getFactoryController();
+    List<ItemStack> deliveryStacks = CreateShopDeliveryPlanner.toDeliveryStacks(stacks);
     Level pickupLevel = pickup.getLevel();
-    if (pickupLevel == null) {
-      return Lists.newArrayList();
-    }
+    BuildingCreateShop shop = resolver.getShop(manager);
     var requester = request.getRequester();
     ILocation targetLocation = requester == null ? null : requester.getLocation();
-    if (targetLocation == null) {
+    if (deliveryStacks.isEmpty() || pickupLevel == null || shop == null || targetLocation == null) {
       return Lists.newArrayList();
     }
+    BlockPos startPos = shop.getLocation().getInDimensionLocation();
     if (isSelfLoopDeliveryTarget(pickupLevel, startPos, targetLocation)) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(
@@ -88,7 +83,9 @@ final class CreateShopDeliveryManager {
       return Lists.newArrayList();
     }
     ILocation pickupLocation =
-        factory.getNewInstance(TypeConstants.ILOCATION, startPos, pickupLevel.dimension());
+        manager
+            .getFactoryController()
+            .getNewInstance(TypeConstants.ILOCATION, startPos, pickupLevel.dimension());
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       try {
         var targetPos = targetLocation.getInDimensionLocation();
@@ -104,9 +101,37 @@ final class CreateShopDeliveryManager {
         // Do not fail delivery creation for debug output.
       }
     }
-    if (request.hasChildren()) {
-      return Lists.newArrayList();
+    List<IToken<?>> created = Lists.newArrayList();
+    for (ItemStack deliveryStack : deliveryStacks) {
+      IToken<?> token =
+          createLinkedDelivery(
+              manager, request, pickupLocation, targetLocation, deliveryStack, pickup, pickupLevel);
+      if (token == null) {
+        // Keep what was already handed out; the remaining stock is planned again on a later tick
+        // once MineColonies resolves or cancels the open children.
+        break;
+      }
+      created.add(token);
     }
+    return created;
+  }
+
+  /**
+   * Creates, links and dispatches one delivery child of {@code request}.
+   *
+   * @return the delivery token, or {@code null} when it could not be created or linked
+   */
+  @Nullable
+  private IToken<?> createLinkedDelivery(
+      IRequestManager manager,
+      IRequest<?> request,
+      ILocation pickupLocation,
+      ILocation targetLocation,
+      ItemStack selected,
+      CreateShopBlockEntity pickup,
+      Level pickupLevel) {
+    BlockPos startPos = pickupLocation.getInDimensionLocation();
+    var requester = request.getRequester();
     Delivery delivery =
         new Delivery(
             pickupLocation,
@@ -125,7 +150,7 @@ final class CreateShopDeliveryManager {
             requester == null ? "<null>" : requester.getClass().getName(),
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
-      return Lists.newArrayList();
+      return null;
     }
     try {
       boolean alreadyLinked = request.getChildren().contains(token);
@@ -176,7 +201,7 @@ final class CreateShopDeliveryManager {
             token,
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
-      return Lists.newArrayList();
+      return null;
     }
     request.addDelivery(selected.copy());
     resolver.getPendingTracker().markDeliveryStarted(request.getId());
@@ -263,7 +288,7 @@ final class CreateShopDeliveryManager {
       }
     }
     nudgeDeliverymen(manager, token);
-    return Lists.newArrayList(token);
+    return token;
   }
 
   boolean assignDeliveryRequest(IRequestManager manager, IToken<?> token) {
@@ -402,6 +427,9 @@ final class CreateShopDeliveryManager {
       handler = shopPickup.getItemHandler(null);
     } else if (pickupEntity instanceof AbstractTileEntityRack rack) {
       handler = rack.getItemHandlerCap();
+    } else if (pickupEntity instanceof TileEntityCreateShop hut) {
+      // Deliveries start at the hut; couriers read its combined rack inventory.
+      handler = hut.getItemHandlerCap((net.minecraft.core.Direction) null);
     }
     int slots = handler == null ? -1 : handler.getSlots();
     int matchSlot = -1;

@@ -13,7 +13,6 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
  * Handles delivery completion reconciliation and reservation consumption for Create Shop requests.
@@ -74,19 +73,8 @@ final class CreateShopDeliveryCompletionService {
         if (shop != null) {
           pickup = shop.getPickupBlockEntity();
         }
-        level =
-            manager == null || manager.getColony() == null ? null : manager.getColony().getWorld();
         ILocation start = delivery.getStart();
         BlockPos startPos = start == null ? null : start.getInDimensionLocation();
-        if (pickup == null
-            && level != null
-            && startPos != null
-            && com.minecolonies.api.util.WorldUtil.isBlockLoaded(level, startPos)) {
-          BlockEntity startEntity = level.getBlockEntity(startPos);
-          if (startEntity instanceof CreateShopBlockEntity shopPickup) {
-            pickup = shopPickup;
-          }
-        }
         if (pickup != null
             && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(
                 delivery, shop, pickup)) {

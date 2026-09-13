@@ -1,6 +1,5 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
-import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
@@ -13,7 +12,6 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** Handles delivery-cancel callbacks and parent requeue reconciliation for Create Shop requests. */
 final class CreateShopDeliveryCancelService {
@@ -62,16 +60,6 @@ final class CreateShopDeliveryCancelService {
 
     BuildingCreateShop shop = resolver.getShop(manager);
     CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
-    if (pickup == null) {
-      ILocation start = delivery.getStart();
-      BlockPos startPos = start == null ? null : start.getInDimensionLocation();
-      if (startPos != null) {
-        BlockEntity entity = level.getBlockEntity(startPos);
-        if (entity instanceof CreateShopBlockEntity shopPickup) {
-          pickup = shopPickup;
-        }
-      }
-    }
     if (pickup == null) {
       int fallbackPending = Math.max(1, stack.getCount());
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
