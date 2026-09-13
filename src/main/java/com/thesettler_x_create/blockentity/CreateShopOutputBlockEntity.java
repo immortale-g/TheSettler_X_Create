@@ -182,6 +182,9 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
         rollBack(pulls);
         return ItemStack.EMPTY;
       }
+      if (!simulate) {
+        shop.noteRackStockChange(extracted, -extracted.getCount());
+      }
       return extracted;
     }
 
