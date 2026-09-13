@@ -241,7 +241,7 @@ final class CreateShopDeliveryLifecycleLedgerService {
               }
               IRequest<?> currentTask;
               try {
-                currentTask = job.getCurrentTask();
+                currentTask = CreateShopCourierTasks.peekCurrentTask(manager, job);
               } catch (Exception ignored) {
                 currentTask = null;
               }
