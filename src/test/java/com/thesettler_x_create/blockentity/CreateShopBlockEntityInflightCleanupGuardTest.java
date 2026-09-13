@@ -15,7 +15,7 @@ class CreateShopBlockEntityInflightCleanupGuardTest {
 
     assertTrue(source.contains("MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE = 2"));
     assertTrue(source.contains("compactInflightEntriesForPromptStability()"));
-    assertTrue(source.contains("setChanged();"));
+    assertTrue(source.contains("host.markChanged();"));
     assertTrue(source.contains("changed = true;"));
   }
 }
