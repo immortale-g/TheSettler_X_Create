@@ -4,12 +4,14 @@ import com.google.common.collect.ImmutableCollection;
 import com.minecolonies.api.blocks.AbstractBlockMinecoloniesRack;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.jobs.registry.JobEntry;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.AbstractDeliverymanRequestable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Pickup;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
+import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
@@ -103,6 +105,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   private final ShopResolverFactory resolverFactory;
   private final ShopResolverHealthCheck resolverHealthCheck;
   private final ShopHousekeepingOrchestrator housekeepingOrchestrator;
+  private final ShopPickupKeepPolicy pickupKeepPolicy;
   private long lostPackageInteractionEpoch;
   private boolean legacyCourierMigrationAttempted;
 
@@ -122,6 +125,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.resolverFactory = new ShopResolverFactory(this);
     this.resolverHealthCheck = new ShopResolverHealthCheck(this);
     this.housekeepingOrchestrator = new ShopHousekeepingOrchestrator(this);
+    this.pickupKeepPolicy = new ShopPickupKeepPolicy(this);
     this.lostPackageInteractionEpoch = 0L;
     this.legacyCourierMigrationAttempted = false;
   }
@@ -245,6 +249,21 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   public boolean hasContainerPosition(BlockPos pos) {
     return containerList.contains(pos) || getLocation().getInDimensionLocation().equals(pos);
+  }
+
+  /**
+   * A courier pickup ({@code inventory == false}) only takes what the shopkeeper moved to the hut
+   * buffer, never rack stock or reserved items. Citizens dumping their own inventory keep the
+   * MineColonies behavior.
+   */
+  @Override
+  public int buildingRequiresCertainAmountOfItem(
+      ItemStack stack, List<ItemStorage> localAlreadyKept, boolean inventory, JobEntry jobEntry) {
+    if (inventory) {
+      return super.buildingRequiresCertainAmountOfItem(
+          stack, localAlreadyKept, inventory, jobEntry);
+    }
+    return pickupKeepPolicy.takeableForPickup(stack, localAlreadyKept);
   }
 
   @Override

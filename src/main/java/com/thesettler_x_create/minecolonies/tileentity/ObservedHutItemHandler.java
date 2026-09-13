@@ -1,7 +1,6 @@
 package com.thesettler_x_create.minecolonies.tileentity;
 
 import com.minecolonies.api.inventory.api.CombinedItemHandler;
-import java.util.function.Consumer;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -19,10 +18,16 @@ import org.jetbrains.annotations.Nullable;
  * method forwards to the inventory MineColonies built; none of the parent's own state is used.
  */
 final class ObservedHutItemHandler extends CombinedItemHandler {
-  private final CombinedItemHandler delegate;
-  private final Consumer<ItemStack> onTaken;
+  /** Receives every real extraction with the combined slot it came from. */
+  @FunctionalInterface
+  interface TakenListener {
+    void taken(int slot, ItemStack taken);
+  }
 
-  ObservedHutItemHandler(CombinedItemHandler delegate, Consumer<ItemStack> onTaken) {
+  private final CombinedItemHandler delegate;
+  private final TakenListener onTaken;
+
+  ObservedHutItemHandler(CombinedItemHandler delegate, TakenListener onTaken) {
     super("");
     this.delegate = delegate;
     this.onTaken = onTaken;
@@ -38,7 +43,7 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
   public ItemStack extractItem(int slot, int amount, boolean simulate) {
     ItemStack extracted = delegate.extractItem(slot, amount, simulate);
     if (!simulate && !extracted.isEmpty()) {
-      onTaken.accept(extracted.copy());
+      onTaken.taken(slot, extracted.copy());
     }
     return extracted;
   }

@@ -11,6 +11,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkPerfLogger;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.stock.ReservedAmount;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
 
   private final ShopRackAccess rackAccess = new ShopRackAccess(this);
+
+  private final ShopStockAgingLedger stockAging = new ShopStockAgingLedger();
 
   // Rebuilt whenever MineColonies rebuilds the combined inventory it wraps.
   @Nullable private ObservedHutItemHandler observedHut;
@@ -110,6 +113,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (!shopAddress.isEmpty()) {
       tag.putString(TAG_ADDRESS, shopAddress);
     }
+    stockAging.save(tag, registries);
   }
 
   @Override
@@ -117,6 +121,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     super.loadAdditional(tag, registries);
     stockNetworkId = tag.hasUUID(TAG_NETWORK) ? tag.getUUID(TAG_NETWORK) : null;
     shopAddress = tag.getString(TAG_ADDRESS);
+    stockAging.load(tag, registries);
   }
 
   @Override
@@ -208,10 +213,18 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return observedHut;
   }
 
-  private void onHutItemsTaken(ItemStack taken) {
+  private void onHutItemsTaken(int slot, ItemStack taken) {
     if (level == null
         || level.isClientSide
         || !(getBuilding() instanceof BuildingCreateShop shop)) {
+      return;
+    }
+    // The hut buffer only holds what the shopkeeper moved out for a warehouse pickup, so taking
+    // from it is never a delivery being gathered. MineColonies adds the hut inventory last.
+    IItemHandler hutBuffer = getInventory();
+    if (hutBuffer != null
+        && observedHut != null
+        && slot >= observedHut.getSlots() - hutBuffer.getSlots()) {
       return;
     }
     var resolver = shop.getShopResolver();
@@ -247,15 +260,16 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
-   * Returns true when at least one rack item is currently not reserved for pending requests.
+   * Returns true when at least one rack item has been unreserved long enough to move it out.
    *
-   * <p>Used to keep the shopkeeper active for inbound rack cleanup work.
+   * <p>Used to keep the shopkeeper active for inbound rack cleanup work. Every housekeeping read
+   * below goes through {@link #collectMovableRackBudgets}, so fresh stock waits in the racks.
    */
   public boolean hasUnreservedRackItems(@Nullable CreateShopBlockEntity pickup) {
     if (pickup == null || getBuilding() == null || getLevel() == null) {
       return false;
     }
-    for (RackStackBudget budget : collectRackBudgets(pickup)) {
+    for (RackStackBudget budget : collectMovableRackBudgets(pickup)) {
       if (budget.remaining > 0) {
         return true;
       }
@@ -264,8 +278,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
-   * Returns the first rack position and item stack that is not reserved by pending requests, or
-   * null if nothing needs to be moved.
+   * Returns the first rack position and item stack that has been unreserved long enough, or null if
+   * nothing needs to be moved.
    */
   @Nullable
   public Tuple<BlockPos, ItemStack> findNextUnreservedRackItem(
@@ -273,7 +287,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (pickup == null || getBuilding() == null || getLevel() == null) {
       return null;
     }
-    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    List<RackStackBudget> budgets = collectMovableRackBudgets(pickup);
     if (budgets.isEmpty()) {
       return null;
     }
@@ -325,7 +339,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
     int budget = Integer.MAX_VALUE;
     if (pickup != null) {
-      List<RackStackBudget> budgets = collectRackBudgets(pickup);
+      List<RackStackBudget> budgets = collectMovableRackBudgets(pickup);
       RackStackBudget b = findBudget(budgets, target);
       budget = b != null ? b.remaining : 0;
     }
@@ -368,7 +382,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
-   * Moves up to {@code maxStacks} unreserved rack stacks into hut inventory.
+   * Moves up to {@code maxStacks} rack stacks that have been unreserved long enough into hut
+   * inventory.
    *
    * <p>Items reserved by pending request ids remain in racks so delivery planning can consume them.
    */
@@ -384,7 +399,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (hut == null) {
       return 0;
     }
-    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    List<RackStackBudget> budgets = collectMovableRackBudgets(pickup);
     if (budgets.isEmpty()) {
       logHousekeepingDebug("skip:budgets-empty");
       return 0;
@@ -564,6 +579,53 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
     }
     return totals;
+  }
+
+  /**
+   * The rack stock the shopkeeper may move to the hut: unreserved and unreserved for at least
+   * {@link com.thesettler_x_create.Config#HOUSEKEEPING_MIN_AGE_TICKS}. Every call also brings the
+   * stock ages up to date, so fresh arrivals start their clock the first time housekeeping looks.
+   */
+  private List<RackStackBudget> collectMovableRackBudgets(CreateShopBlockEntity pickup) {
+    List<RackStackBudget> budgets = collectRackBudgets(pickup);
+    if (getLevel() == null) {
+      return budgets;
+    }
+    long now = getLevel().getGameTime();
+    List<ReservedAmount<ItemStack>> unreserved = new ArrayList<>();
+    for (RackStackBudget budget : budgets) {
+      unreserved.add(new ReservedAmount<>(budget.key, budget.remaining));
+    }
+    if (stockAging.update(unreserved, now)) {
+      setChanged();
+    }
+    long minAge = com.thesettler_x_create.Config.HOUSEKEEPING_MIN_AGE_TICKS.getAsLong();
+    for (RackStackBudget budget : budgets) {
+      budget.remaining = Math.min(budget.remaining, stockAging.agedAmount(budget.key, now, minAge));
+    }
+    budgets.removeIf(budget -> budget.remaining <= 0);
+    return budgets;
+  }
+
+  /** How many items of this kind the shop racks hold right now. */
+  public int countInRacks(ItemStack key) {
+    if (key == null || key.isEmpty()) {
+      return 0;
+    }
+    int count = 0;
+    for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
+      IItemHandler handler = rack.getInventory();
+      if (handler == null) {
+        continue;
+      }
+      for (int slot = 0; slot < handler.getSlots(); slot++) {
+        ItemStack stack = handler.getStackInSlot(slot);
+        if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, key)) {
+          count += stack.getCount();
+        }
+      }
+    }
+    return count;
   }
 
   private List<AbstractTileEntityRack> collectRacksForHousekeeping() {

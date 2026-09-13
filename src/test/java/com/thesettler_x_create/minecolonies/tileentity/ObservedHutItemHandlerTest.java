@@ -28,7 +28,7 @@ class ObservedHutItemHandlerTest {
     assertTrue(
         source.contains("ItemStack extracted = delegate.extractItem(slot, amount, simulate);"));
     assertTrue(source.contains("if (!simulate && !extracted.isEmpty()) {"));
-    assertTrue(source.contains("onTaken.accept(extracted.copy());"));
+    assertTrue(source.contains("onTaken.taken(slot, extracted.copy());"));
   }
 
   @Test
@@ -52,7 +52,7 @@ class ObservedHutItemHandlerTest {
     when(hut.getSlots()).thenReturn(54);
     when(hut.getLastIndex(10)).thenReturn(27);
     when(hut.getSlotLimit(5)).thenReturn(64);
-    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, taken -> {});
+    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, (slot, taken) -> {});
 
     assertEquals(54, observed.getSlots());
     assertEquals(27, observed.getLastIndex(10));
@@ -66,9 +66,10 @@ class ObservedHutItemHandlerTest {
     CombinedItemHandler otherHut = mock(CombinedItemHandler.class);
 
     assertEquals(
-        new ObservedHutItemHandler(hut, taken -> {}), new ObservedHutItemHandler(hut, taken -> {}));
+        new ObservedHutItemHandler(hut, (slot, taken) -> {}),
+        new ObservedHutItemHandler(hut, (slot, taken) -> {}));
     assertNotEquals(
-        new ObservedHutItemHandler(hut, taken -> {}),
-        new ObservedHutItemHandler(otherHut, taken -> {}));
+        new ObservedHutItemHandler(hut, (slot, taken) -> {}),
+        new ObservedHutItemHandler(otherHut, (slot, taken) -> {}));
   }
 }

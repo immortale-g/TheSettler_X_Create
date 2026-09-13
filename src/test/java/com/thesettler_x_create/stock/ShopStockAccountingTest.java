@@ -87,6 +87,25 @@ class ShopStockAccountingTest {
   }
 
   @Test
+  void pickupKeepsAllRackStockAndEveryReservedItem() {
+    assertEquals(64, ShopStockAccounting.pickupKeepAmount(64, 16));
+    // 16 reserved but only 10 in the racks: 6 reserved items in the hut buffer stay too.
+    assertEquals(16, ShopStockAccounting.pickupKeepAmount(10, 16));
+    assertEquals(0, ShopStockAccounting.pickupKeepAmount(0, -1));
+  }
+
+  @Test
+  void pickupTakesOnlyWhatIsBeyondTheKeepAmount() {
+    // Rack slot of 64 while 64 must stay: nothing.
+    assertEquals(0, ShopStockAccounting.pickupTakeable(64, 64, 0));
+    // Hut buffer slot after the racks kept all 64: everything.
+    assertEquals(20, ShopStockAccounting.pickupTakeable(20, 64, 64));
+    // Partly covered.
+    assertEquals(12, ShopStockAccounting.pickupTakeable(20, 72, 64));
+    assertEquals(20, ShopStockAccounting.pickupTakeable(20, 0, 0));
+  }
+
+  @Test
   void extractablePrefersTheReservationWhenThereIsOne() {
     assertEquals(16, ShopStockAccounting.extractable(64, 16, 128));
     assertEquals(64, ShopStockAccounting.extractable(64, 0, 128));
