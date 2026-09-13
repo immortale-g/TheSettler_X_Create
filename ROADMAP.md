@@ -84,6 +84,19 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
 - Kleinkram: ungenutztes `CreateShopTestRequestPayload`, zwei `getSimpleName()`-Stringvergleiche,
   Helper für den Debug-Log-Guard, Gradle-Task `testModernStructurize` umbenennen.
 - Dedicated-Server-Test und mehrere Shops in einer Colony.
+- Racks und Hütten-Inventar trennen. Die Racks gehören der Create-Seite (Ware aus dem Netz,
+  Reservierungen, Einsammeln der Deliveries), das Hütten-Inventar der Kolonie-Seite (Ware, die nach
+  Create verschickt wird, und alte Überschüsse für den Warehouse-Pickup). Heute legt ein Kurier, der
+  an den Shop liefert (Colony Gauge), die Ware ins Sammelinventar, und dort kommen die Racks zuerst.
+  - `BuildingCreateShop.getItemHandlerCap` gibt nur das Hütten-Inventar zurück (als
+    `CombinedItemHandler`, damit Sortieren weiter geht). Anlieferung und Pickup sehen dann nur die
+    Hütte; das Einsammeln von Deliveries läuft weiter über den Hütten-Block.
+  - Bei voller Hütte keinen Stapel tauschen lassen (`isItemStackInRequest`), der Kurier wartet.
+  - Output-Block holt Gauge-Ware aus der Hütte, als Übergang für bestehende Welten danach aus den
+    Racks.
+  - Gauge-Ware nicht mehr im Rack-Reservierungsledger führen; der Pickup lässt stattdessen die Menge
+    offener Gauge-Aufgaben in der Hütte. `ShopPickupKeepPolicy` wird dadurch einfacher.
+  - Platz: Das Hütten-Inventar hat standardmäßig 27 Plätze.
 
 ### Danach
 
