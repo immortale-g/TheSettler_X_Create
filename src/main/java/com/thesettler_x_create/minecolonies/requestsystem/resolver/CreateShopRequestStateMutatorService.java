@@ -1,13 +1,11 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.TheSettlerXCreate;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /** Centralizes request pending/cooldown state mutations to avoid split write paths. */
@@ -157,13 +155,6 @@ final class CreateShopRequestStateMutatorService {
     }
     int queueRemoved = 0;
     int courierTasksCleared = 0;
-    DeliverySignature orphanSignature = null;
-    try {
-      IRequest<?> orphanRequest = manager.getRequestHandler().getRequestOrNull(childToken);
-      orphanSignature = DeliverySignature.fromRequest(orphanRequest);
-    } catch (Exception ignored) {
-      orphanSignature = null;
-    }
     try {
       var colony = manager.getColony();
       var buildingManager = colony == null ? null : colony.getServerBuildingManager();
@@ -201,11 +192,11 @@ final class CreateShopRequestStateMutatorService {
             }
             try {
               var current = job.getCurrentTask();
+              // Token match only. Matching by start, target and stack also hit sibling
+              // deliveries of the same parent, which are identical now that all of them start at
+              // the hut, and failed a courier task that was still valid.
               if (current != null) {
-                boolean tokenMatch = childToken.equals(current.getId());
-                boolean signatureMatch =
-                    orphanSignature != null && orphanSignature.matches(current);
-                if (tokenMatch || signatureMatch) {
+                if (childToken.equals(current.getId())) {
                   job.onTaskDeletion(current.getId());
                   job.finishRequest(false);
                   courierTasksCleared++;
@@ -236,38 +227,6 @@ final class CreateShopRequestStateMutatorService {
           assignmentRemoved,
           queueRemoved,
           courierTasksCleared);
-    }
-  }
-
-  private record DeliverySignature(
-      net.minecraft.core.BlockPos from, net.minecraft.core.BlockPos to, ItemStack stack) {
-    static DeliverySignature fromRequest(IRequest<?> request) {
-      if (request == null || !(request.getRequest() instanceof Delivery delivery)) {
-        return null;
-      }
-      if (delivery.getStack() == null || delivery.getStack().isEmpty()) {
-        return null;
-      }
-      return new DeliverySignature(
-          delivery.getStart().getInDimensionLocation(),
-          delivery.getTarget().getInDimensionLocation(),
-          delivery.getStack().copy());
-    }
-
-    boolean matches(IRequest<?> request) {
-      if (request == null || !(request.getRequest() instanceof Delivery delivery)) {
-        return false;
-      }
-      if (!from.equals(delivery.getStart().getInDimensionLocation())
-          || !to.equals(delivery.getTarget().getInDimensionLocation())) {
-        return false;
-      }
-      ItemStack other = delivery.getStack();
-      if (other == null || other.isEmpty() || stack == null || stack.isEmpty()) {
-        return false;
-      }
-      return ItemStack.isSameItemSameComponents(stack, other)
-          && other.getCount() == stack.getCount();
     }
   }
 }
