@@ -3,7 +3,7 @@
 Erstellt nach Code-Analyse, Juni 2026. Der Analyseteil unten ist der Stand von damals und wird
 bewusst nicht umgeschrieben, damit die Begründungen nachvollziehbar bleiben.
 
-## Status, Stand 2026-09-12
+## Status, Stand 2026-09-13
 
 | Phase | Stand |
 |-------|-------|
@@ -15,8 +15,8 @@ bewusst nicht umgeschrieben, damit die Begründungen nachvollziehbar bleiben.
 
 Danach nicht mehr als nummerierte Phasen geführt: 0.3.0-Release mit Colony Gauge und Packager,
 Placement-Handler als 0.3.1, `BuildingCreateShop`-Refaktor in `Shop*`-Collaborators, Konsolidierung
-der Create-Logistik (`CreateLogisticsBridge`, `CreatePackageBridge`), laufender Clean-Code-Audit auf
-`fix/pre-1.0-hardening`.
+der Create-Logistik (`CreateLogisticsBridge`, `CreatePackageBridge`), Clean-Code-Audit auf `develop`
+(damals `fix/pre-1.0-hardening`).
 
 In 0.3.2 kamen vier Korrekturen am Request-Lebenszyklus dazu: Restbedarf berücksichtigt gelieferte
 Mengen, der Tooltip-Crash des Network Link Tuners, und zwei entfernte Eingriffe in fremde
@@ -33,6 +33,42 @@ täglicher Workflow testet gegen die neuesten Releases.
 nach fünf Minuten. Große Requests, die stackweise ausgeliefert werden, bestellten den Rest dann
 erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen eine frische Frist.
 
+## Plan ab 2026-09-13
+
+### Branches
+
+- `master` ist die Release-Linie. Hotfixes zweigen von `master` ab, werden dort released und danach
+  nach `develop` gemergt.
+- `develop` ist die Entwicklungslinie (bis 2026-09-13 `fix/pre-1.0-hardening`). Sie enthält die
+  1.0-Punchlist, den Clean-Code-Audit und alle 0.3.x-Hotfixes. Feature-Branches zweigen von
+  `develop` ab und gehen dorthin zurück.
+- Ein Release ist ein Merge von `develop` nach `master` mit Tag.
+
+### 0.4.0: große Aufträge schneller ausliefern
+
+Heute legt der Shop pro Request immer nur eine Delivery mit einem Stack an und wartet, bis sie
+abgeschlossen ist. Große Aufträge laufen dadurch Tour für Tour nacheinander, und mehrere Kuriere
+helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf einmal an.
+
+- Extra-Child-Recovery abtrennen (auskommentiert, nicht gelöscht). Sie behandelt jedes zweite aktive
+  Child als Fehler und würde parallele Deliveries sofort wieder abräumen.
+- Reservierungen pro Request über mehrere Items und Mengen (heute ein Item pro Request, Tag-Requests
+  verlieren dadurch Reservierungen). Bestandsformeln an einer Stelle, mit echten Unit-Tests.
+- Deliveries starten an der Shop-Hütte, alle Stücke werden sofort angelegt. MineColonies bündelt sie
+  pro Kurier und verteilt sie auf mehrere Kuriere.
+- Reservierungen werden bei der Abholung verbraucht, sofern sich die Abholung verlässlich beobachten
+  lässt, sonst bei der Ablieferung.
+- Signatur-Match in `finalizeOrphanDeliveryChild` entfernen.
+
+### 0.5.0: Bestellungen gehören dem Shop
+
+- Reservieren erst, wenn Ware im Rack ankommt. Unterwegs-Ware wird nur noch im Inflight-Ledger geführt.
+- Inflight-Einträge haben einen optionalen Besitzer. Endet ein Request, wird die Bestellung abgekoppelt
+  statt gelöscht, und ein Folge-Request übernimmt sie, statt neu zu bestellen.
+- Eine einzige Bestellstelle, die Ware schon beim Einreihen als unterwegs erfasst.
+- Nachschub auch bei offenen Delivery-Children, Colony Factory Gauge umstellen, robustere
+  Ankunftserkennung.
+
 ### Offen für 1.0
 
 - `finalizeOrphanDeliveryChild` und `CreateShopDeliveryChildRecoveryService` greifen weiterhin in
@@ -41,8 +77,20 @@ erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen
 - `ShopCourierDiagnostics` verändert per Reflection Citizen-Zustand, sobald `debugLogging` an ist.
   Eine Diagnose darf nur beobachten.
 - `pickupConfirmedAtTick` wird gesetzt, sobald ein Kurier die Aufgabe hat, nicht wenn er die Ware
-  trägt. Zwei Recovery-Pfade hängen an diesem Flag.
-- `debugLogging` steht per Default auf `true`. Für ein 1.0-Release auf `false` setzen.
+  trägt. Zwei Recovery-Pfade hängen an diesem Flag. Wird mit 0.4.0 angegangen.
+- Requests, die mindestens `minimumCount` erhalten haben und bei leerem Create-Netz festhängen,
+  blockieren andere Resolver. Klären, ob sie nach einer Frist abgeschlossen oder freigegeben werden.
+- `attemptResolve` umbauen, sobald die Bestandsformeln aus 0.4.0/0.5.0 getestet vorliegen.
+- Kleinkram: ungenutztes `CreateShopTestRequestPayload`, zwei `getSimpleName()`-Stringvergleiche,
+  Helper für den Debug-Log-Guard, Gradle-Task `testModernStructurize` umbenennen.
+- Dedicated-Server-Test und mehrere Shops in einer Colony.
+
+### Danach
+
+- MineColonies-Followup-Muster: Der Shop setzt den Request auf RESOLVED, sobald die Ware reserviert im
+  Rack liegt, legt die Deliveries in `getFollowupRequestForCompletion` an, und MineColonies schließt
+  den Request selbst ab. Setzt 0.5.0 voraus und ist eine eigene Entscheidung, weil Teillieferungen dann
+  der MineColonies-Semantik folgen.
 
 ---
 
