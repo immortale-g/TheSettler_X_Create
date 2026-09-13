@@ -27,6 +27,7 @@ final class CreateShopPendingRequestProcessorService {
   private final CreateShopPostCreationUpdateService postCreationUpdateService;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopOpenDeliveryTopupService openDeliveryTopupService;
 
   CreateShopPendingRequestProcessorService(
       CreateShopPendingRequestGateService pendingRequestGateService,
@@ -37,7 +38,9 @@ final class CreateShopPendingRequestProcessorService {
       CreateShopPendingDeliveryCreationService pendingDeliveryCreationService,
       CreateShopPostCreationUpdateService postCreationUpdateService,
       CreateShopResolverDiagnostics diagnostics,
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopOpenDeliveryTopupService openDeliveryTopupService) {
+    this.openDeliveryTopupService = openDeliveryTopupService;
     this.pendingRequestGateService = pendingRequestGateService;
     this.childReconciliationService = childReconciliationService;
     this.pendingStateDecisionService = pendingStateDecisionService;
@@ -135,6 +138,20 @@ final class CreateShopPendingRequestProcessorService {
         return;
       }
       if (childResult.hasActiveChildren() || request.hasChildren()) {
+        // Deliveries are still open: keep reserving, ordering and handing out arrived stock,
+        // counted so that nothing goes out twice. Closing the parent stays with MineColonies.
+        openDeliveryTopupService.process(
+            resolver,
+            manager,
+            requestHandler,
+            request,
+            level,
+            shop,
+            tile,
+            pickup,
+            deliverable,
+            workerWorking,
+            requestIdLog);
         return;
       }
     }

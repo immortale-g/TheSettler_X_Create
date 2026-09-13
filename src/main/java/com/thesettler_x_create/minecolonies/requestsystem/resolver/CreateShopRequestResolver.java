@@ -172,7 +172,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingDeliveryCreationService,
             postCreationUpdateService,
             diagnostics,
-            requestStateMutatorService);
+            requestStateMutatorService,
+            new CreateShopOpenDeliveryTopupService(
+                outstandingNeededService,
+                planning,
+                networkOrderService,
+                stockResolver,
+                deliveryManager,
+                postCreationUpdateService,
+                requestStateMutatorService,
+                messaging,
+                diagnostics));
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,
@@ -333,7 +343,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   protected int getWarehouseInternalCount(
       com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse ignored,
       IRequest<? extends IDeliverable> request) {
-    return warehouseCountService.getWarehouseInternalCount(getLocation(), request, stockResolver);
+    return warehouseCountService.getWarehouseInternalCount(
+        getLocation(), request, stockResolver, planning);
   }
 
   BuildingCreateShop getShop(IRequestManager manager) {

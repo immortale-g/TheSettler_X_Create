@@ -9,13 +9,20 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 
 /**
- * Resolves effective Create network stock count exposed to MineColonies warehouse resolver hooks.
+ * Count behind {@code AbstractWarehouseRequestResolver#getWarehouseInternalCount}: what the shop
+ * can hand out for a request, network stock plus rack stock not reserved for other requests.
+ *
+ * <p>MineColonies only calls this hook from the base class {@code canResolveRequest}, which {@link
+ * CreateShopRequestResolver} replaces with its own validator, and other warehouses only count
+ * buildings of the warehouse type. It is kept consistent with the validator so it cannot mislead if
+ * that ever changes.
  */
 final class CreateShopWarehouseCountService {
   int getWarehouseInternalCount(
       ILocation resolverLocation,
       IRequest<? extends IDeliverable> request,
-      CreateShopStockResolver stockResolver) {
+      CreateShopStockResolver stockResolver,
+      CreateShopResolverPlanning planning) {
     if (request == null || resolverLocation == null) {
       return 0;
     }
@@ -47,8 +54,16 @@ final class CreateShopWarehouseCountService {
     if (pickup == null) {
       return 0;
     }
-    int available = stockResolver.getNetworkAvailable(tile, deliverable);
-    int reserved = pickup.getReservedForDeliverable(deliverable);
-    return ShopStockAccounting.unreservedStock(available, reserved);
+    // Network stock and rack reservations are two different stores; reservations only ever lower
+    // what the racks can give.
+    int reservedForRequest =
+        pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(request.getId()));
+    int reservedForOthers =
+        ShopStockAccounting.reservedForOthers(
+            pickup.getReservedForDeliverable(deliverable), reservedForRequest);
+    CreateShopStockSnapshot snapshot =
+        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
+    return ShopStockAccounting.totalAvailable(
+        snapshot.networkAvailable(), snapshot.rackUsable(), 0);
   }
 }

@@ -72,12 +72,25 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
 
 ### 0.5.0: Bestellungen gehören dem Shop
 
-- Reservieren erst, wenn Ware im Rack ankommt. Unterwegs-Ware wird nur noch im Inflight-Ledger geführt.
+Branch `feat/inflight-pool` (baut auf `feat/stock-observer` auf), noch nicht im Spiel getestet.
+
+- Inflight-Buchhaltung als `InflightBook` im Paket `stock/` mit Unit-Tests, Speicherformat unverändert.
+- Ankunftserkennung robust: Jede Rack-Bewegung, die der Shop kennt (Hütten-Tür, Housekeeping,
+  Output-Block, Übergaben, Kurier-Dumps), verschiebt den Vergleichswert mit.
+- Reservieren erst, wenn Ware im Rack ankommt (vor der Planung jedes Kolonie-Ticks), gedeckelt auf
+  freien Rack-Bestand ohne Gauge-Reservierungen. Unterwegs-Ware steht nur noch im Inflight-Ledger.
 - Inflight-Einträge haben einen optionalen Besitzer. Endet ein Request, wird die Bestellung abgekoppelt
-  statt gelöscht, und ein Folge-Request übernimmt sie, statt neu zu bestellen.
-- Eine einzige Bestellstelle, die Ware schon beim Einreihen als unterwegs erfasst.
-- Nachschub auch bei offenen Delivery-Children, Colony Factory Gauge umstellen, robustere
-  Ankunftserkennung.
+  statt gelöscht, und ein Folge-Request übernimmt sie, statt neu zu bestellen. Besitzerlose Bestellungen
+  verfallen nach dem Inflight-Timeout still.
+- Eine einzige Bestellstelle (`CreateShopNetworkOrderService`) für ersten Versuch und Nachschub, die
+  Ware schon beim Einreihen als unterwegs erfasst. Aufgegebene Broadcasts streichen genau diese
+  Bestellung.
+- Nachschub und neue Deliveries auch bei offenen Delivery-Children (`OpenDeliveryPlan`): offene
+  Deliveries zählen beim Bestellen als gedeckt, bei neuen Deliveries werden nicht abgeholte abgezogen.
+- Nicht mehr offen: der Inflight-Cleanup pro abgeschlossenem Child (I-3) und die Warehouse-Zählung
+  (R-4, wird für den Shop von MineColonies nicht aufgerufen, jetzt trotzdem konsistent).
+- Colony Factory Gauge bleibt beim Reservieren beim Bestellen; das löst die Trennung von Racks und
+  Hütte in 1.0.
 
 ### Offen für 1.0
 
