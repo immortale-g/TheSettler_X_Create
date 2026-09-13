@@ -240,9 +240,5 @@ final class CreateShopPendingRequestProcessorService {
     }
     postCreationUpdateService.apply(
         resolver, manager, request, level, creationResult, requestIdLog);
-    UUID requestUuid = CreateShopRequestResolver.toRequestId(request.getId());
-    if (requestUuid != null) {
-      pickup.markInflightHandedOff(requestUuid);
-    }
   }
 }
