@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -199,6 +200,61 @@ class ShopInflightLedger {
       host.markChanged();
     }
     return removed;
+  }
+
+  int getInflightRemainingFor(@Nullable UUID requestUuid, Predicate<ItemStack> accepts) {
+    if (!host.ensureServerThread("getInflightRemainingFor")) {
+      return 0;
+    }
+    return book.remainingForMatching(requestUuid, accepts);
+  }
+
+  /** Removes the owner from a request's orders; they keep coming for nobody. */
+  int detach(@Nullable UUID requestUuid) {
+    if (!host.ensureServerThread("detachInflight")) {
+      return 0;
+    }
+    int detached = book.detach(requestUuid);
+    if (detached > 0) {
+      host.markChanged();
+    }
+    return detached;
+  }
+
+  /** Hands unowned incoming stock the request accepts to it. @return the amount claimed */
+  int claimFree(@Nullable UUID requestUuid, Predicate<ItemStack> accepts, int amount) {
+    if (!host.ensureServerThread("claimFreeInflight")) {
+      return 0;
+    }
+    int claimed = book.claimFreeMatching(requestUuid, accepts, amount);
+    if (claimed > 0) {
+      host.markChanged();
+    }
+    return claimed;
+  }
+
+  /** Drops an amount of one item from a request's orders. @return the amount removed */
+  int cancel(@Nullable UUID requestUuid, ItemStack key, int amount) {
+    if (!host.ensureServerThread("cancelInflightAmount") || key == null || key.isEmpty()) {
+      return 0;
+    }
+    int removed = book.cancel(requestUuid, key, amount);
+    if (removed > 0) {
+      host.markChanged();
+    }
+    return removed;
+  }
+
+  /** Drops unowned orders older than {@code timeout}. @return the dropped entries */
+  List<InflightBook.StoredEntry<ItemStack>> expireFree(long now, long timeout) {
+    if (!host.ensureServerThread("expireFreeInflight")) {
+      return Collections.emptyList();
+    }
+    List<InflightBook.StoredEntry<ItemStack>> expired = book.expireFree(now, timeout);
+    if (!expired.isEmpty()) {
+      host.markChanged();
+    }
+    return expired;
   }
 
   /**

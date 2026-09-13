@@ -225,6 +225,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         normalized,
         requesterName,
         requestUuid);
+    // Tracked as on its way from the moment it is queued: the broadcast only happens on the next
+    // server tick, and a request deciding again before that must already see this order.
+    recordInflight(consolidateRequestedStacks(normalized), requesterName, requestUuid);
     if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] queued {} stack(s) for grouped network broadcast {} -> '{}'",
@@ -252,7 +255,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             shop.getShopAddress(),
             requesterName == null ? "" : requesterName,
             requestUuid);
-    return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
+    if (!broadcastQueuedRequest(key, normalized)) {
+      return Collections.emptyList();
+    }
+    recordInflight(consolidateRequestedStacks(normalized), key.requesterName(), requestUuid);
+    return normalized;
   }
 
   public static void flushQueuedRequests() {
@@ -382,18 +389,14 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   }
 
   /**
-   * Seam-audit finding s2-1 (still-open half): called when {@link CreateNetworkRequestQueue}
-   * definitively gives up on a bucket after {@code MAX_RETRY_ATTEMPTS} failed broadcasts. {@link
-   * CreateShopAttemptResolveService} reserves the ordered amount via {@code pickup.reserve(...)} as
-   * soon as a network order is attempted - before knowing whether the broadcast will ever succeed -
-   * so a permanently-abandoned order used to leave that amount "spoken for" until the reservation's
-   * own 5-minute TTL expired it. Consuming it here per-stack (not a blanket {@code
-   * release(requestId)}) only removes the amount this specific failed attempt reserved, so a newer,
-   * still-viable reservation for the same request (e.g. a later retry that reserved more) isn't
-   * wiped alongside it.
+   * Called when {@link CreateNetworkRequestQueue} definitively gives up on a bucket after {@code
+   * MAX_RETRY_ATTEMPTS} failed broadcasts. The order was tracked as on its way when it was queued;
+   * dropping exactly that amount (not every order of the request) lets the request see the need
+   * again right away without losing a newer order that was sent.
    */
-  void releaseAbandonedReservation(@Nullable UUID requestUuid, List<ItemStack> stacks) {
-    if (requestUuid == null || stacks == null || stacks.isEmpty()) {
+  void forgetAbandonedOrder(
+      @Nullable UUID requestUuid, String requesterName, List<ItemStack> stacks) {
+    if (stacks == null || stacks.isEmpty()) {
       return;
     }
     if (!(shop.getBuilding() instanceof BuildingCreateShop building)) {
@@ -407,7 +410,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (stack == null || stack.isEmpty()) {
         continue;
       }
-      pickup.consumeReservedForRequest(requestUuid, stack, stack.getCount());
+      if (requestUuid != null) {
+        pickup.cancelInflight(requestUuid, stack, stack.getCount());
+      } else {
+        pickup.consumeInflight(stack, stack.getCount(), requesterName, shop.getShopAddress(), -1L);
+      }
     }
   }
 
@@ -497,7 +504,6 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.address(),
             key.requesterName());
       }
-      recordInflight(consolidated, key.requesterName(), key.requestUuid());
       return true;
     } catch (Exception ex) {
       // Not gated behind Config.DEBUG_LOGGING - see the getSummary() catch above for why.

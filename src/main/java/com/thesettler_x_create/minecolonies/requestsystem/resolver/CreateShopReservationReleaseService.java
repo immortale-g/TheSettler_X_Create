@@ -4,22 +4,18 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.minecolonies.api.colony.requestsystem.request.RequestState;
-import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
-import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
-import net.minecraft.world.item.ItemStack;
+import java.util.UUID;
 
-/** Releases reserved pickup stock and clears matching inflight data for cancelled deliveries. */
+/**
+ * Lets go of what an ended request held in the shop: its reservations are released, and its orders
+ * still on their way lose their owner instead of being forgotten, so the next request for the same
+ * item claims them instead of ordering again.
+ */
 final class CreateShopReservationReleaseService {
-  private final CreateShopResolverMessaging messaging;
-
-  CreateShopReservationReleaseService(CreateShopResolverMessaging messaging) {
-    this.messaging = messaging;
-  }
 
   void releaseReservation(
       IRequestManager manager, IRequest<?> request, ILocation resolverLocation) {
@@ -31,30 +27,15 @@ final class CreateShopReservationReleaseService {
     if (pickup == null) {
       return;
     }
-    pickup.release(CreateShopRequestResolver.toRequestId(request.getId()));
-    if (request.getState() != RequestState.CANCELLED
-        || !(request.getRequest() instanceof Delivery delivery)) {
-      return;
-    }
-    ItemStack key = delivery.getStack();
-    if (key == null || key.isEmpty()) {
-      return;
-    }
-    // UUID-first cancel: precise and drift-free for entries recorded since Phase 3.1.
-    java.util.UUID requestUuid = CreateShopRequestResolver.toRequestId(request.getId());
-    int cleared = pickup.cancelInflightByUuid(requestUuid);
-    // String-matching fallback for legacy entries (recorded before Phase 3.1, requestUuid == null).
-    if (cleared <= 0) {
-      String requesterName = messaging.resolveRequesterName(manager, request);
-      TileEntityCreateShop tile = shop.getCreateShopTileEntity();
-      String address = sanitizeAddress(tile == null ? "" : tile.getShopAddress());
-      cleared = shop.cancelLostPackage(key, requesterName, address, -1L);
-    }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
+    pickup.release(requestId);
+    int detached = pickup.detachInflight(requestId);
+    if (Config.DEBUG_LOGGING.getAsBoolean() && detached > 0) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] releaseReservation cancelled request={} clearedInflight={}",
+          "[CreateShop] releaseReservation request={} state={} detachedInflight={}",
           request.getId(),
-          cleared);
+          request.getState(),
+          detached);
     }
   }
 
@@ -70,13 +51,5 @@ final class CreateShopReservationReleaseService {
     var building =
         colony.getServerBuildingManager().getBuilding(resolverLocation.getInDimensionLocation());
     return building instanceof BuildingCreateShop shop ? shop : null;
-  }
-
-  private static String sanitizeAddress(String value) {
-    if (value == null) {
-      return "";
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? "" : trimmed;
   }
 }

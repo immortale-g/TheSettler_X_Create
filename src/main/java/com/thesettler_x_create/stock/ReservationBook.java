@@ -160,6 +160,25 @@ public final class ReservationBook<K> {
     return reservedMatching(candidate -> sameKey.test(candidate, key));
   }
 
+  /** Total reserved for a key by every owner except the given ones. */
+  public int reservedForExcluding(K key, Set<UUID> excludedOwners) {
+    if (key == null) {
+      return 0;
+    }
+    int total = 0;
+    for (Map.Entry<UUID, OwnerReservations<K>> owner : owners.entrySet()) {
+      if (excludedOwners != null && excludedOwners.contains(owner.getKey())) {
+        continue;
+      }
+      for (MutableAmount<K> entry : owner.getValue().amounts) {
+        if (sameKey.test(entry.key, key)) {
+          total += entry.amount;
+        }
+      }
+    }
+    return total;
+  }
+
   /** Total reserved across all owners for every key the filter accepts. */
   public int reservedMatching(Predicate<K> filter) {
     if (filter == null) {

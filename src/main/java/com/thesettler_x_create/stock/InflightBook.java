@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 
@@ -201,6 +202,20 @@ public final class InflightBook<K> {
     return remaining;
   }
 
+  /** What is still coming for a request, for every item it accepts. */
+  public int remainingForMatching(UUID owner, Predicate<K> accepts) {
+    if (owner == null || accepts == null) {
+      return 0;
+    }
+    int remaining = 0;
+    for (Entry<K> entry : entries) {
+      if (owner.equals(entry.owner) && accepts.test(entry.key)) {
+        remaining += entry.remaining;
+      }
+    }
+    return remaining;
+  }
+
   /** What is still coming for nobody, exactly this item. */
   public int freeRemaining(K key) {
     if (key == null) {
@@ -222,13 +237,26 @@ public final class InflightBook<K> {
    * @return the amount claimed
    */
   public int claimFree(UUID owner, K key, int amount) {
-    if (owner == null || key == null || amount <= 0) {
+    if (key == null) {
+      return 0;
+    }
+    return claimFreeMatching(owner, candidate -> sameKey.test(candidate, key), amount);
+  }
+
+  /**
+   * Like {@link #claimFree(UUID, Object, int)} for any item a request accepts, e.g. every log for a
+   * request for logs.
+   *
+   * @return the amount claimed
+   */
+  public int claimFreeMatching(UUID owner, Predicate<K> accepts, int amount) {
+    if (owner == null || accepts == null || amount <= 0) {
       return 0;
     }
     int claimed = 0;
     for (int i = 0; i < entries.size() && claimed < amount; i++) {
       Entry<K> entry = entries.get(i);
-      if (entry.owner != null || !sameKey.test(entry.key, key)) {
+      if (entry.owner != null || !accepts.test(entry.key)) {
         continue;
       }
       int take = Math.min(entry.remaining, amount - claimed);
@@ -582,17 +610,21 @@ public final class InflightBook<K> {
   }
 
   /**
-   * Keeps notice prompts stable: identical segments collapse into one, and a requester/address
-   * tuple keeps only its {@link #MAX_OPEN_SEGMENTS_PER_TUPLE} newest segments.
+   * Keeps notice prompts stable for unowned entries: identical segments collapse into one, and a
+   * requester/address tuple keeps only its {@link #MAX_OPEN_SEGMENTS_PER_TUPLE} newest segments.
+   * Entries of a request are never merged or dropped; each of them is an order the request counts
+   * on, and losing one makes the request order again.
    */
   private void compact() {
+    entries.removeIf(entry -> entry.remaining <= 0);
     if (entries.size() <= 1) {
-      entries.removeIf(entry -> entry.remaining <= 0);
       return;
     }
     Map<String, Entry<K>> unique = new LinkedHashMap<>();
+    List<Entry<K>> owned = new ArrayList<>();
     for (Entry<K> entry : entries) {
-      if (entry.remaining <= 0) {
+      if (entry.owner != null) {
+        owned.add(entry);
         continue;
       }
       String segment =
@@ -604,9 +636,7 @@ public final class InflightBook<K> {
               + "|"
               + entry.requestedAt
               + "|"
-              + entry.remaining
-              + "|"
-              + entry.owner;
+              + entry.remaining;
       Entry<K> existing = unique.get(segment);
       if (existing == null) {
         unique.put(segment, entry);
@@ -627,6 +657,8 @@ public final class InflightBook<K> {
       keptPerTuple.put(tuple, count + 1);
       kept.add(entry);
     }
+    kept.addAll(owned);
+    // Stable sort: entries of the same tick keep their recording order.
     kept.sort((left, right) -> Long.compare(left.requestedAt, right.requestedAt));
     entries.clear();
     entries.addAll(kept);

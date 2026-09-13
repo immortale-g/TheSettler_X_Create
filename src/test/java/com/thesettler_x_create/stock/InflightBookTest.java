@@ -149,6 +149,32 @@ class InflightBookTest {
   }
 
   @Test
+  void remainingForMatchingCountsEveryAcceptedItemOfTheRequest() {
+    InflightBook<String> book = book();
+    record(book, "log#oak", 32, 0L, REQUEST_A);
+    record(book, "log#birch", 16, 1L, REQUEST_A);
+    record(book, "log#spruce", 8, 2L, REQUEST_B);
+
+    assertEquals(48, book.remainingForMatching(REQUEST_A, key -> key.startsWith("log#")));
+    assertEquals(0, book.remainingForMatching(null, key -> true));
+  }
+
+  @Test
+  void aRequestForAnyVariantClaimsEveryAcceptedFreeOrder() {
+    InflightBook<String> book = book();
+    record(book, "log#oak", 32, 0L, null);
+    record(book, "log#birch", 32, 1L, null);
+    record(book, "plank", 64, 2L, null);
+
+    int claimed = book.claimFreeMatching(REQUEST_A, key -> key.startsWith("log#"), 48);
+
+    assertEquals(48, claimed);
+    assertEquals(48, book.remainingFor(REQUEST_A, "log#oak"));
+    assertEquals(16, book.freeRemaining("log#birch"));
+    assertEquals(64, book.freeRemaining("plank"));
+  }
+
+  @Test
   void cancelDropsOnlyThatRequest() {
     InflightBook<String> book = book();
     record(book, "iron", 64, 0L, REQUEST_A);
@@ -213,14 +239,26 @@ class InflightBookTest {
   }
 
   @Test
-  void aTupleKeepsOnlyItsTwoNewestSegments() {
+  void anUnownedTupleKeepsOnlyItsTwoNewestSegments() {
     InflightBook<String> book = book();
-    record(book, "iron", 1, 1L, REQUEST_A);
-    record(book, "iron", 2, 2L, REQUEST_A);
-    record(book, "iron", 3, 3L, REQUEST_A);
+    record(book, "iron", 1, 1L, null);
+    record(book, "iron", 2, 2L, null);
+    record(book, "iron", 3, 3L, null);
 
     assertEquals(2, book.entryCount());
-    assertEquals(5, book.remainingFor(REQUEST_A, "iron"));
+    assertEquals(5, book.freeRemaining("iron"));
+  }
+
+  @Test
+  void ordersOfARequestAreNeverMergedOrDropped() {
+    InflightBook<String> book = book();
+    record(book, "iron", 64, 1L, REQUEST_A);
+    record(book, "iron", 64, 1L, REQUEST_A);
+    record(book, "iron", 64, 2L, REQUEST_A);
+    record(book, "iron", 16, 3L, REQUEST_B);
+
+    assertEquals(4, book.entryCount());
+    assertEquals(192, book.remainingFor(REQUEST_A, "iron"));
   }
 
   @Test

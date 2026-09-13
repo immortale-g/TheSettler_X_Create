@@ -45,6 +45,16 @@ class ReservationBookTest {
   }
 
   @Test
+  void reservedForCanLeaveOutSomeOwners() {
+    book.reserve(REQUEST_A, "brass_ingot", 64);
+    book.reserve(REQUEST_B, "brass_ingot", 16);
+
+    assertEquals(64, book.reservedForExcluding("brass_ingot", java.util.Set.of(REQUEST_B)));
+    assertEquals(80, book.reservedForExcluding("brass_ingot", java.util.Set.of()));
+    assertEquals(80, book.reservedForExcluding("brass_ingot", null));
+  }
+
+  @Test
   void keysAreStoredNormalized() {
     book.reserve(REQUEST_A, " oak_log ", 8);
 

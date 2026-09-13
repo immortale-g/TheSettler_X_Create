@@ -87,6 +87,23 @@ class ShopStockAccountingTest {
   }
 
   @Test
+  void anArrivalIsReservedUpToTheFreeRackStock() {
+    // 64 arrived, the rack holds 64, nothing else reserved.
+    assertEquals(64, ShopStockAccounting.arrivalReservation(64, 64, 0));
+    // A legacy reservation made when ordering already covers these goods.
+    assertEquals(0, ShopStockAccounting.arrivalReservation(64, 64, 64));
+    assertEquals(20, ShopStockAccounting.arrivalReservation(64, 84, 64));
+    assertEquals(0, ShopStockAccounting.arrivalReservation(64, 10, 30));
+  }
+
+  @Test
+  void rackStockIsNotReservedForGoodsTheRequestOrderedItself() {
+    assertEquals(36, ShopStockAccounting.rackReservationNeed(100, 64));
+    assertEquals(0, ShopStockAccounting.rackReservationNeed(64, 100));
+    assertEquals(64, ShopStockAccounting.rackReservationNeed(64, -1));
+  }
+
+  @Test
   void pickupKeepsAllRackStockAndEveryReservedItem() {
     assertEquals(64, ShopStockAccounting.pickupKeepAmount(64, 16));
     // 16 reserved but only 10 in the racks: 6 reserved items in the hut buffer stay too.

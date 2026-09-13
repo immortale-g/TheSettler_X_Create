@@ -102,6 +102,14 @@ public class CreateShopBlockEntity extends BlockEntity {
     return reservationLedger.getReservedFor(key);
   }
 
+  /**
+   * Returns the reserved count for a stack key by every request except the given ones, e.g. without
+   * Colony Factory Gauge reservations, which cover goods not in the racks yet.
+   */
+  public int getReservedForExcluding(ItemStack key, java.util.Set<UUID> excludedRequests) {
+    return reservationLedger.getReservedForExcluding(key, excludedRequests);
+  }
+
   /** Returns total reserved count for a deliverable match. */
   public int getReservedForDeliverable(IDeliverable deliverable) {
     return reservationLedger.getReservedForDeliverable(deliverable);
@@ -232,8 +240,48 @@ public class CreateShopBlockEntity extends BlockEntity {
     return inflightLedger.cancelInflightByUuid(requestUuid);
   }
 
-  public int clearInflightByUuid(@Nullable UUID requestUuid) {
-    return inflightLedger.cancelInflightByUuid(requestUuid);
+  /** What is still on its way for a request, for every item it accepts. */
+  public int getInflightRemainingFor(
+      @Nullable UUID requestUuid, java.util.function.Predicate<ItemStack> accepts) {
+    return inflightLedger.getInflightRemainingFor(requestUuid, accepts);
+  }
+
+  /**
+   * A request ended: its orders on the way lose their owner instead of being forgotten, so a new
+   * request for the item claims them instead of ordering again.
+   *
+   * @return the amount that is now unowned
+   */
+  public int detachInflight(@Nullable UUID requestUuid) {
+    return inflightLedger.detach(requestUuid);
+  }
+
+  /**
+   * Hands unowned incoming stock that a request accepts to that request, oldest first.
+   *
+   * @return the amount claimed
+   */
+  public int claimFreeInflight(
+      @Nullable UUID requestUuid, java.util.function.Predicate<ItemStack> accepts, int amount) {
+    return inflightLedger.claimFree(requestUuid, accepts, amount);
+  }
+
+  /**
+   * Drops an amount of one item from a request's orders, for an order that was never sent.
+   *
+   * @return the amount removed
+   */
+  public int cancelInflight(@Nullable UUID requestUuid, ItemStack stackKey, int amount) {
+    return inflightLedger.cancel(requestUuid, stackKey, amount);
+  }
+
+  /**
+   * Drops unowned orders older than {@code timeout}; nobody waits for them.
+   *
+   * @return the dropped orders
+   */
+  public List<InflightBook.StoredEntry<ItemStack>> expireFreeInflight(long now, long timeout) {
+    return inflightLedger.expireFree(now, timeout);
   }
 
   /**

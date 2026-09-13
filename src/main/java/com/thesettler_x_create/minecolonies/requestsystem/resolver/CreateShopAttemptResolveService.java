@@ -29,6 +29,7 @@ final class CreateShopAttemptResolveService {
   private final CreateShopStockResolver stockResolver;
   private final CreateShopResolverDiagnostics diagnostics;
   private final CreateShopRequestStateMachine flowStateMachine;
+  private final CreateShopNetworkOrderService networkOrderService;
 
   CreateShopAttemptResolveService(
       CreateShopRequestStateMutatorService requestStateMutatorService,
@@ -40,7 +41,9 @@ final class CreateShopAttemptResolveService {
       CreateShopResolverPlanning planning,
       CreateShopStockResolver stockResolver,
       CreateShopResolverDiagnostics diagnostics,
-      CreateShopRequestStateMachine flowStateMachine) {
+      CreateShopRequestStateMachine flowStateMachine,
+      CreateShopNetworkOrderService networkOrderService) {
+    this.networkOrderService = networkOrderService;
     this.requestStateMutatorService = requestStateMutatorService;
     this.messaging = messaging;
     this.deliveryManager = deliveryManager;
@@ -173,42 +176,36 @@ final class CreateShopAttemptResolveService {
 
     List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned =
         planning.planFromRacksWithPositions(tile, deliverable, Math.min(provide, rackUsable));
-    List<ItemStack> ordered = planning.extractStacks(planned);
+    List<ItemStack> rackPlanned = planning.extractStacks(planned);
+    List<ItemStack> ordered = Lists.newArrayList(rackPlanned);
     List<ItemStack> networkOrdered = Lists.newArrayList();
-    int plannedCount = ordered.stream().mapToInt(ItemStack::getCount).sum();
+    int plannedCount = rackPlanned.stream().mapToInt(ItemStack::getCount).sum();
     int remaining = Math.max(0, provide - plannedCount);
-    String requesterName = null;
-    int inflightRemaining = 0;
-    int effectiveNetworkNeeded = remaining;
+    CreateShopNetworkOrderService.OrderResult networkOrder = null;
     if (remaining > 0 && workerWorking) {
-      requesterName = messaging.resolveRequesterName(manager, request);
-      inflightRemaining = pickup.getInflightRemaining(deliverable.getResult(), requestId);
-      if (inflightRemaining <= 0) {
-        inflightRemaining =
-            pickup.getInflightRemaining(
-                deliverable.getResult(), requesterName, tile.getShopAddress());
-      }
-      effectiveNetworkNeeded = ShopStockAccounting.networkOrderAmount(remaining, inflightRemaining);
-      if (effectiveNetworkNeeded > 0) {
-        networkOrdered.addAll(
-            stockResolver.requestFromNetwork(
-                tile,
-                deliverable,
-                effectiveNetworkNeeded,
-                requesterName,
-                CreateShopRequestResolver.toRequestId(request.getId())));
-        ordered.addAll(networkOrdered);
-      }
+      networkOrder =
+          networkOrderService.orderMissing(
+              tile,
+              pickup,
+              deliverable,
+              requestId,
+              remaining,
+              () -> networkAvailable,
+              messaging.resolveRequesterName(manager, request));
+      networkOrdered.addAll(networkOrder.ordered());
+      ordered.addAll(networkOrdered);
     }
+    int effectiveNetworkNeeded = networkOrder == null ? remaining : networkOrder.orderedCount();
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] attemptResolve provide={} (available={}, reserved={}, needed={}, remaining={}, inflightRemaining={}, effectiveNetworkNeeded={}) -> ordered {} stack(s)",
+          "[CreateShop] attemptResolve provide={} (available={}, reserved={}, needed={}, remaining={}, inflightRemaining={}, claimed={}, orderedNow={}) -> ordered {} stack(s)",
           provide,
           available,
           reservedForOthers,
           needed,
           remaining,
-          inflightRemaining,
+          networkOrder == null ? 0 : networkOrder.ownInflight(),
+          networkOrder == null ? 0 : networkOrder.claimed(),
           effectiveNetworkNeeded,
           ordered.size());
     }
@@ -287,7 +284,10 @@ final class CreateShopAttemptResolveService {
       }
     }
 
-    if (ordered.isEmpty() && remaining > 0 && workerWorking && effectiveNetworkNeeded <= 0) {
+    if (ordered.isEmpty()
+        && remaining > 0
+        && networkOrder != null
+        && networkOrder.somethingOnItsWay()) {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:wait-existing-inflight");
@@ -295,11 +295,10 @@ final class CreateShopAttemptResolveService {
       return Lists.newArrayList();
     }
 
-    if (!ordered.isEmpty()) {
-      for (ItemStack stack : ordered) {
-        if (stack.isEmpty()) {
-          continue;
-        }
+    // Only rack stock is reserved. What was ordered from the network is tracked as on its way and
+    // reserved for this request when it arrives.
+    for (ItemStack stack : rackPlanned) {
+      if (!stack.isEmpty()) {
         pickup.reserve(requestId, stack.copy(), stack.getCount());
       }
     }

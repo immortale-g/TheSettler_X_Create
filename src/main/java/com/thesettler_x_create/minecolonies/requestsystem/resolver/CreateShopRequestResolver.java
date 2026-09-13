@@ -126,6 +126,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     CreateShopFlowStateRehydrateService flowStateRehydrateService =
         new CreateShopFlowStateRehydrateService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
+    CreateShopNetworkOrderService networkOrderService =
+        new CreateShopNetworkOrderService(stockResolver);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
             requestStateMutatorService,
@@ -137,17 +139,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             planning,
             stockResolver,
             diagnostics,
-            flowStateMachine);
+            flowStateMachine,
+            networkOrderService);
     this.resolverCallbackService =
         new CreateShopResolverCallbackService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
     CreateShopPendingTopupService pendingTopupService =
         new CreateShopPendingTopupService(
-            diagnostics, flowStateMachine, stockResolver, messaging, requestStateMutatorService);
+            diagnostics,
+            flowStateMachine,
+            stockResolver,
+            messaging,
+            requestStateMutatorService,
+            networkOrderService);
     CreateShopPendingDeliveryCreationService pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
-    this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
+    this.reservationReleaseService = new CreateShopReservationReleaseService();
     CreateShopChildReconciliationService childReconciliationService =
         new CreateShopChildReconciliationService(
             deliveryManager,

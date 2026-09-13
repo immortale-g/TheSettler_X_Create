@@ -44,9 +44,15 @@ final class CreateShopReservationSyncService {
       return 0;
     }
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
+    // Goods this request ordered itself are reserved for it when they arrive; free rack stock is
+    // only for what is not on its way, or another request loses stock that is already here.
+    int ownInflight = pickup.getInflightRemainingFor(requestId, deliverable::matches);
     int reserveTarget =
         ShopStockAccounting.reservableFromRack(
-            rackAvailable, reservedForDeliverable, pendingCount, reservedForRequest);
+            rackAvailable,
+            reservedForDeliverable,
+            ShopStockAccounting.rackReservationNeed(pendingCount, ownInflight),
+            reservedForRequest);
     if (reserveTarget <= 0) {
       return 0;
     }

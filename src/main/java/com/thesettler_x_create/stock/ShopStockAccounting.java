@@ -90,6 +90,25 @@ public final class ShopStockAccounting {
   }
 
   /**
+   * How much of an arrival its request may reserve: what arrived, capped at the rack stock no other
+   * Create request has reserved. Legacy reservations made when ordering already cover goods on
+   * their way, so reserving the arrival on top of them would count the same items twice.
+   */
+  public static int arrivalReservation(int arrived, int rackStock, int reservedByRequests) {
+    int free = Math.max(0, rackStock - Math.max(0, reservedByRequests));
+    return Math.max(0, Math.min(arrived, free));
+  }
+
+  /**
+   * The part of a request's pending amount that rack stock may still be reserved for: what is
+   * neither reserved yet nor on its way for the request. A request must not take free rack stock
+   * for goods it has ordered itself, or another request loses stock that is already here.
+   */
+  public static int rackReservationNeed(int pendingCount, int ownInflight) {
+    return Math.max(0, pendingCount - Math.max(0, ownInflight));
+  }
+
+  /**
    * What a warehouse pickup must leave in the shop of one item kind: everything in the racks (the
    * shopkeeper decides what leaves them) and at least everything reserved, even when part of it
    * sits in the hut buffer.

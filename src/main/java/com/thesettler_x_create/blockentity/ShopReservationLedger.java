@@ -90,6 +90,12 @@ class ShopReservationLedger {
     return key == null || key.isEmpty() ? 0 : book.reservedFor(key);
   }
 
+  /** Returns total reserved count for a stack key by every request except the given ones. */
+  int getReservedForExcluding(ItemStack key, Set<UUID> excludedRequests) {
+    expireOnServerThread();
+    return key == null || key.isEmpty() ? 0 : book.reservedForExcluding(key, excludedRequests);
+  }
+
   /** Returns total reserved count for a deliverable match. */
   int getReservedForDeliverable(IDeliverable deliverable) {
     if (deliverable == null) {
