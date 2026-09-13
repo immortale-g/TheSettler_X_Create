@@ -8,6 +8,8 @@ import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -109,11 +111,17 @@ final class CreateShopDeliveryChildLedgerService {
     // the request comes straight back as a new order. The old heuristic finished a task whenever a
     // courier stood within two blocks of the delivery target, which is where warehouse couriers
     // idle anyway, so it fired before the courier had even walked to the shop.
-    if (snapshot.courierTaskMatchCount() > 0 && entry.pickupConfirmedAtTick < 0L) {
+    // The real pickup signal is the hut reporting the items leaving (observePickup). A courier
+    // holding the task only counts once the parent's reservation is used up, i.e. the goods have
+    // left the shop; this covers deliveries gathered before a reload, which are never extracted
+    // again. Having the task alone says nothing about the items having moved.
+    if (snapshot.courierTaskMatchCount() > 0
+        && entry.pickupConfirmedAtTick < 0L
+        && isParentReservationUsedUp(resolver, manager, parentToken)) {
       entry.pickupConfirmedAtTick = now;
       entry.diagnosisCode = "COURIER_PICKUP_CONFIRMED";
       entry.diagnosisDetail =
-          "pickup confirmed by courier task match (carryMatches="
+          "pickup confirmed by courier task match after reservation was used up (carryMatches="
               + snapshot.courierCarryMatchCount()
               + ")";
     }
@@ -156,6 +164,40 @@ final class CreateShopDeliveryChildLedgerService {
       }
     }
     logLedger(resolver, entry, now, "poll");
+  }
+
+  /** Records that a courier took this delivery's items out of the shop. */
+  void observePickup(
+      CreateShopRequestResolver resolver,
+      Level level,
+      IToken<?> parentToken,
+      IToken<?> childToken) {
+    if (resolver == null || level == null || parentToken == null || childToken == null) {
+      return;
+    }
+    Map<IToken<?>, CreateShopDeliveryChildLedgerEntry> map = resolver.getDeliveryChildLedger();
+    CreateShopDeliveryChildLedgerEntry entry =
+        map.computeIfAbsent(childToken, CreateShopDeliveryChildLedgerEntry::new);
+    long now = level.getGameTime();
+    if (entry.firstSeenAtTick < 0L) {
+      entry.firstSeenAtTick = now;
+    }
+    entry.parentToken = parentToken;
+    entry.lastSeenAtTick = now;
+    if (entry.pickupConfirmedAtTick < 0L) {
+      entry.pickupConfirmedAtTick = now;
+      entry.diagnosisCode = "COURIER_PICKUP_OBSERVED";
+      entry.diagnosisDetail = "items taken out of the shop hut";
+    }
+    logLedger(resolver, entry, now, "pickup");
+  }
+
+  private static boolean isParentReservationUsedUp(
+      CreateShopRequestResolver resolver, IStandardRequestManager manager, IToken<?> parentToken) {
+    BuildingCreateShop shop = resolver.getShop(manager);
+    CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
+    return pickup != null
+        && pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(parentToken)) <= 0;
   }
 
   void observeMissingChild(

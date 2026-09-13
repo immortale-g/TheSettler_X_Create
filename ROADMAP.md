@@ -59,6 +59,11 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
 - Reservierungen werden bei der Abholung verbraucht, sofern sich die Abholung verlässlich beobachten
   lässt, sonst bei der Ablieferung.
 - Signatur-Match in `finalizeOrphanDeliveryChild` entfernen.
+- `pickupConfirmedAtTick` erst setzen, wenn die Ware die Hütte wirklich verlässt (zwei
+  Recovery-Pfade hängen daran). Die Kurier-Aufgabe allein zählt nur noch, wenn die Reservierung des
+  Requests schon aufgebraucht ist (Deliveries, die vor einem Reload eingesammelt wurden).
+- Housekeeping: Unreservierte Ware erst nach 5 Minuten (Config) in die Hütte tragen, Alter wird
+  gespeichert. Ein Warehouse-Pickup nimmt keine Rack-Ware und nichts Reserviertes mehr mit.
 
 ### 0.5.0: Bestellungen gehören dem Shop
 
@@ -76,8 +81,6 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
   reproduzierbar sind.
 - `ShopCourierDiagnostics` verändert per Reflection Citizen-Zustand, sobald `debugLogging` an ist.
   Eine Diagnose darf nur beobachten.
-- `pickupConfirmedAtTick` wird gesetzt, sobald ein Kurier die Aufgabe hat, nicht wenn er die Ware
-  trägt. Zwei Recovery-Pfade hängen an diesem Flag. Wird mit 0.4.0 angegangen.
 - Requests, die mindestens `minimumCount` erhalten haben und bei leerem Create-Netz festhängen,
   blockieren andere Resolver. Klären, ob sie nach einer Frist abgeschlossen oder freigegeben werden.
 - `attemptResolve` umbauen, sobald die Bestandsformeln aus 0.4.0/0.5.0 getestet vorliegen.

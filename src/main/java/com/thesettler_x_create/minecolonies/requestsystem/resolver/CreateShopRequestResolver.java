@@ -634,6 +634,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
         this, manager, level, parentToken, childToken, child, assignedResolverToken, source);
   }
 
+  void observeDeliveryChildPickup(Level level, IToken<?> parentToken, IToken<?> childToken) {
+    deliveryChildLedgerService.observePickup(this, level, parentToken, childToken);
+  }
+
   void observeDeliveryChildMissing(
       Level level, IToken<?> parentToken, IToken<?> childToken, String source, String detail) {
     deliveryChildLedgerService.observeMissingChild(

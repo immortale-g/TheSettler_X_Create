@@ -12,10 +12,11 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.stock.PickupTracker;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /**
  * Consumes a request's reservation at the moment a courier takes its items out of the shop.
@@ -44,15 +45,18 @@ final class CreateShopPickupObservationService {
     if (pickup == null) {
       return;
     }
-    Set<IToken<?>> queuedDeliveries = new HashSet<>();
+    Map<IToken<?>, IToken<?>> parentByDelivery = new HashMap<>();
     List<PickupTracker.QueuedDelivery<IToken<?>>> candidates = new ArrayList<>();
-    collectQueuedShopDeliveries(manager, shop, pickup, taken, queuedDeliveries, candidates);
-    tracker.retainOnly(queuedDeliveries);
-    if (pickup.getReservedFor(taken) <= 0) {
+    collectQueuedShopDeliveries(manager, shop, pickup, taken, parentByDelivery, candidates);
+    tracker.retainOnly(parentByDelivery.keySet());
+    if (candidates.isEmpty()) {
       return;
     }
+    Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
     for (PickupTracker.Allocation<IToken<?>> allocation :
         tracker.recordTaken(taken.getCount(), candidates)) {
+      resolver.observeDeliveryChildPickup(
+          level, parentByDelivery.get(allocation.delivery()), allocation.delivery());
       int consumed =
           pickup.consumeReservedForRequest(allocation.owner(), taken, allocation.amount());
       if (resolver.isDebugLoggingEnabled()) {
@@ -72,7 +76,7 @@ final class CreateShopPickupObservationService {
       BuildingCreateShop shop,
       CreateShopBlockEntity pickup,
       ItemStack taken,
-      Set<IToken<?>> queuedDeliveries,
+      Map<IToken<?>, IToken<?>> parentByDelivery,
       List<PickupTracker.QueuedDelivery<IToken<?>>> candidates) {
     IColony colony = manager.getColony();
     if (colony == null || colony.getCitizenManager() == null) {
@@ -92,7 +96,7 @@ final class CreateShopPickupObservationService {
                 delivery, shop, pickup)) {
           continue;
         }
-        queuedDeliveries.add(token);
+        parentByDelivery.put(token, request.getParent());
         if (ItemStack.isSameItemSameComponents(delivery.getStack(), taken)) {
           candidates.add(
               new PickupTracker.QueuedDelivery<>(
