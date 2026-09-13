@@ -47,7 +47,7 @@ final class CreateShopPickupObservationService {
     }
     Map<IToken<?>, IToken<?>> parentByDelivery = new HashMap<>();
     List<PickupTracker.QueuedDelivery<IToken<?>>> candidates = new ArrayList<>();
-    collectQueuedShopDeliveries(manager, shop, pickup, taken, parentByDelivery, candidates);
+    collectQueuedShopDeliveries(manager, shop, taken, parentByDelivery, candidates);
     tracker.retainOnly(parentByDelivery.keySet());
     if (candidates.isEmpty()) {
       return;
@@ -74,7 +74,6 @@ final class CreateShopPickupObservationService {
   private static void collectQueuedShopDeliveries(
       IRequestManager manager,
       BuildingCreateShop shop,
-      CreateShopBlockEntity pickup,
       ItemStack taken,
       Map<IToken<?>, IToken<?>> parentByDelivery,
       List<PickupTracker.QueuedDelivery<IToken<?>>> candidates) {
@@ -92,8 +91,7 @@ final class CreateShopPickupObservationService {
         if (request == null
             || !request.hasParent()
             || !(request.getRequest() instanceof Delivery delivery)
-            || !CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(
-                delivery, shop, pickup)) {
+            || !CreateShopDeliveryOriginMatcher.isDeliveryFromShopHut(delivery, shop)) {
           continue;
         }
         parentByDelivery.put(token, request.getParent());

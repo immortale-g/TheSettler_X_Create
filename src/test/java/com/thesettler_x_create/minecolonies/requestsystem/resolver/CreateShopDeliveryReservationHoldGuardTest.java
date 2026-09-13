@@ -1,5 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,7 +28,16 @@ class CreateShopDeliveryReservationHoldGuardTest {
     assertTrue(
         observationSource.contains(
             "pickup.consumeReservedForRequest(allocation.owner(), taken, allocation.amount())"));
-    assertFalse(completionSource.contains("consumeReservedForRequest"));
+    assertTrue(
+        observationSource.contains(
+            "!CreateShopDeliveryOriginMatcher.isDeliveryFromShopHut(delivery, shop)"));
+    // Only deliveries from before 0.4.0, which do not start at the hut, still consume on arrival.
+    int consume = completionSource.indexOf("pickup.consumeReservedForRequest(");
+    int hutCheck =
+        completionSource.indexOf(
+            "!CreateShopDeliveryOriginMatcher.isDeliveryFromShopHut(delivery, shop)");
+    assertTrue(hutCheck >= 0 && consume > hutCheck);
+    assertEquals(consume, completionSource.lastIndexOf("pickup.consumeReservedForRequest("));
   }
 
   @Test

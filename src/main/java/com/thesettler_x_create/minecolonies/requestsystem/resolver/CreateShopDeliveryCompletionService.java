@@ -79,10 +79,15 @@ final class CreateShopDeliveryCompletionService {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
           pickup.clearInflightByUuid(parentRequestId);
           ItemStack stack = delivery.getStack().copy();
-          // The reservation was consumed when the courier took the items out of the shop
-          // (CreateShopPickupObservationService). Consuming it again here would eat a sibling
-          // delivery's share that is still in the rack. What a delivery never picked up is
-          // released with its parent request.
+          // A delivery starting at the hut had its reservation consumed when the courier took the
+          // items out (CreateShopPickupObservationService); consuming it again here would eat a
+          // sibling delivery's share that is still in the rack. A delivery created before 0.4.0
+          // starts at a rack, is gathered past the hut and never reported, so it keeps the old
+          // behavior and consumes on completion.
+          if (!stack.isEmpty()
+              && !CreateShopDeliveryOriginMatcher.isDeliveryFromShopHut(delivery, shop)) {
+            pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
+          }
           if (resolver.isDebugLoggingEnabled()) {
             int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
             int reservedForStack = pickup.getReservedFor(stack);
