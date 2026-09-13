@@ -8,22 +8,49 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class CreateShopDeliveryReservationHoldGuardTest {
+  private static final String RESOLVER_DIR =
+      "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/";
+
   @Test
-  void keepsPickupReservationUntilTerminalDeliveryCleanup() throws Exception {
+  void keepsPickupReservationUntilTheItemsLeaveTheShop() throws Exception {
     String reconciliationSource =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
+        Files.readString(Path.of(RESOLVER_DIR + "CreateShopChildReconciliationService.java"));
     String completionSource =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryCompletionService.java"));
+        Files.readString(Path.of(RESOLVER_DIR + "CreateShopDeliveryCompletionService.java"));
+    String observationSource =
+        Files.readString(Path.of(RESOLVER_DIR + "CreateShopPickupObservationService.java"));
 
     assertFalse(reconciliationSource.contains("reservation release on courier pickup"));
     assertFalse(reconciliationSource.contains("pickup.release(parentRequestId)"));
     assertTrue(reconciliationSource.contains("held by reservation="));
+    // Consumed once, by exactly the amount a courier took out, never again on arrival.
     assertTrue(
-        completionSource.contains(
-            "pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount())"));
+        observationSource.contains(
+            "pickup.consumeReservedForRequest(allocation.owner(), taken, allocation.amount())"));
+    assertFalse(completionSource.contains("consumeReservedForRequest"));
+  }
+
+  @Test
+  void shopHutReportsTakenItemsToTheResolver() throws Exception {
+    String hutSource =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/tileentity/TileEntityCreateShop.java"));
+    String resolverSource =
+        Files.readString(Path.of(RESOLVER_DIR + "CreateShopRequestResolver.java"));
+    String observationSource =
+        Files.readString(Path.of(RESOLVER_DIR + "CreateShopPickupObservationService.java"));
+
+    assertTrue(hutSource.contains("public IItemHandler getItemHandlerCap(Direction side)"));
+    assertTrue(hutSource.contains("new ObservedHutItemHandler(combined, this::onHutItemsTaken)"));
+    assertTrue(
+        hutSource.contains(
+            "resolver.onHutItemsTaken(shop.getColony().getRequestManager(), taken)"));
+    assertTrue(
+        resolverSource.contains(
+            "pickupObservationService.onHutItemsTaken(this, pickupTracker, manager, taken)"));
+    // Reading the courier queue must not assign work to the courier.
+    assertTrue(observationSource.contains("job.getTaskQueue()"));
+    assertFalse(observationSource.contains(".getCurrentTask()"));
   }
 }

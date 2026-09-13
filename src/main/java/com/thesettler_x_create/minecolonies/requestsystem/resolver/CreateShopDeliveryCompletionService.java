@@ -14,9 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/**
- * Handles delivery completion reconciliation and reservation consumption for Create Shop requests.
- */
+/** Handles delivery completion reconciliation for Create Shop requests. */
 final class CreateShopDeliveryCompletionService {
   private final CreateShopDeliveryManager deliveryManager;
   private final CreateShopResolverDiagnostics diagnostics;
@@ -81,25 +79,13 @@ final class CreateShopDeliveryCompletionService {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
           pickup.clearInflightByUuid(parentRequestId);
           ItemStack stack = delivery.getStack().copy();
-          int reservedForStackBefore = pickup.getReservedFor(stack);
-          if (!stack.isEmpty()) {
-            pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
-          }
-          int reservedForStackAfter = pickup.getReservedFor(stack);
-          int consumedReserved = Math.max(0, reservedForStackBefore - reservedForStackAfter);
-          if (consumedReserved > 0 && parentRequest != null) {
-            resolver.transitionFlow(
-                manager,
-                parentRequest,
-                CreateShopFlowState.RESERVED_FOR_DELIVERY,
-                "delivery-complete:reserved-consumed",
-                CreateShopStackMetrics.describeStack(stack),
-                consumedReserved,
-                "com.thesettler_x_create.message.createshop.flow_reserved");
-          }
+          // The reservation was consumed when the courier took the items out of the shop
+          // (CreateShopPickupObservationService). Consuming it again here would eat a sibling
+          // delivery's share that is still in the rack. What a delivery never picked up is
+          // released with its parent request.
           if (resolver.isDebugLoggingEnabled()) {
             int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
-            int reservedForStack = reservedForStackAfter;
+            int reservedForStack = pickup.getReservedFor(stack);
             BlockPos pickupPosition = pickup.getBlockPos();
             deliveryManager.logDeliveryDiagnostics(
                 "complete",
@@ -113,14 +99,13 @@ final class CreateShopDeliveryCompletionService {
                 -1,
                 reservedForStack);
             TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={} reservedConsumed={}",
+                "[CreateShop] delivery complete detail token={} parent={} stack={} count={} start={} target={}",
                 request.getId(),
                 parentToken,
                 stack.isEmpty() ? "<empty>" : stack.getItem().toString(),
                 stack.getCount(),
                 startPos,
-                delivery.getTarget().getInDimensionLocation(),
-                consumedReserved);
+                delivery.getTarget().getInDimensionLocation());
           }
         }
       } catch (Exception ignored) {

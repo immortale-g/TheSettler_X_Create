@@ -13,11 +13,13 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.stock.PickupTracker;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
@@ -69,6 +71,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopResolverCallbackService resolverCallbackService;
   private final CreateShopRequestStateMachine flowStateMachine =
       new CreateShopRequestStateMachine();
+  private final CreateShopPickupObservationService pickupObservationService =
+      new CreateShopPickupObservationService();
+  private final PickupTracker<IToken<?>> pickupTracker = new PickupTracker<>();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -241,6 +246,11 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
     deliveryCallbackService.onDeliveryComplete(manager, request);
+  }
+
+  /** Called by the shop hut when items leave its combined inventory. */
+  public void onHutItemsTaken(IRequestManager manager, ItemStack taken) {
+    pickupObservationService.onHutItemsTaken(this, pickupTracker, manager, taken);
   }
 
   void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {

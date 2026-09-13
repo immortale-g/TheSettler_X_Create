@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.tileentity;
 
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.inventory.InventoryCitizen;
+import com.minecolonies.api.inventory.api.CombinedItemHandler;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
@@ -46,6 +47,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   private final CreateNetworkPerfLogger perfLogger = new CreateNetworkPerfLogger();
 
   private final ShopRackAccess rackAccess = new ShopRackAccess(this);
+
+  // Rebuilt whenever MineColonies rebuilds the combined inventory it wraps.
+  @Nullable private ObservedHutItemHandler observedHut;
 
   public TileEntityCreateShop(BlockPos pos, BlockState state) {
     super(ModBlockEntities.CREATE_SHOP_BUILDING.get(), pos, state);
@@ -185,6 +189,36 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   @Override
   public void dumpInventoryIntoWareHouse(InventoryCitizen inventory) {
     rackAccess.dumpInventoryIntoWareHouse(inventory);
+  }
+
+  /**
+   * The hut's combined rack inventory, wrapped so the shop sees items that leave it. Couriers
+   * gather deliveries starting at the hut through this inventory; the shop's own rack work goes to
+   * the racks directly and is not reported.
+   */
+  @Override
+  public IItemHandler getItemHandlerCap(Direction side) {
+    IItemHandler handler = super.getItemHandlerCap(side);
+    if (!(handler instanceof CombinedItemHandler combined)) {
+      return handler;
+    }
+    if (observedHut == null || observedHut.delegate() != combined) {
+      observedHut = new ObservedHutItemHandler(combined, this::onHutItemsTaken);
+    }
+    return observedHut;
+  }
+
+  private void onHutItemsTaken(ItemStack taken) {
+    if (level == null
+        || level.isClientSide
+        || !(getBuilding() instanceof BuildingCreateShop shop)) {
+      return;
+    }
+    var resolver = shop.getShopResolver();
+    if (resolver == null || shop.getColony() == null) {
+      return;
+    }
+    resolver.onHutItemsTaken(shop.getColony().getRequestManager(), taken);
   }
 
   /**
