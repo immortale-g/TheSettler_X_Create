@@ -18,9 +18,9 @@ class CreateShopRequestResolverInflightAttemptResolveGuardTest {
     assertTrue(source.contains("deliverable.getResult()"));
     assertTrue(source.contains("tile.getShopAddress()"));
     assertTrue(source.contains("int effectiveNetworkNeeded = remaining;"));
+    // The arithmetic itself is covered by ShopStockAccountingTest.
     assertTrue(
-        source.contains(
-            "effectiveNetworkNeeded = Math.max(0, remaining - Math.max(0, inflightRemaining));"));
+        source.contains("ShopStockAccounting.networkOrderAmount(remaining, inflightRemaining);"));
     assertTrue(source.contains("attemptResolve:wait-existing-inflight"));
   }
 }

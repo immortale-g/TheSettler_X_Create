@@ -17,9 +17,9 @@ class CreateShopRequestResolverInflightTopupGuardTest {
     assertTrue(source.contains("pickup.getInflightRemaining("));
     assertTrue(source.contains("deliverable.getResult()"));
     assertTrue(source.contains("tile.getShopAddress()"));
+    // The arithmetic itself is covered by ShopStockAccountingTest.
     assertTrue(
-        source.contains(
-            "int effectiveTopupNeeded = Math.max(0, topupNeeded - Math.max(0, inflightRemaining));"));
+        source.contains("ShopStockAccounting.networkOrderAmount(topupNeeded, inflightRemaining);"));
     assertTrue(source.contains("tickPending:wait-inflight"));
     assertTrue(source.contains("network topup blocked (inflightRemaining={}, topupNeeded={}"));
   }

@@ -7,6 +7,7 @@ import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -95,7 +96,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     }
 
     int reserved = shopBlockEntity.getReservedFor(key);
-    int extractable = reserved > 0 ? Math.min(amount, reserved) : Math.min(amount, available);
+    int extractable = ShopStockAccounting.extractable(amount, reserved, available);
     if (extractable <= 0) {
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
         TheSettlerXCreate.LOGGER.info(

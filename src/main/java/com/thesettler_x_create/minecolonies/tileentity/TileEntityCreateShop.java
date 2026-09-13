@@ -10,6 +10,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkPerfLogger;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -514,7 +515,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
                 || budget.key == null
                 || budget.key.isEmpty()
                 || (budget.remaining =
-                        Math.max(0, budget.remaining - pickup.getReservedFor(budget.key)))
+                        ShopStockAccounting.unreservedStock(
+                            budget.remaining, pickup.getReservedFor(budget.key)))
                     <= 0);
     // Perma-items belong to the output block packager — never move them to the hut via cleanup.
     if (getBuilding() instanceof BuildingCreateShop shop && shop.canUsePermaRequests()) {

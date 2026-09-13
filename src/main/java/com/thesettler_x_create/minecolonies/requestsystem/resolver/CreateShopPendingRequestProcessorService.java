@@ -11,6 +11,7 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.UUID;
 import java.util.function.Function;
 import net.minecraft.world.level.Level;
@@ -187,9 +188,9 @@ final class CreateShopPendingRequestProcessorService {
     int rackAvailable = resolver.getPlanning().getAvailableFromRacks(tile, deliverable);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
     int rackAvailableForRequest =
-        Math.max(
-            0,
-            rackAvailable - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
+        ShopStockAccounting.usableRackStock(
+            rackAvailable,
+            ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest));
     int reservedSynced =
         reservationSyncService.syncReservationsFromRack(
             resolver,
@@ -206,10 +207,9 @@ final class CreateShopPendingRequestProcessorService {
       reservedForRequest += reservedSynced;
       reservedForDeliverable += reservedSynced;
       rackAvailableForRequest =
-          Math.max(
-              0,
-              rackAvailable
-                  - Math.max(0, reservedForDeliverable - Math.max(0, reservedForRequest)));
+          ShopStockAccounting.usableRackStock(
+              rackAvailable,
+              ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest));
     }
     pendingTopupService.handleTopup(
         resolver,

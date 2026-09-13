@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import net.minecraft.world.level.Level;
 
 /** Decides whether pending processing can continue and normalizes pending quantity state. */
@@ -35,7 +36,7 @@ final class CreateShopPendingStateDecisionService {
       String requestIdLog) {
     int trackedPending = Math.max(0, resolver.getPendingTracker().getPendingCount(request.getId()));
     int derivedPending = outstandingNeededService.compute(request, deliverable, reservedForRequest);
-    int pendingCount = Math.max(0, Math.max(reservedForRequest, derivedPending));
+    int pendingCount = ShopStockAccounting.pendingCount(reservedForRequest, derivedPending);
     if (pendingCount != trackedPending) {
       requestStateMutatorService.markOrderedWithPending(
           resolver, null, request.getId(), pendingCount);
