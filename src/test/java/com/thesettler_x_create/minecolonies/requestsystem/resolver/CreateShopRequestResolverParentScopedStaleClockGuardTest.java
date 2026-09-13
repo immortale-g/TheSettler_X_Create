@@ -1,7 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,7 +33,5 @@ class CreateShopRequestResolverParentScopedStaleClockGuardTest {
 
     assertFalse(reconcileSource.contains("isStaleDeliveryChild("));
     assertFalse(reconcileSource.contains("isStaleRecoveryArmed("));
-    // Extra-active-child guard (duplicate children) is still present.
-    assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
   }
 }

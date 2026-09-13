@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * After Phase 3.5, stale delivery-child recovery has been removed. MineColonies owns the delivery
- * lifecycle after DELIVERY_CREATED. The extra-active-child guard (duplicate children for one
- * parent) is retained. This guard confirms both the removal and the remaining invariants.
+ * lifecycle after DELIVERY_CREATED. The extra-active-child recovery is detached as well (see {@link
+ * CreateShopExtraActiveChildRecoveryDetachedGuardTest}); the local-origin check stays.
  */
 class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
   @Test
@@ -35,21 +35,19 @@ class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
   }
 
   @Test
-  void extraActiveChildGuardAndLocalOriginCheckAreRetained() throws Exception {
-    String reconcileSource =
-        Files.readString(
-            Path.of(
-                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java"));
+  void localOriginCheckIsRetained() throws Exception {
+    String reconcileCode =
+        CreateShopGuardSource.activeCode(
+            Files.readString(
+                Path.of(
+                    "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopChildReconciliationService.java")));
     String resolverSource =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopRequestResolver.java"));
 
-    assertTrue(reconcileSource.contains(CreateShopGuardConstants.EXTRA_ACTIVE_CHILD_RECOVERY));
-    assertTrue(reconcileSource.contains("isLocalShopDeliveryChild("));
-    assertTrue(reconcileSource.contains("skip (non-local delivery child)"));
+    assertTrue(reconcileCode.contains("isLocalShopDeliveryChild("));
+    assertTrue(reconcileCode.contains("skip (non-local delivery child)"));
     assertTrue(resolverSource.contains("runtimeStateStore"));
-    // Recovery service (for duplicate-child cancellation) still exists
-    assertTrue(reconcileSource.contains("deliveryChildRecoveryService.recover("));
   }
 }
