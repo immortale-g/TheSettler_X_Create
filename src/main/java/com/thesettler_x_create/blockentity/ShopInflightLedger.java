@@ -24,13 +24,13 @@ class ShopInflightLedger {
   private static final String TAG_INFLIGHT_BASELINES = "InflightBaselines";
   private static final int MAX_OPEN_INFLIGHT_SEGMENTS_PER_TUPLE = 2;
 
-  private final CreateShopBlockEntity owner;
+  private final LedgerHost host;
   private final List<InflightEntry> inflightEntries = new ArrayList<>();
   private final List<BaselineEntry> inflightBaselines = new ArrayList<>();
   private long lastInflightLogTime;
 
-  ShopInflightLedger(CreateShopBlockEntity owner) {
-    this.owner = owner;
+  ShopInflightLedger(LedgerHost host) {
+    this.host = host;
   }
 
   /** Returns unique stack keys currently tracked as inflight. */
@@ -61,13 +61,13 @@ class ShopInflightLedger {
       String requesterName,
       String address,
       @Nullable UUID requestUuid) {
-    if (!owner.ensureServerThread("recordInflight")) {
+    if (!host.ensureServerThread("recordInflight")) {
       return;
     }
     if (stacks == null || stacks.isEmpty()) {
       return;
     }
-    long now = owner.getGameTimeSafe();
+    long now = host.gameTime();
     boolean changed = false;
     for (ItemStack stack : stacks) {
       if (stack == null || stack.isEmpty() || stack.getCount() <= 0) {
@@ -85,20 +85,20 @@ class ShopInflightLedger {
       changed = true;
     }
     if (changed) {
-      owner.setChanged();
+      host.markChanged();
     }
   }
 
   /** Reconciles inflight entries against current rack counts to detect arrivals. */
   void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
-    if (!owner.ensureServerThread("reconcileInflight")) {
+    if (!host.ensureServerThread("reconcileInflight")) {
       return;
     }
     if (inflightEntries.isEmpty()) {
       return;
     }
     ensureBaselines(currentCounts);
-    long now = owner.getGameTimeSafe();
+    long now = host.gameTime();
     boolean changed = false;
     for (BaselineEntry baseline : inflightBaselines) {
       int current = findCount(currentCounts, baseline.stackKey);
@@ -135,13 +135,13 @@ class ShopInflightLedger {
       logOverdue(now);
     }
     if (changed) {
-      owner.setChanged();
+      host.markChanged();
     }
   }
 
   /** Marks overdue inflight entries as notified and returns notices to surface. */
   List<CreateShopBlockEntity.InflightNotice> consumeOverdueNotices(long now, long timeout) {
-    if (!owner.ensureServerThread("consumeOverdueNotices")) {
+    if (!host.ensureServerThread("consumeOverdueNotices")) {
       return java.util.Collections.emptyList();
     }
     if (timeout <= 0L || inflightEntries.isEmpty()) {
@@ -178,7 +178,7 @@ class ShopInflightLedger {
       return java.util.Collections.emptyList();
     }
     selected.notified = true;
-    owner.setChanged();
+    host.markChanged();
     long age = now - selected.requestedAt;
     return java.util.List.of(
         new CreateShopBlockEntity.InflightNotice(
@@ -203,7 +203,7 @@ class ShopInflightLedger {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!owner.ensureServerThread("consumeInflight")) {
+    if (!host.ensureServerThread("consumeInflight")) {
       return 0;
     }
     if (stackKey == null || stackKey.isEmpty() || amount <= 0 || inflightEntries.isEmpty()) {
@@ -231,13 +231,13 @@ class ShopInflightLedger {
     }
     if (changed) {
       pruneBaselines();
-      owner.setChanged();
+      host.markChanged();
     }
     return consumed;
   }
 
   int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid) {
-    if (!owner.ensureServerThread("getInflightRemaining")) {
+    if (!host.ensureServerThread("getInflightRemaining")) {
       return 0;
     }
     if (stackKey == null
@@ -269,7 +269,7 @@ class ShopInflightLedger {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!owner.ensureServerThread("getInflightRemaining")) {
+    if (!host.ensureServerThread("getInflightRemaining")) {
       return 0;
     }
     if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
@@ -300,7 +300,7 @@ class ShopInflightLedger {
       @Nullable String requesterName,
       @Nullable String address,
       long requestedAt) {
-    if (!owner.ensureServerThread("cancelInflight")) {
+    if (!host.ensureServerThread("cancelInflight")) {
       return 0;
     }
     if (stackKey == null || stackKey.isEmpty() || inflightEntries.isEmpty()) {
@@ -315,13 +315,13 @@ class ShopInflightLedger {
     }
     if (removed > 0) {
       pruneBaselines();
-      owner.setChanged();
+      host.markChanged();
     }
     return removed;
   }
 
   int cancelInflightByUuid(@Nullable UUID requestUuid) {
-    if (!owner.ensureServerThread("cancelInflightByUuid")) {
+    if (!host.ensureServerThread("cancelInflightByUuid")) {
       return 0;
     }
     if (requestUuid == null || inflightEntries.isEmpty()) {
@@ -338,7 +338,7 @@ class ShopInflightLedger {
     }
     if (removed > 0) {
       pruneBaselines();
-      owner.setChanged();
+      host.markChanged();
     }
     return removed;
   }
@@ -348,7 +348,7 @@ class ShopInflightLedger {
     for (InflightEntry e : inflightEntries) {
       if (requestUuid.equals(e.requestUuid)) {
         e.handedOff = true;
-        owner.setChanged();
+        host.markChanged();
         return;
       }
     }
@@ -359,7 +359,7 @@ class ShopInflightLedger {
     boolean removed = inflightEntries.removeIf(e -> requestUuid.equals(e.requestUuid));
     if (removed) {
       pruneBaselines();
-      owner.setChanged();
+      host.markChanged();
       return 1;
     }
     return 0;
@@ -374,13 +374,13 @@ class ShopInflightLedger {
       @Nullable String requesterName,
       @Nullable String address,
       long ageTicks) {
-    if (!owner.ensureServerThread("debugInjectInflight")) {
+    if (!host.ensureServerThread("debugInjectInflight")) {
       return 0;
     }
     if (stackKey == null || stackKey.isEmpty() || amount <= 0) {
       return 0;
     }
-    long now = owner.getGameTimeSafe();
+    long now = host.gameTime();
     long requestedAt = Math.max(0L, now - Math.max(0L, ageTicks));
     ItemStack key = makeKey(stackKey);
     upsertBaseline(key, 0);
@@ -388,14 +388,14 @@ class ShopInflightLedger {
         new InflightEntry(
             key, Math.max(1, amount), requestedAt, sanitize(requesterName), sanitize(address)));
     compactInflightEntriesForPromptStability();
-    owner.setChanged();
+    host.markChanged();
     return amount;
   }
 
   /** Debug helper: returns the oldest active inflight tuple, regardless of overdue state. */
   @Nullable
   CreateShopBlockEntity.InflightNotice debugPeekOldestInflightNotice(long now) {
-    if (!owner.ensureServerThread("debugPeekOldestInflightNotice")) {
+    if (!host.ensureServerThread("debugPeekOldestInflightNotice")) {
       return null;
     }
     InflightEntry selected = null;

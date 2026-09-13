@@ -8,6 +8,7 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.UUID;
 import net.minecraft.world.level.Level;
 
@@ -137,7 +138,8 @@ final class CreateShopRequestValidator {
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
+    int reservedForOthers =
+        ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest);
     int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     if (needed <= 0) {
       if (holdDeliveryWindow) {
@@ -180,7 +182,7 @@ final class CreateShopRequestValidator {
     }
 
     int minimum = deliverable.getMinimumCount();
-    boolean result = available >= minimum || available >= needed;
+    boolean result = ShopStockAccounting.canCover(available, needed, minimum);
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] canResolve={} (available={}, reserved={}, needed={}, min={}) for {}",

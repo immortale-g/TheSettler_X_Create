@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 
 /**
  * Resolves effective Create network stock count exposed to MineColonies warehouse resolver hooks.
@@ -48,6 +49,6 @@ final class CreateShopWarehouseCountService {
     }
     int available = stockResolver.getNetworkAvailable(tile, deliverable);
     int reserved = pickup.getReservedForDeliverable(deliverable);
-    return Math.max(0, available - reserved);
+    return ShopStockAccounting.unreservedStock(available, reserved);
   }
 }

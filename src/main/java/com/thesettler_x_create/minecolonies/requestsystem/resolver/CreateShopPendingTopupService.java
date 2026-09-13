@@ -7,6 +7,7 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -49,9 +50,7 @@ final class CreateShopPendingTopupService {
       return;
     }
     int topupNeeded =
-        Math.max(
-            0,
-            pendingCount - Math.max(0, reservedForRequest) - Math.max(0, rackAvailableForRequest));
+        ShopStockAccounting.topupNeed(pendingCount, reservedForRequest, rackAvailableForRequest);
 
     // Only reached while no delivery child is open. A completed partial delivery is already
     // subtracted from pendingCount, and Create orders still on their way are covered by their
@@ -61,7 +60,8 @@ final class CreateShopPendingTopupService {
       int inflightRemaining =
           pickup.getInflightRemaining(
               deliverable.getResult(), requesterName, tile.getShopAddress());
-      int effectiveTopupNeeded = Math.max(0, topupNeeded - Math.max(0, inflightRemaining));
+      int effectiveTopupNeeded =
+          ShopStockAccounting.networkOrderAmount(topupNeeded, inflightRemaining);
       if (effectiveTopupNeeded <= 0) {
         requestStateMutatorService.markOrderedWithPending(
             resolver, level, request.getId(), pendingCount);

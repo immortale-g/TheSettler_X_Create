@@ -3,67 +3,67 @@ package com.thesettler_x_create.blockentity;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import com.thesettler_x_create.stock.ReservationBook;
+import com.thesettler_x_create.stock.ReservedAmount;
+import com.thesettler_x_create.stock.nbt.ReservationNbt;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Tracks per-request item reservations for a {@link CreateShopBlockEntity} - "this much of this
- * item is spoken for by request X, don't let another request double-claim it before the delivery
- * actually happens." Extracted from {@code CreateShopBlockEntity} (which held this state directly
- * until the pre-1.0 hardening pass) purely to keep that class's size manageable; behavior is
- * unchanged.
+ * Minecraft side of the per-request pickup reservations of a {@link CreateShopBlockEntity}: "this
+ * much of this item is spoken for by request X, don't let another request double-claim it before
+ * the delivery actually happens".
+ *
+ * <p>The bookkeeping itself is a {@link ReservationBook} over item stacks. This class adds the
+ * server thread guard, marks the block entity dirty, logs, and saves through {@link
+ * ReservationNbt}.
  */
 class ShopReservationLedger {
   private static final String TAG_RESERVATIONS = "Reservations";
 
-  private final CreateShopBlockEntity owner;
-  private final Map<UUID, Reservation> reservations = new HashMap<>();
+  private final LedgerHost host;
+  private final ReservationBook<ItemStack> book;
 
-  // Saved expiry times can be older than the saved game time (the chunk is not re-saved on every
-  // refresh), so loaded reservations get a fresh TTL once the level is available.
-  private boolean rebaseLoadedReservationExpiry;
-
-  ShopReservationLedger(CreateShopBlockEntity owner) {
-    this.owner = owner;
+  ShopReservationLedger(LedgerHost host) {
+    this.host = host;
+    this.book =
+        new ReservationBook<>(
+            ItemStack::isSameItemSameComponents, ShopReservationLedger::makeKey, host::gameTime);
   }
 
   /** Reserve items for a specific request to avoid duplicate ordering. */
   void reserve(UUID requestId, ItemStack key, int amount) {
-    if (!owner.ensureServerThread("reserve")) {
+    if (!host.ensureServerThread("reserve")) {
       return;
     }
-    if (amount <= 0) {
+    if (key == null || key.isEmpty() || amount <= 0) {
       return;
     }
-    cleanExpired();
-    Reservation reservation = reservations.get(requestId);
-    if (reservation == null) {
-      reservations.put(
-          requestId, new Reservation(requestId, makeKey(key), amount, getExpireTime()));
-    } else {
-      reservation.stackKey = makeKey(key);
-      reservation.reservedAmount += amount;
-      reservation.expiresAtGameTime = getExpireTime();
+    book.expire();
+    if (!book.reserve(requestId, key, amount)) {
+      return;
     }
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] Reserved {}x {} for {}", amount, key.getHoverName().getString(), requestId);
     }
-    owner.setChanged();
+    host.markChanged();
   }
 
   /** Release all reservations for a request. */
   void release(UUID requestId) {
-    if (!owner.ensureServerThread("release")) {
+    if (!host.ensureServerThread("release")) {
       return;
     }
-    cleanExpired();
-    if (reservations.remove(requestId) != null) {
-      owner.setChanged();
+    book.expire();
+    if (book.release(requestId)) {
+      host.markChanged();
     }
   }
 
@@ -71,44 +71,23 @@ class ShopReservationLedger {
    * Keeps the reservations of still-active requests from expiring. Called every resolver tick with
    * the ids of requests that are known to be alive; everything else keeps its normal expiry.
    *
-   * @return number of reservations whose expiry was extended
+   * @return number of requests whose expiry was extended
    */
-  int refreshReservations(java.util.Set<UUID> activeRequestIds) {
-    if (!owner.ensureServerThread("refreshReservations")) {
+  int refreshReservations(Set<UUID> activeRequestIds) {
+    if (!host.ensureServerThread("refreshReservations")) {
       return 0;
     }
-    rebaseLoadedReservationExpiryIfNeeded();
-    if (activeRequestIds == null || activeRequestIds.isEmpty() || reservations.isEmpty()) {
-      return 0;
-    }
-    long now = owner.getGameTimeSafe();
-    int refreshed = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (!activeRequestIds.contains(reservation.requestId)) {
-        continue;
-      }
-      long expires = ReservationExpiryPolicy.keepAliveExpiry(reservation.expiresAtGameTime, now);
-      if (expires != reservation.expiresAtGameTime) {
-        reservation.expiresAtGameTime = expires;
-        refreshed++;
-      }
-    }
+    int refreshed = book.refresh(activeRequestIds);
     if (refreshed > 0) {
-      owner.setChanged();
+      host.markChanged();
     }
     return refreshed;
   }
 
   /** Returns total reserved count for a stack key. */
   int getReservedFor(ItemStack key) {
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (matches(reservation.stackKey, key)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    expireOnServerThread();
+    return key == null || key.isEmpty() ? 0 : book.reservedFor(key);
   }
 
   /** Returns total reserved count for a deliverable match. */
@@ -116,14 +95,8 @@ class ShopReservationLedger {
     if (deliverable == null) {
       return 0;
     }
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (deliverable.matches(reservation.stackKey)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    expireOnServerThread();
+    return book.reservedMatching(deliverable::matches);
   }
 
   /** Returns reserved count for a specific request. */
@@ -131,151 +104,78 @@ class ShopReservationLedger {
     if (requestId == null) {
       return 0;
     }
-    cleanExpired();
-    int total = 0;
-    for (Reservation reservation : reservations.values()) {
-      if (requestId.equals(reservation.requestId)) {
-        total += reservation.reservedAmount;
-      }
-    }
-    return total;
+    expireOnServerThread();
+    return book.reservedForOwner(requestId);
   }
 
-  /** Consumes reserved items for a request when deliveries are created. */
+  /** Consumes reserved items of one kind for a request. */
   int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
-    if (!owner.ensureServerThread("consumeReservedForRequest")) {
+    if (!host.ensureServerThread("consumeReservedForRequest")) {
       return 0;
     }
     if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
       return 0;
     }
-    cleanExpired();
-    Reservation reservation = reservations.get(requestId);
-    if (reservation == null || !matches(reservation.stackKey, key)) {
-      return 0;
-    }
-    int taken = Math.min(amount, reservation.reservedAmount);
-    reservation.reservedAmount -= taken;
-    if (reservation.reservedAmount <= 0) {
-      reservations.remove(requestId);
-    }
+    book.expire();
+    int taken = book.consume(requestId, key, amount);
     if (taken > 0) {
-      owner.setChanged();
+      host.markChanged();
     }
     return taken;
   }
 
-  java.util.List<ItemStack> getReservedStacksSnapshot() {
-    cleanExpired();
-    java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
-    for (Reservation reservation : reservations.values()) {
-      if (reservation.stackKey == null || reservation.stackKey.isEmpty()) {
-        continue;
-      }
-      ItemStack stack = reservation.stackKey.copy();
-      stack.setCount(Math.max(1, reservation.reservedAmount));
+  /** One stack per request and item kind, sized to the reserved amount. */
+  List<ItemStack> getReservedStacksSnapshot() {
+    expireOnServerThread();
+    List<ItemStack> stacks = new java.util.ArrayList<>();
+    for (ReservedAmount<ItemStack> reserved : book.snapshot()) {
+      ItemStack stack = reserved.key().copy();
+      stack.setCount(Math.max(1, reserved.amount()));
       stacks.add(stack);
     }
     return stacks;
   }
 
   int size() {
-    return reservations.size();
+    return book.ownerCount();
   }
 
   void clear() {
-    reservations.clear();
+    book.clear();
   }
 
-  void load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
-    reservations.clear();
+  void load(CompoundTag tag, HolderLookup.Provider registries) {
     if (!tag.contains(TAG_RESERVATIONS)) {
+      book.restore(List.of());
       return;
     }
-    CompoundTag resTag = tag.getCompound(TAG_RESERVATIONS);
-    for (String key : resTag.getAllKeys()) {
-      CompoundTag entry = resTag.getCompound(key);
-      try {
-        UUID id = UUID.fromString(key);
-        ItemStack stack =
-            ItemStack.parse(registries, entry.getCompound("stack")).orElse(ItemStack.EMPTY);
-        int amount = entry.getInt("amount");
-        long expires = entry.getLong("expires");
-        if (!stack.isEmpty() && amount > 0) {
-          reservations.put(id, new Reservation(id, stack, amount, expires));
-        }
-      } catch (IllegalArgumentException ignored) {
-        // Ignore malformed reservation keys.
-      }
-    }
-    rebaseLoadedReservationExpiry = !reservations.isEmpty();
+    book.restore(
+        ReservationNbt.read(
+            tag.getCompound(TAG_RESERVATIONS), stackTag -> readStack(stackTag, registries)));
   }
 
-  void save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
-    CompoundTag resTag = new CompoundTag();
-    for (Map.Entry<UUID, Reservation> entry : reservations.entrySet()) {
-      Reservation reservation = entry.getValue();
-      CompoundTag data = new CompoundTag();
-      data.put("stack", reservation.stackKey.save(registries));
-      data.putInt("amount", reservation.reservedAmount);
-      data.putLong("expires", reservation.expiresAtGameTime);
-      resTag.put(entry.getKey().toString(), data);
-    }
-    tag.put(TAG_RESERVATIONS, resTag);
+  void save(CompoundTag tag, HolderLookup.Provider registries) {
+    tag.put(TAG_RESERVATIONS, ReservationNbt.write(book.stored(), stack -> stack.save(registries)));
   }
 
-  private void cleanExpired() {
-    if (!owner.ensureServerThread("cleanExpired")) {
-      return;
-    }
-    rebaseLoadedReservationExpiryIfNeeded();
-    long now = owner.getGameTimeSafe();
-    Iterator<Map.Entry<UUID, Reservation>> iterator = reservations.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Reservation reservation = iterator.next().getValue();
-      if (ReservationExpiryPolicy.isExpired(reservation.expiresAtGameTime, now)) {
-        iterator.remove();
-      }
+  // Expiry mutates the book, so reads only trigger it on the server thread; off-thread reads see
+  // the last state, as before.
+  private void expireOnServerThread() {
+    if (host.ensureServerThread("cleanExpired") && book.expire()) {
+      host.markChanged();
     }
   }
 
-  private void rebaseLoadedReservationExpiryIfNeeded() {
-    if (!rebaseLoadedReservationExpiry || !owner.hasLevel()) {
-      return;
+  private static Optional<ItemStack> readStack(Tag stackTag, HolderLookup.Provider registries) {
+    if (!(stackTag instanceof CompoundTag compound)) {
+      return Optional.empty();
     }
-    rebaseLoadedReservationExpiry = false;
-    long now = owner.getGameTimeSafe();
-    for (Reservation reservation : reservations.values()) {
-      reservation.expiresAtGameTime =
-          ReservationExpiryPolicy.loadedExpiry(reservation.expiresAtGameTime, now);
-    }
-  }
-
-  private long getExpireTime() {
-    return ReservationExpiryPolicy.newExpiry(owner.getGameTimeSafe());
-  }
-
-  private static boolean matches(ItemStack a, ItemStack b) {
-    return ItemStack.isSameItemSameComponents(a, b);
+    return ItemStack.parse(registries, compound).filter(stack -> !stack.isEmpty());
   }
 
   private static ItemStack makeKey(ItemStack stack) {
     ItemStack copy = stack.copy();
     copy.setCount(1);
     return copy;
-  }
-
-  static class Reservation {
-    final UUID requestId;
-    ItemStack stackKey;
-    int reservedAmount;
-    long expiresAtGameTime;
-
-    Reservation(UUID requestId, ItemStack stackKey, int reservedAmount, long expiresAtGameTime) {
-      this.requestId = requestId;
-      this.stackKey = stackKey;
-      this.reservedAmount = reservedAmount;
-      this.expiresAtGameTime = expiresAtGameTime;
-    }
   }
 }

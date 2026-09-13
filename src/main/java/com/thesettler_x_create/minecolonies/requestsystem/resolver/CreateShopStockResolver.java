@@ -5,6 +5,7 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.create.ICreateNetworkFacade;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.world.item.ItemStack;
@@ -26,8 +27,9 @@ final class CreateShopStockResolver {
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
     int pickupAvailable = planning.getAvailableFromPickup(pickup, deliverable);
-    int rackUsable = Math.max(0, rackAvailable - reservedForOthers);
-    int available = Math.max(0, networkAvailable + rackUsable + pickupAvailable);
+    int rackUsable = ShopStockAccounting.usableRackStock(rackAvailable, reservedForOthers);
+    int available =
+        ShopStockAccounting.totalAvailable(networkAvailable, rackUsable, pickupAvailable);
     return new CreateShopStockSnapshot(
         networkAvailable, rackAvailable, pickupAvailable, rackUsable, available);
   }

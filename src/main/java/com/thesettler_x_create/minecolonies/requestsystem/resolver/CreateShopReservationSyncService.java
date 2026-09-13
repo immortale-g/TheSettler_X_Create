@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -43,9 +44,9 @@ final class CreateShopReservationSyncService {
       return 0;
     }
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int rackUnreserved = Math.max(0, rackAvailable - Math.max(0, reservedForDeliverable));
-    int missingReservation = Math.max(0, pendingCount - Math.max(0, reservedForRequest));
-    int reserveTarget = Math.min(rackUnreserved, missingReservation);
+    int reserveTarget =
+        ShopStockAccounting.reservableFromRack(
+            rackAvailable, reservedForDeliverable, pendingCount, reservedForRequest);
     if (reserveTarget <= 0) {
       return 0;
     }

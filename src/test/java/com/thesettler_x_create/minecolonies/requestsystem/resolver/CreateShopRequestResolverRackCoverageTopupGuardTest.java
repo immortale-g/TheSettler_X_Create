@@ -21,7 +21,12 @@ class CreateShopRequestResolverRackCoverageTopupGuardTest {
     assertTrue(
         processorSource.contains(
             "int rackAvailable = resolver.getPlanning().getAvailableFromRacks(tile, deliverable);"));
-    assertTrue(topupSource.contains("pendingCount"));
-    assertTrue(topupSource.contains("- Math.max(0, rackAvailableForRequest)"));
+    assertTrue(
+        processorSource.contains(
+            "ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest)"));
+    // topupNeed subtracts the usable rack stock; ShopStockAccountingTest covers the arithmetic.
+    assertTrue(
+        topupSource.contains(
+            "ShopStockAccounting.topupNeed(pendingCount, reservedForRequest, rackAvailableForRequest)"));
   }
 }

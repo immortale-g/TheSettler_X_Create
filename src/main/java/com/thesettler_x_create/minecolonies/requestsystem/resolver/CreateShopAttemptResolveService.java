@@ -10,6 +10,7 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -138,7 +139,8 @@ final class CreateShopAttemptResolveService {
     int reservedForRequest = pickup.getReservedForRequest(requestId);
     int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
     int reservedForDeliverable = pickup.getReservedForDeliverable(deliverable);
-    int reservedForOthers = Math.max(0, reservedForDeliverable - reservedForRequest);
+    int reservedForOthers =
+        ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest);
     if (needed <= 0) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
       if (Config.DEBUG_LOGGING.getAsBoolean()) {
@@ -152,7 +154,7 @@ final class CreateShopAttemptResolveService {
         stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
     int rackUsable = snapshot.rackUsable();
     int networkAvailable = workerWorking ? snapshot.networkAvailable() : 0;
-    int available = Math.max(0, networkAvailable + rackUsable);
+    int available = ShopStockAccounting.totalAvailable(networkAvailable, rackUsable, 0);
     int provide = Math.min(available, needed);
     if (provide <= 0) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:insufficient");
@@ -186,7 +188,7 @@ final class CreateShopAttemptResolveService {
             pickup.getInflightRemaining(
                 deliverable.getResult(), requesterName, tile.getShopAddress());
       }
-      effectiveNetworkNeeded = Math.max(0, remaining - Math.max(0, inflightRemaining));
+      effectiveNetworkNeeded = ShopStockAccounting.networkOrderAmount(remaining, inflightRemaining);
       if (effectiveNetworkNeeded > 0) {
         networkOrdered.addAll(
             stockResolver.requestFromNetwork(
