@@ -34,6 +34,11 @@ final class ShopStockAgingLedger {
     return aging.agedAmount(key, now, minAge);
   }
 
+  /** Forgets every age. @return number of item kinds that were tracked */
+  int clear() {
+    return aging.clear();
+  }
+
   void load(CompoundTag tag, HolderLookup.Provider registries) {
     aging.restore(
         StockAgingNbt.read(

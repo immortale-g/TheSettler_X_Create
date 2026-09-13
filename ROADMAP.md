@@ -64,6 +64,11 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
   Requests schon aufgebraucht ist (Deliveries, die vor einem Reload eingesammelt wurden).
 - Housekeeping: Unreservierte Ware erst nach 5 Minuten (Config) in die Hütte tragen, Alter wird
   gespeichert. Ein Warehouse-Pickup nimmt keine Rack-Ware und nichts Reserviertes mehr mit.
+- Übergangsschutz: Deliveries aus Welten vor 0.4.0 (Start am Rack) verbrauchen ihre Reservierung
+  weiter bei der Ablieferung.
+- OP-Befehle `/thesettlerxcreate tracking-reset <colonyId> [scope]` und `tracking-reset-all [scope]`
+  setzen das Shop-Tracking zurück (reservations, inflight, stock-ages, flow-states, gauge, runtime),
+  ohne Requests abzubrechen. Jede neue Tracking-Art bekommt einen eigenen Scope.
 
 ### 0.5.0: Bestellungen gehören dem Shop
 

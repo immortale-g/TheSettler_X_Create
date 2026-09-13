@@ -232,6 +232,47 @@ public class CreateShopBlockEntity extends BlockEntity {
     return inflightLedger.clearInflightByUuid(requestUuid);
   }
 
+  /**
+   * Operator reset: drops every pickup reservation. Open requests reserve rack stock again on their
+   * next tick.
+   *
+   * @return number of requests that held reservations
+   */
+  public int clearReservations() {
+    if (!ensureServerThread("clearReservations")) {
+      return 0;
+    }
+    int cleared = reservationLedger.size();
+    if (cleared > 0) {
+      reservationLedger.clear();
+      setChanged();
+    }
+    return cleared;
+  }
+
+  /**
+   * Operator reset: forgets every order on its way from the Create network. Open requests order it
+   * again; goods that still arrive land in the racks unreserved.
+   *
+   * @return number of orders that were tracked
+   */
+  public int clearInflight() {
+    if (!ensureServerThread("clearInflight")) {
+      return 0;
+    }
+    int cleared = inflightLedger.entryCount();
+    if (inflightLedger.size() > 0) {
+      inflightLedger.clear();
+      setChanged();
+    }
+    return cleared;
+  }
+
+  /** Number of orders currently tracked as on their way from the Create network. */
+  public int getInflightEntryCount() {
+    return inflightLedger.entryCount();
+  }
+
   /** Clears reservations and inflight tracking for test/debug clean-state runs. */
   public int clearRuntimeTrackingForDebug() {
     if (!ensureServerThread("clearRuntimeTrackingForDebug")) {

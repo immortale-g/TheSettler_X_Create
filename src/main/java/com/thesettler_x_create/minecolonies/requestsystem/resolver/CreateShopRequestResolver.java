@@ -248,6 +248,31 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     deliveryCallbackService.onDeliveryComplete(manager, request);
   }
 
+  /**
+   * Operator reset: drops the saved per-request flow states.
+   *
+   * @return number of flow records removed
+   */
+  public int resetFlowStates() {
+    return flowStateMachine.clear();
+  }
+
+  /**
+   * Operator reset: drops all in-memory request bookkeeping (order cooldowns, pending amounts,
+   * delivery ledgers, pickup progress). Open requests re-derive it on their next tick.
+   *
+   * @return number of tracked requests plus delivery ledger entries
+   */
+  public int resetRuntimeTracking() {
+    int cleared = runtimeStateStore.clear() + cancelledRequests.size();
+    cancelledRequests.clear();
+    deliveryLinkLogged.clear();
+    deliveryCreateLogged.clear();
+    chainCycleLogged.clear();
+    pickupTracker.retainOnly(List.of());
+    return cleared;
+  }
+
   /** Called by the shop hut when items leave its combined inventory. */
   public void onHutItemsTaken(IRequestManager manager, ItemStack taken) {
     pickupObservationService.onHutItemsTaken(this, pickupTracker, manager, taken);

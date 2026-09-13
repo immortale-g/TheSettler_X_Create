@@ -102,6 +102,18 @@ class StockAgingTest {
   }
 
   @Test
+  void clearStartsEveryClockAgain() {
+    StockAging<String> aging = aging();
+    aging.update(counts("iron", 64, "gold", 8), 0L);
+
+    assertEquals(2, aging.clear());
+    aging.update(counts("iron", 64), FIVE_MINUTES);
+
+    assertEquals(0, aging.agedAmount("iron", FIVE_MINUTES, FIVE_MINUTES));
+    assertEquals(64, aging.agedAmount("iron", 2 * FIVE_MINUTES, FIVE_MINUTES));
+  }
+
+  @Test
   void restoreSkipsBrokenBatches() {
     StockAging<String> aging = aging();
     aging.restore(

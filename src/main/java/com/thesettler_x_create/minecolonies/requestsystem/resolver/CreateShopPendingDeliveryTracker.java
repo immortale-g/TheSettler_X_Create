@@ -38,6 +38,13 @@ final class CreateShopPendingDeliveryTracker {
     pending.invalidate(token);
   }
 
+  /** Drops every pending state, cooldowns included. @return number of tracked requests */
+  int clear() {
+    int cleared = (int) pending.size();
+    pending.invalidateAll();
+    return cleared;
+  }
+
   Set<IToken<?>> getTokens() {
     return pending.asMap().keySet();
   }

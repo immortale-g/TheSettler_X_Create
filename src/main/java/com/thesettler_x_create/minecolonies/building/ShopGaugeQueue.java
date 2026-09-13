@@ -253,6 +253,23 @@ final class ShopGaugeQueue {
     return ids;
   }
 
+  /**
+   * Operator reset: forgets the gauge requests and the packaging queue. The colony requests stay
+   * open in MineColonies; goods they still deliver are no longer packaged, and the gauges request
+   * again once their promise runs out.
+   *
+   * @return number of tracked gauge requests and queued packaging tasks
+   */
+  int clear() {
+    int cleared = pendingGaugeRequests.size() + gaugePackagingQueue.size();
+    if (cleared > 0) {
+      pendingGaugeRequests.clear();
+      gaugePackagingQueue.clear();
+      owner.markDirty();
+    }
+    return cleared;
+  }
+
   boolean hasGaugeTask() {
     return !gaugePackagingQueue.isEmpty();
   }

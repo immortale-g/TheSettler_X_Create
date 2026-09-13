@@ -22,6 +22,25 @@ final class CreateShopRuntimeStateStore {
       new ConcurrentHashMap<>();
   private final Map<IToken<?>, Long> deliveryChildLedgerLastLogTick = new ConcurrentHashMap<>();
 
+  /**
+   * Drops all in-memory request bookkeeping.
+   *
+   * @return number of tracked requests plus delivery ledger entries
+   */
+  int clear() {
+    int cleared = pendingTracker.clear() + deliveryChildLedger.size();
+    retryingReassignAttempts.clear();
+    missingChildSince.clear();
+    parentLastKnownChildCount.clear();
+    parentLastKnownChildren.clear();
+    parentChildDropLastLogTick.clear();
+    deliveryRootCauseSnapshots.clear();
+    deliveryRootCauseLastLogTick.clear();
+    deliveryChildLedger.clear();
+    deliveryChildLedgerLastLogTick.clear();
+    return cleared;
+  }
+
   CreateShopPendingDeliveryTracker getPendingTracker() {
     return pendingTracker;
   }

@@ -120,6 +120,17 @@ public final class StockAging<K> {
     return batches.size();
   }
 
+  /**
+   * Forgets every age; all unreserved stock starts a new clock on the next update.
+   *
+   * @return number of item kinds that were tracked
+   */
+  public int clear() {
+    int count = batches.size();
+    batches.clear();
+    return count;
+  }
+
   private static boolean adjust(Deque<MutableBatch> queue, int target, long now) {
     int total = 0;
     for (MutableBatch batch : queue) {

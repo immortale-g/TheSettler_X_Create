@@ -75,6 +75,14 @@ final class CreateShopRequestStateMachine {
     active.remove(token);
   }
 
+  /** Drops every flow record and every state still waiting to be restored from NBT. */
+  int clear() {
+    int cleared = active.size() + pendingRestore.size();
+    active.clear();
+    pendingRestore.clear();
+    return cleared;
+  }
+
   Collection<CreateShopFlowRecord> snapshot() {
     return new ArrayList<>(active.values());
   }

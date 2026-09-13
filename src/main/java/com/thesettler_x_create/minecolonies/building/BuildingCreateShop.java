@@ -106,6 +106,7 @@ public class BuildingCreateShop extends AbstractBuilding {
   private final ShopResolverHealthCheck resolverHealthCheck;
   private final ShopHousekeepingOrchestrator housekeepingOrchestrator;
   private final ShopPickupKeepPolicy pickupKeepPolicy;
+  private final ShopTrackingReset trackingReset;
   private long lostPackageInteractionEpoch;
   private boolean legacyCourierMigrationAttempted;
 
@@ -126,6 +127,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.resolverHealthCheck = new ShopResolverHealthCheck(this);
     this.housekeepingOrchestrator = new ShopHousekeepingOrchestrator(this);
     this.pickupKeepPolicy = new ShopPickupKeepPolicy(this);
+    this.trackingReset = new ShopTrackingReset(this);
     this.lostPackageInteractionEpoch = 0L;
     this.legacyCourierMigrationAttempted = false;
   }
@@ -700,6 +702,25 @@ public class BuildingCreateShop extends AbstractBuilding {
           cleared);
     }
     return cleared;
+  }
+
+  /**
+   * Operator reset of the tracking this shop keeps on its own, for the selected scopes. Requests
+   * are not cancelled; see {@link ShopTrackingReset}.
+   */
+  public ShopTrackingResetReport resetTracking(java.util.Set<ShopTrackingScope> scopes) {
+    return trackingReset.reset(scopes);
+  }
+
+  /** Drops flow states loaded from NBT that were not handed to the resolver yet. */
+  int clearPendingFlowStates() {
+    int cleared = pendingFlowStatesTag == null ? 0 : pendingFlowStatesTag.size();
+    pendingFlowStatesTag = null;
+    return cleared;
+  }
+
+  int clearGaugeTracking() {
+    return gaugeQueue.clear();
   }
 
   /** Clears request runtime tracking caches used by Create Shop for debug/test clean-state runs. */

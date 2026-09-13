@@ -607,6 +607,20 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return budgets;
   }
 
+  /**
+   * Operator reset: forgets how long unreserved stock has been waiting. It all waits the full
+   * minimum age again before housekeeping moves it.
+   *
+   * @return number of item kinds that were tracked
+   */
+  public int clearStockAges() {
+    int cleared = stockAging.clear();
+    if (cleared > 0) {
+      setChanged();
+    }
+    return cleared;
+  }
+
   /** How many items of this kind the shop racks hold right now. */
   public int countInRacks(ItemStack key) {
     if (key == null || key.isEmpty()) {
