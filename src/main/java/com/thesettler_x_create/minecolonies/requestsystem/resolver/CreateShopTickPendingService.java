@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
@@ -8,9 +9,11 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.world.level.Level;
 
 /** Orchestrates tick-pending execution for Create Shop resolver state. */
@@ -77,6 +80,7 @@ final class CreateShopTickPendingService {
     Set<IToken<?>> pendingTokens =
         pendingTokenCollectorService.collectPendingTokens(
             resolver, standardManager, level, assignments);
+    refreshActiveReservations(resolver, standardManager, pendingTokens);
     pendingTokens =
         lifecycleRehydrateService.rehydrateAndFilter(
             resolver, standardManager, level, pendingTokens);
@@ -130,5 +134,45 @@ final class CreateShopTickPendingService {
     }
     flowTimeoutCleanupService.processTimedOutFlows(resolver, standardManager, level);
     tickPendingTelemetryService.recordAndMaybeLogPerf(level, System.nanoTime() - perfStart);
+  }
+
+  /**
+   * Keeps pickup reservations alive while their request is still open. Deliveries leave the shop
+   * one stack at a time, so a large request can take longer than the reservation TTL; if the
+   * reservation expired in between, the remaining-need calculation saw nothing reserved and ordered
+   * the rest again from the Create network.
+   */
+  private static void refreshActiveReservations(
+      CreateShopRequestResolver resolver,
+      IStandardRequestManager standardManager,
+      Set<IToken<?>> candidateTokens) {
+    BuildingCreateShop shop = resolver.getShop(standardManager);
+    if (shop == null) {
+      return;
+    }
+    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+    if (pickup == null) {
+      return;
+    }
+    Set<UUID> activeRequestIds = new HashSet<>(shop.getGaugeReservationRequestIds());
+    for (IToken<?> token : candidateTokens) {
+      IRequest<?> request;
+      try {
+        request = standardManager.getRequestHandler().getRequest(token);
+      } catch (Exception ignored) {
+        continue;
+      }
+      if (request != null
+          && !CreateShopRequestResolver.isTerminalRequestState(request.getState())) {
+        activeRequestIds.add(CreateShopRequestResolver.toRequestId(token));
+      }
+    }
+    int refreshed = pickup.refreshReservations(activeRequestIds);
+    if (refreshed > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] reservation keep-alive refreshed={} active={}",
+          refreshed,
+          activeRequestIds.size());
+    }
   }
 }
