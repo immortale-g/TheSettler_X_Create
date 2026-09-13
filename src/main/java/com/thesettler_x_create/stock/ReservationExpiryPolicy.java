@@ -1,4 +1,4 @@
-package com.thesettler_x_create.blockentity;
+package com.thesettler_x_create.stock;
 
 /**
  * Expiry rules for pickup reservations. The TTL only cleans up reservations nobody releases; a

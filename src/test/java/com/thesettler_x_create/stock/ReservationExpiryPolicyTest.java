@@ -1,4 +1,4 @@
-package com.thesettler_x_create.blockentity;
+package com.thesettler_x_create.stock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -25,15 +25,24 @@ class CreateShopReservationKeepAliveGuardTest {
     assertTrue(source.contains("pickup.refreshReservations(activeRequestIds)"));
   }
 
+  // Keep-alive and rebasing behavior itself is covered by ReservationBookTest; this pins that the
+  // block entity ledger actually routes through the book instead of growing its own copy again.
   @Test
-  void blockEntityRebasesLoadedReservationsAndUsesThePolicy() throws Exception {
-    String source =
+  void blockEntityLedgerDelegatesExpiryToTheReservationBook() throws Exception {
+    String ledger =
         Files.readString(
             Path.of(
                 "src/main/java/com/thesettler_x_create/blockentity/ShopReservationLedger.java"));
-    assertTrue(source.contains("rebaseLoadedReservationExpiry = !reservations.isEmpty();"));
-    assertTrue(source.contains("ReservationExpiryPolicy.loadedExpiry("));
-    assertTrue(source.contains("ReservationExpiryPolicy.keepAliveExpiry("));
-    assertFalse(source.contains("RESERVATION_TTL"));
+    assertTrue(ledger.contains("book.refresh(activeRequestIds)"));
+    assertTrue(ledger.contains("book.restore("));
+    assertFalse(ledger.contains("RESERVATION_TTL"));
+    assertFalse(ledger.contains("ReservationExpiryPolicy"));
+
+    String book =
+        Files.readString(
+            Path.of("src/main/java/com/thesettler_x_create/stock/ReservationBook.java"));
+    assertTrue(book.contains("rebaseRestoredExpiry = !owners.isEmpty();"));
+    assertTrue(book.contains("ReservationExpiryPolicy.loadedExpiry("));
+    assertTrue(book.contains("ReservationExpiryPolicy.keepAliveExpiry("));
   }
 }

@@ -53,7 +53,7 @@ public class CreateShopBlockEntity extends BlockEntity {
           setChanged();
         }
       };
-  private final ShopReservationLedger reservationLedger = new ShopReservationLedger(this);
+  private final ShopReservationLedger reservationLedger = new ShopReservationLedger(ledgerHost);
   private final ShopInflightLedger inflightLedger = new ShopInflightLedger(ledgerHost);
   private BlockPos shopPos;
 
