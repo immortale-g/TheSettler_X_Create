@@ -191,7 +191,7 @@ final class CreateShopRequestStateMutatorService {
               // Best effort queue cleanup.
             }
             try {
-              var current = job.getCurrentTask();
+              var current = CreateShopCourierTasks.peekCurrentTask(manager, job);
               // Token match only. Matching by start, target and stack also hit sibling
               // deliveries of the same parent, which are identical now that all of them start at
               // the hut, and failed a courier task that was still valid.
