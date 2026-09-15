@@ -1,25 +1,31 @@
 package com.thesettler_x_create.create;
 
+import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Cross-shop, cross-tick coalescing of Create stock-network requests. Multiple {@link
- * CreateNetworkFacade} instances (one per call, not a singleton per shop) can queue stacks for the
- * same network+address+requester within a tick; {@link #flush()} - called once per server tick from
- * {@code TheSettlerXCreate} - broadcasts each accumulated bucket as a single grouped package
- * request instead of one broadcast per queued call.
+ * Collects package requests placed during a tick and broadcasts them grouped, so several colonist
+ * requests for the same item do not turn into separate network orders.
+ *
+ * <p>{@link #flush()} runs every server tick. A refused broadcast is retried a few times with a
+ * cooldown and then dropped: there is no package to wait for, and the resolver reorders on its own
+ * once nothing is tracked as inflight. Retrying every tick instead would rescan the whole logistics
+ * network 20 times a second for as long as it stays unreachable.
  */
 final class CreateNetworkRequestQueue {
-  private CreateNetworkRequestQueue() {}
+  private static final int MAX_ATTEMPTS = 3;
+  private static final long RETRY_COOLDOWN_FLUSHES = 100;
 
-  private static final Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS =
-      new ConcurrentHashMap<>();
+  private static final Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS = new HashMap<>();
+  private static long flushCounter;
+
+  private CreateNetworkRequestQueue() {}
 
   static void queue(
       CreateNetworkFacade facade,
@@ -44,6 +50,7 @@ final class CreateNetworkRequestQueue {
     if (QUEUED_REQUESTS.isEmpty()) {
       return;
     }
+    flushCounter++;
     var snapshot = new ArrayList<>(QUEUED_REQUESTS.entrySet());
     QUEUED_REQUESTS.clear();
     for (var entry : snapshot) {
@@ -52,13 +59,52 @@ final class CreateNetworkRequestQueue {
       if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
         continue;
       }
-      if (!bucket.facade.broadcastQueuedRequest(key, bucket.stacks)) {
-        requeueFailedBucket(key, bucket);
+      if (bucket.retryAfterFlush > flushCounter) {
+        requeue(key, bucket);
+        continue;
       }
+      CreateLogisticsBridge.Outcome outcome =
+          bucket.facade.broadcastQueuedRequest(key, bucket.stacks);
+      if (outcome.dispatched()) {
+        continue;
+      }
+      bucket.attempts++;
+      if (!shouldRetry(outcome, bucket.attempts)) {
+        TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] dropping package request after {} attempt(s) ({}) network={} address='{}' requester='{}'",
+            bucket.attempts,
+            outcome,
+            key.networkId,
+            key.address,
+            key.requesterName);
+        continue;
+      }
+      bucket.retryAfterFlush = flushCounter + RETRY_COOLDOWN_FLUSHES;
+      requeue(key, bucket);
     }
   }
 
-  private static void requeueFailedBucket(QueuedRequestKey key, QueuedRequestBucket failed) {
+  /**
+   * Whether a refused broadcast is worth sending again.
+   *
+   * <p>A busy packager clears on its own and an unreachable one may just be mid-reload, so both are
+   * retried a limited number of times. An empty order or a failed call will not fix itself by being
+   * sent again. Package-private so the retry policy can be tested without a Minecraft bootstrap.
+   */
+  static boolean shouldRetry(CreateLogisticsBridge.Outcome outcome, int attempts) {
+    if (outcome == null || outcome.dispatched() || attempts >= MAX_ATTEMPTS) {
+      return false;
+    }
+    return outcome == CreateLogisticsBridge.Outcome.PACKAGER_BUSY
+        || outcome == CreateLogisticsBridge.Outcome.NO_PACKAGER;
+  }
+
+  /** Package-private for testing: flushes to wait before retrying a refused bucket. */
+  static long retryCooldownFlushes() {
+    return RETRY_COOLDOWN_FLUSHES;
+  }
+
+  private static void requeue(QueuedRequestKey key, QueuedRequestBucket failed) {
     if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
       return;
     }
@@ -67,6 +113,8 @@ final class CreateNetworkRequestQueue {
     if (target.facade == null) {
       target.facade = failed.facade;
     }
+    target.attempts = Math.max(target.attempts, failed.attempts);
+    target.retryAfterFlush = Math.max(target.retryAfterFlush, failed.retryAfterFlush);
     for (ItemStack stack : failed.stacks) {
       mergeInto(target.stacks, stack);
     }
