@@ -5,9 +5,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.Tool;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.packager.InventorySummary;
-import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
-import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -429,15 +427,24 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     if (order.isEmpty()) {
       return true;
     }
-    PackageOrderWithCrafts request = PackageOrderWithCrafts.simple(order);
     long start = System.nanoTime();
     try {
-      LogisticsManager.broadcastPackageRequest(
-          key.networkId,
-          LogisticallyLinkedBehaviour.RequestType.PLAYER,
-          request,
-          null,
-          key.address == null ? "" : key.address);
+      CreateLogisticsBridge.Outcome outcome =
+          CreateLogisticsBridge.broadcastPackageRequest(key.networkId, order, key.address);
+      if (!outcome.dispatched()) {
+        // No package exists, so nothing may be tracked as inflight - doing so would make the shop
+        // wait out the inflight timeout and then reorder forever against a network that never
+        // answers.
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] package request not dispatched ({}): stacks={} chunks={} network={} address='{}' requester='{}'",
+            describeOutcome(outcome),
+            consolidated.size(),
+            order.size(),
+            key.networkId,
+            key.address,
+            key.requesterName);
+        return false;
+      }
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] broadcast grouped request stacks={} chunks={} network={} address='{}' requester='{}'",
@@ -449,16 +456,20 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
       recordInflight(consolidated, key.requesterName, key.requestUuid);
       return true;
-    } catch (Exception ex) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] grouped request broadcast failed for {}: {}",
-            key.networkId,
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
-      return false;
     } finally {
       perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
     }
+  }
+
+  private static String describeOutcome(CreateLogisticsBridge.Outcome outcome) {
+    return switch (outcome) {
+      case NO_PACKAGER -> CreateFactoryLogisticsCompat.isAvailable()
+          ? "Create Factory Logistics refused the order, no reachable packager or all of them busy"
+          : "no packager on the network could serve this order";
+      case PACKAGER_BUSY -> "network refused, packager busy (50+ packages queued)";
+      case EMPTY_ORDER -> "order was empty when it reached Create";
+      case ERROR -> "logistics call failed, see the warning above";
+      case DISPATCHED -> "dispatched";
+    };
   }
 }

@@ -3,12 +3,10 @@ package com.thesettler_x_create.network;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
-import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
-import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
-import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
+import com.thesettler_x_create.create.CreateLogisticsBridge;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.UUID;
@@ -129,13 +127,16 @@ public final class ModNetwork {
 
           int amount = Math.max(1, payload.amount());
           BigItemStack request = new BigItemStack(payload.stack().copy(), amount);
-          PackageOrderWithCrafts order = PackageOrderWithCrafts.simple(List.of(request));
-          LogisticsManager.broadcastPackageRequest(
-              networkId,
-              LogisticallyLinkedBehaviour.RequestType.PLAYER,
-              order,
-              null,
-              shop.getShopAddress());
+          CreateLogisticsBridge.Outcome outcome =
+              CreateLogisticsBridge.broadcastPackageRequest(
+                  networkId, List.of(request), shop.getShopAddress());
+          if (!outcome.dispatched()) {
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] test request not dispatched ({}) network={} address='{}'",
+                outcome,
+                networkId,
+                shop.getShopAddress());
+          }
         });
   }
 
@@ -171,13 +172,16 @@ public final class ModNetwork {
             return;
           }
 
-          PackageOrderWithCrafts order = PackageOrderWithCrafts.simple(orderStacks);
-          LogisticsManager.broadcastPackageRequest(
-              networkId,
-              LogisticallyLinkedBehaviour.RequestType.PLAYER,
-              order,
-              null,
-              shop.getShopAddress());
+          CreateLogisticsBridge.Outcome outcome =
+              CreateLogisticsBridge.broadcastPackageRequest(
+                  networkId, orderStacks, shop.getShopAddress());
+          if (!outcome.dispatched()) {
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] batch request not dispatched ({}) network={} address='{}'",
+                outcome,
+                networkId,
+                shop.getShopAddress());
+          }
         });
   }
 
