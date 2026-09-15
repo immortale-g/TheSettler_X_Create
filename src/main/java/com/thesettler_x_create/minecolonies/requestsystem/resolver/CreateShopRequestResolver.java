@@ -13,11 +13,13 @@ import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehou
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.stock.PickupTracker;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 
@@ -69,6 +71,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopResolverCallbackService resolverCallbackService;
   private final CreateShopRequestStateMachine flowStateMachine =
       new CreateShopRequestStateMachine();
+  private final CreateShopPickupObservationService pickupObservationService =
+      new CreateShopPickupObservationService();
+  private final PickupTracker<IToken<?>> pickupTracker = new PickupTracker<>();
 
   public CreateShopRequestResolver(ILocation location, IToken<?> token) {
     super(location, token);
@@ -241,6 +246,36 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   public static void onDeliveryComplete(IRequestManager manager, IRequest<?> request) {
     deliveryCallbackService.onDeliveryComplete(manager, request);
+  }
+
+  /**
+   * Operator reset: drops the saved per-request flow states.
+   *
+   * @return number of flow records removed
+   */
+  public int resetFlowStates() {
+    return flowStateMachine.clear();
+  }
+
+  /**
+   * Operator reset: drops all in-memory request bookkeeping (order cooldowns, pending amounts,
+   * delivery ledgers, pickup progress). Open requests re-derive it on their next tick.
+   *
+   * @return number of tracked requests plus delivery ledger entries
+   */
+  public int resetRuntimeTracking() {
+    int cleared = runtimeStateStore.clear() + cancelledRequests.size();
+    cancelledRequests.clear();
+    deliveryLinkLogged.clear();
+    deliveryCreateLogged.clear();
+    chainCycleLogged.clear();
+    pickupTracker.retainOnly(List.of());
+    return cleared;
+  }
+
+  /** Called by the shop hut when items leave its combined inventory. */
+  public void onHutItemsTaken(IRequestManager manager, ItemStack taken) {
+    pickupObservationService.onHutItemsTaken(this, pickupTracker, manager, taken);
   }
 
   void handleDeliveryCancelled(IRequestManager manager, IRequest<?> request) {
@@ -622,6 +657,10 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       String source) {
     deliveryChildLedgerService.observeChild(
         this, manager, level, parentToken, childToken, child, assignedResolverToken, source);
+  }
+
+  void observeDeliveryChildPickup(Level level, IToken<?> parentToken, IToken<?> childToken) {
+    deliveryChildLedgerService.observePickup(this, level, parentToken, childToken);
   }
 
   void observeDeliveryChildMissing(

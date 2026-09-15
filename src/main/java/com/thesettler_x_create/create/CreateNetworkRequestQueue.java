@@ -58,6 +58,26 @@ final class CreateNetworkRequestQueue {
     }
   }
 
+  /**
+   * Drops the orders queued for one shop (network and address) that were not broadcast yet.
+   *
+   * @return number of dropped buckets
+   */
+  static int discard(UUID networkId, String address) {
+    if (networkId == null) {
+      return 0;
+    }
+    String shopAddress = address == null ? "" : address;
+    int before = QUEUED_REQUESTS.size();
+    QUEUED_REQUESTS
+        .keySet()
+        .removeIf(
+            key ->
+                networkId.equals(key.networkId())
+                    && shopAddress.equals(key.address() == null ? "" : key.address()));
+    return before - QUEUED_REQUESTS.size();
+  }
+
   static void flush() {
     if (QUEUED_REQUESTS.isEmpty()) {
       return;

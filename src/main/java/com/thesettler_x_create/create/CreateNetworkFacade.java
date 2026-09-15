@@ -261,6 +261,18 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     CreateNetworkRequestQueue.flush();
   }
 
+  /**
+   * Operator reset: drops this shop's orders that were queued this tick but not broadcast yet.
+   *
+   * @return number of dropped order buckets
+   */
+  public static int discardQueuedRequests(@Nullable TileEntityCreateShop shop) {
+    if (shop == null) {
+      return 0;
+    }
+    return CreateNetworkRequestQueue.discard(shop.getStockNetworkId(), shop.getShopAddress());
+  }
+
   private List<ItemStack> consolidateRequestedStacks(List<ItemStack> requestedStacks) {
     if (requestedStacks == null || requestedStacks.isEmpty()) {
       return Collections.emptyList();

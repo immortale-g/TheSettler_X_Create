@@ -90,6 +90,24 @@ public final class ShopStockAccounting {
   }
 
   /**
+   * What a warehouse pickup must leave in the shop of one item kind: everything in the racks (the
+   * shopkeeper decides what leaves them) and at least everything reserved, even when part of it
+   * sits in the hut buffer.
+   */
+  public static int pickupKeepAmount(int rackStock, int reserved) {
+    return Math.max(0, Math.max(rackStock, reserved));
+  }
+
+  /**
+   * How much of one slot a pickup may take. Slots are visited in order and {@code alreadyKept} is
+   * what earlier slots of the same item kind already kept.
+   */
+  public static int pickupTakeable(int slotCount, int keepAmount, int alreadyKept) {
+    int keepHere = Math.min(Math.max(0, slotCount), Math.max(0, keepAmount - alreadyKept));
+    return Math.max(0, slotCount - keepHere);
+  }
+
+  /**
    * How much an extraction through the shop's item handler may take: reserved stock when there is a
    * reservation for the item, otherwise what the racks hold.
    */

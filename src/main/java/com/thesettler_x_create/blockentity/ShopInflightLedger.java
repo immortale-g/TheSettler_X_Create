@@ -425,6 +425,11 @@ class ShopInflightLedger {
     return inflightEntries.size() + inflightBaselines.size();
   }
 
+  /** Number of orders still tracked as on their way, baselines not counted. */
+  int entryCount() {
+    return inflightEntries.size();
+  }
+
   void clear() {
     inflightEntries.clear();
     inflightBaselines.clear();

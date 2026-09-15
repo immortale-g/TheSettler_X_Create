@@ -14,14 +14,15 @@ import net.minecraft.network.chat.Component;
  * <ul>
  *   <li>{@link CreateShopUninstallCommands} – prepare_uninstall
  *   <li>{@link CreateShopResetCommands} – reset_live_state
+ *   <li>{@link CreateShopTrackingResetCommands} – tracking-reset, tracking-reset-all
  *   <li>{@link CreateShopDiagnosticCommands} – run_live_test
  *   <li>{@link CreateShopTestHarnessCommands} – auto_test_harness, auto_test_harness_full_all
  * </ul>
  *
- * <p>{@code prepare_uninstall} and {@code reset_live_state} are legitimate production maintenance
- * operations and only require operator permission. Every other command here creates fake requests
- * or fake inflight data in a live colony purely for development/testing, so those additionally
- * require {@link Config#ENABLE_DEV_TEST_COMMANDS} (default off) via {@link
+ * <p>{@code prepare_uninstall}, {@code reset_live_state} and the tracking resets are legitimate
+ * production maintenance operations and only require operator permission. Every other command here
+ * creates fake requests or fake inflight data in a live colony purely for development/testing, so
+ * those additionally require {@link Config#ENABLE_DEV_TEST_COMMANDS} (default off) via {@link
  * #requiresDevTestCommands()}.
  */
 public final class CreateShopMaintenanceCommands {
@@ -112,6 +113,9 @@ public final class CreateShopMaintenanceCommands {
                                   () -> Component.literal(result.toSummaryMessage(true)), true);
                           return result.errors == 0 ? 1 : 0;
                         })));
+
+    root.then(CreateShopTrackingResetCommands.resetColony());
+    root.then(CreateShopTrackingResetCommands.resetAllColonies());
 
     root.then(
         Commands.literal("auto_test_harness")

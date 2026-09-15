@@ -30,6 +30,13 @@ public class Config {
           .comment("Cooldown (ticks) between rack-full warning messages.")
           .defineInRange("rackFullWarningCooldown", 6000L, 20L, 24000L);
 
+  public static final ModConfigSpec.LongValue HOUSEKEEPING_MIN_AGE_TICKS =
+      BUILDER
+          .comment(
+              "Ticks unreserved stock must sit in the Create Shop racks before the shopkeeper",
+              "moves it to the hut for a warehouse pickup.")
+          .defineInRange("housekeepingMinAgeTicks", 20L * 60L * 5L, 0L, 72000L);
+
   public static final ModConfigSpec.LongValue COURIER_DEBUG_COOLDOWN =
       BUILDER
           .comment("Cooldown (ticks) between courier debug logs.")
