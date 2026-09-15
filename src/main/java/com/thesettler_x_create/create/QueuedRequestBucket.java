@@ -9,6 +9,12 @@ final class QueuedRequestBucket {
   CreateNetworkFacade facade;
   final List<ItemStack> stacks = new ArrayList<>();
 
+  /** How often this bucket was already refused by the network. */
+  int attempts;
+
+  /** Flush tick before which this bucket must not be retried. */
+  long retryAfterFlush;
+
   QueuedRequestBucket(CreateNetworkFacade facade) {
     this.facade = facade;
   }
