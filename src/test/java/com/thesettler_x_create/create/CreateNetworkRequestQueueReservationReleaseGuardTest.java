@@ -27,7 +27,7 @@ class CreateNetworkRequestQueueReservationReleaseGuardTest {
     assertTrue(method > 0);
     String body = source.substring(method, Math.min(source.length(), method + 1200));
 
-    assertTrue(body.contains("attempts > MAX_RETRY_ATTEMPTS"));
+    assertTrue(body.contains("if (!shouldRetry(outcome, attempts)) {"));
     assertTrue(
         body.contains(
             "failed.facade.releaseAbandonedReservation(key.requestUuid(), failed.stacks);"));

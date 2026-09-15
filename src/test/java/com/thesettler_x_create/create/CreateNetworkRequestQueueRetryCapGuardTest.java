@@ -23,7 +23,10 @@ class CreateNetworkRequestQueueRetryCapGuardTest {
     int method = source.indexOf("private static void requeueFailedBucket(");
     assertTrue(method > 0);
     String body = source.substring(method);
-    assertTrue(body.contains("attempts > MAX_RETRY_ATTEMPTS"));
+    // The cap now lives in shouldRetry, which requeueFailedBucket delegates to. Both halves are
+    // asserted so neither can quietly disappear.
+    assertTrue(body.contains("if (!shouldRetry(outcome, attempts)) {"));
+    assertTrue(source.contains("attempts > MAX_RETRY_ATTEMPTS"));
     // Must not be gated behind Config.DEBUG_LOGGING - that's exactly what made this invisible.
     int giveUpLog = body.indexOf("LOGGER.warn(");
     String giveUpBlock = body.substring(Math.max(0, giveUpLog - 80), giveUpLog);
