@@ -27,6 +27,15 @@ final class CreateNetworkRequestQueue {
    */
   private static final int MAX_RETRY_ATTEMPTS = 5;
 
+  /**
+   * flush() runs every server tick. Retrying a refused broadcast on the very next tick would rescan
+   * the whole logistics network 20 times a second for as long as it stays unreachable, so a refusal
+   * has to cool down first.
+   */
+  private static final long RETRY_COOLDOWN_FLUSHES = 100;
+
+  private static long flushCounter;
+
   private static final Map<QueuedRequestKey, QueuedRequestBucket> QUEUED_REQUESTS =
       new ConcurrentHashMap<>();
 
@@ -73,6 +82,7 @@ final class CreateNetworkRequestQueue {
     if (QUEUED_REQUESTS.isEmpty()) {
       return;
     }
+    flushCounter++;
     var snapshot = new ArrayList<>(QUEUED_REQUESTS.entrySet());
     QUEUED_REQUESTS.clear();
     for (var entry : snapshot) {
@@ -81,26 +91,54 @@ final class CreateNetworkRequestQueue {
       if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
         continue;
       }
-      if (!bucket.facade.broadcastQueuedRequest(key, bucket.stacks)) {
-        requeueFailedBucket(key, bucket);
+      if (bucket.retryAfterFlush > flushCounter) {
+        requeueWithoutCountingAttempt(key, bucket);
+        continue;
+      }
+      CreateLogisticsBridge.Outcome outcome =
+          bucket.facade.broadcastQueuedRequest(key, bucket.stacks);
+      if (!outcome.dispatched()) {
+        requeueFailedBucket(key, bucket, outcome);
       }
     }
   }
 
-  private static void requeueFailedBucket(QueuedRequestKey key, QueuedRequestBucket failed) {
+  /**
+   * Whether a refused broadcast is worth sending again.
+   *
+   * <p>A busy packager clears on its own and an unreachable one may just be mid-reload, so both are
+   * retried. An empty order or a failed call will not fix itself by being sent again.
+   * Package-private so the retry policy can be tested without a Minecraft bootstrap.
+   */
+  static boolean shouldRetry(CreateLogisticsBridge.Outcome outcome, int attempts) {
+    if (outcome == null || outcome.dispatched() || attempts > MAX_RETRY_ATTEMPTS) {
+      return false;
+    }
+    return outcome == CreateLogisticsBridge.Outcome.PACKAGER_BUSY
+        || outcome == CreateLogisticsBridge.Outcome.NO_PACKAGER;
+  }
+
+  /** Package-private for testing: flushes to wait before retrying a refused bucket. */
+  static long retryCooldownFlushes() {
+    return RETRY_COOLDOWN_FLUSHES;
+  }
+
+  private static void requeueFailedBucket(
+      QueuedRequestKey key, QueuedRequestBucket failed, CreateLogisticsBridge.Outcome outcome) {
     if (key == null || failed == null || failed.facade == null || failed.stacks.isEmpty()) {
       return;
     }
     int attempts = failed.failedAttempts + 1;
-    if (attempts > MAX_RETRY_ATTEMPTS) {
+    if (!shouldRetry(outcome, attempts)) {
       // The order was tracked as on its way when it was queued. Forget exactly that amount so the
       // requester re-derives its need next tick instead of waiting for goods that never come.
       failed.facade.forgetAbandonedOrder(key.requestUuid(), key.requesterName(), failed.stacks);
       TheSettlerXCreate.LOGGER.warn(
-          "[CreateShop] giving up on Create network request after {} failed broadcast attempts,"
+          "[CreateShop] giving up on Create network request after {} failed broadcast attempts ({}),"
               + " network={} address='{}' requester='{}' stacks={} - dropping it and forgetting"
               + " the order so the requester can re-derive the need immediately",
           attempts - 1,
+          outcome,
           key.networkId(),
           key.address(),
           key.requesterName(),
@@ -113,7 +151,23 @@ final class CreateNetworkRequestQueue {
       target.facade = failed.facade;
     }
     target.failedAttempts = attempts;
+    target.retryAfterFlush = flushCounter + RETRY_COOLDOWN_FLUSHES;
     for (ItemStack stack : failed.stacks) {
+      ItemStackDataUtil.mergeIntoList(target.stacks, stack);
+    }
+  }
+
+  /** Puts a bucket back while it is still cooling down, without spending one of its attempts. */
+  private static void requeueWithoutCountingAttempt(
+      QueuedRequestKey key, QueuedRequestBucket waiting) {
+    QueuedRequestBucket target =
+        QUEUED_REQUESTS.computeIfAbsent(key, ignored -> new QueuedRequestBucket(waiting.facade));
+    if (target.facade == null) {
+      target.facade = waiting.facade;
+    }
+    target.failedAttempts = Math.max(target.failedAttempts, waiting.failedAttempts);
+    target.retryAfterFlush = Math.max(target.retryAfterFlush, waiting.retryAfterFlush);
+    for (ItemStack stack : waiting.stacks) {
       ItemStackDataUtil.mergeIntoList(target.stacks, stack);
     }
   }

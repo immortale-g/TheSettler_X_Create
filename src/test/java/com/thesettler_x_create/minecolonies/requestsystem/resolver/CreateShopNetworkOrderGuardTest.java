@@ -67,7 +67,8 @@ class CreateShopNetworkOrderGuardTest {
         facade.indexOf(
             "recordInflight(consolidateRequestedStacks(normalized), requesterName, requestUuid);");
     assertTrue(queued > 0 && recorded > queued);
-    int broadcast = facade.indexOf("boolean broadcastQueuedRequest(");
+    int broadcast = facade.indexOf("QueuedRequestKey key, List<ItemStack> stacks) {");
+    assertTrue(broadcast > 0);
     assertFalse(facade.substring(broadcast).contains("recordInflight("));
     assertTrue(facade.contains("pickup.cancelInflight(requestUuid, stack, stack.getCount());"));
     assertTrue(

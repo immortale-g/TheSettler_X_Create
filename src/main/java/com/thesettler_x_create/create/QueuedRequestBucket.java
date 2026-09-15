@@ -12,6 +12,9 @@ final class QueuedRequestBucket {
   /** How many consecutive broadcast failures this bucket has survived (see requeueFailedBucket). */
   int failedAttempts;
 
+  /** Flush tick before which this bucket must not be retried. */
+  long retryAfterFlush;
+
   QueuedRequestBucket(CreateNetworkFacade facade) {
     this.facade = facade;
   }
