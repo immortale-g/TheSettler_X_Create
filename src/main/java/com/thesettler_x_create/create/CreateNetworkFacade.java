@@ -252,7 +252,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             shop.getShopAddress(),
             requesterName == null ? "" : requesterName,
             requestUuid);
-    return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
+    return broadcastQueuedRequest(key, normalized).dispatched()
+        ? normalized
+        : Collections.emptyList();
   }
 
   public static void flushQueuedRequests() {
@@ -464,17 +466,18 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     return summary;
   }
 
-  boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
+  CreateLogisticsBridge.Outcome broadcastQueuedRequest(
+      QueuedRequestKey key, List<ItemStack> stacks) {
     if (key == null
         || stacks == null
         || stacks.isEmpty()
         || shop == null
         || key.networkId() == null) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     List<ItemStack> consolidated = consolidateRequestedStacks(stacks);
     if (consolidated.isEmpty()) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     List<BigItemStack> order = new ArrayList<>();
     for (ItemStack requestStack : consolidated) {
@@ -483,11 +486,26 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     if (order.isEmpty()) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     long start = System.nanoTime();
     try {
-      CreateLogisticsBridge.broadcastPackageRequest(key.networkId(), order, key.address());
+      CreateLogisticsBridge.Outcome outcome =
+          CreateLogisticsBridge.broadcastPackageRequest(key.networkId(), order, key.address());
+      if (!outcome.dispatched()) {
+        // No package exists, so nothing may be tracked as inflight - doing so would make the shop
+        // wait out the inflight timeout and then reorder forever against a network that never
+        // answers.
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] package request not dispatched ({}): stacks={} chunks={} network={} address='{}' requester='{}'",
+            describeOutcome(outcome),
+            consolidated.size(),
+            order.size(),
+            key.networkId(),
+            key.address(),
+            key.requesterName());
+        return outcome;
+      }
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] broadcast grouped request stacks={} chunks={} network={} address='{}' requester='{}'",
@@ -498,16 +516,21 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.requesterName());
       }
       recordInflight(consolidated, key.requesterName(), key.requestUuid());
-      return true;
-    } catch (Exception ex) {
-      // Not gated behind Config.DEBUG_LOGGING - see the getSummary() catch above for why.
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
-          "[CreateShop] grouped request broadcast failed for {}: {}",
-          key.networkId(),
-          ex.getMessage() == null ? "<null>" : ex.getMessage());
-      return false;
+      return outcome;
     } finally {
       perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
     }
+  }
+
+  private static String describeOutcome(CreateLogisticsBridge.Outcome outcome) {
+    return switch (outcome) {
+      case NO_PACKAGER -> CreateFactoryLogisticsCompat.isAvailable()
+          ? "Create Factory Logistics refused the order, no reachable packager or all of them busy"
+          : "no packager on the network could serve this order";
+      case PACKAGER_BUSY -> "network refused, packager busy (50+ packages queued)";
+      case EMPTY_ORDER -> "order was empty when it reached Create";
+      case ERROR -> "logistics call failed, see the warning above";
+      case DISPATCHED -> "dispatched";
+    };
   }
 }

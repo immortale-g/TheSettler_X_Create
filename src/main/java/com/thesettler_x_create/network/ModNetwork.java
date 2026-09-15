@@ -131,8 +131,16 @@ public final class ModNetwork {
 
           int amount = Math.max(1, payload.amount());
           BigItemStack request = new BigItemStack(payload.stack().copy(), amount);
-          CreateLogisticsBridge.broadcastPackageRequest(
-              networkId, List.of(request), shop.getShopAddress());
+          CreateLogisticsBridge.Outcome outcome =
+              CreateLogisticsBridge.broadcastPackageRequest(
+                  networkId, List.of(request), shop.getShopAddress());
+          if (!outcome.dispatched()) {
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] test request not dispatched ({}) network={} address='{}'",
+                outcome,
+                networkId,
+                shop.getShopAddress());
+          }
         });
   }
 
@@ -168,8 +176,16 @@ public final class ModNetwork {
             return;
           }
 
-          CreateLogisticsBridge.broadcastPackageRequest(
-              networkId, orderStacks, shop.getShopAddress());
+          CreateLogisticsBridge.Outcome outcome =
+              CreateLogisticsBridge.broadcastPackageRequest(
+                  networkId, orderStacks, shop.getShopAddress());
+          if (!outcome.dispatched()) {
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] batch request not dispatched ({}) network={} address='{}'",
+                outcome,
+                networkId,
+                shop.getShopAddress());
+          }
         });
   }
 
