@@ -67,7 +67,8 @@ class CreateShopDeliveryLifecycleLedgerGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopDeliveryRootCauseSnapshotService.java"));
 
-    assertTrue(source.contains("getCurrentTask()"));
+    // The current task is read without JobDeliveryman.getCurrentTask(), which assigns work.
+    assertTrue(source.contains("CreateShopCourierTasks.peekCurrentTask(manager, jobDeliveryman)"));
     assertTrue(source.contains("getTaskQueue()"));
     assertTrue(source.contains("taskQueue="));
   }

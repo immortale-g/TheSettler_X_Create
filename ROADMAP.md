@@ -33,6 +33,10 @@ täglicher Workflow testet gegen die neuesten Releases.
 nach fünf Minuten. Große Requests, die stackweise ausgeliefert werden, bestellten den Rest dann
 erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen eine frische Frist.
 
+0.3.5 hört auf, aus der Diagnose heraus Kurieraufträge zu verteilen. `JobDeliveryman.getCurrentTask()`
+zieht bei einem Kurier ohne Aufgaben neue Aufträge aus der Warehouse-Queue; der Shop rief es bei jeder
+Prüfung eines offenen Lieferauftrags für alle Kuriere auf. Gelesen wird jetzt nur noch die Task-Queue.
+
 ## Plan ab 2026-09-13
 
 ### Branches
