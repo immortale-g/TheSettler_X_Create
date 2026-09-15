@@ -1,5 +1,6 @@
 package com.thesettler_x_create.create;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -46,6 +47,46 @@ class CreateLogisticsBridgeOutcomeGuardTest {
     int inflight = source.indexOf("recordInflight(consolidated,");
     assertTrue(refusal > 0 && inflight > refusal);
     assertTrue(source.indexOf("return false;", refusal) < inflight);
+  }
+
+  @Test
+  void inflightIsWrittenFromExactlyOnePlaceAndOnlyAfterDispatch() throws Exception {
+    String facade = read("src/main/java/com/thesettler_x_create/create/CreateNetworkFacade.java");
+    // One writer only: if a second path ever records inflight, it has to be reviewed against the
+    // dispatch check as well, so this guard has to fail rather than silently allow it.
+    assertEquals(
+        1,
+        countOccurrences(facade, "pickup.recordInflight("),
+        "inflight must only be written by CreateNetworkFacade.recordInflight");
+    assertEquals(
+        1,
+        countOccurrences(facade, "      recordInflight(consolidated,"),
+        "recordInflight must only be called once, inside the dispatched branch");
+
+    // And nobody outside the facade may write inflight directly.
+    for (String path :
+        allJavaSources().stream()
+            .filter(p -> !p.endsWith("CreateNetworkFacade.java"))
+            .filter(p -> !p.endsWith("CreateShopBlockEntity.java"))
+            .toList()) {
+      assertFalse(
+          read(path).contains(".recordInflight("),
+          path + " must not record inflight, only CreateNetworkFacade may");
+    }
+  }
+
+  private static int countOccurrences(String haystack, String needle) {
+    int count = 0;
+    for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+      count++;
+    }
+    return count;
+  }
+
+  private static java.util.List<String> allJavaSources() throws Exception {
+    try (var paths = Files.walk(Path.of("src/main/java"))) {
+      return paths.filter(p -> p.toString().endsWith(".java")).map(Path::toString).toList();
+    }
   }
 
   @Test

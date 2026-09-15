@@ -233,7 +233,9 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             shop.getShopAddress(),
             requesterName == null ? "" : requesterName,
             null);
-    return broadcastQueuedRequest(key, normalized) ? normalized : Collections.emptyList();
+    return broadcastQueuedRequest(key, normalized).dispatched()
+        ? normalized
+        : Collections.emptyList();
   }
 
   public static void flushQueuedRequests() {
@@ -401,17 +403,18 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     return summary;
   }
 
-  boolean broadcastQueuedRequest(QueuedRequestKey key, List<ItemStack> stacks) {
+  CreateLogisticsBridge.Outcome broadcastQueuedRequest(
+      QueuedRequestKey key, List<ItemStack> stacks) {
     if (key == null
         || stacks == null
         || stacks.isEmpty()
         || shop == null
         || key.networkId == null) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     List<ItemStack> consolidated = consolidateRequestedStacks(stacks);
     if (consolidated.isEmpty()) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     List<BigItemStack> order = new ArrayList<>();
     for (ItemStack requestStack : consolidated) {
@@ -425,7 +428,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     if (order.isEmpty()) {
-      return true;
+      return CreateLogisticsBridge.Outcome.EMPTY_ORDER;
     }
     long start = System.nanoTime();
     try {
@@ -443,7 +446,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.networkId,
             key.address,
             key.requesterName);
-        return false;
+        return outcome;
       }
       if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -455,7 +458,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.requesterName);
       }
       recordInflight(consolidated, key.requesterName, key.requestUuid);
-      return true;
+      return outcome;
     } finally {
       perfLogger.recordBroadcast(System.nanoTime() - start, order.size(), shop);
     }
