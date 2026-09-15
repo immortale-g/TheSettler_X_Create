@@ -200,7 +200,7 @@ final class CreateShopRequestStateMutatorService {
               // Best effort queue cleanup.
             }
             try {
-              var current = job.getCurrentTask();
+              var current = CreateShopCourierTasks.peekCurrentTask(manager, job);
               if (current != null) {
                 boolean tokenMatch = childToken.equals(current.getId());
                 boolean signatureMatch =

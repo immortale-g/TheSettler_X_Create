@@ -93,7 +93,7 @@ final class CreateShopDeliveryRootCauseSnapshotService {
             if (citizen.getJob()
                 instanceof com.minecolonies.core.colony.jobs.JobDeliveryman jobDeliveryman) {
               try {
-                IRequest<?> task = jobDeliveryman.getCurrentTask();
+                IRequest<?> task = CreateShopCourierTasks.peekCurrentTask(manager, jobDeliveryman);
                 currentTask = task == null ? "<none>" : String.valueOf(task.getId());
               } catch (Exception ignored) {
                 currentTask = "<error>";
