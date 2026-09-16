@@ -1,7 +1,7 @@
 name: Compat (latest releases)
 
-# Early warning only. Compiles and tests against the newest MineColonies, Structurize and Create
-# releases instead of the pinned versions, so upstream API breaks show up here before players hit
+# Early warning only. Compiles and tests against the newest MineColonies, Structurize, Create and
+# Create Factory Logistics releases instead of the pinned versions, so upstream API breaks show up here before players hit
 # them. A red run does not block anything; it means an adapter or a version bump is needed.
 #
 # Scheduled runs always use this file from the default branch, so the branch list lives here: the
@@ -43,4 +43,4 @@ jobs:
           echo "Testing ${{ matrix.ref }} with: $args" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compile and test against latest releases
-        run: ./gradlew compileJava test testModernStructurize ${{ steps.deps.outputs.args }}
+        run: ./gradlew compileJava test testModernStructurize testFactoryLogistics ${{ steps.deps.outputs.args }}
