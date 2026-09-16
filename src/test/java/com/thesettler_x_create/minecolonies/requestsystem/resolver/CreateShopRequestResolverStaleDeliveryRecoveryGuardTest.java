@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * After Phase 3.5, stale delivery-child recovery has been removed. MineColonies owns the delivery
- * lifecycle after DELIVERY_CREATED. The extra-active-child recovery is detached as well (see {@link
- * CreateShopExtraActiveChildRecoveryDetachedGuardTest}); the local-origin check stays.
+ * lifecycle after DELIVERY_CREATED. The extra-active-child recovery is gone as well (see {@link
+ * CreateShopExtraActiveChildRecoveryRemovedGuardTest}); the local-origin check stays.
  */
 class CreateShopRequestResolverStaleDeliveryRecoveryGuardTest {
   @Test

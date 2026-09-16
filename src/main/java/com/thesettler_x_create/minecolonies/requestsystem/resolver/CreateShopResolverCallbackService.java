@@ -359,7 +359,8 @@ final class CreateShopResolverCallbackService {
       return false;
     }
     var orphanChild = resolver.findPickedUpOrphanChildForParent(request.getId());
-    if (orphanChild == null) {
+    if (orphanChild == null
+        || requestStateMutatorService.isUnfinishedDeliveryChild(standardManager, orphanChild)) {
       return false;
     }
     BuildingCreateShop shop = resolver.getShop(manager);
@@ -380,7 +381,7 @@ final class CreateShopResolverCallbackService {
     Level level = manager.getColony() == null ? null : manager.getColony().getWorld();
     resolver.observeDeliveryChildCallbackTerminal(
         level, request.getId(), orphanChild, "fast-orphan-pickedup-recovery");
-    requestStateMutatorService.finalizeOrphanDeliveryChild(
+    requestStateMutatorService.forgetVanishedDeliveryChild(
         resolver, standardManager, orphanChild, "fast-orphan-pickedup-recovery");
     // The orphan never reached MineColonies' completion callback, so MineColonies will not ask us
     // to resolve the parent. Run the same completion check it would have triggered.

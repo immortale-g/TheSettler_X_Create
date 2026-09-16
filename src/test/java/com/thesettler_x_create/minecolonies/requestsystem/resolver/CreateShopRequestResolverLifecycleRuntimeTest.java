@@ -3,21 +3,15 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -47,33 +41,7 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
 
   @Test
   @SuppressWarnings({"rawtypes", "unchecked"})
-  void recoverySkipsMutationWhenParentOwnershipDriftsAway() throws Exception {
-    IToken<?> parentToken = token(UUID.randomUUID());
-    IToken<?> childToken = token(UUID.randomUUID());
-    IRequest<?> parentRequest = mock(IRequest.class);
-    when(parentRequest.getId()).thenReturn(parentToken);
-
-    ILocation foreignLocation = mock(ILocation.class);
-    when(foreignLocation.getDimension()).thenReturn(Level.OVERWORLD);
-    when(foreignLocation.getInDimensionLocation()).thenReturn(new BlockPos(99, 70, 99));
-    CreateShopRequestResolver foreignResolver =
-        new CreateShopRequestResolver(foreignLocation, token(UUID.randomUUID()));
-
-    when(manager.getResolverHandler().getResolverForRequest(parentRequest))
-        .thenReturn((IRequestResolver) foreignResolver);
-
-    boolean recovered =
-        invokeRecoverDeliveryChild(
-            manager, level, parentRequest, childToken, null, null, null, "owner-drift", "test");
-
-    assertFalse(recovered);
-    verify(manager, never()).updateRequestState(any(), any());
-    verify(parentRequest, never()).removeChild(any());
-  }
-
-  @Test
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  void requestedCompleteCleansParentTrackingAndPendingState() throws Exception {
+  void requestedCompleteCleansParentTrackingAndPendingState() {
     IToken<?> parentToken = token(UUID.randomUUID());
 
     resolver.getPendingTracker().setPendingCount(parentToken, 3);
@@ -93,51 +61,6 @@ class CreateShopRequestResolverLifecycleRuntimeTest {
     assertEquals(0, resolver.getPendingTracker().getPendingCount(parentToken));
     assertFalse(resolver.getPendingTracker().hasDeliveryStarted(parentToken));
     assertFalse(resolver.getCooldown().isOrdered(parentToken));
-  }
-
-  private boolean invokeRecoverDeliveryChild(
-      IStandardRequestManager manager,
-      Level level,
-      IRequest<?> parentRequest,
-      IToken<?> childToken,
-      IRequest<?> childRequest,
-      com.thesettler_x_create.minecolonies.building.BuildingCreateShop shop,
-      com.thesettler_x_create.blockentity.CreateShopBlockEntity pickup,
-      String pendingSource,
-      String logTemplate)
-      throws Exception {
-    Field field = CreateShopRequestResolver.class.getDeclaredField("deliveryChildRecoveryService");
-    field.setAccessible(true);
-    Object recoveryService = field.get(resolver);
-    Method method =
-        recoveryService
-            .getClass()
-            .getDeclaredMethod(
-                "recover",
-                CreateShopRequestResolver.class,
-                IStandardRequestManager.class,
-                Level.class,
-                IRequest.class,
-                IToken.class,
-                IRequest.class,
-                com.thesettler_x_create.minecolonies.building.BuildingCreateShop.class,
-                com.thesettler_x_create.blockentity.CreateShopBlockEntity.class,
-                String.class,
-                String.class);
-    method.setAccessible(true);
-    return (boolean)
-        method.invoke(
-            recoveryService,
-            resolver,
-            manager,
-            level,
-            parentRequest,
-            childToken,
-            childRequest,
-            shop,
-            pickup,
-            pendingSource,
-            logTemplate);
   }
 
   @SuppressWarnings("unchecked")

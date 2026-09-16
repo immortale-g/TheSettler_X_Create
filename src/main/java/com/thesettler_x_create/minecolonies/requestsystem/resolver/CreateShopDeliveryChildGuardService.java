@@ -9,9 +9,8 @@ import net.minecraft.world.level.Level;
  *
  * <p>Stale-child detection and forced courier recovery have been removed: once DELIVERY_CREATED is
  * reached, MineColonies owns the delivery. The shop reacts to terminal callbacks rather than
- * polling courier progress. The only remaining active guard is the extra-active-child check which
- * cancels duplicate delivery children for the same parent (a programming-error guard, not a
- * timeout-based heuristic).
+ * polling courier progress. It never cancels a delivery child: MineColonies answers that by
+ * cancelling every child of the parent.
  */
 final class CreateShopDeliveryChildGuardService {
   /**
