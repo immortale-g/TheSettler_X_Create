@@ -1,7 +1,8 @@
 name: Build
 
 # Builds against the pinned dependency versions from gradle.properties. `check` also runs
-# testModernStructurize, so both Structurize placement handler APIs are covered.
+# testModernStructurize, so both Structurize placement handler APIs are covered, and
+# testFactoryLogistics, which resolves the reflective Create Factory Logistics bridge against cfl_version.
 on: [push, pull_request]
 
 jobs:
