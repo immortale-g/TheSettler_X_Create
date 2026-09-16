@@ -38,4 +38,25 @@ class CreateFactoryLogisticsCompatTest {
     assertTrue(source.contains("getMethod(\"of\", PackageOrderWithCrafts.class)"));
     assertTrue(source.contains("\"broadcastPackageRequest\""));
   }
+
+  @Test
+  void missingClassesOnlyStaySilentWhenFactoryLogisticsIsNotLoaded() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/create/CreateFactoryLogisticsCompat.java"));
+    // A ClassNotFoundException means "CFL not installed" only if the mod is really absent. With CFL
+    // loaded it means its API moved, and that must be reported instead of silently falling back.
+    int notFound = source.indexOf("catch (ClassNotFoundException missing) {");
+    assertTrue(notFound > 0);
+    String branch = source.substring(notFound, source.indexOf("catch (Exception", notFound));
+    assertTrue(branch.contains("if (isInstalled()) {"));
+    assertTrue(branch.contains("warnApiBroken(missing);"));
+    assertTrue(source.contains("mods.isLoaded(MOD_ID)"));
+  }
+
+  @Test
+  void isInstalledIsFalseWithoutAModLoader() {
+    assertFalse(CreateFactoryLogisticsCompat.isInstalled());
+  }
 }

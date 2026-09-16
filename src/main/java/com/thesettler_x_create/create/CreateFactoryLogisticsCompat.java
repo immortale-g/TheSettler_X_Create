@@ -5,6 +5,7 @@ import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * false} and callers fall back to the stock Create path.
  */
 public final class CreateFactoryLogisticsCompat {
+  private static final String MOD_ID = "create_factory_logistics";
   private static final String ORDER_CLASS =
       "ru.zznty.create_factory_abstractions.generic.support.GenericOrder";
   private static final String MANAGER_CLASS =
@@ -58,12 +60,17 @@ public final class CreateFactoryLogisticsCompat {
       return;
     }
     resolved = true;
+    orderOf = null;
+    broadcast = null;
     try {
-      Class<?> orderClass = Class.forName(ORDER_CLASS);
-      Class<?> managerClass = Class.forName(MANAGER_CLASS);
-      Class<?> inventoryClass = Class.forName(INVENTORY_CLASS);
-      orderOf = orderClass.getMethod("of", PackageOrderWithCrafts.class);
-      broadcast =
+      // Loaded without initializing: resolving signatures must not run CFL's static setup, and the
+      // compat test resolves these outside a running game.
+      ClassLoader loader = CreateFactoryLogisticsCompat.class.getClassLoader();
+      Class<?> orderClass = Class.forName(ORDER_CLASS, false, loader);
+      Class<?> managerClass = Class.forName(MANAGER_CLASS, false, loader);
+      Class<?> inventoryClass = Class.forName(INVENTORY_CLASS, false, loader);
+      Method resolvedOrderOf = orderClass.getMethod("of", PackageOrderWithCrafts.class);
+      Method resolvedBroadcast =
           managerClass.getMethod(
               "broadcastPackageRequest",
               UUID.class,
@@ -71,17 +78,65 @@ public final class CreateFactoryLogisticsCompat {
               orderClass,
               inventoryClass,
               String.class);
+      // A changed return type would not fail the lookup, it would just make every broadcast read
+      // as refused. Treat it as a broken API instead.
+      if (resolvedOrderOf.getReturnType() != orderClass
+          || resolvedBroadcast.getReturnType() != boolean.class) {
+        throw new NoSuchMethodException(
+            "unexpected return types: "
+                + resolvedOrderOf.getReturnType().getName()
+                + ", "
+                + resolvedBroadcast.getReturnType().getName());
+      }
+      orderOf = resolvedOrderOf;
+      broadcast = resolvedBroadcast;
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] Create Factory Logistics detected, routing package requests through its generic logistics layer");
-    } catch (ClassNotFoundException notInstalled) {
-      orderOf = null;
-      broadcast = null;
+          "[CreateShop] Create Factory Logistics {} detected, routing package requests through its generic logistics layer",
+          installedVersion());
+    } catch (ClassNotFoundException missing) {
+      // Absent classes mean one of two very different things. Without CFL this is the normal case.
+      // With CFL loaded it means the API moved, and the shop would silently stop reaching its
+      // packagers - exactly the endless-order bug this class exists to prevent.
+      if (isInstalled()) {
+        warnApiBroken(missing);
+      }
     } catch (Exception | LinkageError ex) {
-      orderOf = null;
-      broadcast = null;
-      TheSettlerXCreate.LOGGER.warn(
-          "[CreateShop] Create Factory Logistics is installed but its logistics API did not resolve ({}), falling back to the stock Create path. Package requests may be dropped silently.",
-          ex.toString());
+      warnApiBroken(ex);
+    }
+  }
+
+  private static void warnApiBroken(Throwable cause) {
+    TheSettlerXCreate.LOGGER.error(
+        "[CreateShop] Create Factory Logistics {} is installed, but its logistics API was not found"
+            + " ({}). The Create Shop falls back to the stock Create path, which does not produce"
+            + " packages while CFL is installed: orders will not arrive. This build of"
+            + " TheSettler_x_Create needs an update for this CFL version.",
+        installedVersion(),
+        cause.toString());
+  }
+
+  /** Whether the CFL mod itself is loaded, independent of whether its API resolved. */
+  static boolean isInstalled() {
+    try {
+      ModList mods = ModList.get();
+      return mods != null && mods.isLoaded(MOD_ID);
+    } catch (RuntimeException | LinkageError noModLoader) {
+      // Unit tests run without FML.
+      return false;
+    }
+  }
+
+  private static String installedVersion() {
+    try {
+      ModList mods = ModList.get();
+      if (mods == null) {
+        return "<unknown version>";
+      }
+      return mods.getModContainerById(MOD_ID)
+          .map(container -> container.getModInfo().getVersion().toString())
+          .orElse("<unknown version>");
+    } catch (RuntimeException | LinkageError noModLoader) {
+      return "<unknown version>";
     }
   }
 
