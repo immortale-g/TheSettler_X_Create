@@ -98,7 +98,7 @@ final class ShopLostPackageRequestCanceller {
         if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package cancel fallback matched root token={} (address-match unavailable)",
-              fallbackTupleCandidate.getId());
+              (IToken<?>) fallbackTupleCandidate.getId());
         }
       } catch (Exception ex) {
         if (DebugLog.enabled()) {

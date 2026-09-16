@@ -78,7 +78,8 @@ final class CreateShopAttemptResolveService {
     if (resolver.isCancelledRequest(request.getId())) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (request cancelled) {}", request.getId());
+            "[CreateShop] attemptResolve skipped (request cancelled) {}",
+            (IToken<?>) request.getId());
       }
       return Lists.newArrayList();
     }
@@ -96,7 +97,7 @@ final class CreateShopAttemptResolveService {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve skipped (has active children) request={}",
-            request.getId());
+            (IToken<?>) request.getId());
       }
       return Lists.newArrayList();
     }

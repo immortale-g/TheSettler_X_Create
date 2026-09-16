@@ -116,7 +116,7 @@ final class CreateShopResolverChain {
     } catch (StackOverflowError error) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] request chain validation overflow for {}", request.getId());
+            "[CreateShop] request chain validation overflow for {}", (IToken<?>) request.getId());
       }
       return false;
     }

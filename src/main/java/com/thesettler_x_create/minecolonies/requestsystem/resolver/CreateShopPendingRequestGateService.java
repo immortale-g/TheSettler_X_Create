@@ -74,7 +74,7 @@ final class CreateShopPendingRequestGateService {
             "com.thesettler_x_create.message.createshop.flow_cancelled");
         if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (cancelled)", request.getId());
+              "[CreateShop] tickPending: {} skip (cancelled)", (IToken<?>) request.getId());
         }
         return true;
       }
@@ -93,7 +93,7 @@ final class CreateShopPendingRequestGateService {
           "com.thesettler_x_create.message.createshop.flow_cancelled");
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
+            "[CreateShop] tickPending: {} skip (state cancelled)", (IToken<?>) request.getId());
       }
       return true;
     }
