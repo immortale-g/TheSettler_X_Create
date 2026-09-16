@@ -77,7 +77,9 @@ final class CreateShopDeliveryCompletionService {
             && CreateShopDeliveryOriginMatcher.isDeliveryFromLocalShopStart(
                 delivery, shop, pickup)) {
           UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentToken);
-          pickup.clearInflightByUuid(parentRequestId);
+          // The parent's orders still on their way stay tracked: one completed delivery says
+          // nothing about the rest, and forgetting them made the parent order again. They are
+          // detached when the parent itself ends.
           ItemStack stack = delivery.getStack().copy();
           // A delivery starting at the hut had its reservation consumed when the courier took the
           // items out (CreateShopPickupObservationService); consuming it again here would eat a

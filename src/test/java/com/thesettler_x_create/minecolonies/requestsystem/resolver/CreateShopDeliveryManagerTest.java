@@ -65,7 +65,11 @@ class CreateShopDeliveryManagerTest {
     assertFalse(source.contains("if (request.hasChildren()) {"));
   }
 
-  /** The callers skip requests with open children, which is why the manager no longer checks. */
+  /**
+   * The callers decide whether a request may get more deliveries, which is why the manager does not
+   * check. Without open children the regular path plans them; with open children only the
+   * open-delivery path does, and it subtracts what the open deliveries still hold.
+   */
   @Test
   void callersOnlyPlanDeliveriesForRequestsWithoutOpenChildren() throws Exception {
     String attemptResolve =
@@ -85,5 +89,15 @@ class CreateShopDeliveryManagerTest {
         pendingProcessor.indexOf("if (childResult.hasActiveChildren() || request.hasChildren()) {");
     int pendingCreate = pendingProcessor.indexOf("pendingDeliveryCreationService.process(");
     assertTrue(pendingGuard >= 0 && pendingGuard < pendingCreate);
+    int openDeliveryPath = pendingProcessor.indexOf("openDeliveryTopupService.process(");
+    assertTrue(pendingGuard < openDeliveryPath && openDeliveryPath < pendingCreate);
+
+    String openDelivery =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/CreateShopOpenDeliveryTopupService.java"));
+    assertTrue(openDelivery.contains("OpenDeliveryPlan.of("));
+    assertTrue(openDelivery.contains("if (plan.deliverNow() > 0) {"));
+    assertTrue(openDelivery.contains("ledger.pickupConfirmedAtTick < 0L"));
   }
 }

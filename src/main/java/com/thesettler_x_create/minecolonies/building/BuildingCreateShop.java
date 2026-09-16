@@ -308,6 +308,8 @@ public class BuildingCreateShop extends AbstractBuilding {
             "[CreateShop] tick: resolver missing for shop {}",
             getLocation().getInDimensionLocation());
       }
+      // Arrivals first: goods that came in are reserved for their request before anyone plans.
+      inflightTracker.reconcileArrivals(colony);
       if (resolver != null) {
         resolver.tickPendingDeliveries(colony.getRequestManager());
       }

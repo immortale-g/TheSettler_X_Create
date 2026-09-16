@@ -42,11 +42,13 @@ class CreateLogisticsBridgeOutcomeGuardTest {
     String source = read("src/main/java/com/thesettler_x_create/create/CreateNetworkFacade.java");
     assertTrue(source.contains("CreateLogisticsBridge.broadcastPackageRequest("));
     assertTrue(source.contains("if (!outcome.dispatched()) {"));
-    // The refusal branch must return before reaching recordInflight.
-    int refusal = source.indexOf("if (!outcome.dispatched()) {");
-    int inflight = source.indexOf("recordInflight(consolidated,");
-    assertTrue(refusal > 0 && inflight > refusal);
-    assertTrue(source.indexOf("return false;", refusal) < inflight);
+    // The immediate path has no tick between ordering and broadcasting, so it gates on the
+    // dispatch before tracking anything.
+    int gate = source.indexOf("if (!broadcastQueuedRequest(key, normalized).dispatched()) {");
+    assertTrue(gate > 0, "the immediate order point must gate on a dispatched broadcast");
+    assertTrue(
+        source.indexOf("recordInflight(consolidateRequestedStacks(normalized)", gate) > gate,
+        "inflight must be recorded after that gate");
   }
 
   @Test
@@ -58,10 +60,21 @@ class CreateLogisticsBridgeOutcomeGuardTest {
         1,
         countOccurrences(facade, "pickup.recordInflight("),
         "inflight must only be written by CreateNetworkFacade.recordInflight");
-    assertEquals(
-        1,
-        countOccurrences(facade, "      recordInflight(consolidated,"),
-        "recordInflight must only be called once, inside the dispatched branch");
+    // The queued path deliberately tracks the order one tick early, so a request deciding again
+    // before the broadcast already sees it. That is only safe because giving up forgets it again -
+    // if that counterpart ever disappears, an undispatched order would stay tracked forever.
+    String queue =
+        read("src/main/java/com/thesettler_x_create/create/CreateNetworkRequestQueue.java");
+    assertTrue(
+        queue.contains("failed.facade.forgetAbandonedOrder("),
+        "giving up on a broadcast must forget the order it tracked when queuing");
+    assertTrue(queue.contains("if (!shouldRetry(outcome, attempts)) {"));
+
+    int broadcast = facade.indexOf("QueuedRequestKey key, List<ItemStack> stacks) {");
+    assertTrue(broadcast > 0);
+    assertFalse(
+        facade.substring(broadcast).contains("recordInflight("),
+        "the broadcast itself must not record inflight, that is the order point's job");
 
     // And nobody outside the facade may write inflight directly.
     for (String path :

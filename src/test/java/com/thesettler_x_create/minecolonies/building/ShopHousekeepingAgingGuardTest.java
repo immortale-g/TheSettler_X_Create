@@ -48,6 +48,7 @@ class ShopHousekeepingAgingGuardTest {
   void hutBufferExtractionsAreNotBookedAsDeliveryPickups() throws Exception {
     String source = Files.readString(TILE);
 
-    assertTrue(source.contains("slot >= observedHut.getSlots() - hutBuffer.getSlots()"));
+    assertTrue(source.contains("if (!isRackSlot(slot)) {"));
+    assertTrue(source.contains("slot < observedHut.getSlots() - hutBuffer.getSlots()"));
   }
 }

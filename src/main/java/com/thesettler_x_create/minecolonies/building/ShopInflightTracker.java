@@ -6,7 +6,12 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.InflightBook;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -19,6 +24,53 @@ final class ShopInflightTracker {
     this.shop = shop;
   }
 
+  /**
+   * Books arrived Create orders and reserves them for the request that ordered them. Runs every
+   * colony tick before the resolver plans, so goods that arrived are already spoken for when other
+   * requests look at the free rack stock.
+   */
+  void reconcileArrivals(IColony colony) {
+    if (colony == null || colony.getWorld() == null || colony.getWorld().isClientSide) {
+      return;
+    }
+    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+    if (pickup == null) {
+      return;
+    }
+    List<ItemStack> inflightKeys = pickup.getInflightKeys();
+    if (inflightKeys.isEmpty()) {
+      return;
+    }
+    Map<ItemStack, Integer> currentCounts = shop.getStockCountsForKeys(inflightKeys);
+    List<InflightBook.Arrival<ItemStack>> arrivals = pickup.reconcileInflight(currentCounts);
+    if (arrivals.isEmpty()) {
+      return;
+    }
+    Set<UUID> gaugeRequests = shop.getGaugeReservationRequestIds();
+    for (InflightBook.Arrival<ItemStack> arrival : arrivals) {
+      int reserved = 0;
+      if (arrival.owner() != null) {
+        int rackStock = countFor(currentCounts, arrival.key());
+        // Gauge reservations cover colony goods not in the racks yet; they must not block this.
+        int reservedByRequests = pickup.getReservedForExcluding(arrival.key(), gaugeRequests);
+        reserved =
+            ShopStockAccounting.arrivalReservation(arrival.amount(), rackStock, reservedByRequests);
+        if (reserved > 0) {
+          pickup.reserve(arrival.owner(), arrival.key(), reserved);
+        }
+      }
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] inflight arrival item={} amount={} owner={} reserved={}",
+            arrival.key().getHoverName().getString(),
+            arrival.amount(),
+            arrival.owner(),
+            reserved);
+      }
+    }
+  }
+
+  /** Overdue orders: unowned ones are dropped, owned ones are asked about. */
   void tick(IColony colony) {
     if (colony == null) {
       return;
@@ -38,12 +90,19 @@ final class ShopInflightTracker {
     if (pickup == null) {
       return;
     }
-    List<ItemStack> inflightKeys = pickup.getInflightKeys();
-    if (inflightKeys.isEmpty()) {
+    for (InflightBook.StoredEntry<ItemStack> expired :
+        pickup.expireFreeInflight(now, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong())) {
+      if (BuildingCreateShop.isDebugRequests()) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] inflight dropped unowned overdue order item={} remaining={} age={}",
+            expired.key().getHoverName().getString(),
+            expired.remaining(),
+            now - expired.requestedAt());
+      }
+    }
+    if (pickup.getInflightKeys().isEmpty()) {
       return;
     }
-    var currentCounts = shop.getStockCountsForKeys(inflightKeys);
-    pickup.reconcileInflight(currentCounts);
     if (shop.hasActiveLocalDeliveryChildrenForInflight(colony)) {
       if (BuildingCreateShop.isDebugRequests()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
@@ -104,6 +163,15 @@ final class ShopInflightTracker {
       // Hard gate: only one lost-package interaction should be triggered per tracker tick.
       break;
     }
+  }
+
+  private static int countFor(Map<ItemStack, Integer> counts, ItemStack key) {
+    for (Map.Entry<ItemStack, Integer> entry : counts.entrySet()) {
+      if (ItemStack.isSameItemSameComponents(entry.getKey(), key)) {
+        return entry.getValue();
+      }
+    }
+    return 0;
   }
 
   private ICitizenData getShopkeeperCitizen() {

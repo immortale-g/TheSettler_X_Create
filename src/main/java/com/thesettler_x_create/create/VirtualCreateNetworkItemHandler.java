@@ -126,6 +126,9 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
     // Keep reservations until the parent request completes (or TTL expires) to avoid re-requests
     // mid-delivery.
+    if (!simulate) {
+      shopBlockEntity.noteRackStockChange(extracted, -extracted.getCount());
+    }
 
     if (Config.DEBUG_LOGGING.getAsBoolean()) {
       TheSettlerXCreate.LOGGER.info(

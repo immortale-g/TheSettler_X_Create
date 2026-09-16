@@ -19,13 +19,16 @@ final class CreateShopPendingTopupService {
   private final CreateShopStockResolver stockResolver;
   private final CreateShopResolverMessaging messaging;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
+  private final CreateShopNetworkOrderService networkOrderService;
 
   CreateShopPendingTopupService(
       CreateShopResolverDiagnostics diagnostics,
       CreateShopRequestStateMachine flowStateMachine,
       CreateShopStockResolver stockResolver,
       CreateShopResolverMessaging messaging,
-      CreateShopRequestStateMutatorService requestStateMutatorService) {
+      CreateShopRequestStateMutatorService requestStateMutatorService,
+      CreateShopNetworkOrderService networkOrderService) {
+    this.networkOrderService = networkOrderService;
     this.diagnostics = diagnostics;
     this.flowStateMachine = flowStateMachine;
     this.stockResolver = stockResolver;
@@ -52,55 +55,39 @@ final class CreateShopPendingTopupService {
     int topupNeeded =
         ShopStockAccounting.topupNeed(pendingCount, reservedForRequest, rackAvailableForRequest);
 
-    // Only reached while no delivery child is open. A completed partial delivery is already
-    // subtracted from pendingCount, and Create orders still on their way are covered by their
-    // reservation and the inflight check below, so only the real remainder is ordered.
+    // A completed partial delivery is already subtracted from pendingCount. Orders on their way
+    // for this request, and unowned ones it takes over, are counted by the order service, so only
+    // the real remainder is ordered. Nothing is reserved here; arrivals are.
     if (workerWorking && topupNeeded > 0) {
-      String requesterName = messaging.resolveRequesterName(manager, request);
-      int inflightRemaining =
-          pickup.getInflightRemaining(
-              deliverable.getResult(), requesterName, tile.getShopAddress());
-      int effectiveTopupNeeded =
-          ShopStockAccounting.networkOrderAmount(topupNeeded, inflightRemaining);
-      if (effectiveTopupNeeded <= 0) {
-        requestStateMutatorService.markOrderedWithPending(
-            resolver, level, request.getId(), pendingCount);
-        diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
-        flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
+      CreateShopNetworkOrderService.OrderResult order =
+          networkOrderService.orderMissing(
+              tile,
+              pickup,
+              deliverable,
+              CreateShopRequestResolver.toRequestId(request.getId()),
+              topupNeeded,
+              () -> stockResolver.getNetworkAvailable(tile, deliverable),
+              messaging.resolveRequesterName(manager, request));
+      List<ItemStack> topupOrdered = order.ordered();
+      if (topupOrdered.isEmpty()) {
+        if (order.somethingOnItsWay()) {
+          requestStateMutatorService.markOrderedWithPending(
+              resolver, level, request.getId(), pendingCount);
+          diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
+          flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
+        }
         if (Config.DEBUG_LOGGING.getAsBoolean()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} network topup blocked (inflightRemaining={}, topupNeeded={}, pending={}, reserved={}, rack={})",
+              "[CreateShop] tickPending: {} network topup not ordered (inflightRemaining={}, claimed={}, topupNeeded={}, pending={}, reserved={}, rack={})",
               requestIdLog,
-              inflightRemaining,
+              order.ownInflight(),
+              order.claimed(),
               topupNeeded,
               pendingCount,
               reservedForRequest,
               rackAvailableForRequest);
         }
         return;
-      }
-
-      int networkAvailable = stockResolver.getNetworkAvailable(tile, deliverable);
-      int topupCount = Math.min(networkAvailable, effectiveTopupNeeded);
-      if (topupCount <= 0) {
-        return;
-      }
-      List<ItemStack> topupOrdered =
-          stockResolver.requestFromNetwork(
-              tile,
-              deliverable,
-              topupCount,
-              requesterName,
-              CreateShopRequestResolver.toRequestId(request.getId()));
-      if (topupOrdered.isEmpty()) {
-        return;
-      }
-      for (ItemStack stack : topupOrdered) {
-        if (stack.isEmpty()) {
-          continue;
-        }
-        pickup.reserve(
-            CreateShopRequestResolver.toRequestId(request.getId()), stack.copy(), stack.getCount());
       }
       requestStateMutatorService.markOrderedWithPending(
           resolver, level, request.getId(), pendingCount);

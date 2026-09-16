@@ -10,27 +10,31 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The shop hut's combined rack inventory, passed through unchanged, that reports every item really
- * taken out of it.
+ * taken out of it and every other real change of a slot.
  *
  * <p>Couriers gather deliveries that start at the hut through this inventory, so this is where the
- * shop sees a pickup happen. It extends {@link CombinedItemHandler} instead of only implementing
- * the item handler interface because MineColonies' warehouse sort only works on that type. Every
- * method forwards to the inventory MineColonies built; none of the parent's own state is used.
+ * shop sees a pickup happen. MineColonies also delivers into the building and sorts it through
+ * here. It extends {@link CombinedItemHandler} instead of only implementing the item handler
+ * interface because MineColonies' warehouse sort only works on that type. Every method forwards to
+ * the inventory MineColonies built; none of the parent's own state is used.
  */
 final class ObservedHutItemHandler extends CombinedItemHandler {
-  /** Receives every real extraction with the combined slot it came from. */
-  @FunctionalInterface
-  interface TakenListener {
+  /** Receives the real changes, each with the combined slot it happened in. */
+  interface ChangeListener {
+    /** Items were extracted. */
     void taken(int slot, ItemStack taken);
+
+    /** Items were inserted ({@code delta > 0}) or a slot was overwritten. */
+    void changed(int slot, ItemStack key, int delta);
   }
 
   private final CombinedItemHandler delegate;
-  private final TakenListener onTaken;
+  private final ChangeListener listener;
 
-  ObservedHutItemHandler(CombinedItemHandler delegate, TakenListener onTaken) {
+  ObservedHutItemHandler(CombinedItemHandler delegate, ChangeListener listener) {
     super("");
     this.delegate = delegate;
-    this.onTaken = onTaken;
+    this.listener = listener;
   }
 
   /** The inventory this one forwards to; replaced when MineColonies rebuilds it. */
@@ -43,7 +47,7 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
   public ItemStack extractItem(int slot, int amount, boolean simulate) {
     ItemStack extracted = delegate.extractItem(slot, amount, simulate);
     if (!simulate && !extracted.isEmpty()) {
-      onTaken.taken(slot, extracted.copy());
+      listener.taken(slot, extracted.copy());
     }
     return extracted;
   }
@@ -51,12 +55,24 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
   @NotNull
   @Override
   public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
-    return delegate.insertItem(slot, stack, simulate);
+    ItemStack leftover = delegate.insertItem(slot, stack, simulate);
+    int inserted = stack.getCount() - leftover.getCount();
+    if (!simulate && !stack.isEmpty() && inserted > 0) {
+      listener.changed(slot, stack.copy(), inserted);
+    }
+    return leftover;
   }
 
   @Override
   public void setStackInSlot(int slot, ItemStack stack) {
+    ItemStack before = delegate.getStackInSlot(slot).copy();
     delegate.setStackInSlot(slot, stack);
+    if (!before.isEmpty()) {
+      listener.changed(slot, before, -before.getCount());
+    }
+    if (stack != null && !stack.isEmpty()) {
+      listener.changed(slot, stack.copy(), stack.getCount());
+    }
   }
 
   @NotNull

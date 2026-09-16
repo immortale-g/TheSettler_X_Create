@@ -208,7 +208,22 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return handler;
     }
     if (observedHut == null || observedHut.delegate() != combined) {
-      observedHut = new ObservedHutItemHandler(combined, this::onHutItemsTaken);
+      observedHut =
+          new ObservedHutItemHandler(
+              combined,
+              new ObservedHutItemHandler.ChangeListener() {
+                @Override
+                public void taken(int slot, ItemStack taken) {
+                  onHutItemsTaken(slot, taken);
+                }
+
+                @Override
+                public void changed(int slot, ItemStack key, int delta) {
+                  if (isRackSlot(slot)) {
+                    noteRackStockChange(key, delta);
+                  }
+                }
+              });
     }
     return observedHut;
   }
@@ -220,18 +235,43 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return;
     }
     // The hut buffer only holds what the shopkeeper moved out for a warehouse pickup, so taking
-    // from it is never a delivery being gathered. MineColonies adds the hut inventory last.
-    IItemHandler hutBuffer = getInventory();
-    if (hutBuffer != null
-        && observedHut != null
-        && slot >= observedHut.getSlots() - hutBuffer.getSlots()) {
+    // from it is never a delivery being gathered.
+    if (!isRackSlot(slot)) {
       return;
     }
+    noteRackStockChange(taken, -taken.getCount());
     var resolver = shop.getShopResolver();
     if (resolver == null || shop.getColony() == null) {
       return;
     }
     resolver.onHutItemsTaken(shop.getColony().getRequestManager(), taken);
+  }
+
+  /** Whether a slot of the combined inventory belongs to a rack. MineColonies adds the hut last. */
+  private boolean isRackSlot(int slot) {
+    IItemHandler hutBuffer = getInventory();
+    return hutBuffer == null
+        || observedHut == null
+        || slot < observedHut.getSlots() - hutBuffer.getSlots();
+  }
+
+  /**
+   * Reports a rack change this shop caused or observed, so the inflight tracking neither mistakes
+   * it for an arrival nor lets it hide one.
+   */
+  public void noteRackStockChange(ItemStack key, int delta) {
+    if (level == null
+        || level.isClientSide
+        || key == null
+        || key.isEmpty()
+        || delta == 0
+        || !(getBuilding() instanceof BuildingCreateShop shop)) {
+      return;
+    }
+    CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
+    if (pickup != null) {
+      pickup.noteRackStockChange(key, delta);
+    }
   }
 
   /**
@@ -357,6 +397,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       }
       ItemStack extracted = handler.extractItem(slot, toExtract, false);
       if (!extracted.isEmpty()) {
+        noteRackStockChange(extracted, -extracted.getCount());
         setChanged();
         return extracted;
       }
@@ -465,6 +506,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         if (inserted <= 0) {
           continue;
         }
+        noteRackStockChange(extracted, -inserted);
         budget.remaining -= inserted;
         movedStacks++;
       }

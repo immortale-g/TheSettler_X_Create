@@ -6,6 +6,7 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.VirtualCreateNetworkItemHandler;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
+import com.thesettler_x_create.stock.InflightBook;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -101,6 +102,14 @@ public class CreateShopBlockEntity extends BlockEntity {
     return reservationLedger.getReservedFor(key);
   }
 
+  /**
+   * Returns the reserved count for a stack key by every request except the given ones, e.g. without
+   * Colony Factory Gauge reservations, which cover goods not in the racks yet.
+   */
+  public int getReservedForExcluding(ItemStack key, java.util.Set<UUID> excludedRequests) {
+    return reservationLedger.getReservedForExcluding(key, excludedRequests);
+  }
+
   /** Returns total reserved count for a deliverable match. */
   public int getReservedForDeliverable(IDeliverable deliverable) {
     return reservationLedger.getReservedForDeliverable(deliverable);
@@ -135,7 +144,7 @@ public class CreateShopBlockEntity extends BlockEntity {
       Map<ItemStack, Integer> baselines,
       String requesterName,
       String address) {
-    inflightLedger.recordInflight(stacks, baselines, requesterName, address);
+    inflightLedger.recordInflight(stacks, baselines, requesterName, address, null);
   }
 
   public void recordInflight(
@@ -147,9 +156,22 @@ public class CreateShopBlockEntity extends BlockEntity {
     inflightLedger.recordInflight(stacks, baselines, requesterName, address, requestUuid);
   }
 
-  /** Reconciles inflight entries against current rack counts to detect arrivals. */
-  public void reconcileInflight(Map<ItemStack, Integer> currentCounts) {
-    inflightLedger.reconcileInflight(currentCounts);
+  /**
+   * Reports a rack change the shop caused or observed itself (a courier gathering, housekeeping,
+   * packaging, a handover), so it is not mistaken for, or does not hide, an arrival.
+   */
+  public void noteRackStockChange(ItemStack key, int delta) {
+    inflightLedger.noteStockChange(key, delta);
+  }
+
+  /**
+   * Reconciles inflight entries against current rack counts to detect arrivals.
+   *
+   * @return what arrived, per owning request ({@code null}: nobody) and item
+   */
+  public List<InflightBook.Arrival<ItemStack>> reconcileInflight(
+      Map<ItemStack, Integer> currentCounts) {
+    return inflightLedger.reconcileInflight(currentCounts);
   }
 
   /** Marks overdue inflight entries as notified and returns notices to surface. */
@@ -160,7 +182,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Consumes tracked inflight quantity for a specific overdue notice tuple. */
   public int consumeInflight(
       ItemStack stackKey, int amount, @Nullable String requesterName, @Nullable String address) {
-    return inflightLedger.consumeInflight(stackKey, amount, requesterName, address);
+    return inflightLedger.consumeInflight(stackKey, amount, requesterName, address, -1L);
   }
 
   public int consumeInflight(
@@ -174,11 +196,8 @@ public class CreateShopBlockEntity extends BlockEntity {
 
   /**
    * Returns currently tracked inflight remainder for a request, matched by its MineColonies request
-   * UUID rather than the requester-name/address strings {@link #getInflightRemaining( ItemStack,
-   * String, String, long)} relies on — those can drift if a citizen is renamed or a resolver
-   * reassigns the request before this check runs, causing a false "nothing inflight" read and a
-   * duplicate network order. Every other lifecycle step (cancel, clear, hand-off) was already
-   * UUID-first; this was the one read path still on strings-only.
+   * UUID rather than the requester-name/address strings, which can drift when a citizen is renamed
+   * or a request is reassigned.
    */
   public int getInflightRemaining(ItemStack stackKey, @Nullable UUID requestUuid) {
     return inflightLedger.getInflightRemaining(stackKey, requestUuid);
@@ -187,7 +206,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Returns currently tracked inflight remainder for a lost-package tuple. */
   public int getInflightRemaining(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
-    return inflightLedger.getInflightRemaining(stackKey, requesterName, address);
+    return inflightLedger.getInflightRemaining(stackKey, requesterName, address, -1L);
   }
 
   public int getInflightRemaining(
@@ -201,7 +220,7 @@ public class CreateShopBlockEntity extends BlockEntity {
   /** Clears tracked inflight entries for a matching stack/requester/address tuple. */
   public int cancelInflight(
       ItemStack stackKey, @Nullable String requesterName, @Nullable String address) {
-    return inflightLedger.cancelInflight(stackKey, requesterName, address);
+    return inflightLedger.cancelInflight(stackKey, requesterName, address, -1L);
   }
 
   public int cancelInflight(
@@ -215,21 +234,54 @@ public class CreateShopBlockEntity extends BlockEntity {
   /**
    * Cancels all inflight entries linked to the given request UUID.
    *
-   * <p>UUID-based cancel is precise and drift-free. String-matching fallback is still needed for
-   * legacy entries (requestUuid == null) recorded before Phase 3.1.
-   *
    * @return total remaining quantity removed
    */
   public int cancelInflightByUuid(@Nullable UUID requestUuid) {
     return inflightLedger.cancelInflightByUuid(requestUuid);
   }
 
-  public void markInflightHandedOff(@Nullable UUID requestUuid) {
-    inflightLedger.markInflightHandedOff(requestUuid);
+  /** What is still on its way for a request, for every item it accepts. */
+  public int getInflightRemainingFor(
+      @Nullable UUID requestUuid, java.util.function.Predicate<ItemStack> accepts) {
+    return inflightLedger.getInflightRemainingFor(requestUuid, accepts);
   }
 
-  public int clearInflightByUuid(@Nullable UUID requestUuid) {
-    return inflightLedger.clearInflightByUuid(requestUuid);
+  /**
+   * A request ended: its orders on the way lose their owner instead of being forgotten, so a new
+   * request for the item claims them instead of ordering again.
+   *
+   * @return the amount that is now unowned
+   */
+  public int detachInflight(@Nullable UUID requestUuid) {
+    return inflightLedger.detach(requestUuid);
+  }
+
+  /**
+   * Hands unowned incoming stock that a request accepts to that request, oldest first.
+   *
+   * @return the amount claimed
+   */
+  public int claimFreeInflight(
+      @Nullable UUID requestUuid, java.util.function.Predicate<ItemStack> accepts, int amount) {
+    return inflightLedger.claimFree(requestUuid, accepts, amount);
+  }
+
+  /**
+   * Drops an amount of one item from a request's orders, for an order that was never sent.
+   *
+   * @return the amount removed
+   */
+  public int cancelInflight(@Nullable UUID requestUuid, ItemStack stackKey, int amount) {
+    return inflightLedger.cancel(requestUuid, stackKey, amount);
+  }
+
+  /**
+   * Drops unowned orders older than {@code timeout}; nobody waits for them.
+   *
+   * @return the dropped orders
+   */
+  public List<InflightBook.StoredEntry<ItemStack>> expireFreeInflight(long now, long timeout) {
+    return inflightLedger.expireFree(now, timeout);
   }
 
   /**

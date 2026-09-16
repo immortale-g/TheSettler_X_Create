@@ -12,11 +12,20 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.Test;
 
 // ItemStack cannot be loaded without a Minecraft bootstrap, so the extraction path is pinned by
 // source and the forwarding is checked on the methods that do not touch item stacks.
 class ObservedHutItemHandlerTest {
+  private static final ObservedHutItemHandler.ChangeListener NO_OP =
+      new ObservedHutItemHandler.ChangeListener() {
+        @Override
+        public void taken(int slot, ItemStack taken) {}
+
+        @Override
+        public void changed(int slot, ItemStack key, int delta) {}
+      };
 
   @Test
   void reportsOnlyRealNonEmptyExtractions() throws Exception {
@@ -28,7 +37,20 @@ class ObservedHutItemHandlerTest {
     assertTrue(
         source.contains("ItemStack extracted = delegate.extractItem(slot, amount, simulate);"));
     assertTrue(source.contains("if (!simulate && !extracted.isEmpty()) {"));
-    assertTrue(source.contains("onTaken.taken(slot, extracted.copy());"));
+    assertTrue(source.contains("listener.taken(slot, extracted.copy());"));
+  }
+
+  @Test
+  void reportsRealInsertionsAndOverwrittenSlots() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/tileentity/ObservedHutItemHandler.java"));
+
+    assertTrue(source.contains("if (!simulate && !stack.isEmpty() && inserted > 0) {"));
+    assertTrue(source.contains("listener.changed(slot, stack.copy(), inserted);"));
+    assertTrue(source.contains("listener.changed(slot, before, -before.getCount());"));
+    assertTrue(source.contains("listener.changed(slot, stack.copy(), stack.getCount());"));
   }
 
   @Test
@@ -52,7 +74,7 @@ class ObservedHutItemHandlerTest {
     when(hut.getSlots()).thenReturn(54);
     when(hut.getLastIndex(10)).thenReturn(27);
     when(hut.getSlotLimit(5)).thenReturn(64);
-    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, (slot, taken) -> {});
+    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, NO_OP);
 
     assertEquals(54, observed.getSlots());
     assertEquals(27, observed.getLastIndex(10));
@@ -65,11 +87,8 @@ class ObservedHutItemHandlerTest {
     CombinedItemHandler hut = mock(CombinedItemHandler.class);
     CombinedItemHandler otherHut = mock(CombinedItemHandler.class);
 
-    assertEquals(
-        new ObservedHutItemHandler(hut, (slot, taken) -> {}),
-        new ObservedHutItemHandler(hut, (slot, taken) -> {}));
+    assertEquals(new ObservedHutItemHandler(hut, NO_OP), new ObservedHutItemHandler(hut, NO_OP));
     assertNotEquals(
-        new ObservedHutItemHandler(hut, (slot, taken) -> {}),
-        new ObservedHutItemHandler(otherHut, (slot, taken) -> {}));
+        new ObservedHutItemHandler(hut, NO_OP), new ObservedHutItemHandler(otherHut, NO_OP));
   }
 }

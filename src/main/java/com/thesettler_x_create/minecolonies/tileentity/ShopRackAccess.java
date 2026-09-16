@@ -114,7 +114,13 @@ class ShopRackAccess {
         return;
       }
       IItemHandler handler = rack.getItemHandlerCap();
+      ItemStack before = stack.copy();
       InventoryUtils.transferItemStackIntoNextBestSlotInItemHandler(inventory, slot, handler);
+      ItemStack after = inventory.getStackInSlot(slot);
+      int moved =
+          before.getCount()
+              - (ItemStack.isSameItemSameComponents(after, before) ? after.getCount() : 0);
+      owner.noteRackStockChange(before, moved);
     }
   }
 
@@ -162,6 +168,7 @@ class ShopRackAccess {
         if (remaining.getCount() == before.getCount()) {
           break;
         }
+        owner.noteRackStockChange(before, before.getCount() - remaining.getCount());
       }
       if (allowHutFallback && !remaining.isEmpty()) {
         IItemHandler hut = owner.getItemHandlerCap((Direction) null);

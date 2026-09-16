@@ -126,6 +126,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     CreateShopFlowStateRehydrateService flowStateRehydrateService =
         new CreateShopFlowStateRehydrateService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
+    CreateShopNetworkOrderService networkOrderService =
+        new CreateShopNetworkOrderService(stockResolver);
     this.attemptResolveService =
         new CreateShopAttemptResolveService(
             requestStateMutatorService,
@@ -137,17 +139,23 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             planning,
             stockResolver,
             diagnostics,
-            flowStateMachine);
+            flowStateMachine,
+            networkOrderService);
     this.resolverCallbackService =
         new CreateShopResolverCallbackService(
             requestStateMutatorService, outstandingNeededService, diagnostics);
     CreateShopPendingTopupService pendingTopupService =
         new CreateShopPendingTopupService(
-            diagnostics, flowStateMachine, stockResolver, messaging, requestStateMutatorService);
+            diagnostics,
+            flowStateMachine,
+            stockResolver,
+            messaging,
+            requestStateMutatorService,
+            networkOrderService);
     CreateShopPendingDeliveryCreationService pendingDeliveryCreationService =
         new CreateShopPendingDeliveryCreationService(
             planning, deliveryManager, pendingState, messaging, diagnostics, flowStateMachine);
-    this.reservationReleaseService = new CreateShopReservationReleaseService(messaging);
+    this.reservationReleaseService = new CreateShopReservationReleaseService();
     CreateShopChildReconciliationService childReconciliationService =
         new CreateShopChildReconciliationService(
             deliveryManager,
@@ -164,7 +172,17 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
             pendingDeliveryCreationService,
             postCreationUpdateService,
             diagnostics,
-            requestStateMutatorService);
+            requestStateMutatorService,
+            new CreateShopOpenDeliveryTopupService(
+                outstandingNeededService,
+                planning,
+                networkOrderService,
+                stockResolver,
+                deliveryManager,
+                postCreationUpdateService,
+                requestStateMutatorService,
+                messaging,
+                diagnostics));
     this.tickPendingService =
         new CreateShopTickPendingService(
             pendingTokenCollectorService,
@@ -325,7 +343,8 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   protected int getWarehouseInternalCount(
       com.minecolonies.core.colony.buildings.workerbuildings.BuildingWareHouse ignored,
       IRequest<? extends IDeliverable> request) {
-    return warehouseCountService.getWarehouseInternalCount(getLocation(), request, stockResolver);
+    return warehouseCountService.getWarehouseInternalCount(
+        getLocation(), request, stockResolver, planning);
   }
 
   BuildingCreateShop getShop(IRequestManager manager) {
