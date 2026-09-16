@@ -10,6 +10,7 @@ import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.Collection;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
@@ -78,6 +79,52 @@ final class CreateShopResolverCallbackService {
     if (outstandingNeededService.compute(request, deliverable, 0) > 0) {
       return false;
     }
+    return closeParent(resolver, manager, request, source);
+  }
+
+  /**
+   * Closes a parent that got less than its full count once the shop can deliver nothing more: at
+   * least the minimum count arrived, no delivery child is open, nothing is reserved or in the racks
+   * for it, and the tick found nothing on its way and nothing left in the Create network. Without
+   * this such a request stayed with the shop forever and no other resolver could take it.
+   */
+  boolean finishShortOfCount(
+      CreateShopRequestResolver resolver,
+      IRequestManager manager,
+      IRequest<?> request,
+      int reservedForRequest,
+      int usableRackStock,
+      String source) {
+    if (resolver == null
+        || manager == null
+        || request == null
+        || !(request.getRequest() instanceof IDeliverable deliverable)
+        || CreateShopRequestResolver.isTerminalRequestState(request.getState())
+        || request.hasChildren()) {
+      return false;
+    }
+    int delivered = outstandingNeededService.delivered(request, deliverable);
+    if (!ShopStockAccounting.canCloseShort(
+        delivered, deliverable.getMinimumCount(), reservedForRequest, usableRackStock, false)) {
+      return false;
+    }
+    if (isDebugLoggingEnabledSafe()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] finish parent={} source={} short of count delivered={} min={} count={}",
+          request.getId(),
+          source,
+          delivered,
+          deliverable.getMinimumCount(),
+          deliverable.getCount());
+    }
+    return closeParent(resolver, manager, request, source);
+  }
+
+  private boolean closeParent(
+      CreateShopRequestResolver resolver,
+      IRequestManager manager,
+      IRequest<?> request,
+      String source) {
     try {
       manager.updateRequestState(request.getId(), RequestState.RESOLVED);
     } catch (Exception ex) {

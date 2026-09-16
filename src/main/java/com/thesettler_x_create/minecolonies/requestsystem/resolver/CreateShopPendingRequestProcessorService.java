@@ -228,19 +228,35 @@ final class CreateShopPendingRequestProcessorService {
               rackAvailable,
               ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest));
     }
-    pendingTopupService.handleTopup(
-        resolver,
-        manager,
-        request,
-        level,
-        tile,
-        pickup,
-        deliverable,
-        workerWorking,
-        pendingCount,
-        reservedForRequest,
-        rackAvailableForRequest,
-        requestIdLog);
+    boolean nothingMoreToGet =
+        pendingTopupService.handleTopup(
+            resolver,
+            manager,
+            request,
+            level,
+            tile,
+            pickup,
+            deliverable,
+            workerWorking,
+            pendingCount,
+            reservedForRequest,
+            rackAvailableForRequest,
+            requestIdLog);
+    // The Create network is empty for this request and nothing is on its way. A request that got
+    // its minimum count is done, as it would be with a warehouse; otherwise it would block every
+    // other resolver.
+    if (nothingMoreToGet
+        && resolver
+            .getResolverCallbackService()
+            .finishShortOfCount(
+                resolver,
+                manager,
+                request,
+                reservedForRequest,
+                rackAvailableForRequest,
+                "tickPending:network-exhausted")) {
+      return;
+    }
     var creationResult =
         pendingDeliveryCreationService.process(
             manager,

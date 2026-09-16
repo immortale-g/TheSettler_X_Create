@@ -39,6 +39,25 @@ public final class ShopStockAccounting {
   }
 
   /**
+   * Whether a request may close short of its full count: it received at least the minimum its
+   * requester accepts, and the shop has nothing more for it, neither reserved, nor in the racks,
+   * nor on its way. MineColonies' warehouse closes requests the same way once it handed out at
+   * least the minimum; the requester asks again for the rest when it still needs it.
+   */
+  public static boolean canCloseShort(
+      int delivered,
+      int minimumCount,
+      int reservedForRequest,
+      int usableRackStock,
+      boolean onItsWay) {
+    return delivered > 0
+        && delivered >= minimumCount
+        && reservedForRequest <= 0
+        && usableRackStock <= 0
+        && !onItsWay;
+  }
+
+  /**
    * How much of the rack stock can be reserved for a request right now: the unreserved rack stock,
    * capped at the part of the pending amount that is not reserved yet.
    */
