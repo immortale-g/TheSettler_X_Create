@@ -59,7 +59,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how these fit together.
 ./gradlew build
 ```
 
-The jar lands in `build/libs/`. `build` also runs the tests, Spotless, `testModernStructurize`,
+The jar lands in `build/libs/`. `build` also runs the tests, Spotless, `testStructurizeModernApi`,
 `testFactoryLogistics` and `testFml`.
 
 `test` runs plain JUnit with Mockito. Tests that need real `ItemStack`s or registries are tagged
@@ -76,7 +76,7 @@ the minimum versions in `neoforge.mods.toml`, so raising them raises what player
 
 Structurize 1.0.808 changed the placement handler API. The mod is compiled against
 `structurize_compile_version` (new API) but runs its normal tests on `structurize_version` (old
-API); `testModernStructurize` repeats the placement handler compat test on the new API.
+API); `testStructurizeModernApi` repeats the placement handler compat test on the new API.
 
 Create Factory Logistics is optional and not compiled against. When it is installed, the shop sends
 package requests through its API by reflection, because plain Create requests produce no packages

@@ -110,7 +110,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 // "optional", meaning it will not be pulled by dependents of this mod.
 configurations {
     runtimeClasspath.extendsFrom localRuntime
-    // Structurize at structurize_compile_version (IPlacementContext API), for testModernStructurize.
+    // Structurize at structurize_compile_version (IPlacementContext API), for testStructurizeModernApi.
     modernStructurize
     // Create Factory Logistics at cfl_version, for testFactoryLogistics.
     factoryLogistics
@@ -157,7 +157,7 @@ dependencies {
 
     // Structurize 1.0.808 replaced the IPlacementHandler signatures with IPlacementContext variants.
     // The placement handlers implement both, so they compile against the newer API while the dev
-    // client and the regular tests run structurize_version. testModernStructurize covers the other.
+    // client and the regular tests run structurize_version. testStructurizeModernApi covers the other.
     compileOnly("com.ldtteam:structurize:${structurize_compile_version}") { transitive = false }
     testImplementation("com.ldtteam:structurize:${structurize_version}") { transitive = false }
     localRuntime("com.ldtteam:structurize:${structurize_version}") { transitive = false }
@@ -337,7 +337,7 @@ tasks.named('test', Test) {
 
 // Reruns the placement compat tests with structurize_compile_version, so the IPlacementContext path
 // is exercised even while structurize_version is still on the legacy API.
-tasks.register('testModernStructurize', Test) {
+tasks.register('testStructurizeModernApi', Test) {
     description = 'Runs the Structurize placement compat tests against the IPlacementContext API.'
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
@@ -388,7 +388,7 @@ tasks.register('testFactoryLogistics', Test) {
 }
 
 tasks.named('check') {
-    dependsOn 'testModernStructurize', 'testFactoryLogistics', 'testFml'
+    dependsOn 'testStructurizeModernApi', 'testFactoryLogistics', 'testFml'
 }
 
 spotless {
