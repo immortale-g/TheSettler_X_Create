@@ -7,16 +7,16 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * Seam-audit findings s3-7/s4-4: {@code DEBUG_LOGGING} defaulted to {@code true}, so every
- * production/survival server would ship with this mod's (fairly chatty) debug logging on by
- * default. Deliberately deferred until the pre-1.0 hardening pass; flipped to default {@code false}
- * here.
+ * Debug logging stays on by default until the 1.0.0 release, so beta and pre-release reports come
+ * with traceable request and delivery flows (the README says so too). Seam-audit findings
+ * s3-7/s4-4 still apply: the 1.0.0 release commit flips this to {@code false}, together with this
+ * test and the README note.
  */
 class ConfigDebugLoggingDefaultGuardTest {
 
   @Test
-  void debugLoggingDefaultsToFalse() throws Exception {
+  void debugLoggingDefaultsToTrueUntilRelease() throws Exception {
     String source = Files.readString(Path.of("src/main/java/com/thesettler_x_create/Config.java"));
-    assertTrue(source.contains(".define(\"debugLogging\", false);"));
+    assertTrue(source.contains(".define(\"debugLogging\", true);"));
   }
 }
