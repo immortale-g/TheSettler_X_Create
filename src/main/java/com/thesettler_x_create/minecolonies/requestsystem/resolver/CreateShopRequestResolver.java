@@ -58,10 +58,9 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   private final CreateShopRetryingReassignService retryingReassignService =
       new CreateShopRetryingReassignService();
   private final CreateShopDeliveryCancelService deliveryCancelService;
-  // Kept as fields (not local-ized like their siblings below) - two runtime tests reach these via
-  // reflection (CreateShopRequestResolverLifecycleRuntimeTest,
-  // CreateShopRequestResolverTimeoutCleanupRuntimeTest), which only works against instance fields.
-  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
+  // Kept as a field (not local-ized like its siblings below) - a runtime test reaches it via
+  // reflection (CreateShopRequestResolverTimeoutCleanupRuntimeTest), which only works against
+  // instance fields.
   private final CreateShopFlowTimeoutCleanupService flowTimeoutCleanupService;
   private final CreateShopDeliveryChildLedgerService deliveryChildLedgerService =
       new CreateShopDeliveryChildLedgerService();
@@ -115,9 +114,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.deliveryCancelService =
         new CreateShopDeliveryCancelService(
             requestStateMutatorService, diagnostics, recheck, deliveryManager);
-    this.deliveryChildRecoveryService =
-        new CreateShopDeliveryChildRecoveryService(
-            requestStateMutatorService, ownership, diagnostics);
     CreateShopPendingRequestGateService pendingRequestGateService =
         new CreateShopPendingRequestGateService(ownership, diagnostics, requestStateMutatorService);
     CreateShopReservationSyncService reservationSyncService =
@@ -158,10 +154,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     this.reservationReleaseService = new CreateShopReservationReleaseService();
     CreateShopChildReconciliationService childReconciliationService =
         new CreateShopChildReconciliationService(
-            deliveryManager,
-            deliveryChildRecoveryService,
-            deliveryRootCauseSnapshotService,
-            requestStateMutatorService);
+            deliveryManager, deliveryRootCauseSnapshotService, requestStateMutatorService);
     CreateShopPendingRequestProcessorService pendingRequestProcessorService =
         new CreateShopPendingRequestProcessorService(
             pendingRequestGateService,

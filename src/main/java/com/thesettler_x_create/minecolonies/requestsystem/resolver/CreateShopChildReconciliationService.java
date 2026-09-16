@@ -21,19 +21,14 @@ import net.minecraft.world.level.Level;
 final class CreateShopChildReconciliationService {
   private final CreateShopDeliveryManager deliveryManager;
 
-  // Only used by the detached extra-active-child recovery in reconcile(); kept wired so the
-  // recovery can be switched back on without touching the resolver construction.
-  private final CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService;
   private final CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService;
   private final CreateShopRequestStateMutatorService requestStateMutatorService;
 
   CreateShopChildReconciliationService(
       CreateShopDeliveryManager deliveryManager,
-      CreateShopDeliveryChildRecoveryService deliveryChildRecoveryService,
       CreateShopDeliveryRootCauseSnapshotService deliveryRootCauseSnapshotService,
       CreateShopRequestStateMutatorService requestStateMutatorService) {
     this.deliveryManager = deliveryManager;
-    this.deliveryChildRecoveryService = deliveryChildRecoveryService;
     this.deliveryRootCauseSnapshotService = deliveryRootCauseSnapshotService;
     this.requestStateMutatorService = requestStateMutatorService;
   }
@@ -53,8 +48,6 @@ final class CreateShopChildReconciliationService {
     int duplicateChildrenRemoved = 0;
     boolean hasActiveChildren = false;
     boolean recoveredParent = false;
-    // Detached extra-active-child recovery, see the commented block in the child loop below.
-    // IToken<?> activeLocalDeliveryChild = null;
     if (!children.isEmpty()) {
       java.util.Set<IToken<?>> seenChildren = new HashSet<>();
       for (IToken<?> childToken : List.copyOf(children)) {
@@ -147,35 +140,10 @@ final class CreateShopChildReconciliationService {
             }
             resolver.observeDeliveryChildLifecycle(
                 standardManager, level, request.getId(), childToken, child, childAssigned, "poll");
-            // Extra-active-child recovery, detached ahead of parallel deliveries (0.4.0).
-            // It treated every second active local delivery child as a stray duplicate and
-            // cancelled it. MineColonies answers a cancelled child by cancelling all children of
-            // the parent and reassigning it, so a parent with several deliveries on the way would
-            // lose all of them. Duplicate links to the same token are still removed above.
-            // Kept commented out rather than deleted in case a real duplicate case shows up again.
-            //
-            // if (activeLocalDeliveryChild != null && !activeLocalDeliveryChild.equals(childToken))
-            // {
-            //   boolean recovered =
-            //       deliveryChildRecoveryService.recover(
-            //           resolver,
-            //           standardManager,
-            //           level,
-            //           request,
-            //           childToken,
-            //           child,
-            //           shop,
-            //           pickup,
-            //           "extra-active-child-recovery",
-            //           "[CreateShop] extra active delivery-child recovery parent={} child={}"
-            //               + " stateUpdated={} item={} count={}");
-            //   if (recovered) {
-            //     missing++;
-            //     continue;
-            //   }
-            // } else {
-            //   activeLocalDeliveryChild = childToken;
-            // }
+            // No recovery for a second active local delivery child: parents have several
+            // deliveries on the way since 0.4.0, and cancelling one child makes MineColonies
+            // cancel all children of the parent and reassign it. Duplicate links to the same
+            // token are still removed above.
             deliveryRootCauseSnapshotService.logSnapshot(
                 resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
@@ -274,6 +242,9 @@ final class CreateShopChildReconciliationService {
     if (!parentRequest.getId().equals(ledger.parentToken)) {
       return false;
     }
+    if (requestStateMutatorService.isUnfinishedDeliveryChild(standardManager, childToken)) {
+      return false;
+    }
     BuildingCreateShop shop = resolver.getShop(standardManager);
     CreateShopBlockEntity pickup = shop == null ? null : shop.getPickupBlockEntity();
     if (pickup != null) {
@@ -293,7 +264,7 @@ final class CreateShopChildReconciliationService {
     parentRequest.removeChild(childToken);
     resolver.observeDeliveryChildCallbackTerminal(
         level, parentRequest.getId(), childToken, "immediate-missing-after-pickup");
-    requestStateMutatorService.finalizeOrphanDeliveryChild(
+    requestStateMutatorService.forgetVanishedDeliveryChild(
         resolver, standardManager, childToken, "immediate-missing-after-pickup");
     // The vanished child never triggers MineColonies' resolveRequest, so run the same check here.
     boolean finished =

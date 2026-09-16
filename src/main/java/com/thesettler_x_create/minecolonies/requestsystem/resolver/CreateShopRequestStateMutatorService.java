@@ -107,126 +107,91 @@ final class CreateShopRequestStateMutatorService {
     clearPendingTokenState(resolver, token, clearFlowState);
   }
 
-  void finalizeOrphanDeliveryChild(
+  /**
+   * Whether MineColonies still holds the delivery child as unfinished. Such a child is
+   * MineColonies' to finish or cancel, and the outcome reaches us through the requester callbacks,
+   * so recovery paths must leave it alone.
+   */
+  boolean isUnfinishedDeliveryChild(IStandardRequestManager manager, IToken<?> childToken) {
+    if (manager == null || childToken == null) {
+      return false;
+    }
+    try {
+      IRequest<?> child = manager.getRequestHandler().getRequestOrNull(childToken);
+      return child != null && !CreateShopRequestResolver.isTerminalRequestState(child.getState());
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  /**
+   * Drops our own tracking for a delivery child that MineColonies no longer holds.
+   *
+   * <p>This used to fail the child and then clean the warehouse queue, the courier task queue and
+   * the request data by hand. MineColonies does all of that itself when a request is cancelled or
+   * failed (DeliverymenRequestResolver#onAssignedRequestCancelled calls onTaskDeletion and removes
+   * the token from the warehouse queue), and removing request data without that path is exactly
+   * what leaves a courier stuck on a task token that no longer resolves. Nothing here touches
+   * MineColonies state any more; a dead courier token is reported, not repaired.
+   */
+  void forgetVanishedDeliveryChild(
       CreateShopRequestResolver resolver,
       IStandardRequestManager manager,
       IToken<?> childToken,
       String source) {
-    if (resolver == null || manager == null || childToken == null) {
+    if (resolver == null || childToken == null) {
       return;
     }
-    boolean parentDetached = false;
-    try {
-      IRequest<?> orphanRequest = manager.getRequestHandler().getRequestOrNull(childToken);
-      if (orphanRequest != null && orphanRequest.hasParent()) {
-        IToken<?> parentToken = orphanRequest.getParent();
-        IRequest<?> parentRequest =
-            parentToken == null ? null : manager.getRequestHandler().getRequestOrNull(parentToken);
-        if (parentRequest != null) {
-          parentRequest.removeChild(childToken);
-        }
-        orphanRequest.setParent(null);
-        parentDetached = true;
-      }
-    } catch (Exception ignored) {
-      // Best effort: orphan may already be detached in native graph.
+    clearMissingChild(resolver, childToken);
+    resolver.clearRootCauseTracking(childToken);
+    int deadCourierTokens = reportDeadCourierTaskTokens(manager, childToken, source);
+    if (resolver.isDebugLoggingEnabled()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] vanished child forgotten source={} child={} deadCourierTokens={}",
+          source,
+          childToken,
+          deadCourierTokens);
     }
-    try {
-      manager.updateRequestState(
-          childToken, com.minecolonies.api.colony.requestsystem.request.RequestState.FAILED);
-    } catch (Exception ignored) {
-      // Best effort: some native child state transitions are restricted.
+  }
+
+  private int reportDeadCourierTaskTokens(
+      IStandardRequestManager manager, IToken<?> childToken, String source) {
+    if (manager == null || isUnfinishedDeliveryChild(manager, childToken)) {
+      return 0;
     }
-    int assignmentRemoved = 0;
-    try {
-      var store = manager.getRequestResolverRequestAssignmentDataStore();
-      if (store != null && store.getAssignments() != null) {
-        for (var assigned : store.getAssignments().values()) {
-          if (assigned == null || assigned.isEmpty()) {
-            continue;
-          }
-          while (assigned.remove(childToken)) {
-            assignmentRemoved++;
-          }
-        }
-      }
-    } catch (Exception ignored) {
-      // Best effort only.
-    }
-    int queueRemoved = 0;
-    int courierTasksCleared = 0;
+    int found = 0;
     try {
       var colony = manager.getColony();
       var buildingManager = colony == null ? null : colony.getServerBuildingManager();
       var buildings = buildingManager == null ? null : buildingManager.getBuildings();
-      if (buildings != null && !buildings.isEmpty()) {
-        for (var entry : buildings.entrySet()) {
-          var building = entry.getValue();
-          if (building == null) {
+      if (buildings == null) {
+        return 0;
+      }
+      for (var building : buildings.values()) {
+        var couriers =
+            building == null ? null : building.getModule(BuildingModules.WAREHOUSE_COURIERS);
+        if (couriers == null || couriers.getAssignedCitizen() == null) {
+          continue;
+        }
+        for (var citizen : couriers.getAssignedCitizen()) {
+          if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
             continue;
           }
-          var queue = building.getModule(BuildingModules.WAREHOUSE_REQUEST_QUEUE);
-          if (queue == null
-              || queue.getMutableRequestList() == null
-              || queue.getMutableRequestList().isEmpty()) {
-            // keep going; courier task cleanup still relevant.
-          } else {
-            while (queue.getMutableRequestList().remove(childToken)) {
-              queueRemoved++;
-            }
-          }
-          var couriers = building.getModule(BuildingModules.WAREHOUSE_COURIERS);
-          if (couriers == null || couriers.getAssignedCitizen() == null) {
-            continue;
-          }
-          for (var citizen : couriers.getAssignedCitizen()) {
-            if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
-              continue;
-            }
-            try {
-              while (job.getTaskQueue() != null && job.getTaskQueue().remove(childToken)) {
-                courierTasksCleared++;
-              }
-            } catch (Exception ignored) {
-              // Best effort queue cleanup.
-            }
-            try {
-              var current = CreateShopCourierTasks.peekCurrentTask(manager, job);
-              // Token match only. Matching by start, target and stack also hit sibling
-              // deliveries of the same parent, which are identical now that all of them start at
-              // the hut, and failed a courier task that was still valid.
-              if (current != null) {
-                if (childToken.equals(current.getId())) {
-                  job.onTaskDeletion(current.getId());
-                  job.finishRequest(false);
-                  courierTasksCleared++;
-                }
-              }
-            } catch (Exception ignored) {
-              // Best effort task interruption.
-            }
+          // getTaskQueue() is a read-only copy.
+          if (job.getTaskQueue().contains(childToken)) {
+            found++;
+            TheSettlerXCreate.LOGGER.warn(
+                "[CreateShop] MC_COURIER_DEAD_TASK_TOKEN courier={} child={} source={}: the"
+                    + " courier still queues a delivery MineColonies no longer knows",
+                citizen.getName(),
+                childToken,
+                source);
           }
         }
       }
     } catch (Exception ignored) {
-      // Best effort only.
+      // Diagnostics only.
     }
-    try {
-      manager.getRequestHandler().cleanRequestData(childToken);
-    } catch (Exception ignored) {
-      // Best effort only.
-    }
-    clearMissingChild(resolver, childToken);
-    resolver.clearRootCauseTracking(childToken);
-    if (resolver.isDebugLoggingEnabled()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] orphan child finalized source={} child={} parentDetached={} assignmentsRemoved={} queueRemoved={} courierTasksCleared={}",
-          source,
-          childToken,
-          parentDetached,
-          assignmentRemoved,
-          queueRemoved,
-          courierTasksCleared);
-    }
+    return found;
   }
 }

@@ -2,11 +2,8 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.entity.citizen.AbstractEntityCitizen;
 import com.minecolonies.api.util.constant.TypeConstants;
-import com.minecolonies.core.colony.CitizenData;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
-import com.minecolonies.core.colony.managers.CitizenManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.HashMap;
@@ -15,7 +12,13 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.world.level.Level;
 
-/** Debug utilities for courier assignments and entity state. */
+/**
+ * Debug utilities for courier assignments and entity state.
+ *
+ * <p>Read-only: this class only logs. It used to re-spawn and re-register citizens whose entity
+ * looked missing, which made MineColonies warn "Missing entity upon adding data to that entity!"
+ * and changed colony state only when debug logging was on.
+ */
 final class ShopCourierDiagnostics {
   private static final Set<String> REFLECTION_WARNED =
       java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
@@ -26,11 +29,9 @@ final class ShopCourierDiagnostics {
   private String lastCourierDebugDump;
   private String lastCourierEntityDump;
   private String lastAssignedCitizensDump;
-  private String lastEntityRepairDump;
   private String lastWarehouseCompareDump;
   private final Map<String, String> lastAssignedCitizenInfo = new HashMap<>();
   private final Map<Integer, Boolean> lastAccessResult = new HashMap<>();
-  private final Map<String, Long> lastEntityRepairAttemptTime = new HashMap<>();
 
   ShopCourierDiagnostics(BuildingCreateShop shop) {
     this.shop = shop;
@@ -39,7 +40,6 @@ final class ShopCourierDiagnostics {
     this.lastCourierDebugDump = "";
     this.lastCourierEntityDump = "";
     this.lastAssignedCitizensDump = "";
-    this.lastEntityRepairDump = "";
     this.lastWarehouseCompareDump = "";
   }
 
@@ -158,28 +158,11 @@ final class ShopCourierDiagnostics {
         jobState = appendJobDetail(job, jobState, "getCurrentRequest");
         jobState = appendJobDetail(job, jobState, "getCurrentRequestToken");
         jobState = appendJobDetail(job, jobState, "getRequestToken");
-        jobState = appendJobDetail(job, jobState, "getCurrentTask");
       }
       debugLines.add(
           "citizen=" + name + " job=" + jobName + " state=" + jobState + " pos=" + citizenPos);
-      if (job != null) {
-        Object currentTask = tryInvoke(job, "getCurrentTask");
-        if (currentTask != null) {
-          debugLines.add(
-              "task class="
-                  + currentTask.getClass().getName()
-                  + " detail="
-                  + describeTask(currentTask));
-        }
-      }
-      if ("<entity-null>".equals(citizenPos)) {
-        if (shouldLogCourierEntity(level)) {
-          logCitizenEntityDiagnostics(citizen, level);
-        }
-        String key = describeCitizenKey(citizen);
-        if (shouldAttemptEntityRepair(key, level)) {
-          attemptCitizenEntityRepair(citizen, level);
-        }
+      if ("<entity-null>".equals(citizenPos) && shouldLogCourierEntity(level)) {
+        logCitizenEntityDiagnostics(citizen, level);
       }
       loggedCitizens++;
     }
@@ -225,15 +208,6 @@ final class ShopCourierDiagnostics {
       logAssignmentDelta("courier hire", lastAssignedCitizenInfo, currentInfo);
       lastAssignedCitizenInfo.clear();
       lastAssignedCitizenInfo.putAll(currentInfo);
-      Level level = shop.getColony() == null ? null : shop.getColony().getWorld();
-      for (var citizen : citizens) {
-        if (citizen == null || safeCitizenEntityId(citizen) >= 0) {
-          continue;
-        }
-        if (getCitizenEntity(citizen, level) != null) {
-          attemptCitizenEntityRepair(citizen, level);
-        }
-      }
     }
   }
 
@@ -411,19 +385,6 @@ final class ShopCourierDiagnostics {
     return false;
   }
 
-  private boolean shouldAttemptEntityRepair(String key, Level level) {
-    if (key == null || level == null) {
-      return false;
-    }
-    long now = level.getGameTime();
-    long last = lastEntityRepairAttemptTime.getOrDefault(key, 0L);
-    if (now == 0L || now - last >= Config.COURIER_ENTITY_DEBUG_COOLDOWN.getAsLong()) {
-      lastEntityRepairAttemptTime.put(key, now);
-      return true;
-    }
-    return false;
-  }
-
   private void logCitizenEntityDiagnostics(ICitizenData citizen, Level level) {
     if (citizen == null || level == null) {
       return;
@@ -442,7 +403,6 @@ final class ShopCourierDiagnostics {
     }
     String uuidInfo = uuidValue == null ? "<null>" : uuidValue.toString();
     String uuidLookup = "<n/a>";
-    boolean hasUuidEntity = false;
     if (uuidValue instanceof java.util.UUID uuid
         && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
       var entity = serverLevel.getEntity(uuid);
@@ -453,7 +413,6 @@ final class ShopCourierDiagnostics {
                 + entity.blockPosition()
                 + " dim="
                 + serverLevel.dimension().location();
-        hasUuidEntity = true;
       } else {
         uuidLookup = "<missing>";
       }
@@ -473,172 +432,6 @@ final class ShopCourierDiagnostics {
       lastCourierEntityDump = dump;
       TheSettlerXCreate.LOGGER.info("[CreateShop] courier debug: citizen entity missing {}", dump);
     }
-    if (hasUuidEntity && entityId < 0) {
-      attemptCitizenEntityRepair(citizen, level);
-    }
-  }
-
-  private void attemptCitizenEntityRepair(ICitizenData citizen, Level level) {
-    if (citizen == null || level == null) {
-      return;
-    }
-    boolean invoked = false;
-    String result = "<unknown>";
-    if (citizen instanceof CitizenData cd) {
-      try {
-        cd.updateEntityIfNecessary();
-        invoked = true;
-        result = "ok";
-      } catch (Exception ex) {
-        result = ex.getMessage() == null ? "<error>" : ex.getMessage();
-      }
-    } else {
-      result = "<not-CitizenData>";
-    }
-    boolean forceInvoked = false;
-    String forceResult = "<skipped>";
-    boolean spawnInvoked = false;
-    String spawnResult = "<skipped>";
-    boolean registerInvoked = false;
-    String registerResult = "<skipped>";
-    boolean hasEntity = getCitizenEntity(citizen, level) != null;
-    if (safeCitizenEntityId(citizen) < 0 && hasEntity) {
-      forceResult = attemptForceEntityId(citizen, level);
-      forceInvoked = !"<skipped>".equals(forceResult);
-    }
-    if (invoked && safeCitizenEntityId(citizen) < 0 && !hasEntity) {
-      spawnResult = attemptSpawnOrCreateCitizen(citizen, level);
-      spawnInvoked = !"<skipped>".equals(spawnResult);
-    }
-    if (safeCitizenEntityId(citizen) < 0 && !hasEntity) {
-      registerResult = attemptRegisterCivilian(citizen, level);
-      registerInvoked = !"<skipped>".equals(registerResult);
-    }
-    if (safeCitizenEntityId(citizen) < 0 && !hasEntity) {
-      forceResult = attemptForceEntityId(citizen, level);
-      forceInvoked = !"<skipped>".equals(forceResult);
-    }
-    String dump =
-        "id="
-            + safeCitizenId(citizen)
-            + " updateInvoked="
-            + invoked
-            + " updateResult="
-            + result
-            + " spawnInvoked="
-            + spawnInvoked
-            + " spawnResult="
-            + spawnResult
-            + " registerInvoked="
-            + registerInvoked
-            + " registerResult="
-            + registerResult
-            + " forceInvoked="
-            + forceInvoked
-            + " forceResult="
-            + forceResult;
-    if (!dump.equals(lastEntityRepairDump)) {
-      lastEntityRepairDump = dump;
-      TheSettlerXCreate.LOGGER.info("[CreateShop] courier entity repair: {}", dump);
-    }
-  }
-
-  private String attemptSpawnOrCreateCitizen(ICitizenData citizen, Level level) {
-    if (citizen == null || level == null || shop.getColony() == null) {
-      return "<skipped>";
-    }
-    try {
-      var manager = shop.getColony().getCitizenManager();
-      if (manager == null) {
-        return "<no-manager>";
-      }
-      manager.spawnOrCreateCitizen(citizen, level);
-      return "ok";
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
-    }
-  }
-
-  private String attemptRegisterCivilian(ICitizenData citizen, Level level) {
-    if (citizen == null || level == null || shop.getColony() == null) {
-      return "<skipped>";
-    }
-    Object entity = getCitizenEntity(citizen, level);
-    if (!(entity instanceof AbstractEntityCitizen mcEntity)) {
-      return "<no-entity>";
-    }
-    try {
-      var manager = shop.getColony().getCitizenManager();
-      if (!(manager instanceof CitizenManager cm)) {
-        return "<no-manager>";
-      }
-      cm.registerCivilian(mcEntity);
-      return "ok";
-    } catch (Exception ex) {
-      return ex.getMessage() == null ? "<error>" : ex.getMessage();
-    }
-  }
-
-  private Object getCitizenEntity(ICitizenData citizen, Level level) {
-    java.util.Optional<AbstractEntityCitizen> opt = citizen.getEntity();
-    if (opt.isPresent()) {
-      return opt.get();
-    }
-    java.util.UUID uuid = citizen instanceof CitizenData cd ? cd.getUUID() : null;
-    if (uuid != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-      return serverLevel.getEntity(uuid);
-    }
-    return null;
-  }
-
-  private String attemptForceEntityId(ICitizenData citizen, Level level) {
-    if (citizen == null || level == null) {
-      return "<skipped>";
-    }
-    java.util.Optional<AbstractEntityCitizen> entityOpt = citizen.getEntity();
-    Object entity = getCitizenEntity(citizen, level);
-    java.util.UUID citizenUuid = citizen instanceof CitizenData cd ? cd.getUUID() : null;
-    if (!(entity instanceof net.minecraft.world.entity.Entity mcEntity)) {
-      String uuidInfo = citizenUuid == null ? "<null>" : citizenUuid.toString();
-      String lookup = "<n/a>";
-      if (citizenUuid != null
-          && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-        var found = serverLevel.getEntity(citizenUuid);
-        lookup =
-            found == null
-                ? "<missing>"
-                : found.getClass().getName()
-                    + " pos="
-                    + found.blockPosition()
-                    + " dim="
-                    + serverLevel.dimension().location();
-      }
-      String optInfo = entityOpt.isPresent() ? "present" : "empty";
-      return "<no-entity opt=" + optInfo + " uuid=" + uuidInfo + " uuidLookup=" + lookup + ">";
-    }
-    if (citizenUuid != null) {
-      java.util.UUID entityUuid = mcEntity.getUUID();
-      if (!citizenUuid.equals(entityUuid)) {
-        return "<uuid-mismatch citizen=" + citizenUuid + " entity=" + entityUuid + ">";
-      }
-    }
-    int id = mcEntity.getId();
-    if (citizen instanceof CitizenData cd && entity instanceof AbstractEntityCitizen ace) {
-      try {
-        cd.setEntity(ace);
-        return "setEntity ok id=" + id;
-      } catch (Exception ex) {
-        return ex.getMessage() == null ? "<error>" : ex.getMessage();
-      }
-    }
-    return "<no-public-setter>";
-  }
-
-  private int safeCitizenEntityId(ICitizenData citizen) {
-    if (citizen == null) {
-      return -1;
-    }
-    return citizen.getEntity().map(net.minecraft.world.entity.Entity::getId).orElse(-1);
   }
 
   private String describeCitizenPosition(ICitizenData citizen) {
@@ -691,55 +484,6 @@ final class ShopCourierDiagnostics {
         "[CreateShop] reflection call failed {} err={}",
         key,
         ex.getMessage() == null ? "<null>" : ex.getMessage());
-  }
-
-  private String describeTask(Object task) {
-    if (task == null) {
-      return "<none>";
-    }
-    StringBuilder detail = new StringBuilder();
-    Object token = tryInvoke(task, "getRequestToken");
-    if (token != null) {
-      detail.append("token=").append(token).append(" ");
-    }
-    Object request = tryInvoke(task, "getRequest");
-    if (request != null) {
-      detail.append("request=").append(request).append(" ");
-    }
-    Object requester = tryInvoke(task, "getRequester");
-    if (requester != null) {
-      detail.append("requester=").append(requester).append(" ");
-    }
-    Object from = tryInvoke(task, "getFrom");
-    if (from != null) {
-      detail.append("from=").append(from).append(" ");
-    }
-    Object to = tryInvoke(task, "getTo");
-    if (to != null) {
-      detail.append("to=").append(to).append(" ");
-    }
-    Object location = tryInvoke(task, "getLocation");
-    if (location != null) {
-      detail.append("location=").append(location).append(" ");
-    }
-    Object pickup = tryInvoke(task, "getPickupLocation");
-    if (pickup != null) {
-      detail.append("pickup=").append(pickup).append(" ");
-    }
-    Object delivery = tryInvoke(task, "getDeliveryLocation");
-    if (delivery != null) {
-      detail.append("delivery=").append(delivery).append(" ");
-    }
-    Object start = tryInvoke(task, "getStart");
-    if (start != null) {
-      detail.append("start=").append(start).append(" ");
-    }
-    Object target = tryInvoke(task, "getTarget");
-    if (target != null) {
-      detail.append("target=").append(target).append(" ");
-    }
-    String result = detail.toString().trim();
-    return result.isEmpty() ? task.toString() : result;
   }
 
   private String appendJobDetail(Object job, String base, String methodName) {
