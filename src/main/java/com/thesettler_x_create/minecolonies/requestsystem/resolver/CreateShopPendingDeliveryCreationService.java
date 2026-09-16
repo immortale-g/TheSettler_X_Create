@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -68,14 +68,12 @@ final class CreateShopPendingDeliveryCreationService {
               java.util.Collections.singletonList(pendingResult));
         }
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pendingCount={})",
-            requestIdLog,
-            totalAvailable,
-            rackAvailableForRequest,
-            pendingCount);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} waiting (available={}, rackAvailable={}, pendingCount={})",
+          requestIdLog,
+          totalAvailable,
+          rackAvailableForRequest,
+          pendingCount);
       return DeliveryCreationResult.waiting();
     }
 
@@ -85,16 +83,14 @@ final class CreateShopPendingDeliveryCreationService {
     if (stacks.isEmpty()) {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:plan-empty");
       diagnostics.logPendingReasonChange(request.getId(), "wait:plan-empty");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pendingCount={})",
-            requestIdLog,
-            rackAvailableForRequest,
-            pendingCount);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} skip (plan empty, rackAvailable={}, pendingCount={})",
+          requestIdLog,
+          rackAvailableForRequest,
+          pendingCount);
       return DeliveryCreationResult.waiting();
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: {} creating deliveries (stacks={}, deliverCount={}, pendingCount={}, rackAvailable={})",
           requestIdLog,
@@ -108,10 +104,8 @@ final class CreateShopPendingDeliveryCreationService {
     if (created.isEmpty()) {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:create-failed");
       diagnostics.logPendingReasonChange(request.getId(), "create:failed");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} create failed (no deliveries created)", requestIdLog);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} create failed (no deliveries created)", requestIdLog);
       return DeliveryCreationResult.waiting();
     }
 

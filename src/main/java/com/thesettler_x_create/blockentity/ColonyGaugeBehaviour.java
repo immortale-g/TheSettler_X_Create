@@ -9,6 +9,7 @@ import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBoard;
 import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsFormatter;
 import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringBehaviour;
 import com.simibubi.create.foundation.utility.CreateLang;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.client.gui.ColonyGaugeScreen;
 import com.thesettler_x_create.menu.ColonyGaugeSetItemMenu;
@@ -110,7 +111,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     BuildingCreateShop building = findBuilding();
     if (building == null) return;
     int cancelled = building.cancelPendingGaugeRequests(getFilter(), targetAddress);
-    if (cancelled > 0 && com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (cancelled > 0 && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] cancelled {} stale colony request(s) slot={} address={}",
           cancelled,
@@ -296,7 +297,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   void tryRequest() {
-    boolean debug = com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean();
+    boolean debug = DebugLog.enabled();
 
     if (!isLinked()) {
       if (debug)
@@ -393,7 +394,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     // event directly — tickStorageMonitor() already runs every tick, but call it here too so the
     // gauge reflects the delivery immediately instead of waiting up to a tick.
     tickStorageMonitor();
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] onDeliveryReceived slot={} inStorage={} target={} satisfied={}",
           slot.getSerializedName(),

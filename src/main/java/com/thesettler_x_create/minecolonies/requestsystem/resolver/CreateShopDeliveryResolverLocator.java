@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 
 /** Resolves callback ownership for delivery-child requests. */
@@ -123,7 +123,7 @@ final class CreateShopDeliveryResolverLocator {
 
   static void logUnresolvedDeliveryCallback(
       String stage, IRequestManager manager, IRequest<?> request) {
-    if (!isDebugLoggingEnabled()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
@@ -167,13 +167,5 @@ final class CreateShopDeliveryResolverLocator {
         assignmentResolver == null ? "<none>" : assignmentResolver,
         assignmentResolverClass,
         ownerResolverClass);
-  }
-
-  private static boolean isDebugLoggingEnabled() {
-    try {
-      return Config.DEBUG_LOGGING.getAsBoolean();
-    } catch (IllegalStateException ignored) {
-      return false;
-    }
   }
 }

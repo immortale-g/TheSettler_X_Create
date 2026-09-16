@@ -21,7 +21,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.simibubi.create.content.logistics.BigItemStack;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.block.CreateShopBlock;
 import com.thesettler_x_create.block.CreateShopOutputBlock;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -56,10 +56,6 @@ import org.jetbrains.annotations.Nullable;
 /** Create Shop building integration with MineColonies request system and Create network. */
 public class BuildingCreateShop extends AbstractBuilding {
   public static final String SCHEMATIC_NAME = "createshop";
-
-  static boolean isDebugRequests() {
-    return Config.DEBUG_LOGGING.getAsBoolean();
-  }
 
   private static final String TAG_PICKUP_POS = "PickupPos";
   private static final String TAG_OUTPUT_POS = "OutputPos";
@@ -146,7 +142,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     boolean result =
         citizen != null
             && citizen.getJob() instanceof com.minecolonies.core.colony.jobs.JobDeliveryman;
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       courierDiagnostics.logAccessCheck(citizen, result);
     }
     return result;
@@ -303,7 +299,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     permaManager.tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
-      if (isDebugRequests() && resolver == null) {
+      if (DebugLog.enabled() && resolver == null) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tick: resolver missing for shop {}",
             getLocation().getInDimensionLocation());
@@ -584,7 +580,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       String address,
       long requestedAt,
       @Nullable java.util.UUID requestUuid) {
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requested item={} remaining={} requester='{}' address='{}'",
           stackKey == null || stackKey.isEmpty() ? "<empty>" : stackKey.getHoverName().getString(),
@@ -593,7 +589,7 @@ public class BuildingCreateShop extends AbstractBuilding {
           address);
     }
     if (stackKey == null || stackKey.isEmpty() || remaining <= 0) {
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: invalid input");
       }
@@ -602,7 +598,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     TileEntityCreateShop tile = getCreateShopTileEntity();
     CreateShopBlockEntity pickup = getPickupBlockEntity();
     if (tile == null || pickup == null || tile.getStockNetworkId() == null) {
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart rejected: tilePresent={} pickupPresent={} networkPresent={}",
             tile != null,
@@ -615,7 +611,7 @@ public class BuildingCreateShop extends AbstractBuilding {
         pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
     int reorderTarget = Math.min(Math.max(1, remaining), Math.max(0, trackedRemaining));
     if (reorderTarget <= 0) {
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart skipped: no tracked inflight remaining for tuple");
       }
@@ -627,7 +623,7 @@ public class BuildingCreateShop extends AbstractBuilding {
         new CreateNetworkFacade(tile)
             .requestStacksImmediate(List.of(requested), requesterName, requestUuid);
     if (reordered.isEmpty()) {
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package restart failed: network returned empty reorder list");
       }
@@ -641,7 +637,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
     int consumed =
         pickup.consumeInflight(stackKey, requestedCount, requesterName, address, requestedAt);
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package restart requester={} item={} requested={} consumedOld={}",
           requesterName,
@@ -694,7 +690,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     if (cleared <= 0) {
       cleared = pickup.cancelInflight(stackKey, requesterName, address, requestedAt);
     }
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package cancel uuid={} item={} requester='{}' address='{}' cleared={}",
           requestUuid,
@@ -733,7 +729,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       return 0;
     }
     int cleared = pickup.clearRuntimeTrackingForDebug();
-    if (isDebugRequests() && cleared > 0) {
+    if (DebugLog.enabled() && cleared > 0) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] debug reset runtime tracking shop={} cleared={}",
           getLocation() == null ? "<unknown>" : getLocation().getInDimensionLocation(),
@@ -748,7 +744,7 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   void advanceLostPackageInteractionEpoch(String reason) {
     lostPackageInteractionEpoch++;
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction epoch advanced to {} reason={}",
           lostPackageInteractionEpoch,
@@ -774,7 +770,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     int cancelledRequests =
         new ShopLostPackageRequestCanceller(this)
             .cancelMatchingRequests(stackKey, requesterName, address, requestedAt);
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package cancel+requests uuid={} item={} requester='{}' address='{}' clearedInflight={} cancelledRequests={}",
           requestUuid,
@@ -977,7 +973,7 @@ public class BuildingCreateShop extends AbstractBuilding {
           } else {
             super.onRequestedRequestComplete(standard, request);
           }
-          if (isDebugRequests()) {
+          if (DebugLog.enabled()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] pickup request cleanup token={} state={} reason=terminal-open-token",
                 token,
@@ -1017,7 +1013,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       } else {
         manager.assignRequest(token);
       }
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] pickup request repair token={} state={} resolver={} action={}",
             token,
@@ -1028,7 +1024,7 @@ public class BuildingCreateShop extends AbstractBuilding {
                 : "assign");
       }
     } catch (Exception ex) {
-      if (isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] pickup request repair failed token={} state={} resolver={} error={}",
             token,
@@ -1059,7 +1055,7 @@ public class BuildingCreateShop extends AbstractBuilding {
       }
     }
     markDirty();
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] pickup request cleanup token={} reason={}", token, reason);
     }
@@ -1127,7 +1123,7 @@ public class BuildingCreateShop extends AbstractBuilding {
     } catch (Exception ignored) {
       // Best-effort migration only.
     }
-    if (isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] legacy shop-courier migration modulePresent=true cleared={}", cleared);
     }

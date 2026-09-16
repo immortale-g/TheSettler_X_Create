@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -59,7 +60,7 @@ final class CreateShopPickupObservationService {
           level, parentByDelivery.get(allocation.delivery()), allocation.delivery());
       int consumed =
           pickup.consumeReservedForRequest(allocation.owner(), taken, allocation.amount());
-      if (resolver.isDebugLoggingEnabled()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] pickup observed delivery={} request={} item={} taken={} reservationConsumed={}",
             allocation.delivery(),

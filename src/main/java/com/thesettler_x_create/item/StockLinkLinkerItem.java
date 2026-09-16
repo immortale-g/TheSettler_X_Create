@@ -7,9 +7,8 @@ import com.simibubi.create.content.logistics.packagerLink.PackagerLinkBlockEntit
 import com.simibubi.create.content.logistics.stockTicker.StockCheckingBlockEntity;
 import com.simibubi.create.content.logistics.stockTicker.StockTickerBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.ItemStackDataUtil;
-import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -127,9 +126,7 @@ public class StockLinkLinkerItem extends Item {
       }
     }
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info("Retuned stock link at {} to {}", pos, newFreq);
-    }
+    DebugLog.info("Retuned stock link at {} to {}", pos, newFreq);
 
     context
         .getPlayer()

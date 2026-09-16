@@ -8,6 +8,7 @@ import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.gui.widget.IconButton;
 import com.simibubi.create.foundation.gui.widget.ScrollInput;
 import com.simibubi.create.foundation.utility.CreateLang;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.init.ModItems;
 import com.thesettler_x_create.network.ColonyGaugeConfigPacket;
@@ -212,7 +213,7 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
   }
 
   private void sendConfig() {
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] sending config pos={} address='{}' promiseClearingInterval={} clearPromises={} reset={}",
           behaviour.getPanelPosition(),

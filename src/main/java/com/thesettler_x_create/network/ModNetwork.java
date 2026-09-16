@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
@@ -189,7 +190,7 @@ public final class ModNetwork {
       ColonyGaugeConfigPacket payload, IPayloadContext context) {
     context.enqueueWork(
         () -> {
-          boolean debug = com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean();
+          boolean debug = DebugLog.enabled();
           if (!(context.player() instanceof ServerPlayer player)) {
             if (debug) {
               TheSettlerXCreate.LOGGER.info(

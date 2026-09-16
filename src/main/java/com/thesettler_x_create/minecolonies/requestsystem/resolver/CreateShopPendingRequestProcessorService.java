@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -79,7 +79,7 @@ final class CreateShopPendingRequestProcessorService {
       requestStateMutatorService.clearPendingTokenState(
           resolver, standardManager, request.getId(), true);
       diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (terminal state={})",
             request.getId(),
@@ -110,7 +110,7 @@ final class CreateShopPendingRequestProcessorService {
               shop,
               pickup,
               requestIdLog);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
         diagnostics.logParentChildrenState(standardManager, request.getId(), "tickPending");
@@ -161,7 +161,7 @@ final class CreateShopPendingRequestProcessorService {
       Long lastDropLog = resolver.getParentChildDropLastLogTick(request.getId());
       if (lastDropLog == null || now - lastDropLog >= 100L) {
         requestStateMutatorService.markParentChildDropLog(resolver, request.getId(), now);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           String previousChildren = resolver.getParentLastKnownChildren(request.getId());
           if (previousChildren == null) {
             previousChildren = "[]";
@@ -182,7 +182,7 @@ final class CreateShopPendingRequestProcessorService {
     // No delivery child is open here. Closing the parent is MineColonies' call via resolveRequest
     // once the last child completes, so this tick only orders and delivers what is still missing.
 
-    if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!onCooldown && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
           requestIdLog,

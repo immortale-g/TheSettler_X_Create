@@ -44,9 +44,7 @@ public class TheSettlerXCreateClient {
               .skipVanillaRender(be -> false)
               .apply();
         });
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info("TheSettler_x_Create client setup complete");
-    }
+    DebugLog.info("TheSettler_x_Create client setup complete");
   }
 
   @SubscribeEvent

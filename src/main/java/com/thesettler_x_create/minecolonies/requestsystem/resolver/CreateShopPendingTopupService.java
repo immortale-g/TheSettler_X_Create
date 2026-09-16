@@ -3,7 +3,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -82,7 +82,7 @@ final class CreateShopPendingTopupService {
           diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
           flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
         }
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} network topup not ordered (inflightRemaining={}, claimed={}, topupNeeded={}, pending={}, reserved={}, rack={})",
               requestIdLog,
@@ -101,7 +101,7 @@ final class CreateShopPendingTopupService {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:network-topup");
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.request_sent", topupOrdered);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} network topup ordered={} pending={} reserved={}",
             requestIdLog,

@@ -2,7 +2,7 @@ package com.thesettler_x_create.create;
 
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.util.WorldUtil;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -84,7 +84,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
     int available = getAvailableFromRacks(key);
     if (available <= 0) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] extractItem failed (no rack stock) item={} reserved={} available={} simulate={}",
             key.getHoverName().getString(),
@@ -98,7 +98,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     int reserved = shopBlockEntity.getReservedFor(key);
     int extractable = ShopStockAccounting.extractable(amount, reserved, available);
     if (extractable <= 0) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] extractItem failed (not extractable) item={} reserved={} available={} request={} simulate={}",
             key.getHoverName().getString(),
@@ -112,7 +112,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
     ItemStack extracted = tryExtractFromRacks(key, extractable, simulate);
     if (extracted.isEmpty()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] extractItem failed (rack extract empty) item={} reserved={} available={} request={} simulate={}",
             key.getHoverName().getString(),
@@ -130,7 +130,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
       shopBlockEntity.noteRackStockChange(extracted, -extracted.getCount());
     }
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] extractItem {}x {} (simulate={})",
           extracted.getCount(),

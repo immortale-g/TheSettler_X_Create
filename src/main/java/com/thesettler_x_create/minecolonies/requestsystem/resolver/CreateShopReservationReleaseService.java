@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -30,7 +30,7 @@ final class CreateShopReservationReleaseService {
     UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
     pickup.release(requestId);
     int detached = pickup.detachInflight(requestId);
-    if (Config.DEBUG_LOGGING.getAsBoolean() && detached > 0) {
+    if (DebugLog.enabled() && detached > 0) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] releaseReservation request={} state={} detachedInflight={}",
           request.getId(),

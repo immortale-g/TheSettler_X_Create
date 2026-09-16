@@ -74,12 +74,12 @@ public class TheSettlerXCreate {
   private void commonSetup(FMLCommonSetupEvent event) {
     event.enqueueWork(
         () -> {
-          LOGGER.info("[CreateShop] debugLogging = {}", Config.DEBUG_LOGGING.getAsBoolean());
+          LOGGER.info("[CreateShop] debugLogging = {}", DebugLog.enabled());
           registerRequestSystemFactories();
           CreatePlacementHandlers.register();
           adoptCitizenSoundsForCreateShop();
         });
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       LOGGER.info("TheSettler_x_Create common setup complete");
     }
   }
@@ -152,7 +152,7 @@ public class TheSettlerXCreate {
 
   @SubscribeEvent
   public void onServerStarting(ServerStartingEvent event) {
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       LOGGER.info("TheSettler_x_Create server starting");
     }
   }
@@ -161,7 +161,7 @@ public class TheSettlerXCreate {
     CreateNetworkFacade.flushQueuedRequests();
     IColonyManager manager = IColonyManager.getInstance();
     var colonies = manager.getAllColonies();
-    if (Config.DEBUG_LOGGING.getAsBoolean()
+    if (DebugLog.enabled()
         && event.getServer() != null
         && (lastGlobalTickLog < 0L
             || event.getServer().getTickCount() - lastGlobalTickLog >= 200L)) {

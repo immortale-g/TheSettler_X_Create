@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -41,7 +41,7 @@ final class CreateShopTickPendingService {
     if (resolver == null) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending entry manager={} resolverId={}",
           manager == null ? "<null>" : manager.getClass().getName(),
@@ -50,23 +50,17 @@ final class CreateShopTickPendingService {
     IStandardRequestManager standardManager =
         CreateShopRequestResolver.unwrapStandardManager(manager);
     if (standardManager == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no standard manager)");
-      }
+      DebugLog.info("[CreateShop] tickPending skipped (no standard manager)");
       return;
     }
     long perfStart = System.nanoTime();
     Level level = standardManager.getColony().getWorld();
     if (level == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (no level)");
-      }
+      DebugLog.info("[CreateShop] tickPending skipped (no level)");
       return;
     }
     if (level.isClientSide) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending skipped (client side)");
-      }
+      DebugLog.info("[CreateShop] tickPending skipped (client side)");
       return;
     }
     resolver
@@ -87,8 +81,7 @@ final class CreateShopTickPendingService {
     if (pendingTokens.isEmpty()) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()
-        && tickPendingTelemetryService.shouldLogTickPending(level)) {
+    if (DebugLog.enabled() && tickPendingTelemetryService.shouldLogTickPending(level)) {
       int assignedCount = pendingTokens.size();
       int orderedCount = resolver.getCooldown().getOrderedCount();
       TheSettlerXCreate.LOGGER.info(
@@ -104,8 +97,7 @@ final class CreateShopTickPendingService {
     }
     boolean workerWorking = shop.isWorkerWorking();
     if (!workerWorking) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()
-          && tickPendingTelemetryService.shouldLogTickPending(level)) {
+      if (DebugLog.enabled() && tickPendingTelemetryService.shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info("[CreateShop] tickPending worker not working; reconciling");
       }
     }
@@ -168,7 +160,7 @@ final class CreateShopTickPendingService {
       }
     }
     int refreshed = pickup.refreshReservations(activeRequestIds);
-    if (refreshed > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (refreshed > 0 && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] reservation keep-alive refreshed={} active={}",
           refreshed,

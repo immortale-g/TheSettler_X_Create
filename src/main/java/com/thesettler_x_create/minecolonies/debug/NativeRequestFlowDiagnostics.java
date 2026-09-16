@@ -8,7 +8,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -24,7 +24,7 @@ public final class NativeRequestFlowDiagnostics {
   private final Map<Integer, String> lastDump = new ConcurrentHashMap<>();
 
   public void tick(IColony colony, long serverTick) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean() || colony == null) {
+    if (!DebugLog.enabled() || colony == null) {
       return;
     }
     if (!(colony.getRequestManager() instanceof IStandardRequestManager standard)) {

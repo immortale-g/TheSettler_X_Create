@@ -1,7 +1,7 @@
 package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.stock.ReservationBook;
 import com.thesettler_x_create.stock.ReservedAmount;
@@ -49,7 +49,7 @@ class ShopReservationLedger {
     if (!book.reserve(requestId, key, amount)) {
       return;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] Reserved {}x {} for {}", amount, key.getHoverName().getString(), requestId);
     }

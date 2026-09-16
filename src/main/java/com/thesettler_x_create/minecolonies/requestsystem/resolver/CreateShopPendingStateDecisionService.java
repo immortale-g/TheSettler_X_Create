@@ -2,8 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.Config;
-import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 import net.minecraft.world.level.Level;
 
@@ -41,15 +40,13 @@ final class CreateShopPendingStateDecisionService {
       requestStateMutatorService.markOrderedWithPending(
           resolver, null, request.getId(), pendingCount);
       diagnostics.recordPendingSource(request.getId(), "tickPending:derived-reconcile");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} reconcile pending tracked={} derived={} reserved={} -> {}",
-            requestIdLog,
-            trackedPending,
-            derivedPending,
-            reservedForRequest,
-            pendingCount);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} reconcile pending tracked={} derived={} reserved={} -> {}",
+          requestIdLog,
+          trackedPending,
+          derivedPending,
+          reservedForRequest,
+          pendingCount);
     }
     if (pendingCount <= 0 && !onCooldown) {
       diagnostics.logPendingReasonChange(
@@ -58,10 +55,7 @@ final class CreateShopPendingStateDecisionService {
               + reservedForRequest
               + " pending="
               + resolver.getPendingTracker().getPendingCount(request.getId()));
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
-      }
+      DebugLog.info("[CreateShop] tickPending: {} skip (no pending)", requestIdLog);
       return PendingDecision.skipped();
     }
     if (pendingCount <= 0) {
@@ -69,23 +63,19 @@ final class CreateShopPendingStateDecisionService {
       if (onCooldown && parentTerminal && !request.hasChildren()) {
         requestStateMutatorService.clearOrderedAndPending(resolver, request.getId());
         diagnostics.logPendingReasonChange(request.getId(), "recover:stale-cooldown-no-pending");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} cleared stale cooldown (no pending/no children)",
-              requestIdLog);
-        }
+        DebugLog.info(
+            "[CreateShop] tickPending: {} cleared stale cooldown (no pending/no children)",
+            requestIdLog);
         return PendingDecision.skipped();
       }
       diagnostics.logPendingReasonChange(
           request.getId(),
           "skip:pending-count reserved=" + reservedForRequest + " pending=" + pendingCount);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
-            requestIdLog,
-            reservedForRequest,
-            pendingCount);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} skip (reservedForRequest={}, pendingCount={})",
+          requestIdLog,
+          reservedForRequest,
+          pendingCount);
       return PendingDecision.skipped();
     }
     if (!workerAvailabilityGate.shouldResumePending(workerWorking, pendingCount)) {
@@ -96,12 +86,10 @@ final class CreateShopPendingStateDecisionService {
         diagnostics.recordPendingSource(request.getId(), "tickPending:worker-unavailable");
       }
       diagnostics.logPendingReasonChange(request.getId(), "wait:worker-not-working");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",
-            requestIdLog,
-            pendingCount);
-      }
+      DebugLog.info(
+          "[CreateShop] tickPending: {} waiting (worker unavailable, pendingCount={})",
+          requestIdLog,
+          pendingCount);
       return PendingDecision.skipped();
     }
     return PendingDecision.proceed(pendingCount);

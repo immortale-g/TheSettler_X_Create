@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,7 +68,7 @@ final class ShopPermaRequestManager {
         || permaOres.isEmpty()
         || !shop.canUsePermaRequests()
         || !shop.isWorkerWorking()) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] perma tick skipped: colony={} permaOres={} canUse={}",
             colony == null ? "<null>" : colony.getID(),
@@ -78,36 +79,28 @@ final class ShopPermaRequestManager {
     }
     Level level = colony.getWorld();
     if (level == null || level.isClientSide) {
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: level={}", level);
-      }
+      DebugLog.info("[CreateShop] perma tick skipped: level={}", level);
       return;
     }
     long now = level.getGameTime();
     if (now - lastPermaRequestTick < Config.PERMA_REQUEST_INTERVAL_TICKS.getAsLong()) {
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] perma tick throttled: now={} last={} diff={}",
-            now,
-            lastPermaRequestTick,
-            now - lastPermaRequestTick);
-      }
+      DebugLog.info(
+          "[CreateShop] perma tick throttled: now={} last={} diff={}",
+          now,
+          lastPermaRequestTick,
+          now - lastPermaRequestTick);
       return;
     }
     lastPermaRequestTick = now;
 
     IRequestManager manager = colony.getRequestManager();
     if (manager == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: request manager null");
-      }
+      DebugLog.info("[CreateShop] perma tick skipped: request manager null");
       return;
     }
     IRequester requester = shop.getRequester();
     if (requester == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] perma tick skipped: requester null");
-      }
+      DebugLog.info("[CreateShop] perma tick skipped: requester null");
       return;
     }
 
@@ -117,24 +110,20 @@ final class ShopPermaRequestManager {
     for (ResourceLocation itemId : ordered) {
       Item item = BuiltInRegistries.ITEM.get(itemId);
       if (item == null || item == net.minecraft.world.item.Items.AIR) {
-        if (BuildingCreateShop.isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info("[CreateShop] perma skip: missing item {}", itemId);
-        }
+        DebugLog.info("[CreateShop] perma skip: missing item {}", itemId);
         continue;
       }
       ItemStack stack = new ItemStack(item, 1);
       int available = ShopWarehouseStockUtil.countInWarehouses(shop, stack);
       int pending = permaPendingCounts.getOrDefault(itemId, 0);
       int requestable = Math.max(0, available - pending);
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] perma eval item={} available={} pending={} requestable={} waitFull={}",
-            itemId,
-            available,
-            pending,
-            requestable,
-            permaWaitFullStack);
-      }
+      DebugLog.info(
+          "[CreateShop] perma eval item={} available={} pending={} requestable={} waitFull={}",
+          itemId,
+          available,
+          pending,
+          requestable,
+          permaWaitFullStack);
       if (requestable <= 0) {
         continue;
       }
@@ -148,13 +137,8 @@ final class ShopPermaRequestManager {
       if (token != null) {
         permaPendingRequests.put(token, new PendingPermaRequest(itemId, amount));
         permaPendingCounts.merge(itemId, amount, Integer::sum);
-        if (BuildingCreateShop.isDebugRequests()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] perma request created token={} item={} amount={}",
-              token,
-              itemId,
-              amount);
-        }
+        DebugLog.info(
+            "[CreateShop] perma request created token={} item={} amount={}", token, itemId, amount);
       }
     }
   }

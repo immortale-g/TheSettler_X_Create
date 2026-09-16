@@ -7,7 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.Tuple;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -100,7 +100,7 @@ final class CreateShopOpenDeliveryTopupService {
             pickup.getInflightRemainingFor(requestId, deliverable::matches),
             ShopStockAccounting.unreservedStock(
                 rackAvailable, pickup.getReservedForDeliverable(deliverable)));
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: {} open deliveries={} notPickedUp={} needed={} plan={}",
           requestIdLog,

@@ -22,8 +22,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The placement handlers are compiled against Structurize 1.0.808+ (IPlacementContext signatures)
  * but must keep working with 1.0.807 and older. {@code test} runs this class with the older
- * Structurize on the classpath, {@code testStructurizeModernApi} with the newer one, so each run calls
- * the handlers exactly the way that Structurize version does.
+ * Structurize on the classpath, {@code testStructurizeModernApi} with the newer one, so each run
+ * calls the handlers exactly the way that Structurize version does.
  */
 class StructurizePlacementApiCompatTest {
   private static final String CONTEXT_CLASS = "com.ldtteam.structurize.placement.IPlacementContext";

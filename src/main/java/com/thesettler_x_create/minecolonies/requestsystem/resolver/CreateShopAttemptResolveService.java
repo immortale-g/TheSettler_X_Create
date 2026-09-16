@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -76,7 +76,7 @@ final class CreateShopAttemptResolveService {
       resolver.clearCancelledRequest(request.getId());
     }
     if (resolver.isCancelledRequest(request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve skipped (request cancelled) {}", request.getId());
       }
@@ -84,21 +84,16 @@ final class CreateShopAttemptResolveService {
     }
     Level level = manager.getColony().getWorld();
     if (level.isClientSide) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (no level or client)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (no level or client)");
       return Lists.newArrayList();
     }
     if (cooldown.isRequestOnCooldown(level, request.getId())) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (request already ordered)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (request already ordered)");
       return Lists.newArrayList();
     }
     if (request.hasChildren()) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:has-children");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve skipped (has active children) request={}",
             request.getId());
@@ -110,31 +105,22 @@ final class CreateShopAttemptResolveService {
 
     BuildingCreateShop shop = resolver.getShop(manager);
     if (shop == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (shop missing)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (shop missing)");
       return Lists.newArrayList();
     }
     TileEntityCreateShop tile = shop.getCreateShopTileEntity();
     if (tile == null || tile.getStockNetworkId() == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (missing stock network id)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (missing stock network id)");
       return Lists.newArrayList();
     }
     shop.ensurePickupLink();
     CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
     if (pickup == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (pickup block missing)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (pickup block missing)");
       return Lists.newArrayList();
     }
     if (pickup.getLevel() == null) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (pickup level missing)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (pickup level missing)");
       return Lists.newArrayList();
     }
 
@@ -146,9 +132,7 @@ final class CreateShopAttemptResolveService {
         ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest);
     if (needed <= 0) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info("[CreateShop] attemptResolve skipped (needed<=0)");
-      }
+      DebugLog.info("[CreateShop] attemptResolve skipped (needed<=0)");
       return Lists.newArrayList();
     }
     boolean workerWorking = shop.isWorkerWorking();
@@ -161,14 +145,12 @@ final class CreateShopAttemptResolveService {
     int provide = Math.min(available, needed);
     if (provide <= 0) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:insufficient");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve aborted (available={}, reserved={}, needed={}) for {}",
-            available,
-            reservedForOthers,
-            needed,
-            deliverable);
-      }
+      DebugLog.info(
+          "[CreateShop] attemptResolve aborted (available={}, reserved={}, needed={}) for {}",
+          available,
+          reservedForOthers,
+          needed,
+          deliverable);
       requestStateMutatorService.markOrderedWithPending(resolver, level, request.getId(), needed);
       diagnostics.recordPendingSource(request.getId(), "attemptResolve:insufficient");
       return Lists.newArrayList();
@@ -196,7 +178,7 @@ final class CreateShopAttemptResolveService {
       ordered.addAll(networkOrdered);
     }
     int effectiveNetworkNeeded = networkOrder == null ? remaining : networkOrder.orderedCount();
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] attemptResolve provide={} (available={}, reserved={}, needed={}, remaining={}, inflightRemaining={}, claimed={}, orderedNow={}) -> ordered {} stack(s)",
           provide,
@@ -237,7 +219,7 @@ final class CreateShopAttemptResolveService {
               resolver, level, request.getId(), needed);
           diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-wrapped-manager");
           flowStateMachine.touch(request.getId(), now, "attemptResolve:defer-wrapped-manager");
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          if (DebugLog.enabled()) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] attemptResolve defer delivery creation (wrapped manager) request={} needed={} rackUsable={}",
                 request.getId(),
@@ -256,7 +238,7 @@ final class CreateShopAttemptResolveService {
             "com.thesettler_x_create.message.createshop.flow_arrived");
         List<IToken<?>> created =
             deliveryManager.createDeliveriesFromStacks(manager, request, planned, pickup);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] attemptResolve created deliveries parent={} manager={} tokens={}",
               request.getId(),

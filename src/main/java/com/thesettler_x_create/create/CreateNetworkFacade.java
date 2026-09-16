@@ -6,6 +6,7 @@ import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.packager.InventorySummary;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -46,7 +47,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     int result = Math.max(0, total);
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] getAvailable={} for {}", result, deliverable);
     }
@@ -181,7 +182,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   public List<ItemStack> requestItems(
       IDeliverable deliverable, int amount, String requesterName, @Nullable UUID requestUuid) {
     if (!hasNetwork() || amount <= 0) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] requestItems skipped (amount={}, shop={}, network={})",
             amount,
@@ -192,7 +193,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
     InventorySummary summary = getSummary();
     if (summary == null || summary.isEmpty()) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] requestItems skipped (summary empty) for {}", shop.getStockNetworkId());
       }
@@ -212,7 +213,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       List<ItemStack> requestedStacks, String requesterName, @Nullable UUID requestUuid) {
     List<ItemStack> normalized = normalizeRequestedStacks(requestedStacks);
     if (normalized.isEmpty()) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] requestStacks computed empty order");
       }
@@ -228,7 +229,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     // Tracked as on its way from the moment it is queued: the broadcast only happens on the next
     // server tick, and a request deciding again before that must already see this order.
     recordInflight(consolidateRequestedStacks(normalized), requesterName, requestUuid);
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] queued {} stack(s) for grouped network broadcast {} -> '{}'",
           normalized.size(),
@@ -309,7 +310,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         capacityStalled = true;
         shop.noteCapacityStall(requested, requested.getCount(), acceptedCount);
       }
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         if (acceptedCount <= 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] requestStacks skipped '{}' x{} (no rack/hut capacity)",
@@ -455,7 +456,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
 
   private InventorySummary getSummaryWithLogging() {
     if (!hasNetwork()) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] getAvailable skipped (no shop/network)");
       }
@@ -463,7 +464,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     }
     InventorySummary summary = getSummary();
     if (summary == null || summary.isEmpty()) {
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] Network summary empty for {}", shop.getStockNetworkId());
       }
@@ -511,7 +512,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
             key.requesterName());
         return outcome;
       }
-      if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] broadcast grouped request stacks={} chunks={} network={} address='{}' requester='{}'",
             consolidated.size(),

@@ -1,8 +1,7 @@
 package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.Config;
-import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.create.VirtualCreateNetworkItemHandler;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -368,10 +367,7 @@ public class CreateShopBlockEntity extends BlockEntity {
     }
     var server = level.getServer();
     if (server != null && !server.isSameThread()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] inflight '{}' ignored off-server-thread", action);
-      }
+      DebugLog.info("[CreateShop] inflight '{}' ignored off-server-thread", action);
       return false;
     }
     return true;

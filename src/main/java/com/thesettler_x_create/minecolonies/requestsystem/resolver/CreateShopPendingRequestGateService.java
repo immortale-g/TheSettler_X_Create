@@ -7,7 +7,7 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.resolver.retrying.IRetryingRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 
@@ -41,7 +41,7 @@ final class CreateShopPendingRequestGateService {
         boolean reassigned = tryReassignFromRetryingOwner(standardManager, request);
         diagnostics.logPendingReasonChange(
             request.getId(), "skip:ownership-handoff-active-delivery");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: "
                   + request.getId()
@@ -72,7 +72,7 @@ final class CreateShopPendingRequestGateService {
             "",
             0,
             "com.thesettler_x_create.message.createshop.flow_cancelled");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} skip (cancelled)", request.getId());
         }
@@ -91,7 +91,7 @@ final class CreateShopPendingRequestGateService {
           "",
           0,
           "com.thesettler_x_create.message.createshop.flow_cancelled");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
       }

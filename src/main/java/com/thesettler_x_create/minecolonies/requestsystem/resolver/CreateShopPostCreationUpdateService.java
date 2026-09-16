@@ -2,7 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 import net.minecraft.world.item.ItemStack;
@@ -64,7 +64,7 @@ final class CreateShopPostCreationUpdateService {
     int remainingCount = Math.max(0, creationResult.remainingCount());
     if (remainingCount != creationResult.remainingCount()) {
       diagnostics.logPendingReasonChange(request.getId(), "normalize:remaining<0");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} normalized remainingCount {} -> 0",
             requestIdLog,
@@ -82,9 +82,7 @@ final class CreateShopPostCreationUpdateService {
       diagnostics.recordPendingSource(request.getId(), "tickPending:await-child-complete");
     }
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] tickPending: {} skip assignRequest (delivery created)", requestIdLog);
-    }
+    DebugLog.info(
+        "[CreateShop] tickPending: {} skip assignRequest (delivery created)", requestIdLog);
   }
 }

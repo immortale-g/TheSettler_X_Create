@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -90,7 +91,7 @@ final class CreateShopDeliveryCompletionService {
               && !CreateShopDeliveryOriginMatcher.isDeliveryFromShopHut(delivery, shop)) {
             pickup.consumeReservedForRequest(parentRequestId, stack, stack.getCount());
           }
-          if (resolver.isDebugLoggingEnabled()) {
+          if (DebugLog.enabled()) {
             int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
             int reservedForStack = pickup.getReservedFor(stack);
             BlockPos pickupPosition = pickup.getBlockPos();
@@ -122,7 +123,7 @@ final class CreateShopDeliveryCompletionService {
     // Parent resolution is left to MineColonies: this callback runs inside
     // RequestHandler#onRequestCompleted before it detaches the child and, once the parent has no
     // children left, calls our resolveRequest. Keep the child linked so that path runs.
-    if (resolver.isDebugLoggingEnabled()) {
+    if (DebugLog.enabled()) {
       IStandardRequestManager debugManager =
           CreateShopRequestResolver.unwrapStandardManager(manager);
       if (debugManager != null) {

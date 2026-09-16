@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +23,7 @@ final class CreateShopDeliveryRootCauseSnapshotService {
       IToken<?> childToken,
       IToken<?> assignedResolverToken) {
     if (resolver == null
-        || !resolver.isDebugLoggingEnabled()
+        || !DebugLog.enabled()
         || manager == null
         || level == null
         || parent == null

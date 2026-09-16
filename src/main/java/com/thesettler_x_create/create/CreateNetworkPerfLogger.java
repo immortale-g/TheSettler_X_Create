@@ -1,6 +1,7 @@
 package com.thesettler_x_create.create;
 
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 
@@ -29,7 +30,7 @@ public final class CreateNetworkPerfLogger {
   }
 
   private void maybeLogPerf(TileEntityCreateShop shop) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     if (shop == null || shop.getLevel() == null) {

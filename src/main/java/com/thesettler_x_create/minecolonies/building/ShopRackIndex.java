@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.WorldUtil;
 import com.minecolonies.core.tileentities.TileEntityRack;
 import com.simibubi.create.content.logistics.BigItemStack;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.Iterator;
 import java.util.List;
@@ -54,7 +54,7 @@ final class ShopRackIndex {
       iterator.remove();
       removed++;
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && (kept > 0 || removed > 0)) {
+    if (DebugLog.enabled() && (kept > 0 || removed > 0)) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] ensureRackContainers kept={} removed={} total={}",
           kept,

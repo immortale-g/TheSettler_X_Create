@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,7 +45,7 @@ final class ShopCourierDiagnostics {
   }
 
   void debugCourierAssignments(IColony colony) {
-    if (!BuildingCreateShop.isDebugRequests() || colony == null) {
+    if (!DebugLog.enabled() || colony == null) {
       return;
     }
     Level level = colony.getWorld();
@@ -196,7 +197,7 @@ final class ShopCourierDiagnostics {
       entries.add(describeCitizenAssignmentDetail(citizen));
       String key = describeCitizenKey(citizen);
       currentInfo.put(key, describeCitizenAssignmentDetail(citizen));
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         logCitizenUuidLookup(citizen);
       }
     }
@@ -472,7 +473,7 @@ final class ShopCourierDiagnostics {
   }
 
   private void logReflectionFailure(Object target, String methodName, Exception ex) {
-    if (!BuildingCreateShop.isDebugRequests() || target == null) {
+    if (!DebugLog.enabled() || target == null) {
       return;
     }
     String key =

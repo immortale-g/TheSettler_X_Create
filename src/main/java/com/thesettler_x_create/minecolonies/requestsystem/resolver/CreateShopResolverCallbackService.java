@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -46,7 +46,7 @@ final class CreateShopResolverCallbackService {
       @NotNull IRequestManager manager,
       @NotNull IRequest<? extends IDeliverable> request) {
     boolean finished = finishIfDelivered(resolver, manager, request, "resolveRequest");
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] resolveRequest parent={} finished={} state={}",
           request.getId(),
@@ -108,7 +108,7 @@ final class CreateShopResolverCallbackService {
         delivered, deliverable.getMinimumCount(), reservedForRequest, usableRackStock, false)) {
       return false;
     }
-    if (isDebugLoggingEnabledSafe()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] finish parent={} source={} short of count delivered={} min={} count={}",
           request.getId(),
@@ -128,7 +128,7 @@ final class CreateShopResolverCallbackService {
     try {
       manager.updateRequestState(request.getId(), RequestState.RESOLVED);
     } catch (Exception ex) {
-      if (isDebugLoggingEnabledSafe()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] finish parent={} source={} failed: {}",
             request.getId(),
@@ -147,7 +147,7 @@ final class CreateShopResolverCallbackService {
         "com.thesettler_x_create.message.createshop.flow_request_completed");
     resolver.releaseReservation(manager, request);
     requestStateMutatorService.clearPendingTokenState(resolver, request.getId(), true);
-    if (isDebugLoggingEnabledSafe()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] finish parent={} source={} -> resolved", request.getId(), source);
     }
@@ -229,7 +229,7 @@ final class CreateShopResolverCallbackService {
         CreateShopRequestResolver.unwrapStandardManager(manager);
     boolean graphActiveChild = hasActiveNonTerminalChildInGraph(standardManager, request.getId());
     if (!terminal || graphActiveChild) {
-      if (isDebugLoggingEnabledSafe()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] terminal cleanup skipped token={} state={} terminal={} graphActiveChild={}",
             request.getId(),
@@ -351,14 +351,6 @@ final class CreateShopResolverCallbackService {
     return null;
   }
 
-  private static boolean isDebugLoggingEnabledSafe() {
-    try {
-      return Config.DEBUG_LOGGING.getAsBoolean();
-    } catch (IllegalStateException ignored) {
-      return false;
-    }
-  }
-
   private static boolean hasActiveNonTerminalChildInGraph(
       IStandardRequestManager manager,
       com.minecolonies.api.colony.requestsystem.token.IToken<?> parentToken) {
@@ -416,7 +408,7 @@ final class CreateShopResolverCallbackService {
       int reservedForRequest =
           pickup.getReservedForRequest(CreateShopRequestResolver.toRequestId(request.getId()));
       if (reservedForRequest > 0) {
-        if (isDebugLoggingEnabledSafe()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] fast orphan picked-up recovery skipped parent={} reservationHeld={}",
               request.getId(),
@@ -434,7 +426,7 @@ final class CreateShopResolverCallbackService {
     // to resolve the parent. Run the same completion check it would have triggered.
     boolean finished =
         finishIfDelivered(resolver, manager, request, "fast-orphan-pickedup-recovery");
-    if (isDebugLoggingEnabledSafe()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] fast orphan picked-up recovery parent={} child={} finished={}",
           request.getId(),

@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -367,7 +368,7 @@ final class CreateShopDeliveryChildLedgerService {
       CreateShopDeliveryChildLedgerEntry entry,
       long now,
       String source) {
-    if (!resolver.isDebugLoggingEnabled()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     Long last = resolver.getDeliveryLedgerLastLogTick(entry.childToken);
