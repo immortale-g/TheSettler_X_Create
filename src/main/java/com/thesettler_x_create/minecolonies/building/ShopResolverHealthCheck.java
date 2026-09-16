@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.ResolverLocationUtil;
 import java.util.Collection;
@@ -80,7 +81,7 @@ final class ShopResolverHealthCheck {
       return;
     }
 
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] resolver health mismatch: resolverKnown={} providerContains={} typeContains={} resolver={}",
           resolverKnown,
@@ -96,14 +97,14 @@ final class ShopResolverHealthCheck {
     try {
       colony.getRequestManager().onProviderAddedToColony(shop);
     } catch (Exception ex) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver provider repair failed: {}",
             ex.getMessage() == null ? "<null>" : ex.getMessage());
       }
       return;
     }
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] resolver provider repair triggered for {}", resolverId);
     }
@@ -172,7 +173,7 @@ final class ShopResolverHealthCheck {
         if (assignmentSelected != null
             && !assignmentSelected.getId().equals(selected.getId())
             && hasAssignedRequestsForResolver(manager, assignmentSelected.getId())) {
-          if (BuildingCreateShop.isDebugRequests()) {
+          if (DebugLog.enabled()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] resolver assignment drift detected: switching {} -> {}",
                 selected.getId(),
@@ -182,7 +183,7 @@ final class ShopResolverHealthCheck {
         } else {
           CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
           if (ownershipSelected != null && !ownershipSelected.getId().equals(selected.getId())) {
-            if (BuildingCreateShop.isDebugRequests()) {
+            if (DebugLog.enabled()) {
               com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                   "[CreateShop] resolver ownership drift detected: switching {} -> {}",
                   selected.getId(),
@@ -197,7 +198,7 @@ final class ShopResolverHealthCheck {
     CreateShopRequestResolver ownershipSelected = findResolverFromRequestOwnership(manager);
     if (ownershipSelected != null
         && (selected == null || !selected.getId().equals(ownershipSelected.getId()))) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver ownership priority switch {} -> {}",
             selected == null ? "<null>" : selected.getId(),
@@ -211,7 +212,7 @@ final class ShopResolverHealthCheck {
     if (current == null || !current.getId().equals(selected.getId())) {
       shop.setResolverState(
           selected, shop.getDeliveryResolverToken(), shop.getPickupResolverToken());
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] resolver synced to registered token {} (previous={})",
             selected.getId(),

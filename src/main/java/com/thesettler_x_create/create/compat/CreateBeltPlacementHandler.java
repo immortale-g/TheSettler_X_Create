@@ -9,6 +9,7 @@ import com.minecolonies.api.colony.IColonyManager;
 import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.kinetics.belt.BeltPart;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -216,7 +217,7 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
       }
     }
     clearBuffers(key);
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateCompat] placed belt run controller={} length={}", key.controllerPos(), length);
     }

@@ -16,11 +16,9 @@ import org.junit.jupiter.api.Test;
  * Unlike this project's usual source-text GuardTests, these actually run the StreamCodec against a
  * live buffer - possible here because BlockPos/String/boolean/int/ ResourceLocation all resolve
  * through {@link RegistryAccess#EMPTY} with no live-game bootstrap. {@code
- * CreateShopTestRequestPayload} and {@code CreateShopBatchRequestPayload} carry an ItemStack, whose
- * STREAM_CODEC throws outside a bootstrapped game instance (verified: both fail with
- * ExceptionInInitializerError under this test runner) - those two are covered by
- * ItemStackNetworkPayloadGuardTest instead, following the project's established GuardTest
- * convention for exactly this reason.
+ * CreateShopBatchRequestPayload} carries item stacks, whose STREAM_CODEC throws outside a
+ * bootstrapped game instance (ExceptionInInitializerError under the plain test runner); it is
+ * covered by ItemStackNetworkPayloadGuardTest instead.
  */
 class NetworkPayloadRoundTripTest {
 

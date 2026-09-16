@@ -1,6 +1,7 @@
 package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.util.InventoryUtils;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -29,7 +30,7 @@ final class ShopLostPackageHandoverProcessor {
       String requesterName,
       String address,
       long requestedAt) {
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover requested player={} item={} remaining={} requester='{}' address='{}'",
           player == null ? "<null>" : player.getName().getString(),
@@ -39,7 +40,7 @@ final class ShopLostPackageHandoverProcessor {
           address);
     }
     if (player == null || stackKey == null || stackKey.isEmpty()) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover rejected: invalid input");
       }
@@ -48,7 +49,7 @@ final class ShopLostPackageHandoverProcessor {
     TileEntityCreateShop tile = shop.getCreateShopTileEntity();
     CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
     if (tile == null || pickup == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover rejected: tilePresent={} pickupPresent={}",
             tile != null,
@@ -60,7 +61,7 @@ final class ShopLostPackageHandoverProcessor {
     shop.ensureRackContainers();
     int targetAmount = Math.max(1, remaining);
     int inflightBefore = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover precheck inventorySlots={} target={} inflightBefore={} requester='{}' address='{}'",
           inventory.getContainerSize(),
@@ -83,7 +84,7 @@ final class ShopLostPackageHandoverProcessor {
         scannedPackages++;
       }
       int matching = ShopPackageContentMatcher.countMatchingInPackage(candidate, stackKey);
-      if (BuildingCreateShop.isDebugRequests() && candidate != null && !candidate.isEmpty()) {
+      if (DebugLog.enabled() && candidate != null && !candidate.isEmpty()) {
         if (isPackage || matching > 0) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover scan slot={} stack={} isPackage={} matchingCount={}",
@@ -98,7 +99,7 @@ final class ShopLostPackageHandoverProcessor {
       }
       matchedPackages++;
       List<ItemStack> previewUnpacked = ShopPackageContentMatcher.unpackPackage(candidate);
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} previewUnpackedStacks={} matching={}",
             slot,
@@ -106,7 +107,7 @@ final class ShopLostPackageHandoverProcessor {
             matching);
       }
       if (previewUnpacked.isEmpty()) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} skip: preview unpack empty", slot);
         }
@@ -117,7 +118,7 @@ final class ShopLostPackageHandoverProcessor {
       int consumeTarget =
           Math.min(targetAmount - totalConsumed, Math.max(0, previewInsertedMatching));
       if (consumeTarget <= 0) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} skip: preview accepted no matching items",
               slot);
@@ -128,7 +129,7 @@ final class ShopLostPackageHandoverProcessor {
           pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
       int looseRemaining = pickup.getInflightRemaining(stackKey, "", "");
       if (strictRemaining < consumeTarget && looseRemaining < consumeTarget) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} skip: no inflight remainder for consumeTarget={} strictRemaining={} looseRemaining={}",
               slot,
@@ -140,7 +141,7 @@ final class ShopLostPackageHandoverProcessor {
       }
       ItemStack removedPackage = inventory.removeItem(slot, 1);
       if (removedPackage.isEmpty()) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} failed: package remove returned empty",
               slot);
@@ -157,19 +158,19 @@ final class ShopLostPackageHandoverProcessor {
           }
         }
       }
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} unpackedStacks={}", slot, unpacked.size());
       }
       if (unpacked.isEmpty()) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package handover slot={} skipped: package unpacked empty", slot);
         }
         continue;
       }
       List<ItemStack> leftovers = tile.insertIntoRacksOnly(unpacked);
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover slot={} insertedStacks={} leftoverStacks={}",
             slot,
@@ -196,7 +197,7 @@ final class ShopLostPackageHandoverProcessor {
       int consumed =
           pickup.consumeInflight(stackKey, consumeTarget, requesterName, address, requestedAt);
       totalConsumed += Math.max(0, consumed);
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package handover requester={} item={} inserted={} consumedOld={} totalConsumed={} target={}",
             requesterName,
@@ -223,7 +224,7 @@ final class ShopLostPackageHandoverProcessor {
       }
     }
     int inflightAfter = pickup.getInflightRemaining(stackKey, requesterName, address, requestedAt);
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover summary scannedPackages={} matchedPackages={} removedPackages={} insertedMatchingTotal={} consumedTotal={} target={} inflightBefore={} inflightAfter={}",
           scannedPackages,
@@ -238,7 +239,7 @@ final class ShopLostPackageHandoverProcessor {
     if (totalConsumed > 0) {
       return totalConsumed;
     }
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package handover failed: no matching package found in player inventory or no inflight consumed (insertedMatchingTotal={})",
           totalInsertedMatching);

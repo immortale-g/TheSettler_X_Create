@@ -2,7 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +37,7 @@ final class CreateShopPendingTokenCollectorService {
     if (!assignedByOwner.isEmpty()) {
       int before = assigned.size();
       assigned.addAll(assignedByOwner);
-      if (Config.DEBUG_LOGGING.getAsBoolean()
+      if (DebugLog.enabled()
           && tickPendingTelemetryService.shouldLogTickPending(level)
           && (before == 0 || assignedByOwner.size() > before)) {
         TheSettlerXCreate.LOGGER.info(
@@ -52,8 +52,7 @@ final class CreateShopPendingTokenCollectorService {
           ownership.collectAssignedTokensFromLocalResolvers(standardManager, assignments);
       if (!recovered.isEmpty()) {
         assigned.addAll(recovered);
-        if (Config.DEBUG_LOGGING.getAsBoolean()
-            && tickPendingTelemetryService.shouldLogTickPending(level)) {
+        if (DebugLog.enabled() && tickPendingTelemetryService.shouldLogTickPending(level)) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending assignment drift recovered: resolverId={} recoveredAssignments={}",
               resolver.getResolverToken(),
@@ -61,7 +60,7 @@ final class CreateShopPendingTokenCollectorService {
         }
       }
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean() && assigned.isEmpty()) {
+    if (DebugLog.enabled() && assigned.isEmpty()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending no assignments for resolverId={} assignmentsKeys={}",
           resolver.getResolverToken(),
@@ -71,8 +70,7 @@ final class CreateShopPendingTokenCollectorService {
     pendingTokens.addAll(assigned);
     pendingTokens.addAll(resolver.getPendingTracker().getTokens());
     if (pendingTokens.isEmpty()) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()
-          && tickPendingTelemetryService.shouldLogTickPending(level)) {
+      if (DebugLog.enabled() && tickPendingTelemetryService.shouldLogTickPending(level)) {
         if (resolver.getPendingTracker().hasEntries()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: empty snapshot but maps ordered={} pendingCounts={}",
@@ -80,8 +78,7 @@ final class CreateShopPendingTokenCollectorService {
               resolver.getPendingTracker().size());
         }
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean()
-          && tickPendingTelemetryService.shouldLogTickPending(level)) {
+      if (DebugLog.enabled() && tickPendingTelemetryService.shouldLogTickPending(level)) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: no assigned or ordered requests for resolver {}",
             resolver.getResolverToken());

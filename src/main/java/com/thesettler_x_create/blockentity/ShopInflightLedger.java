@@ -1,6 +1,7 @@
 package com.thesettler_x_create.blockentity;
 
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TextUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.stock.InflightBook;
@@ -324,7 +325,7 @@ class ShopInflightLedger {
   }
 
   private boolean shouldLogOverdue(long now) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean() || now == 0L) {
+    if (!DebugLog.enabled() || now == 0L) {
       return false;
     }
     return now - lastInflightLogTime >= Config.INFLIGHT_LOG_COOLDOWN.getAsLong();

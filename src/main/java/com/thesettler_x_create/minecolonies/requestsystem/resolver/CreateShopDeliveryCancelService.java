@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -65,7 +66,7 @@ final class CreateShopDeliveryCancelService {
       requestStateMutatorService.markOrderedWithPendingAtLeastOne(
           resolver, level, parentToken, fallbackPending);
       diagnostics.recordPendingSource(parentToken, "delivery-cancel-missing-pickup");
-      if (resolver.isDebugLoggingEnabled()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery cancelled {} -> parent={} pendingCount={} (pickup missing, fallback requeue)",
             request.getId(),
@@ -89,7 +90,7 @@ final class CreateShopDeliveryCancelService {
         resolver, level, parentToken, pendingCount);
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
 
-    if (resolver.isDebugLoggingEnabled()) {
+    if (DebugLog.enabled()) {
       int reservedForStack = pickup.getReservedFor(stack);
       BlockPos pickupPosition = pickup.getBlockPos();
       deliveryManager.logDeliveryDiagnostics(

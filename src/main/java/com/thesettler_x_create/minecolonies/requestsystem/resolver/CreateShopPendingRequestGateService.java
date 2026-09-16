@@ -4,9 +4,10 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
+import com.minecolonies.api.colony.requestsystem.resolver.retrying.IRetryingRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 
@@ -40,7 +41,7 @@ final class CreateShopPendingRequestGateService {
         boolean reassigned = tryReassignFromRetryingOwner(standardManager, request);
         diagnostics.logPendingReasonChange(
             request.getId(), "skip:ownership-handoff-active-delivery");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: "
                   + request.getId()
@@ -71,9 +72,9 @@ final class CreateShopPendingRequestGateService {
             "",
             0,
             "com.thesettler_x_create.message.createshop.flow_cancelled");
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} skip (cancelled)", request.getId());
+              "[CreateShop] tickPending: {} skip (cancelled)", (IToken<?>) request.getId());
         }
         return true;
       }
@@ -90,9 +91,9 @@ final class CreateShopPendingRequestGateService {
           "",
           0,
           "com.thesettler_x_create.message.createshop.flow_cancelled");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tickPending: {} skip (state cancelled)", request.getId());
+            "[CreateShop] tickPending: {} skip (state cancelled)", (IToken<?>) request.getId());
       }
       return true;
     }
@@ -114,8 +115,7 @@ final class CreateShopPendingRequestGateService {
     } catch (Exception ignored) {
       return false;
     }
-    if (owner == null
-        || !"StandardRetryingRequestResolver".equals(owner.getClass().getSimpleName())) {
+    if (!(owner instanceof IRetryingRequestResolver)) {
       return false;
     }
     IToken<?> ownerToken;

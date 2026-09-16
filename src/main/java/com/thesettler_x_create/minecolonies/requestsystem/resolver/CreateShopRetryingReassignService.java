@@ -2,9 +2,10 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.resolver.retrying.IRetryingRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.Map;
 import net.minecraft.world.level.Level;
@@ -42,8 +43,7 @@ final class CreateShopRetryingReassignService {
       } catch (Exception ignored) {
         continue;
       }
-      if (ownerResolver == null
-          || !"StandardRetryingRequestResolver".equals(ownerResolver.getClass().getSimpleName())) {
+      if (!(ownerResolver instanceof IRetryingRequestResolver)) {
         continue;
       }
       java.util.List<IToken<?>> tokenSnapshot = new java.util.ArrayList<>(tokens);
@@ -77,17 +77,15 @@ final class CreateShopRetryingReassignService {
         try {
           IToken<?> newResolver =
               manager.reassignRequest(requestToken, java.util.List.of(ownerToken));
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] retrying reassign token={} from={} to={} hold={}",
-                requestToken,
-                ownerToken,
-                newResolver,
-                deliveryWindowHold);
-          }
+          DebugLog.info(
+              "[CreateShop] retrying reassign token={} from={} to={} hold={}",
+              requestToken,
+              ownerToken,
+              newResolver,
+              deliveryWindowHold);
           return;
         } catch (Exception ex) {
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          if (DebugLog.enabled()) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] retrying reassign failed token={} from={} error={}",
                 requestToken,

@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import net.minecraft.network.chat.MutableComponent;
@@ -72,7 +72,7 @@ public final class SafeRequester implements IRequester {
 
   private void logCompatibilityCallbackError(
       final String action, final IRequest<?> request, final Exception ex) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     String token = request == null ? "<null>" : String.valueOf(request.getId());

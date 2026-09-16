@@ -3,7 +3,7 @@ package com.thesettler_x_create.blockentity;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 import com.simibubi.create.content.logistics.packager.PackagingRequest;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.init.ModBlockEntities;
@@ -29,7 +29,7 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     // instead of always crediting whichever panel happens to be first in iteration order.
     ItemStack deliveredItem = firstNonEmpty(CreatePackageBridge.readContents(box));
 
-    if (Config.DEBUG_LOGGING.getAsBoolean() && !simulate && level != null) {
+    if (DebugLog.enabled() && !simulate && level != null) {
       Direction facing =
           getBlockState().getOptionalValue(DirectionalBlock.FACING).orElse(Direction.UP);
       BlockPos target = getBlockPos().relative(facing.getOpposite());
@@ -51,7 +51,7 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
           deliveredItem);
     }
     boolean result = super.unwrapBox(box, simulate);
-    if (Config.DEBUG_LOGGING.getAsBoolean() && !simulate) {
+    if (DebugLog.enabled() && !simulate) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyPackager] unwrapBox pos={} result={} box={}",
           getBlockPos(),
@@ -84,7 +84,7 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
    */
   @Override
   public void attemptToSend(List<PackagingRequest> queuedRequests) {
-    if (Config.DEBUG_LOGGING.getAsBoolean() && level != null && !level.isClientSide()) {
+    if (DebugLog.enabled() && level != null && !level.isClientSide()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyPackager] attemptToSend suppressed pos={} (this packager never sends)",
           getBlockPos());

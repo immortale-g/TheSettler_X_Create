@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
@@ -49,10 +50,6 @@ public final class ModNetwork {
         SetCreateShopPermaWaitPayload.TYPE,
         SetCreateShopPermaWaitPayload.STREAM_CODEC,
         ModNetwork::handleSetPermaWait);
-    registrar.playToServer(
-        CreateShopTestRequestPayload.TYPE,
-        CreateShopTestRequestPayload.STREAM_CODEC,
-        ModNetwork::handleTestRequest);
     registrar.playToServer(
         CreateShopBatchRequestPayload.TYPE,
         CreateShopBatchRequestPayload.STREAM_CODEC,
@@ -108,39 +105,6 @@ public final class ModNetwork {
             return;
           }
           building.setPermaWaitFullStack(payload.enabled());
-        });
-  }
-
-  private static void handleTestRequest(
-      CreateShopTestRequestPayload payload, IPayloadContext context) {
-    context.enqueueWork(
-        () -> {
-          TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null) {
-            return;
-          }
-
-          UUID networkId = shop.getStockNetworkId();
-          if (networkId == null) {
-            return;
-          }
-
-          if (payload.stack().isEmpty()) {
-            return;
-          }
-
-          int amount = Math.max(1, payload.amount());
-          BigItemStack request = new BigItemStack(payload.stack().copy(), amount);
-          CreateLogisticsBridge.Outcome outcome =
-              CreateLogisticsBridge.broadcastPackageRequest(
-                  networkId, List.of(request), shop.getShopAddress());
-          if (!outcome.dispatched()) {
-            TheSettlerXCreate.LOGGER.warn(
-                "[CreateShop] test request not dispatched ({}) network={} address='{}'",
-                outcome,
-                networkId,
-                shop.getShopAddress());
-          }
         });
   }
 
@@ -226,7 +190,7 @@ public final class ModNetwork {
       ColonyGaugeConfigPacket payload, IPayloadContext context) {
     context.enqueueWork(
         () -> {
-          boolean debug = com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean();
+          boolean debug = DebugLog.enabled();
           if (!(context.player() instanceof ServerPlayer player)) {
             if (debug) {
               TheSettlerXCreate.LOGGER.info(

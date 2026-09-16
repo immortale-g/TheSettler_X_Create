@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import net.minecraft.world.level.Level;
 
@@ -23,7 +24,7 @@ final class CreateShopResolverCooldown {
 
   void markRequestOrdered(Level level, IToken<?> token) {
     resolver.getPendingTracker().setCooldown(level, token, Config.ORDER_TTL_TICKS.getAsLong());
-    if (isDebugLoggingEnabled()) {
+    if (DebugLog.enabled()) {
       resolver.getPendingTracker().setReason(token, "markRequestOrdered");
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] markRequestOrdered token={} resolver={} until={}",
@@ -37,7 +38,7 @@ final class CreateShopResolverCooldown {
 
   void clearRequestCooldown(IToken<?> token) {
     resolver.getPendingTracker().clearCooldown(token);
-    if (isDebugLoggingEnabled() && token != null) {
+    if (DebugLog.enabled() && token != null) {
       String source = resolver.getPendingTracker().getReason(token);
       if (source != null) {
         resolver.getPendingTracker().setReason(token, null);
@@ -59,14 +60,6 @@ final class CreateShopResolverCooldown {
 
   int getOrderedCount() {
     return resolver.getPendingTracker().size();
-  }
-
-  private static boolean isDebugLoggingEnabled() {
-    try {
-      return Config.DEBUG_LOGGING.getAsBoolean();
-    } catch (IllegalStateException ignored) {
-      return false;
-    }
   }
 
   private static String resolveClearCooldownCaller() {

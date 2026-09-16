@@ -11,6 +11,7 @@ import com.minecolonies.api.util.BlockPosUtil;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.stock.PickupTracker;
@@ -224,7 +225,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
       @NotNull IRequestManager manager, @NotNull IRequest<? extends IDeliverable> request) {
     // Avoid AbstractWarehouseRequestResolver followup logic (casts to TileEntityWareHouse).
     // Keep MineColonies delivery-resolver behavior: no explicit followup requests here.
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       int size = 0;
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] followup completion request={} state={} children={} followups={}",
@@ -405,14 +406,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   String tryDescribeResolver(Object resolver) {
     return resolver == null ? "<none>" : resolver.getClass().getSimpleName();
-  }
-
-  private static boolean isDebugLoggingEnabledSafe() {
-    try {
-      return Config.DEBUG_LOGGING.getAsBoolean();
-    } catch (IllegalStateException ignored) {
-      return false;
-    }
   }
 
   static boolean isTerminalRequestState(RequestState state) {
@@ -601,10 +594,6 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
 
   Long getParentChildRecheckDueTick(IToken<?> parentToken) {
     return recheck.getParentChildRecheckDueTick(parentToken);
-  }
-
-  boolean isDebugLoggingEnabled() {
-    return isDebugLoggingEnabledSafe();
   }
 
   Long getRetryingReassignAttempt(IToken<?> token) {

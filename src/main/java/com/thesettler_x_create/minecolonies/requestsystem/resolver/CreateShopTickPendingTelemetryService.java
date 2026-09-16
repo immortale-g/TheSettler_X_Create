@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.List;
 import java.util.Set;
@@ -51,7 +52,7 @@ final class CreateShopTickPendingTelemetryService {
 
   void recordAndMaybeLogPerf(Level level, long tickPendingNanos) {
     lastTickPendingNanos = tickPendingNanos;
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     if (level == null) {

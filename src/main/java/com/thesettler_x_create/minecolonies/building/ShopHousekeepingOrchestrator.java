@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Deliver
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -109,7 +110,7 @@ final class ShopHousekeepingOrchestrator {
           }
           return true;
         } catch (Exception ex) {
-          if (BuildingCreateShop.isDebugRequests()) {
+          if (DebugLog.enabled()) {
             com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] housekeeping delivery-child check failed token={} error={}",
                 token,
@@ -157,7 +158,7 @@ final class ShopHousekeepingOrchestrator {
       return;
     }
     if (!isHousekeepingAllowed(colony, pickup)) {
-      if (BuildingCreateShop.isDebugRequests() && shouldLogDebug(now)) {
+      if (DebugLog.enabled() && shouldLogDebug(now)) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] housekeeping pickup blocked reason={} pendingUnreserved={}",
             shop.describeHousekeepingBlockReason(),
@@ -171,7 +172,7 @@ final class ShopHousekeepingOrchestrator {
       int pickupPriority = shop.getPickUpPriority();
       if (pickupPriority > 0) {
         boolean pickupRequested = shop.createNativeHutPickupRequest(pickupPriority);
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] housekeeping pickup request priority={} created={} hutHasItems={}",
               pickupPriority,

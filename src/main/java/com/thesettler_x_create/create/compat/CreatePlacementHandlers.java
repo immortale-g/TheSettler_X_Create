@@ -1,7 +1,7 @@
 package com.thesettler_x_create.create.compat;
 
 import com.ldtteam.structurize.placement.handlers.placement.PlacementHandlers;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.Map;
 import net.minecraft.resources.ResourceLocation;
@@ -27,7 +27,7 @@ public final class CreatePlacementHandlers {
     PlacementHandlers.add(new CompositeBlockItemRemapHandler(compositeBlockRequiredItems));
     PlacementHandlers.add(new CreateBeltPlacementHandler());
 
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateCompat] registered Structurize placement handlers for {} composite Create blocks + belts",
           compositeBlockRequiredItems.size());

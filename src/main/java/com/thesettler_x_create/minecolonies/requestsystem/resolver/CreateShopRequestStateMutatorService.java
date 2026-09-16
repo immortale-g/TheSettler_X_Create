@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import net.minecraft.world.level.Level;
 
@@ -145,13 +146,11 @@ final class CreateShopRequestStateMutatorService {
     clearMissingChild(resolver, childToken);
     resolver.clearRootCauseTracking(childToken);
     int deadCourierTokens = reportDeadCourierTaskTokens(manager, childToken, source);
-    if (resolver.isDebugLoggingEnabled()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] vanished child forgotten source={} child={} deadCourierTokens={}",
-          source,
-          childToken,
-          deadCourierTokens);
-    }
+    DebugLog.info(
+        "[CreateShop] vanished child forgotten source={} child={} deadCourierTokens={}",
+        source,
+        childToken,
+        deadCourierTokens);
   }
 
   private int reportDeadCourierTaskTokens(

@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.requestsystem.request.RequestState;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -54,12 +54,10 @@ final class CreateShopChildReconciliationService {
         if (!seenChildren.add(childToken)) {
           request.removeChild(childToken);
           duplicateChildrenRemoved++;
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] tickPending: {} child {} duplicate -> removed",
-                requestIdLog,
-                childToken);
-          }
+          DebugLog.info(
+              "[CreateShop] tickPending: {} child {} duplicate -> removed",
+              requestIdLog,
+              childToken);
           continue;
         }
         try {
@@ -71,12 +69,10 @@ final class CreateShopChildReconciliationService {
                 level, request.getId(), childToken, "poll-missing", "handler lookup returned null");
             hasActiveChildren = true;
             missing++;
-            if (Config.DEBUG_LOGGING.getAsBoolean()) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[CreateShop] tickPending: {} child {} missing -> hold (no drop without terminal proof)",
-                  requestIdLog,
-                  childToken);
-            }
+            DebugLog.info(
+                "[CreateShop] tickPending: {} child {} missing -> hold (no drop without terminal proof)",
+                requestIdLog,
+                childToken);
             if (tryImmediateMissingAfterPickupRecovery(
                 resolver, standardManager, level, request, childToken, requestIdLog)) {
               recoveredParent = true;
@@ -100,12 +96,10 @@ final class CreateShopChildReconciliationService {
             }
             if (!CreateShopDeliveryOriginMatcher.isLocalShopDeliveryChild(child, shop, pickup)) {
               hasActiveChildren = true;
-              if (Config.DEBUG_LOGGING.getAsBoolean()) {
-                TheSettlerXCreate.LOGGER.info(
-                    "[CreateShop] tickPending: {} child {} skip (non-local delivery child)",
-                    requestIdLog,
-                    childToken);
-              }
+              DebugLog.info(
+                  "[CreateShop] tickPending: {} child {} skip (non-local delivery child)",
+                  requestIdLog,
+                  childToken);
               continue;
             }
             IToken<?> childAssigned = assignmentLookup.apply(childToken);
@@ -117,7 +111,7 @@ final class CreateShopChildReconciliationService {
                   // Best-effort kick so native delivery resolver can pick up CREATED children.
                 }
                 childAssigned = assignmentLookup.apply(childToken);
-                if (Config.DEBUG_LOGGING.getAsBoolean()) {
+                if (DebugLog.enabled()) {
                   TheSettlerXCreate.LOGGER.info(
                       "[CreateShop] tickPending: {} child {} CREATED assignKick={}",
                       requestIdLog,
@@ -129,7 +123,7 @@ final class CreateShopChildReconciliationService {
             if (childAssigned == null) {
               boolean assigned = deliveryManager.assignDeliveryRequest(standardManager, childToken);
               boolean queued = deliveryManager.isQueuedInWarehouse(standardManager, childToken);
-              if (Config.DEBUG_LOGGING.getAsBoolean()) {
+              if (DebugLog.enabled()) {
                 TheSettlerXCreate.LOGGER.info(
                     "[CreateShop] tickPending: {} child {} unassigned delivery -> assign={} queue={}",
                     requestIdLog,
@@ -148,7 +142,7 @@ final class CreateShopChildReconciliationService {
                 resolver, standardManager, level, request, child, childToken, childAssigned);
             hasActiveChildren = true;
           }
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          if (DebugLog.enabled()) {
             String childType = child.getRequest().getClass().getName();
             String childState = child.getState().toString();
             TheSettlerXCreate.LOGGER.info(
@@ -169,7 +163,7 @@ final class CreateShopChildReconciliationService {
               ex.getMessage() == null ? "<null>" : ex.getMessage());
           hasActiveChildren = true;
           missing++;
-          if (Config.DEBUG_LOGGING.getAsBoolean()) {
+          if (DebugLog.enabled()) {
             TheSettlerXCreate.LOGGER.info(
                 "[CreateShop] tickPending: {} child {} lookup failed -> hold (no drop): {}",
                 requestIdLog,
@@ -251,13 +245,11 @@ final class CreateShopChildReconciliationService {
       UUID parentRequestId = CreateShopRequestResolver.toRequestId(parentRequest.getId());
       int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
       if (reservedForRequest > 0) {
-        if (resolver.isDebugLoggingEnabled()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] tickPending: {} missing child {} held by reservation={} -> no orphan recovery",
-              requestIdLog,
-              childToken,
-              reservedForRequest);
-        }
+        DebugLog.info(
+            "[CreateShop] tickPending: {} missing child {} held by reservation={} -> no orphan recovery",
+            requestIdLog,
+            childToken,
+            reservedForRequest);
         return false;
       }
     }
@@ -272,7 +264,7 @@ final class CreateShopChildReconciliationService {
             .getResolverCallbackService()
             .finishIfDelivered(
                 resolver, standardManager, parentRequest, "immediate-missing-after-pickup");
-    if (resolver.isDebugLoggingEnabled()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: {} immediate recovery (missing+pickupConfirmed) parent={} child={} finished={}",
           requestIdLog,

@@ -30,6 +30,20 @@ class ShopStockAccountingTest {
   }
 
   @Test
+  void canCloseShortOnlyWithTheMinimumAndNothingMoreToCome() {
+    assertTrue(ShopStockAccounting.canCloseShort(20, 1, 0, 0, false));
+    assertTrue(ShopStockAccounting.canCloseShort(32, 32, 0, 0, false));
+    // Below the minimum the requester does not accept it yet.
+    assertFalse(ShopStockAccounting.canCloseShort(16, 32, 0, 0, false));
+    // Nothing delivered is never a finished request.
+    assertFalse(ShopStockAccounting.canCloseShort(0, 0, 0, 0, false));
+    // Anything still reserved, in the racks or on its way can still be delivered.
+    assertFalse(ShopStockAccounting.canCloseShort(20, 1, 8, 0, false));
+    assertFalse(ShopStockAccounting.canCloseShort(20, 1, 0, 8, false));
+    assertFalse(ShopStockAccounting.canCloseShort(20, 1, 0, 0, true));
+  }
+
+  @Test
   void canCoverAcceptsTheFullNeedOrTheRequestersMinimum() {
     assertTrue(ShopStockAccounting.canCover(256, 256, 256));
     assertTrue(ShopStockAccounting.canCover(100, 256, 64));

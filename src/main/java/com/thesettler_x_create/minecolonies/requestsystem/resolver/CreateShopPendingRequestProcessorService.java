@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -79,7 +79,7 @@ final class CreateShopPendingRequestProcessorService {
       requestStateMutatorService.clearPendingTokenState(
           resolver, standardManager, request.getId(), true);
       diagnostics.logPendingReasonChange(request.getId(), "skip:terminal-state");
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (terminal state={})",
             request.getId(),
@@ -110,7 +110,7 @@ final class CreateShopPendingRequestProcessorService {
               shop,
               pickup,
               requestIdLog);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} skip (has children)", requestIdLog);
         diagnostics.logParentChildrenState(standardManager, request.getId(), "tickPending");
@@ -161,7 +161,7 @@ final class CreateShopPendingRequestProcessorService {
       Long lastDropLog = resolver.getParentChildDropLastLogTick(request.getId());
       if (lastDropLog == null || now - lastDropLog >= 100L) {
         requestStateMutatorService.markParentChildDropLog(resolver, request.getId(), now);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           String previousChildren = resolver.getParentLastKnownChildren(request.getId());
           if (previousChildren == null) {
             previousChildren = "[]";
@@ -182,7 +182,7 @@ final class CreateShopPendingRequestProcessorService {
     // No delivery child is open here. Closing the parent is MineColonies' call via resolveRequest
     // once the last child completes, so this tick only orders and delivers what is still missing.
 
-    if (!onCooldown && Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!onCooldown && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] tickPending: {} proceed (cooldown cleared, reservedForRequest={})",
           requestIdLog,
@@ -228,19 +228,35 @@ final class CreateShopPendingRequestProcessorService {
               rackAvailable,
               ShopStockAccounting.reservedForOthers(reservedForDeliverable, reservedForRequest));
     }
-    pendingTopupService.handleTopup(
-        resolver,
-        manager,
-        request,
-        level,
-        tile,
-        pickup,
-        deliverable,
-        workerWorking,
-        pendingCount,
-        reservedForRequest,
-        rackAvailableForRequest,
-        requestIdLog);
+    boolean nothingMoreToGet =
+        pendingTopupService.handleTopup(
+            resolver,
+            manager,
+            request,
+            level,
+            tile,
+            pickup,
+            deliverable,
+            workerWorking,
+            pendingCount,
+            reservedForRequest,
+            rackAvailableForRequest,
+            requestIdLog);
+    // The Create network is empty for this request and nothing is on its way. A request that got
+    // its minimum count is done, as it would be with a warehouse; otherwise it would block every
+    // other resolver.
+    if (nothingMoreToGet
+        && resolver
+            .getResolverCallbackService()
+            .finishShortOfCount(
+                resolver,
+                manager,
+                request,
+                reservedForRequest,
+                rackAvailableForRequest,
+                "tickPending:network-exhausted")) {
+      return;
+    }
     var creationResult =
         pendingDeliveryCreationService.process(
             manager,

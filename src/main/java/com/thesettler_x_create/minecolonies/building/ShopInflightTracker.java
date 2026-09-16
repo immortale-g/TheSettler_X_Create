@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.building;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.job.JobCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -59,7 +60,7 @@ final class ShopInflightTracker {
           pickup.reserve(arrival.owner(), arrival.key(), reserved);
         }
       }
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] inflight arrival item={} amount={} owner={} reserved={}",
             arrival.key().getHoverName().getString(),
@@ -92,7 +93,7 @@ final class ShopInflightTracker {
     }
     for (InflightBook.StoredEntry<ItemStack> expired :
         pickup.expireFreeInflight(now, Config.INFLIGHT_TIMEOUT_TICKS.getAsLong())) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] inflight dropped unowned overdue order item={} remaining={} age={}",
             expired.key().getHoverName().getString(),
@@ -104,7 +105,7 @@ final class ShopInflightTracker {
       return;
     }
     if (shop.hasActiveLocalDeliveryChildrenForInflight(colony)) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction skipped: local delivery still active");
       }
@@ -125,7 +126,7 @@ final class ShopInflightTracker {
     }
     ICitizenData citizen = getShopkeeperCitizen();
     if (citizen == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction skipped: no shopkeeper citizen found");
       }
@@ -135,7 +136,7 @@ final class ShopInflightTracker {
       if (notice == null || notice.stackKey == null || notice.stackKey.isEmpty()) {
         continue;
       }
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction trigger item={} remaining={} age={} requester='{}' address='{}'",
             notice.stackKey.getHoverName().getString(),
@@ -153,7 +154,7 @@ final class ShopInflightTracker {
               notice.requestedAt,
               shop.getLostPackageInteractionEpoch(),
               notice.requestUuid);
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction trigger dispatch citizen={} interactionId={}",
             citizen.getName(),

@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Every call site that places a Create stock-network package request used to build its own {@code
  * PackageOrderWithCrafts} and call {@code LogisticsManager.broadcastPackageRequest} directly - the
- * same few lines duplicated once in {@link CreateNetworkFacade} and twice in {@code ModNetwork}
- * (test- and batch-request handlers). That is now consolidated behind {@link
+ * same few lines duplicated once in {@link CreateNetworkFacade} and in {@code ModNetwork}'s
+ * batch-request handler. That is now consolidated behind {@link
  * CreateLogisticsBridge#broadcastPackageRequest}, so a future Create-addon compatibility shim (e.g.
  * for mixins that change the request shape) only has to patch one place.
  */
@@ -29,14 +29,14 @@ class CreateLogisticsBridgeConsolidationGuardTest {
   }
 
   @Test
-  void modNetworkTestAndBatchHandlersRouteThroughTheSharedBridge() throws Exception {
+  void modNetworkBatchHandlerRoutesThroughTheSharedBridge() throws Exception {
     String source =
         Files.readString(Path.of("src/main/java/com/thesettler_x_create/network/ModNetwork.java"));
 
     int bridgeCalls = countOccurrences(source, "CreateLogisticsBridge.broadcastPackageRequest(");
     assertTrue(
-        bridgeCalls == 2,
-        "expected handleTestRequest and handleBatchRequest to both route through the bridge, found "
+        bridgeCalls == 1,
+        "expected handleBatchRequest to route through the bridge, found "
             + bridgeCalls
             + " call(s)");
     assertFalse(source.contains("LogisticsManager.broadcastPackageRequest("));

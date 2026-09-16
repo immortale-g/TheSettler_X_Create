@@ -9,6 +9,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.PickupRequestResolver;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 
@@ -62,7 +63,7 @@ final class ShopResolverFactory {
 
     shop.setResolverState(shopResolver, null, null);
 
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] createResolvers at {} -> {}",
           shop.getLocation().getInDimensionLocation(),

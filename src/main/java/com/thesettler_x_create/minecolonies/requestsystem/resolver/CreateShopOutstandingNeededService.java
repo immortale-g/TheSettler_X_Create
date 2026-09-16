@@ -39,6 +39,14 @@ final class CreateShopOutstandingNeededService {
     return Math.max(0, needed - Math.max(0, reservedForRequest));
   }
 
+  /** What MineColonies recorded as delivered for the request, matching items only. */
+  int delivered(IRequest<?> request, IDeliverable deliverable) {
+    if (request == null || deliverable == null) {
+      return 0;
+    }
+    return countAlreadyDelivered(request, deliverable);
+  }
+
   /**
    * Sums what MineColonies already recorded as delivered for this request. Every delivery child we
    * create adds its stack via {@code IRequest#addDelivery}, and MineColonies resets that list when

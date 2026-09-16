@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Deliver
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
 import java.util.LinkedHashSet;
@@ -82,7 +83,7 @@ final class ShopLostPackageRequestCanceller {
           cancelled++;
           continue;
         }
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package cancel request failed token={} error={}",
               token,
@@ -94,13 +95,13 @@ final class ShopLostPackageRequestCanceller {
       try {
         standard.updateRequestState(fallbackTupleCandidate.getId(), RequestState.CANCELLED);
         cancelled++;
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package cancel fallback matched root token={} (address-match unavailable)",
-              fallbackTupleCandidate.getId());
+              (IToken<?>) fallbackTupleCandidate.getId());
         }
       } catch (Exception ex) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package cancel fallback failed token={} error={}",
               fallbackTupleCandidate.getId(),
@@ -129,7 +130,7 @@ final class ShopLostPackageRequestCanceller {
     }
     try {
       standard.getRequestHandler().cleanRequestData(token);
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package cancel force-clean token={} reason={}", token, message);
       }

@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 
 /**
@@ -27,7 +28,7 @@ final class CreateShopResolverDiagnostics {
 
   void logParentChildrenState(
       IStandardRequestManager manager, IToken<?> parentToken, String phase) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     var handler = manager.getRequestHandler();
@@ -57,7 +58,7 @@ final class CreateShopResolverDiagnostics {
   }
 
   void logRequestStateChange(IStandardRequestManager manager, IToken<?> token, String phase) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     try {
@@ -89,7 +90,7 @@ final class CreateShopResolverDiagnostics {
   }
 
   void logPendingReasonChange(IToken<?> token, String reason) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     String previous = pendingReasonSnapshots.put(token, reason);
@@ -104,7 +105,7 @@ final class CreateShopResolverDiagnostics {
   }
 
   void recordPendingSource(IToken<?> token, String reason) {
-    if (!Config.DEBUG_LOGGING.getAsBoolean() || token == null || reason == null) {
+    if (!DebugLog.enabled() || token == null || reason == null) {
       return;
     }
     String previous = resolver.getPendingTracker().getReason(token);

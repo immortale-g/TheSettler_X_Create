@@ -5,6 +5,7 @@ import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
+import com.thesettler_x_create.DebugLog;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.List;
@@ -97,7 +98,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     this.requestedAt = requestedAt;
     this.interactionEpoch = interactionEpoch;
     this.requestUuid = requestUuid;
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction created debugId={} item={} remaining={} requester='{}' address='{}'",
           debugInstanceId,
@@ -110,7 +111,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
 
   @Override
   public void onServerResponseTriggered(int response, Player player, ICitizenData citizen) {
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction response debugId={} response={} active={} player={} citizen={} item={} remaining={} requester='{}' address='{}'",
           debugInstanceId,
@@ -124,7 +125,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
           address);
     }
     if (!active || player == null || citizen == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction ignored active={} playerNull={} citizenNull={}",
             active,
@@ -134,7 +135,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       return;
     }
     if (!(citizen.getWorkBuilding() instanceof BuildingCreateShop shop)) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction ignored: work building is not create shop");
       }
@@ -142,7 +143,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
     if (!isStillTracked(shop)) {
       active = false;
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction stale debugId={} item={} remaining={} requester='{}' address='{}' requestedAt={} epoch={} shopEpoch={}",
             debugInstanceId,
@@ -171,7 +172,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         if (remaining > 0) {
           deferReorderUnavailableInteraction(citizen);
         }
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
               "[CreateShop] lost-package interaction reorder unavailable debugId={} item={} remaining={}",
               debugInstanceId,
@@ -198,7 +199,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       handled = true;
       remaining = 0;
     }
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction handled={} response={} consumed={} remaining={}",
           handled,
@@ -224,7 +225,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         active = false;
       }
     }
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction isValid debugId={} active={} citizen={}",
           debugInstanceId,
@@ -314,7 +315,7 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     interactionEpoch = tag.contains(TAG_EPOCH) ? tag.getLong(TAG_EPOCH) : 0L;
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
     requestUuid = tag.hasUUID(TAG_REQUEST_UUID) ? tag.getUUID(TAG_REQUEST_UUID) : null;
-    if (BuildingCreateShop.isDebugRequests()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] lost-package interaction deserialize debugId={} item={} remaining={} requester='{}' address='{}' active={}",
           debugInstanceId,
@@ -407,14 +408,14 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
       if (removed > 0) {
         citizen.markDirty(0);
       }
-      if (removed > 0 && BuildingCreateShop.isDebugRequests()) {
+      if (removed > 0 && DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction immediate-remove debugId={} removed={}",
             debugInstanceId,
             removed);
       }
     } catch (Exception ex) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
             "[CreateShop] lost-package interaction immediate-remove failed debugId={} err={}",
             debugInstanceId,

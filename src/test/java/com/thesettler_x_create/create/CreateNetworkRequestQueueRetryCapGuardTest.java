@@ -27,11 +27,12 @@ class CreateNetworkRequestQueueRetryCapGuardTest {
     // asserted so neither can quietly disappear.
     assertTrue(body.contains("if (!shouldRetry(outcome, attempts)) {"));
     assertTrue(source.contains("attempts > MAX_RETRY_ATTEMPTS"));
-    // Must not be gated behind Config.DEBUG_LOGGING - that's exactly what made this invisible.
+    // Must not be gated behind debug logging - that's exactly what made this invisible.
     int giveUpLog = body.indexOf("LOGGER.warn(");
     String giveUpBlock = body.substring(Math.max(0, giveUpLog - 80), giveUpLog);
     assertTrue(giveUpLog > 0);
     assertTrue(!giveUpBlock.contains("DEBUG_LOGGING"));
+    assertTrue(!giveUpBlock.contains("DebugLog"));
   }
 
   @Test

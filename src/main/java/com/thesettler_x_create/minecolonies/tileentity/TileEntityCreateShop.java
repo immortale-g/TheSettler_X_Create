@@ -7,6 +7,7 @@ import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.minecolonies.api.tileentities.AbstractTileEntityWareHouse;
 import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.Tuple;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkPerfLogger;
 import com.thesettler_x_create.init.ModBlockEntities;
@@ -80,7 +81,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   public void setStockNetworkId(@Nullable UUID id) {
     stockNetworkId = id;
     setChanged();
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] Stock network set to {} at {}", id, worldPosition);
     }
@@ -450,7 +451,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       logHousekeepingDebug("skip:racks-empty");
       return 0;
     }
-    if (com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       int unreserved = 0;
       for (RackStackBudget budget : budgets) {
         if (budget != null) {
@@ -699,7 +700,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   private void logHousekeepingDebug(String message) {
-    if (!com.thesettler_x_create.Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (!DebugLog.enabled()) {
       return;
     }
     com.thesettler_x_create.TheSettlerXCreate.LOGGER.info("[CreateShop] housekeeping {}", message);

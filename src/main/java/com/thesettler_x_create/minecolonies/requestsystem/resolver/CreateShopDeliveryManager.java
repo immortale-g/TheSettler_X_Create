@@ -18,7 +18,7 @@ import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModul
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -73,7 +73,7 @@ final class CreateShopDeliveryManager {
     }
     BlockPos startPos = shop.getLocation().getInDimensionLocation();
     if (isSelfLoopDeliveryTarget(pickupLevel, startPos, targetLocation)) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] skip delivery create self-loop start={} target={} request={}",
             startPos,
@@ -86,7 +86,7 @@ final class CreateShopDeliveryManager {
         manager
             .getFactoryController()
             .getNewInstance(TypeConstants.ILOCATION, startPos, pickupLevel.dimension());
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       try {
         var targetPos = targetLocation.getInDimensionLocation();
         var pickupBlock = pickupLevel.getBlockState(startPos).getBlock();
@@ -143,7 +143,7 @@ final class CreateShopDeliveryManager {
     try {
       token = manager.createRequest(deliveryRequester, delivery);
     } catch (Exception ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery create failed requester={} parentRequester={} error={}",
             deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
@@ -174,14 +174,14 @@ final class CreateShopDeliveryManager {
       if (child != null) {
         child.setParent(request.getId());
       }
-      if (duplicateLinksRemoved > 0 && Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (duplicateLinksRemoved > 0 && DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery link dedupe parent={} child={} removedDuplicates={}",
             request.getId(),
             token,
             duplicateLinksRemoved);
       }
-      if (alreadyLinked && Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (alreadyLinked && DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery link exists parent={} child={} skipAddChild=true",
             request.getId(),
@@ -194,7 +194,7 @@ final class CreateShopDeliveryManager {
       } catch (Exception ignored) {
         // Best-effort rollback only.
       }
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery link failed parent={} child={} error={}",
             request.getId(),
@@ -205,7 +205,7 @@ final class CreateShopDeliveryManager {
     }
     request.addDelivery(selected.copy());
     resolver.getPendingTracker().markDeliveryStarted(request.getId());
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       String key = token.toString();
       if (resolver.markDeliveryCreateLogged(key)) {
         TheSettlerXCreate.LOGGER.info(
@@ -246,14 +246,14 @@ final class CreateShopDeliveryManager {
     }
     boolean assigned = assignDeliveryRequest(manager, token);
     boolean queued = isQueuedInWarehouse(manager, token);
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] delivery native dispatch token={} assign={} warehouseQueue={}",
           token,
           assigned ? "ok" : "none",
           queued ? "present" : "missing");
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (DebugLog.enabled()) {
       IDeliverable deliverable = request.getRequest() instanceof IDeliverable typed ? typed : null;
       int reservedForDeliverable =
           deliverable == null ? 0 : pickup.getReservedForDeliverable(deliverable);
@@ -306,7 +306,7 @@ final class CreateShopDeliveryManager {
       manager.assignRequest(token);
       return true;
     } catch (Exception ex) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] delivery assign immediate token={} result=failed error={}",
             token,
@@ -498,20 +498,15 @@ final class CreateShopDeliveryManager {
       }
       warehousesWithQueue++;
       if (queue.getMutableRequestList().contains(token)) {
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] delivery warehouse queue token={} queued=present", token);
-        }
+        DebugLog.info("[CreateShop] delivery warehouse queue token={} queued=present", token);
         return true;
       }
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery warehouse queue token={} queued=missing buildingsChecked={} withQueue={}",
-          token,
-          warehousesChecked,
-          warehousesWithQueue);
-    }
+    DebugLog.info(
+        "[CreateShop] delivery warehouse queue token={} queued=missing buildingsChecked={} withQueue={}",
+        token,
+        warehousesChecked,
+        warehousesWithQueue);
     return false;
   }
 
@@ -557,14 +552,12 @@ final class CreateShopDeliveryManager {
         availableCouriers++;
       }
     }
-    if (Config.DEBUG_LOGGING.getAsBoolean()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] delivery nudge couriers token={} warehousesWithToken={} checked={} availableCouriers={}",
-          token,
-          warehousesWithToken,
-          checked,
-          availableCouriers);
-    }
+    DebugLog.info(
+        "[CreateShop] delivery nudge couriers token={} warehousesWithToken={} checked={} availableCouriers={}",
+        token,
+        warehousesWithToken,
+        checked,
+        availableCouriers);
     return availableCouriers;
   }
 }

@@ -8,9 +8,13 @@ import com.thesettler_x_create.TheSettlerXCreate;
 
 /**
  * Prunes stale/terminal entries out of every building's warehouse request queue, and cancels the
- * still-active Create Shop-owned ones among them, as part of {@code reset_live_state}. Extracted
- * from {@link CreateShopResetCommands}, which still owns the drain-round orchestration and the
- * shared {@link CreateShopResetCommands#handleGraphException} classifier.
+ * still-active Create Shop-owned ones among them, as part of {@code reset_live_state}.
+ *
+ * <p>Active requests are cancelled through MineColonies, which cleans up couriers and queues
+ * itself. Removing dead or terminal tokens and leftover data of cancelled requests by hand is a
+ * deliberate exception: this is an admin repair command for state MineColonies left behind.
+ * Extracted from {@link CreateShopResetCommands}, which still owns the drain-round orchestration
+ * and the shared {@link CreateShopResetCommands#handleGraphException} classifier.
  */
 final class CreateShopWarehouseQueuePruner {
   private CreateShopWarehouseQueuePruner() {}
@@ -61,21 +65,15 @@ final class CreateShopWarehouseQueuePruner {
             if (!CreateShopCommandSupport.isCreateShopOwnedRequest(standard, queuedRequest)) {
               continue;
             }
+            // Cancelling through MineColonies removes the token from this queue and from the
+            // courier's task queue and drops the request data; doing either by hand afterwards
+            // only failed on the already removed request.
             try {
               standard.updateRequestState(queuedToken, RequestState.CANCELLED);
               result.queueRequestsCancelled++;
             } catch (Exception cancelEx) {
               CreateShopResetCommands.handleGraphException(
                   cancelEx, queuedToken, "reset_live_state queue active cancel", result);
-            }
-            liveQueue.remove(queuedToken);
-            result.queueEntriesCleared++;
-            try {
-              standard.getRequestHandler().cleanRequestData(queuedToken);
-              result.staleCleaned++;
-            } catch (Exception cleanEx) {
-              CreateShopResetCommands.handleGraphException(
-                  cleanEx, queuedToken, "reset_live_state queue active cleanup", result);
             }
             continue;
           }

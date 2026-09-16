@@ -8,6 +8,7 @@ import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop.GaugePackagingTask;
@@ -56,17 +57,13 @@ final class ShopGaugeQueue {
    */
   int requestForGauge(ItemStack item, int amount, String gaugeAddress) {
     if (item.isEmpty() || amount <= 0) {
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}",
-            item,
-            amount);
-      }
+      DebugLog.info(
+          "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}", item, amount);
       return 0;
     }
     int minLevel = Config.PERMA_MIN_BUILDING_LEVEL.get();
     if (owner.getBuildingLevel() < minLevel) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=building-level-too-low item={} level={} required={}",
             item.getItem(),
@@ -77,7 +74,7 @@ final class ShopGaugeQueue {
     }
     IColony colony = owner.getColony();
     if (colony == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=no-colony item={}", item.getItem());
       }
@@ -85,14 +82,14 @@ final class ShopGaugeQueue {
     }
     IRequester requester = owner.getRequester();
     if (requester == null) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=no-requester item={}", item.getItem());
       }
       return 0;
     }
     if (!owner.isWorkerWorking()) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=worker-not-working item={}", item.getItem());
       }
@@ -103,7 +100,7 @@ final class ShopGaugeQueue {
     // network (vanilla Create Factory Gauges already cover that case).
     int available = ShopWarehouseStockUtil.countInWarehouses(owner, item);
     if (available <= 0) {
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] requestForGauge skip reason=nothing-in-warehouse item={} requested={}",
             item.getItem(),
@@ -138,7 +135,7 @@ final class ShopGaugeQueue {
       if (pickup != null) {
         pickup.reserve(requestId, item.copy(), actualAmount);
       }
-      if (BuildingCreateShop.isDebugRequests()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] request created token={} item={} amount={} available={} address={} queued={}",
             token,
@@ -148,7 +145,7 @@ final class ShopGaugeQueue {
             gaugeAddress,
             !alreadyQueued);
       }
-    } else if (BuildingCreateShop.isDebugRequests()) {
+    } else if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[ColonyGauge] requestForGauge skip reason=createAndAssignRequest-returned-null item={} amount={}",
           item.getItem(),
@@ -189,7 +186,7 @@ final class ShopGaugeQueue {
         standard.updateRequestState(token, RequestState.CANCELLED);
         cancelled++;
       } catch (Exception ex) {
-        if (BuildingCreateShop.isDebugRequests()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[ColonyGauge] cancelPendingGaugeRequests failed token={} error={}",
               token,
@@ -204,12 +201,10 @@ final class ShopGaugeQueue {
     gaugePackagingQueue.removeIf(t -> t.gaugeAddress().equals(gaugeAddress));
     if (cancelled > 0) {
       owner.markDirty();
-      if (BuildingCreateShop.isDebugRequests()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] cancelPendingGaugeRequests address={} cancelled={}",
-            gaugeAddress,
-            cancelled);
-      }
+      DebugLog.info(
+          "[ColonyGauge] cancelPendingGaugeRequests address={} cancelled={}",
+          gaugeAddress,
+          cancelled);
     }
     return cancelled;
   }
@@ -336,7 +331,7 @@ final class ShopGaugeQueue {
                 token, new GaugePackagingTask(item, amount, address, requestId));
           }
         } catch (Exception ex) {
-          if (BuildingCreateShop.isDebugRequests()) {
+          if (DebugLog.enabled()) {
             TheSettlerXCreate.LOGGER.info(
                 "[ColonyGauge] failed to restore pendingGaugeRequests entry {}: {}",
                 i,

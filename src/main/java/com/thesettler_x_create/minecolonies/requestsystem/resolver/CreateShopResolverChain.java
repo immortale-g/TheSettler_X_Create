@@ -5,7 +5,7 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 
 /**
@@ -64,7 +64,7 @@ final class CreateShopResolverChain {
       IToken<?> parentToken = parent.getId();
       if (childToken.equals(parentToken)) {
         parent.removeChild(childToken);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           String key = "self:" + parentToken;
           if (resolver.markChainCycleLogged(key)) {
             TheSettlerXCreate.LOGGER.info(
@@ -75,7 +75,7 @@ final class CreateShopResolverChain {
       }
       if (visiting.contains(childToken)) {
         parent.removeChild(childToken);
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           String key = "cycle:" + parentToken + ":" + childToken;
           if (resolver.markChainCycleLogged(key)) {
             TheSettlerXCreate.LOGGER.info(
@@ -103,7 +103,7 @@ final class CreateShopResolverChain {
       stack.push(child);
       itStack.push(child.getChildren().iterator());
     }
-    if (steps >= resolver.getMaxChainSanitizeNodes() && Config.DEBUG_LOGGING.getAsBoolean()) {
+    if (steps >= resolver.getMaxChainSanitizeNodes() && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] request chain sanitize aborted after {} steps for {}", steps, rootToken);
     }
@@ -114,9 +114,9 @@ final class CreateShopResolverChain {
     try {
       return resolver.isRequestChainValid(manager, request);
     } catch (StackOverflowError error) {
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] request chain validation overflow for {}", request.getId());
+            "[CreateShop] request chain validation overflow for {}", (IToken<?>) request.getId());
       }
       return false;
     }

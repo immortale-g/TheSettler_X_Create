@@ -3,7 +3,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 import com.minecolonies.api.colony.requestsystem.manager.IRequestManager;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.Config;
+import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
@@ -36,7 +36,13 @@ final class CreateShopPendingTopupService {
     this.requestStateMutatorService = requestStateMutatorService;
   }
 
-  void handleTopup(
+  /**
+   * Orders what the racks and reservations do not cover.
+   *
+   * @return true when something was missing and nothing could be found for it: no own or unowned
+   *     order on its way and nothing in the Create network
+   */
+  boolean handleTopup(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IRequest<?> request,
@@ -50,7 +56,7 @@ final class CreateShopPendingTopupService {
       int rackAvailableForRequest,
       String requestIdLog) {
     if (resolver == null) {
-      return;
+      return false;
     }
     int topupNeeded =
         ShopStockAccounting.topupNeed(pendingCount, reservedForRequest, rackAvailableForRequest);
@@ -76,7 +82,7 @@ final class CreateShopPendingTopupService {
           diagnostics.recordPendingSource(request.getId(), "tickPending:wait-inflight");
           flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:wait-inflight");
         }
-        if (Config.DEBUG_LOGGING.getAsBoolean()) {
+        if (DebugLog.enabled()) {
           TheSettlerXCreate.LOGGER.info(
               "[CreateShop] tickPending: {} network topup not ordered (inflightRemaining={}, claimed={}, topupNeeded={}, pending={}, reserved={}, rack={})",
               requestIdLog,
@@ -87,7 +93,7 @@ final class CreateShopPendingTopupService {
               reservedForRequest,
               rackAvailableForRequest);
         }
-        return;
+        return !order.somethingOnItsWay();
       }
       requestStateMutatorService.markOrderedWithPending(
           resolver, level, request.getId(), pendingCount);
@@ -95,7 +101,7 @@ final class CreateShopPendingTopupService {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:network-topup");
       messaging.sendShopChat(
           manager, "com.thesettler_x_create.message.createshop.request_sent", topupOrdered);
-      if (Config.DEBUG_LOGGING.getAsBoolean()) {
+      if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] tickPending: {} network topup ordered={} pending={} reserved={}",
             requestIdLog,
@@ -103,13 +109,14 @@ final class CreateShopPendingTopupService {
             pendingCount,
             reservedForRequest);
       }
-      return;
+      return false;
     }
 
     if (!workerWorking && topupNeeded > 0) {
       flowStateMachine.touch(request.getId(), level.getGameTime(), "tickPending:worker-idle-topup");
       diagnostics.logPendingReasonChange(request.getId(), "wait:worker-for-network-topup");
     }
+    return false;
   }
 
   private int countStackList(List<ItemStack> stacks) {
