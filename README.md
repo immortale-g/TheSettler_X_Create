@@ -59,7 +59,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how these fit together.
 ./gradlew build
 ```
 
-The jar lands in `build/libs/`. `build` also runs the tests, Spotless and `testModernStructurize`.
+The jar lands in `build/libs/`. `build` also runs the tests, Spotless, `testModernStructurize` and
+`testFactoryLogistics`.
 
 ### Dependency versions
 
@@ -71,6 +72,13 @@ the minimum versions in `neoforge.mods.toml`, so raising them raises what player
 Structurize 1.0.808 changed the placement handler API. The mod is compiled against
 `structurize_compile_version` (new API) but runs its normal tests on `structurize_version` (old
 API); `testModernStructurize` repeats the placement handler compat test on the new API.
+
+Create Factory Logistics is optional and not compiled against. When it is installed, the shop sends
+package requests through its API by reflection, because plain Create requests produce no packages
+under CFL. That API lives in `create_factory_abstractions`, which CFL ships inside its own jar.
+`testFactoryLogistics` unpacks it from `cfl_version` and checks that the reflective calls still
+resolve, since a rename in CFL would otherwise only show up in game. The bridge needs CFL 1.5.2 or
+newer; older releases do not have that library.
 
 To try other versions without editing the file, override them on the command line:
 
@@ -84,8 +92,8 @@ Jars in `libs/` are only added to the dev client as optional extra mods.
 ### Latest release check
 
 The `Compat (latest releases)` workflow runs daily and on demand. It asks
-`.github/scripts/resolve-latest-deps.sh` for the newest MineColonies, Structurize and Create
-releases and compiles and tests against them. It is an early warning for upstream API breaks, not a
+`.github/scripts/resolve-latest-deps.sh` for the newest MineColonies, Structurize, Create and Create
+Factory Logistics releases and compiles and tests against them. It is an early warning for upstream API breaks, not a
 release gate: the pinned build stays the reference.
 
 Spotless enforces google-java-format. If the build fails with
