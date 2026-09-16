@@ -59,8 +59,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how these fit together.
 ./gradlew build
 ```
 
-The jar lands in `build/libs/`. `build` also runs the tests, Spotless, `testModernStructurize` and
-`testFactoryLogistics`.
+The jar lands in `build/libs/`. `build` also runs the tests, Spotless, `testModernStructurize`,
+`testFactoryLogistics` and `testFml`.
+
+`test` runs plain JUnit with Mockito. Tests that need real `ItemStack`s or registries are tagged
+`@Tag("fml")` and run in `testFml` instead, which starts FML with the mod and its dependencies loaded.
+That is also why `ponder_version` has to match the Ponder that Create ships inside its jar: FML
+refuses to load Create next to an older Ponder.
 
 ### Dependency versions
 

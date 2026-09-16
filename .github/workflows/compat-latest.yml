@@ -43,4 +43,4 @@ jobs:
           echo "Testing ${{ matrix.ref }} with: $args" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compile and test against latest releases
-        run: ./gradlew compileJava test testModernStructurize testFactoryLogistics ${{ steps.deps.outputs.args }}
+        run: ./gradlew compileJava test testModernStructurize testFactoryLogistics testFml ${{ steps.deps.outputs.args }}

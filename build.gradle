@@ -85,6 +85,13 @@ runs {
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
     }
 
+    // Unit tests inside a loaded FML (task testFml), for tests that need real ItemStacks or
+    // registries. Only tests tagged "fml" run here; the plain test task skips them.
+    fml {
+        runType 'junit'
+        unitTestSource sourceSets.test
+    }
+
     data {
         // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
         // workingDirectory project.file('run-data')
@@ -305,7 +312,22 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.withType(Test).configureEach {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (name == 'testFml') {
+            includeTags 'fml'
+        } else {
+            excludeTags 'fml'
+        }
+    }
+}
+
+// junit-fml registers a JUnit launcher listener that boots FML for every test run on the test
+// classpath. The plain test tasks run without it; afterEvaluate so it also covers the tasks below
+// that set their own classpath.
+afterEvaluate {
+    tasks.withType(Test).matching { it.name != 'testFml' }.configureEach {
+        classpath = classpath.filter { !it.name.startsWith('junit-fml-') }
+    }
 }
 
 // The regular test run uses structurize_version, whose placement API is named by structurize_api.
@@ -366,7 +388,7 @@ tasks.register('testFactoryLogistics', Test) {
 }
 
 tasks.named('check') {
-    dependsOn 'testModernStructurize', 'testFactoryLogistics'
+    dependsOn 'testModernStructurize', 'testFactoryLogistics', 'testFml'
 }
 
 spotless {
