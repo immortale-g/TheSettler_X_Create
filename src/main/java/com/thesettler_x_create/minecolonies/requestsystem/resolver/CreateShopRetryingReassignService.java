@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.colony.requestsystem.resolver.retrying.IRetryingRequestResolver;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
@@ -42,8 +43,7 @@ final class CreateShopRetryingReassignService {
       } catch (Exception ignored) {
         continue;
       }
-      if (ownerResolver == null
-          || !"StandardRetryingRequestResolver".equals(ownerResolver.getClass().getSimpleName())) {
+      if (!(ownerResolver instanceof IRetryingRequestResolver)) {
         continue;
       }
       java.util.List<IToken<?>> tokenSnapshot = new java.util.ArrayList<>(tokens);
