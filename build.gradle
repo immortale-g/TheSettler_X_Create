@@ -105,6 +105,8 @@ configurations {
     runtimeClasspath.extendsFrom localRuntime
     // Structurize at structurize_compile_version (IPlacementContext API), for testModernStructurize.
     modernStructurize
+    // Create Factory Logistics at cfl_version, for testFactoryLogistics.
+    factoryLogistics
 }
 
 configurations.configureEach {
@@ -153,6 +155,9 @@ dependencies {
     testImplementation("com.ldtteam:structurize:${structurize_version}") { transitive = false }
     localRuntime("com.ldtteam:structurize:${structurize_version}") { transitive = false }
     modernStructurize("com.ldtteam:structurize:${structurize_compile_version}") { transitive = false }
+
+    // Only used to check the reflective CFL bridge, never compiled against or shipped.
+    factoryLogistics("maven.modrinth:create_factory_logistics:${cfl_version}") { transitive = false }
 
     // Optional extra mods for the dev client only (e.g. JourneyMap, Carry On). Anything managed above
     // is excluded so a stale copy in ./libs cannot load twice.
@@ -321,8 +326,47 @@ tasks.register('testModernStructurize', Test) {
     }
     systemProperty 'thesettler.structurizeApi', 'modern'
 }
+
+// CFL ships the API the shop calls (create_factory_abstractions) jar-in-jar, published nowhere else,
+// so it has to be unpacked before it can go on a test classpath.
+def factoryAbstractionsDir = layout.buildDirectory.dir('factory-logistics')
+tasks.register('extractFactoryAbstractions', Sync) {
+    description = 'Unpacks create_factory_abstractions from the Create Factory Logistics jar.'
+    from(zipTree(configurations.factoryLogistics.elements.map { it.first().asFile })) {
+        include 'META-INF/jarjar/create_factory_abstractions-*.jar'
+        eachFile { it.path = it.name }
+        includeEmptyDirs = false
+    }
+    into factoryAbstractionsDir
+}
+
+// Resolves CreateFactoryLogisticsCompat against the real CFL API at cfl_version. The bridge is
+// reflective, so compileJava stays green whatever CFL renames; this is where such a break shows up.
+tasks.register('testFactoryLogistics', Test) {
+    description = 'Checks the reflective Create Factory Logistics bridge against a real CFL release.'
+    group = 'verification'
+    dependsOn 'extractFactoryAbstractions'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath + files(factoryAbstractionsDir.map { it.asFileTree })
+    filter {
+        includeTestsMatching 'com.thesettler_x_create.create.CreateFactoryLogisticsLiveCompatTest'
+    }
+    systemProperty 'thesettler.factoryLogisticsVersion', cfl_version
+    def unpackedDir = factoryAbstractionsDir
+    def checkedVersion = cfl_version
+    doFirst {
+        // CFL before 1.5.2 had no create_factory_abstractions at all, and the unpack step is then
+        // skipped for lack of input. Say so here rather than as an unexplained test failure.
+        def unpacked = unpackedDir.get().asFile.listFiles()
+        if (unpacked == null || unpacked.length == 0) {
+            throw new GradleException("Create Factory Logistics ${checkedVersion} contains no" +
+                    " create_factory_abstractions library; the shop's CFL bridge needs 1.5.2 or newer.")
+        }
+    }
+}
+
 tasks.named('check') {
-    dependsOn 'testModernStructurize'
+    dependsOn 'testModernStructurize', 'testFactoryLogistics'
 }
 
 spotless {
