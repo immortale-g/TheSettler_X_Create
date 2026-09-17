@@ -120,7 +120,9 @@ final class ShopWorkerStatus {
   }
 
   private boolean isCitizenUnavailable(ICitizenData citizen) {
-    if (citizen.isAsleep()) {
+    // The pause button in the hire window stops the AI, but the job status it last wrote stays as
+    // it was. Without this the shop would keep taking colony orders with a paused shopkeeper.
+    if (citizen.isPaused() || citizen.isAsleep()) {
       return true;
     }
     VisibleCitizenStatus status = citizen.getStatus();
@@ -128,7 +130,7 @@ final class ShopWorkerStatus {
   }
 
   private boolean isHousekeepingBlocked(ICitizenData citizen) {
-    if (citizen.isAsleep()) {
+    if (citizen.isPaused() || citizen.isAsleep()) {
       return true;
     }
     VisibleCitizenStatus status = citizen.getStatus();
