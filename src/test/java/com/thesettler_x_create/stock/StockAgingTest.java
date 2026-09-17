@@ -14,10 +14,10 @@ class StockAgingTest {
     return new StockAging<>(String::equals, key -> key);
   }
 
-  private static List<ReservedAmount<String>> counts(Object... keyAndAmount) {
-    java.util.ArrayList<ReservedAmount<String>> list = new java.util.ArrayList<>();
+  private static List<StockAmount<String>> counts(Object... keyAndAmount) {
+    java.util.ArrayList<StockAmount<String>> list = new java.util.ArrayList<>();
     for (int i = 0; i < keyAndAmount.length; i += 2) {
-      list.add(new ReservedAmount<>((String) keyAndAmount[i], (Integer) keyAndAmount[i + 1]));
+      list.add(new StockAmount<>((String) keyAndAmount[i], (Integer) keyAndAmount[i + 1]));
     }
     return list;
   }

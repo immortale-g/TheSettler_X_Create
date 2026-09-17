@@ -1,7 +1,7 @@
 package com.thesettler_x_create.minecolonies.tileentity;
 
-import com.thesettler_x_create.stock.ReservedAmount;
 import com.thesettler_x_create.stock.StockAging;
+import com.thesettler_x_create.stock.StockAmount;
 import com.thesettler_x_create.stock.nbt.StockAgingNbt;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +25,7 @@ final class ShopStockAgingLedger {
    *
    * @return true when the saved state changed
    */
-  boolean update(List<ReservedAmount<ItemStack>> unreservedNow, long now) {
+  boolean update(List<StockAmount<ItemStack>> unreservedNow, long now) {
     return aging.update(unreservedNow, now);
   }
 

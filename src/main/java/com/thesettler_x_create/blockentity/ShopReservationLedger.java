@@ -4,7 +4,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.stock.ReservationBook;
-import com.thesettler_x_create.stock.ReservedAmount;
+import com.thesettler_x_create.stock.StockAmount;
 import com.thesettler_x_create.stock.nbt.ReservationNbt;
 import java.util.List;
 import java.util.Optional;
@@ -114,6 +114,22 @@ class ShopReservationLedger {
     return book.reservedForOwner(requestId);
   }
 
+  /** Gives back reserved items of one kind for a request, without anyone having taken them. */
+  int releaseReservedForRequest(UUID requestId, ItemStack key, int amount) {
+    if (!host.ensureServerThread("releaseReservedForRequest")) {
+      return 0;
+    }
+    if (requestId == null || key == null || key.isEmpty() || amount <= 0) {
+      return 0;
+    }
+    book.expire();
+    int released = book.release(requestId, key, amount);
+    if (released > 0) {
+      host.markChanged();
+    }
+    return released;
+  }
+
   /** Consumes reserved items of one kind for a request. */
   int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
     if (!host.ensureServerThread("consumeReservedForRequest")) {
@@ -134,7 +150,7 @@ class ShopReservationLedger {
   List<ItemStack> getReservedStacksSnapshot() {
     expireOnServerThread();
     List<ItemStack> stacks = new java.util.ArrayList<>();
-    for (ReservedAmount<ItemStack> reserved : book.snapshot()) {
+    for (StockAmount<ItemStack> reserved : book.snapshot()) {
       ItemStack stack = reserved.key().copy();
       stack.setCount(Math.max(1, reserved.amount()));
       stacks.add(stack);

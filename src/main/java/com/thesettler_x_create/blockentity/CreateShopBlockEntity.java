@@ -119,6 +119,15 @@ public class CreateShopBlockEntity extends BlockEntity {
     return reservationLedger.getReservedForRequest(requestId);
   }
 
+  /**
+   * Gives back one delivery's share of a request's reservation, e.g. when that delivery is
+   * cancelled while the request's other deliveries are still open. Unlike {@link #release(UUID)}
+   * this leaves the shares of those other deliveries reserved.
+   */
+  public int releaseReservedForRequest(UUID requestId, ItemStack key, int amount) {
+    return reservationLedger.releaseReservedForRequest(requestId, key, amount);
+  }
+
   /** Consumes reserved items for a request when deliveries are created. */
   public int consumeReservedForRequest(UUID requestId, ItemStack key, int amount) {
     return reservationLedger.consumeReservedForRequest(requestId, key, amount);
@@ -305,14 +314,16 @@ public class CreateShopBlockEntity extends BlockEntity {
    * Operator reset: forgets every order on its way from the Create network. Open requests order it
    * again; goods that still arrive land in the racks unreserved.
    *
-   * @return number of orders that were tracked
+   * @return number of tracking records that were cleared, orders and baselines together
    */
   public int clearInflight() {
     if (!ensureServerThread("clearInflight")) {
       return 0;
     }
-    int cleared = inflightLedger.entryCount();
-    if (inflightLedger.size() > 0) {
+    // size(), not entryCount(): the clear also wipes the baselines, and an operator diagnostic
+    // that answers 0 while it did change state hides exactly what it is there to show.
+    int cleared = inflightLedger.size();
+    if (cleared > 0) {
       inflightLedger.clear();
       setChanged();
     }

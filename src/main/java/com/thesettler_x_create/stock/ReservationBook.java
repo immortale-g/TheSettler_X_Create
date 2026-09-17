@@ -79,12 +79,27 @@ public final class ReservationBook<K> {
   }
 
   /**
+   * Gives back {@code amount} of {@code key} without anyone having taken it, e.g. when one of
+   * several deliveries of a request is cancelled. The other item kinds and the shares of the
+   * request's remaining deliveries stay reserved, which {@link #release(UUID)} would drop as well.
+   *
+   * @return the amount actually given back
+   */
+  public int release(UUID owner, K key, int amount) {
+    return take(owner, key, amount);
+  }
+
+  /**
    * Takes up to {@code amount} of {@code key} out of the reservations of {@code owner}. Other item
    * kinds of the same owner stay reserved.
    *
    * @return the amount actually taken
    */
   public int consume(UUID owner, K key, int amount) {
+    return take(owner, key, amount);
+  }
+
+  private int take(UUID owner, K key, int amount) {
     if (owner == null || key == null || amount <= 0) {
       return 0;
     }
@@ -209,11 +224,11 @@ public final class ReservationBook<K> {
   }
 
   /** One entry per owner and item kind. */
-  public List<ReservedAmount<K>> snapshot() {
-    List<ReservedAmount<K>> snapshot = new ArrayList<>();
+  public List<StockAmount<K>> snapshot() {
+    List<StockAmount<K>> snapshot = new ArrayList<>();
     for (OwnerReservations<K> reservations : owners.values()) {
       for (MutableAmount<K> entry : reservations.amounts) {
-        snapshot.add(new ReservedAmount<>(entry.key, entry.amount));
+        snapshot.add(new StockAmount<>(entry.key, entry.amount));
       }
     }
     return snapshot;
@@ -233,9 +248,9 @@ public final class ReservationBook<K> {
   public List<StoredReservation<K>> stored() {
     List<StoredReservation<K>> stored = new ArrayList<>();
     for (Map.Entry<UUID, OwnerReservations<K>> entry : owners.entrySet()) {
-      List<ReservedAmount<K>> amounts = new ArrayList<>();
+      List<StockAmount<K>> amounts = new ArrayList<>();
       for (MutableAmount<K> amount : entry.getValue().amounts) {
-        amounts.add(new ReservedAmount<>(amount.key, amount.amount));
+        amounts.add(new StockAmount<>(amount.key, amount.amount));
       }
       stored.add(
           new StoredReservation<>(entry.getKey(), entry.getValue().expiresAtGameTime, amounts));
@@ -256,7 +271,7 @@ public final class ReservationBook<K> {
         }
         OwnerReservations<K> reservations =
             new OwnerReservations<>(reservation.expiresAtGameTime());
-        for (ReservedAmount<K> amount : reservation.amounts()) {
+        for (StockAmount<K> amount : reservation.amounts()) {
           if (amount == null || amount.key() == null || amount.amount() <= 0) {
             continue;
           }

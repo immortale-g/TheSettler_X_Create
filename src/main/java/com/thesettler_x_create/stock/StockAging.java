@@ -44,10 +44,10 @@ public final class StockAging<K> {
    *
    * @return true when anything changed
    */
-  public boolean update(List<ReservedAmount<K>> unreservedNow, long now) {
+  public boolean update(List<StockAmount<K>> unreservedNow, long now) {
     boolean changed = false;
     List<K> seen = new ArrayList<>();
-    for (ReservedAmount<K> counted : unreservedNow) {
+    for (StockAmount<K> counted : unreservedNow) {
       if (counted == null || counted.key() == null) {
         continue;
       }
