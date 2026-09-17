@@ -95,20 +95,26 @@ final class ShopGaugeQueue {
       }
       return 0;
     }
-    // Only place a colony request once we've confirmed the Colony Warehouse actually has the item.
-    // This is the whole point of the Gauge: pull from the Colony Warehouse, not Create's stock
-    // network (vanilla Create Factory Gauges already cover that case).
+    // The gauge pulls from the colony, not from Create's stock network; vanilla Create Factory
+    // Gauges already cover that case. So only ask for what the colony has a chance of providing:
+    // stock in a warehouse, or a crafter who knows the recipe. Without either, an order would walk
+    // the whole resolver chain and end up in the player's request list.
     int available = ShopWarehouseStockUtil.countInWarehouses(owner, item);
-    if (available <= 0) {
+    boolean craftable = available < amount && ShopColonyCraftingUtil.canAnyoneCraft(colony, item);
+    if (available <= 0 && !craftable) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] requestForGauge skip reason=nothing-in-warehouse item={} requested={}",
+            "[ColonyGauge] requestForGauge skip reason=colony-cannot-provide item={} requested={}",
             item.getItem(),
             amount);
       }
       return 0;
     }
-    int actualAmount = Math.min(amount, available);
+    // Ask for everything that is wanted, and say the whole amount is the minimum. MineColonies
+    // answers a warehouse that cannot cover that with a child request for the rest, which reaches
+    // the crafters; asking only for what a warehouse holds would never get there. What a crafter
+    // cannot make either comes back as a shortfall, not as a stuck order.
+    int actualAmount = craftable ? amount : Math.min(amount, available);
 
     // A gauge asks again once its promise runs out, which happens long before a slow delivery
     // arrives. Anything still waiting to be packaged for this item and address is that earlier
@@ -128,7 +134,7 @@ final class ShopGaugeQueue {
     }
 
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
-    Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, 1);
+    Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, actualAmount);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
     if (token != null) {
       UUID requestId = toRequestId(token);

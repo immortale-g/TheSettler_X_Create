@@ -108,6 +108,10 @@ final class CreateShopRequestValidator {
       DebugLog.info("[CreateShop] canResolve=false (shop closed: nobody employed or paused)");
       return false;
     }
+    if (CreateShopChainOriginGuard.servesAShopsOwnOrder(manager, request)) {
+      DebugLog.info("[CreateShop] canResolve=false (this is a shop's own order for these goods)");
+      return false;
+    }
     chain.sanitizeRequestChain(manager, request);
     if (!chain.safeIsRequestChainValid(manager, request)) {
       DebugLog.info("[CreateShop] canResolve=false (request chain invalid)");
