@@ -13,6 +13,7 @@ import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
 import com.thesettler_x_create.create.CreateLogisticsBridge;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.minecolonies.module.CreateShopNetworkMinimumModule;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +67,26 @@ public final class ModNetwork {
         ColonyGaugeConfigPacket.TYPE,
         ColonyGaugeConfigPacket.STREAM_CODEC,
         ModNetwork::handleColonyGaugeConfig);
+    registrar.playToServer(
+        SetCreateShopNetworkMinimumPayload.TYPE,
+        SetCreateShopNetworkMinimumPayload.STREAM_CODEC,
+        ModNetwork::handleSetNetworkMinimum);
+  }
+
+  private static void handleSetNetworkMinimum(
+      SetCreateShopNetworkMinimumPayload payload, IPayloadContext context) {
+    context.enqueueWork(
+        () -> {
+          BuildingCreateShop building = getShopBuilding(context, payload.hutPos());
+          if (building == null) {
+            return;
+          }
+          CreateShopNetworkMinimumModule module =
+              building.getModule(CreateShopNetworkMinimumModule.class);
+          if (module != null && module.setMinimum(payload.stack(), payload.amount())) {
+            building.markDirty();
+          }
+        });
   }
 
   private static void handleSetAddress(

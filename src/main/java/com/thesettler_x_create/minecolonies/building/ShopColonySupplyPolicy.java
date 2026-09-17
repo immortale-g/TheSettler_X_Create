@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.building;
 import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.core.colony.buildings.modules.ItemListModule;
 import com.thesettler_x_create.create.ShopSupplyPolicy;
+import com.thesettler_x_create.minecolonies.module.CreateShopNetworkMinimumModule;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
@@ -28,7 +29,10 @@ public final class ShopColonySupplyPolicy {
     }
     ItemListModule denied =
         shop.getModule(ItemListModule.class, module -> DENIED_LIST_ID.equals(module.getId()));
-    return of(kind -> denied != null && denied.isItemInList(new ItemStorage(kind)), kind -> 0);
+    CreateShopNetworkMinimumModule minimum = shop.getModule(CreateShopNetworkMinimumModule.class);
+    return of(
+        kind -> denied != null && denied.isItemInList(new ItemStorage(kind)),
+        kind -> minimum == null ? 0 : minimum.getMinimum(kind));
   }
 
   /**

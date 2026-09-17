@@ -17,11 +17,13 @@ import com.thesettler_x_create.init.ModBlocks;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.building.ShopColonySupplyPolicy;
 import com.thesettler_x_create.minecolonies.module.CreateShopAddressModule;
+import com.thesettler_x_create.minecolonies.module.CreateShopNetworkMinimumModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopOutputModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopPermaModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopStockModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopTaskModule;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
+import com.thesettler_x_create.minecolonies.moduleview.CreateShopNetworkMinimumModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopPermaModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
@@ -103,6 +105,12 @@ public final class ModMinecoloniesBuildings {
                                           "com.thesettler_x_create.gui.createshop.coloniesmaydraw"),
                                       true,
                                       buildingView -> everyItem())))
+                  // How much of an item stays in the Create network for the shop's own production.
+                  .addBuildingModuleProducer(
+                      new ModuleProducer<>(
+                          "createshop_network_minimum",
+                          CreateShopNetworkMinimumModule::new,
+                          () -> CreateShopNetworkMinimumModuleView::new))
                   .createBuildingEntry());
 
   /** Every item the game knows, the same list the warehouse's minimum-stock picker offers. */

@@ -82,7 +82,7 @@ class ModNetworkGuardTest {
     }
     // Sanity check: fail loudly instead of silently passing if the handler count ever drops to
     // zero (e.g. a refactor renames the handleXxx convention this test relies on).
-    assertEquals(7, handlerCount);
+    assertEquals(8, handlerCount);
   }
 
   private static int findMatchingBraceEnd(String source, int openBraceIndex) {
