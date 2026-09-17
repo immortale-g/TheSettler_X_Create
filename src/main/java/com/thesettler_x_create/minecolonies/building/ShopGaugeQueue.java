@@ -205,7 +205,13 @@ final class ShopGaugeQueue {
         pickup.release(toRequestId(token));
       }
     }
-    gaugePackagingQueue.removeIf(t -> t.gaugeAddress().equals(gaugeAddress));
+    // Same filter the tokens above were picked with. Matching the address alone would drop the
+    // queued task of a second panel that asked for a different item through the same frogport,
+    // whose request is still open and whose reservation nobody would release afterwards.
+    gaugePackagingQueue.removeIf(
+        t ->
+            t.gaugeAddress().equals(gaugeAddress)
+                && (item == null || item.isEmpty() || ItemStack.isSameItem(t.item(), item)));
     if (cancelled > 0) {
       owner.markDirty();
       DebugLog.info(

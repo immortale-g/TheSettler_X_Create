@@ -250,7 +250,18 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       boolean newPromised = promisedUntil > now;
       if (newPromised != promisedSatisfied) {
         promisedSatisfied = newPromised;
-        if (!promisedSatisfied && !satisfied) panelBE().updatePowered();
+        if (!promisedSatisfied) {
+          // The promise lifetime ran out, so this slot stops counting on that order. Create can
+          // simply forget its promise, because its own order lives in the same stock network and
+          // shrinks as goods arrive. Ours is a colony request with a courier walking towards it: if
+          // it is only forgotten, it still arrives later, on top of whatever is asked for next.
+          // Forgetting it therefore means withdrawing it, the same thing the Clear Promises button
+          // in the gauge UI does.
+          cancelActiveRequests();
+          promisedAmount = 0;
+          promisedUntil = 0L;
+          if (!satisfied) panelBE().updatePowered();
+        }
         blockEntity.sendData();
       }
     }
@@ -519,7 +530,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     cachedFrogportAddress =
         tag.contains("FrogportAddress") ? tag.getString("FrogportAddress") : null;
     manualAddress = tag.contains("ManualAddress") ? tag.getString("ManualAddress") : null;
+    // -1 (never expire) like the field default and like Create's FactoryPanelBehaviour. A gauge
+    // saved before this setting existed used to come back with 0, which is 30 seconds.
     promiseClearingInterval =
-        tag.contains("PromiseClearingInterval") ? tag.getInt("PromiseClearingInterval") : 0;
+        tag.contains("PromiseClearingInterval") ? tag.getInt("PromiseClearingInterval") : -1;
   }
 }
