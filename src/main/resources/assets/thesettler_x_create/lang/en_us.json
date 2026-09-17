@@ -23,6 +23,7 @@
   "com.thesettler_x_create.job.createshop": "Create Shopkeeper",
   "com.thesettler_x_create.gui.createshop.address": "Create Shop - Address",
   "com.thesettler_x_create.gui.createshop.stock": "Create Shop - Stock",
+  "com.thesettler_x_create.gui.createshop.coloniesmaydraw": "Create Shop - Colony may draw",
   "com.thesettler_x_create.gui.createshop.stock.storage_empty": "No items in registered shop storage.",
   "com.thesettler_x_create.gui.createshop.stock.network_missing": "No stock network linked.",
   "com.thesettler_x_create.gui.createshop.perma": "Create Shop - Perma Requests",

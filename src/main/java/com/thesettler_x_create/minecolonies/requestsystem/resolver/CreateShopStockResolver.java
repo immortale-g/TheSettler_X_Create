@@ -4,6 +4,9 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.create.ICreateNetworkFacade;
+import com.thesettler_x_create.create.ShopSupplyPolicy;
+import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import com.thesettler_x_create.minecolonies.building.ShopColonySupplyPolicy;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
@@ -23,7 +26,7 @@ final class CreateShopStockResolver {
       IDeliverable deliverable,
       int reservedForOthers,
       CreateShopResolverPlanning planning) {
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
+    ICreateNetworkFacade network = colonyView(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
     int pickupAvailable = planning.getAvailableFromPickup(pickup, deliverable);
@@ -32,6 +35,17 @@ final class CreateShopStockResolver {
         ShopStockAccounting.totalAvailable(networkAvailable, rackUsable, pickupAvailable);
     return new CreateShopStockSnapshot(
         networkAvailable, rackAvailable, pickupAvailable, rackUsable, available);
+  }
+
+  /**
+   * The network as the colony may see it. Everything this class answers goes to a colony request,
+   * so the shop's block list and the minimum it keeps for its own production apply to all of it.
+   */
+  private static ICreateNetworkFacade colonyView(TileEntityCreateShop tile) {
+    BuildingCreateShop shop =
+        tile != null && tile.getBuilding() instanceof BuildingCreateShop building ? building : null;
+    ShopSupplyPolicy policy = ShopColonySupplyPolicy.of(shop);
+    return new CreateNetworkFacade(tile, policy);
   }
 
   List<ItemStack> requestFromNetwork(
@@ -48,12 +62,12 @@ final class CreateShopStockResolver {
     if (count <= 0) {
       return java.util.Collections.emptyList();
     }
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
+    ICreateNetworkFacade network = colonyView(tile);
     return network.requestItems(deliverable, count, requesterName, requestUuid);
   }
 
   int getNetworkAvailable(TileEntityCreateShop tile, IDeliverable deliverable) {
-    ICreateNetworkFacade network = new CreateNetworkFacade(tile);
+    ICreateNetworkFacade network = colonyView(tile);
     return network.getAvailable(deliverable);
   }
 }
