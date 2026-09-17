@@ -3,7 +3,7 @@ package com.thesettler_x_create.stock.nbt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.thesettler_x_create.stock.ReservedAmount;
+import com.thesettler_x_create.stock.StockAmount;
 import com.thesettler_x_create.stock.StoredReservation;
 import java.util.List;
 import java.util.Optional;
@@ -24,9 +24,8 @@ class ReservationNbtTest {
             new StoredReservation<>(
                 REQUEST_A,
                 12_345L,
-                List.of(
-                    new ReservedAmount<>("oak_log", 32), new ReservedAmount<>("birch_log", 16))),
-            new StoredReservation<>(REQUEST_B, 99L, List.of(new ReservedAmount<>("brass", 64))));
+                List.of(new StockAmount<>("oak_log", 32), new StockAmount<>("birch_log", 16))),
+            new StoredReservation<>(REQUEST_B, 99L, List.of(new StockAmount<>("brass", 64))));
 
     CompoundTag tag = ReservationNbt.write(stored, StringTag::valueOf);
     List<StoredReservation<String>> read = ReservationNbt.read(tag, ReservationNbtTest::readKey);
@@ -49,8 +48,7 @@ class ReservationNbtTest {
 
     assertEquals(
         List.of(
-            new StoredReservation<>(
-                REQUEST_A, 6_000L, List.of(new ReservedAmount<>("brass", 256)))),
+            new StoredReservation<>(REQUEST_A, 6_000L, List.of(new StockAmount<>("brass", 256)))),
         read);
   }
 

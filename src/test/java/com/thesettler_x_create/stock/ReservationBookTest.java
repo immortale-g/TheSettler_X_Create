@@ -108,6 +108,29 @@ class ReservationBookTest {
   }
 
   @Test
+  void releasingOneDeliverysShareLeavesTheSiblingsReserved() {
+    // A request split into two deliveries of 32: cancelling one must not unreserve the other's
+    // share, which is sitting in the hut waiting for its courier.
+    book.reserve(REQUEST_A, "oak_log", 64);
+
+    assertEquals(32, book.release(REQUEST_A, "oak_log", 32));
+
+    assertEquals(32, book.reservedForOwner(REQUEST_A));
+    assertEquals(32, book.reservedFor("oak_log"));
+  }
+
+  @Test
+  void releasingAShareIsCappedAndLeavesOtherItemKindsAlone() {
+    book.reserve(REQUEST_A, "oak_log", 8);
+    book.reserve(REQUEST_A, "birch_log", 8);
+
+    assertEquals(8, book.release(REQUEST_A, "oak_log", 64));
+
+    assertEquals(0, book.reservedFor("oak_log"));
+    assertEquals(8, book.reservedFor("birch_log"));
+  }
+
+  @Test
   void reservedMatchingSumsEveryAcceptedKey() {
     book.reserve(REQUEST_A, "oak_log", 32);
     book.reserve(REQUEST_B, "birch_log", 16);
@@ -161,8 +184,7 @@ class ReservationBookTest {
             new StoredReservation<>(
                 REQUEST_A,
                 staleExpiry,
-                List.of(
-                    new ReservedAmount<>("oak_log", 4), new ReservedAmount<>("birch_log", 6)))));
+                List.of(new StockAmount<>("oak_log", 4), new StockAmount<>("birch_log", 6)))));
     now = 50_000L;
 
     assertFalse(book.expire());
@@ -179,9 +201,9 @@ class ReservationBookTest {
                 REQUEST_A,
                 5_000L,
                 List.of(
-                    new ReservedAmount<>("oak_log", 4),
-                    new ReservedAmount<>(" oak_log", 6),
-                    new ReservedAmount<>("birch_log", 0))),
+                    new StockAmount<>("oak_log", 4),
+                    new StockAmount<>(" oak_log", 6),
+                    new StockAmount<>("birch_log", 0))),
             new StoredReservation<>(REQUEST_B, 5_000L, List.of())));
 
     assertEquals(1, book.ownerCount());

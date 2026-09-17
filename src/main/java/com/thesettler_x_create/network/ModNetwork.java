@@ -181,7 +181,9 @@ public final class ModNetwork {
           }
           CreateShopOutputBlockEntity obe = building.getOutputBlockEntity();
           if (obe != null) {
-            obe.setPackageAddress(payload.address());
+            // Same null-coalesce as handleSetAddress: neither field can arrive null off the wire,
+            // and both address handlers say so the same way.
+            obe.setPackageAddress(payload.address() == null ? "" : payload.address());
           }
         });
   }

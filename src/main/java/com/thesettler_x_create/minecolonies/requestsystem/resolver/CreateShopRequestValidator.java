@@ -97,8 +97,15 @@ final class CreateShopRequestValidator {
       DebugLog.info("[CreateShop] canResolve=false (shop missing or not built)");
       return false;
     }
-    if (!shop.isWorkerWorking() && !holdDeliveryWindow) {
-      DebugLog.info("[CreateShop] canResolve=false (no shopkeeper working)");
+    // Taking the request on is a question of whether this shop can serve it at all, not of what the
+    // shopkeeper is doing this minute. A shop with a shopkeeper holds the request and serves it
+    // when
+    // he is back from sleeping or eating, which is how the colony's own resolvers behave; turning
+    // it
+    // away at night would push it through the retry chain into the player's request list instead.
+    // Fulfilment is where the waiting happens: the Create network only counts while he works.
+    if (!shop.acceptsColonyRequests() && !holdDeliveryWindow) {
+      DebugLog.info("[CreateShop] canResolve=false (shop closed: nobody employed or paused)");
       return false;
     }
     chain.sanitizeRequestChain(manager, request);

@@ -81,6 +81,26 @@ final class ShopWorkerStatus {
     return hasShopWorker ? "blocked" : "no-assigned-shopworker";
   }
 
+  /**
+   * Whether the shop is open for colony orders at all. This is what decides if it takes a request
+   * on, not whether the shopkeeper happens to be awake: a request the shop accepts stays with the
+   * shop and is served once he is back at work, the same way a crafting resolver takes a request
+   * while its crafter sleeps.
+   *
+   * <p>A shop turns requests away only when its unavailability has no end in sight, so that
+   * MineColonies can hand them to someone who can serve them: nobody employed, or a shopkeeper the
+   * player has paused. Sleeping, eating and bad weather pass by on their own and only pause the
+   * fulfilment.
+   */
+  boolean acceptsColonyRequests() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen != null && citizen.getJob() instanceof JobCreateShop && !citizen.isPaused()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   boolean isWorkerWorking() {
     boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
@@ -120,7 +140,9 @@ final class ShopWorkerStatus {
   }
 
   private boolean isCitizenUnavailable(ICitizenData citizen) {
-    if (citizen.isAsleep()) {
+    // The pause button in the hire window stops the AI, but the job status it last wrote stays as
+    // it was. Without this the shop would keep taking colony orders with a paused shopkeeper.
+    if (citizen.isPaused() || citizen.isAsleep()) {
       return true;
     }
     VisibleCitizenStatus status = citizen.getStatus();
@@ -128,7 +150,7 @@ final class ShopWorkerStatus {
   }
 
   private boolean isHousekeepingBlocked(ICitizenData citizen) {
-    if (citizen.isAsleep()) {
+    if (citizen.isPaused() || citizen.isAsleep()) {
       return true;
     }
     VisibleCitizenStatus status = citizen.getStatus();

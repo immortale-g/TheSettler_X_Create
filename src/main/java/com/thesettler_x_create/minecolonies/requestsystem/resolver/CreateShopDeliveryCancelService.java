@@ -9,6 +9,7 @@ import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -85,7 +86,7 @@ final class CreateShopDeliveryCancelService {
 
     int reservedForRequest = pickup.getReservedForRequest(parentRequestId);
     int pendingCount = Math.max(1, Math.max(reservedForRequest, stack.getCount()));
-    pickup.release(parentRequestId);
+    releaseCancelledShare(manager, parentToken, childToken, parentRequestId, pickup, stack);
     requestStateMutatorService.markOrderedWithPendingAtLeastOne(
         resolver, level, parentToken, pendingCount);
     diagnostics.recordPendingSource(parentToken, "delivery-cancel-reserve");
@@ -117,5 +118,74 @@ final class CreateShopDeliveryCancelService {
         recheck.scheduleParentChildRecheck(standard, parentToken);
       }
     }
+  }
+
+  /**
+   * Gives back what the cancelled delivery had reserved. Since 0.4.0 a request can have several
+   * deliveries open at once, and each of them has its own share of the request's reservation. As
+   * long as one of the siblings is still open its share has to stay reserved: its items are sitting
+   * in the hut waiting to be picked up, and unreserving them lets a competing request claim them
+   * out from under the courier on his way. Only the last delivery of a request gives the whole
+   * reservation back.
+   */
+  private void releaseCancelledShare(
+      IRequestManager manager,
+      IToken<?> parentToken,
+      IToken<?> childToken,
+      UUID parentRequestId,
+      CreateShopBlockEntity pickup,
+      ItemStack stack) {
+    if (!hasOtherOpenDeliveryChild(manager, parentToken, childToken)) {
+      pickup.release(parentRequestId);
+      return;
+    }
+    int released = pickup.releaseReservedForRequest(parentRequestId, stack, stack.getCount());
+    if (DebugLog.enabled()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] delivery cancelled {} -> parent={} releasedShare={} of {} (siblings still open)",
+          childToken,
+          parentToken,
+          released,
+          stack.getCount());
+    }
+  }
+
+  /**
+   * Whether {@code parentToken} still has a delivery child other than {@code childToken} that
+   * MineColonies has not finished. Read-only on the native request graph; when the graph cannot be
+   * read the answer is "no", which keeps the old whole-request release.
+   */
+  private static boolean hasOtherOpenDeliveryChild(
+      IRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
+    IStandardRequestManager standard = CreateShopRequestResolver.unwrapStandardManager(manager);
+    if (standard == null || standard.getRequestHandler() == null) {
+      return false;
+    }
+    IRequest<?> parent;
+    try {
+      parent = standard.getRequestHandler().getRequest(parentToken);
+    } catch (Exception ignored) {
+      return false;
+    }
+    if (parent == null || !parent.hasChildren() || parent.getChildren() == null) {
+      return false;
+    }
+    for (IToken<?> sibling : List.copyOf(parent.getChildren())) {
+      if (sibling == null || sibling.equals(childToken)) {
+        continue;
+      }
+      try {
+        IRequest<?> child = standard.getRequestHandler().getRequest(sibling);
+        if (child == null
+            || !(child.getRequest() instanceof Delivery)
+            || CreateShopRequestResolver.isTerminalRequestState(child.getState())) {
+          continue;
+        }
+        return true;
+      } catch (Exception ignored) {
+        // A token can outlive its request for a moment; it is simply not a sibling then.
+      }
+    }
+    return false;
   }
 }

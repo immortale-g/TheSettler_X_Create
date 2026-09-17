@@ -467,6 +467,11 @@ public class BuildingCreateShop extends AbstractBuilding {
     return workerStatus.isWorkerWorking();
   }
 
+  /** Whether the shop takes colony orders on at all: someone is employed and not paused. */
+  public boolean acceptsColonyRequests() {
+    return workerStatus.acceptsColonyRequests();
+  }
+
   public boolean hasResolverWork() {
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
     return (resolver != null && resolver.hasProtectedInventoryWindow()) || hasIncomingRackWork();
@@ -498,6 +503,16 @@ public class BuildingCreateShop extends AbstractBuilding {
    */
   public int cancelPendingGaugeRequests(ItemStack item, String gaugeAddress) {
     return gaugeQueue.cancelPendingGaugeRequests(item, gaugeAddress);
+  }
+
+  /**
+   * Cancels the gauge requests for this item and address that nothing is happening on yet and
+   * leaves the ones a courier is already carrying out.
+   *
+   * @return how many requests were left running
+   */
+  public int cancelStalledGaugeRequests(ItemStack item, String gaugeAddress) {
+    return gaugeQueue.cancelStalledGaugeRequests(item, gaugeAddress);
   }
 
   /**

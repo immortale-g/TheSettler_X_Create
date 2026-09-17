@@ -47,6 +47,14 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   private static final int REQUEST_INTERVAL = 100;
 
+  /**
+   * Longest wait between two asks. Every ask that gets as far as the shop scans the racks of every
+   * warehouse in the colony, and a slot whose item the colony simply does not have would do that
+   * every {@link #REQUEST_INTERVAL} ticks forever. Each fruitless ask therefore doubles the wait up
+   * to this, and anything that changes the picture puts it back.
+   */
+  private static final int MAX_REQUEST_INTERVAL = 600;
+
   public final PanelSlot slot;
   public boolean active;
   public boolean satisfied;
@@ -66,6 +74,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   public int promiseClearingInterval = -1;
 
   private int timer = REQUEST_INTERVAL;
+  private int requestInterval = REQUEST_INTERVAL;
   private long promisedUntil = 0L;
 
   /**
@@ -132,6 +141,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     timer = REQUEST_INTERVAL;
     promisedUntil = 0L;
     promisedAmount = 0;
+    requestInterval = REQUEST_INTERVAL;
     setFilter(ItemStack.EMPTY);
     blockEntity.notifyUpdate();
   }
@@ -148,6 +158,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     promisedUntil = 0L;
     promisedAmount = 0;
     timer = REQUEST_INTERVAL;
+    requestInterval = REQUEST_INTERVAL;
     manualAddress = null;
     blockEntity.notifyUpdate();
     panelBE().updatePowered();
@@ -232,8 +243,48 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     return Component.literal(Math.max(0, value.value()) + ((value.row() == 0) ? "" : "▤"));
   }
 
+  /**
+   * The promise lifetime ran out. Create can simply forget its promise: its order lives in the same
+   * stock network and cannot outlive it by much. Ours is a colony request with a courier walking
+   * towards it, so forgetting it would let it arrive later on top of whatever is asked for next.
+   *
+   * <p>So the order is withdrawn instead, the same thing the Clear Promises button does, but only
+   * where nobody is carrying it out yet. A courier already on his way keeps the order and the slot
+   * keeps waiting for another interval: cancelling him would waste the trip, and with a lifetime
+   * shorter than his round trip the slot would cancel and re-place an order forever.
+   */
+  private void onPromiseExpired() {
+    String targetAddress = manualAddress != null ? manualAddress : cachedFrogportAddress;
+    BuildingCreateShop building = findBuilding();
+    // An empty filter would match every item at this address and take the other slots' orders with
+    // it. resetFilter cancels before it clears, so this only guards against a state nobody sets.
+    int stillRunning =
+        building == null
+                || targetAddress == null
+                || targetAddress.isBlank()
+                || getFilter().isEmpty()
+            ? 0
+            : building.cancelStalledGaugeRequests(getFilter(), targetAddress);
+    if (stillRunning > 0) {
+      promisedSatisfied = true;
+      int expiryTicks = getPromiseExpiryTimeInTicks();
+      promisedUntil = expiryTicks < 0 ? Long.MAX_VALUE : getWorld().getGameTime() + expiryTicks;
+      DebugLog.info(
+          "[ColonyGauge] promise expired slot={} keptRunning={} (waiting another interval)",
+          slot.getSerializedName(),
+          stillRunning);
+      return;
+    }
+    promisedAmount = 0;
+    promisedUntil = 0L;
+    if (!satisfied) {
+      panelBE().updatePowered();
+    }
+  }
+
   private void resetTimerSlightly() {
     timer = REQUEST_INTERVAL / 2;
+    requestInterval = REQUEST_INTERVAL;
   }
 
   @Override
@@ -250,7 +301,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       boolean newPromised = promisedUntil > now;
       if (newPromised != promisedSatisfied) {
         promisedSatisfied = newPromised;
-        if (!promisedSatisfied && !satisfied) panelBE().updatePowered();
+        if (!promisedSatisfied) {
+          onPromiseExpired();
+        }
         blockEntity.sendData();
       }
     }
@@ -259,7 +312,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       timer--;
       return;
     }
-    timer = REQUEST_INTERVAL;
+    timer = requestInterval;
     tryRequest();
   }
 
@@ -359,6 +412,12 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     }
 
     int requestedAmount = building.requestForGauge(getFilter().copy(), remaining, targetAddress);
+    // This ask reached the shop and had it look through the colony's warehouses. If it came back
+    // empty-handed, wait longer before asking again; if it worked, go back to asking often.
+    requestInterval =
+        requestedAmount > 0
+            ? REQUEST_INTERVAL
+            : Math.min(MAX_REQUEST_INTERVAL, requestInterval * 2);
     if (requestedAmount > 0) {
       int expiryTicks = getPromiseExpiryTimeInTicks();
       promisedUntil = expiryTicks < 0 ? Long.MAX_VALUE : getWorld().getGameTime() + expiryTicks;
@@ -519,7 +578,9 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     cachedFrogportAddress =
         tag.contains("FrogportAddress") ? tag.getString("FrogportAddress") : null;
     manualAddress = tag.contains("ManualAddress") ? tag.getString("ManualAddress") : null;
+    // -1 (never expire) like the field default and like Create's FactoryPanelBehaviour. A gauge
+    // saved before this setting existed used to come back with 0, which is 30 seconds.
     promiseClearingInterval =
-        tag.contains("PromiseClearingInterval") ? tag.getInt("PromiseClearingInterval") : 0;
+        tag.contains("PromiseClearingInterval") ? tag.getInt("PromiseClearingInterval") : -1;
   }
 }

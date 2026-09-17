@@ -376,8 +376,10 @@ public final class InflightBook<K> {
   }
 
   /**
-   * Picks the oldest overdue order not asked about yet and marks it as asked. At most one notice
-   * per call, grouped by item and address.
+   * Picks the oldest overdue order not asked about yet and marks it as asked, one notice per call.
+   * The notice carries that one segment's remaining amount, not the total of its item and address:
+   * a tuple can hold a second open segment, which ages past the timeout and is asked about on its
+   * own later.
    */
   public List<Notice<K>> consumeOverdueNotices(long now, long timeout) {
     if (timeout <= 0L || entries.isEmpty()) {

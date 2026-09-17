@@ -1,6 +1,6 @@
 package com.thesettler_x_create.stock.nbt;
 
-import com.thesettler_x_create.stock.ReservedAmount;
+import com.thesettler_x_create.stock.StockAmount;
 import com.thesettler_x_create.stock.StoredReservation;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,7 @@ public final class ReservationNbt {
     CompoundTag reservationsTag = new CompoundTag();
     for (StoredReservation<K> reservation : stored) {
       ListTag entries = new ListTag();
-      for (ReservedAmount<K> amount : reservation.amounts()) {
+      for (StockAmount<K> amount : reservation.amounts()) {
         CompoundTag entry = new CompoundTag();
         entry.put(TAG_STACK, keyWriter.apply(amount.key()));
         entry.putInt(TAG_AMOUNT, amount.amount());
@@ -63,7 +63,7 @@ public final class ReservationNbt {
         continue;
       }
       CompoundTag data = reservationsTag.getCompound(ownerKey);
-      List<ReservedAmount<K>> amounts = new ArrayList<>();
+      List<StockAmount<K>> amounts = new ArrayList<>();
       if (data.contains(TAG_ENTRIES, Tag.TAG_LIST)) {
         ListTag entries = data.getList(TAG_ENTRIES, Tag.TAG_COMPOUND);
         for (int i = 0; i < entries.size(); i++) {
@@ -79,12 +79,12 @@ public final class ReservationNbt {
     return stored;
   }
 
-  private static <K> Optional<ReservedAmount<K>> readAmount(
+  private static <K> Optional<StockAmount<K>> readAmount(
       CompoundTag entry, Function<Tag, Optional<K>> keyReader) {
     int amount = entry.getInt(TAG_AMOUNT);
     if (amount <= 0) {
       return Optional.empty();
     }
-    return keyReader.apply(entry.get(TAG_STACK)).map(key -> new ReservedAmount<>(key, amount));
+    return keyReader.apply(entry.get(TAG_STACK)).map(key -> new StockAmount<>(key, amount));
   }
 }

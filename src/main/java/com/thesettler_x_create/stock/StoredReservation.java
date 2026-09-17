@@ -11,9 +11,9 @@ import java.util.UUID;
  * @param amounts one entry per item kind
  */
 public record StoredReservation<K>(
-    UUID owner, long expiresAtGameTime, List<ReservedAmount<K>> amounts) {
+    UUID owner, long expiresAtGameTime, List<StockAmount<K>> amounts) {
 
   public StoredReservation {
-    amounts = List.copyOf(amounts);
+    amounts = amounts == null ? List.of() : List.copyOf(amounts);
   }
 }

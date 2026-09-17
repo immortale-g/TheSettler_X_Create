@@ -12,8 +12,8 @@ import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkPerfLogger;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
-import com.thesettler_x_create.stock.ReservedAmount;
 import com.thesettler_x_create.stock.ShopStockAccounting;
+import com.thesettler_x_create.stock.StockAmount;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -541,6 +541,25 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     capacityStallAccepted = 0;
   }
 
+  /**
+   * Clears the stall only when it is about one of {@code items}. The shop keeps a single stall at a
+   * time, so a request that fits would otherwise wipe the still-true stall of a different request
+   * for a different item and the player would never be told why nothing arrives.
+   */
+  public void clearCapacityStallFor(List<ItemStack> items) {
+    if (capacityStallStack.isEmpty() || items == null) {
+      return;
+    }
+    for (ItemStack item : items) {
+      if (item != null
+          && !item.isEmpty()
+          && ItemStack.isSameItemSameComponents(item, capacityStallStack)) {
+        clearCapacityStall();
+        return;
+      }
+    }
+  }
+
   public boolean hasCapacityStall() {
     if (capacityStallUntil <= 0L || level == null) {
       return false;
@@ -635,9 +654,9 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return budgets;
     }
     long now = getLevel().getGameTime();
-    List<ReservedAmount<ItemStack>> unreserved = new ArrayList<>();
+    List<StockAmount<ItemStack>> unreserved = new ArrayList<>();
     for (RackStackBudget budget : budgets) {
-      unreserved.add(new ReservedAmount<>(budget.key, budget.remaining));
+      unreserved.add(new StockAmount<>(budget.key, budget.remaining));
     }
     if (stockAging.update(unreserved, now)) {
       setChanged();
