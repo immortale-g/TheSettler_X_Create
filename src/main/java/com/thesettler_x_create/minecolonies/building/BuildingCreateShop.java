@@ -467,9 +467,9 @@ public class BuildingCreateShop extends AbstractBuilding {
     return workerStatus.isWorkerWorking();
   }
 
-  /** Whether anyone is employed as this shop's shopkeeper, awake or not. */
-  public boolean hasShopkeeper() {
-    return workerStatus.hasShopkeeper();
+  /** Whether the shop takes colony orders on at all: someone is employed and not paused. */
+  public boolean acceptsColonyRequests() {
+    return workerStatus.acceptsColonyRequests();
   }
 
   public boolean hasResolverWork() {

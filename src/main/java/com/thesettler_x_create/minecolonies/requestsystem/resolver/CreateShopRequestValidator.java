@@ -104,8 +104,8 @@ final class CreateShopRequestValidator {
     // it
     // away at night would push it through the retry chain into the player's request list instead.
     // Fulfilment is where the waiting happens: the Create network only counts while he works.
-    if (!shop.hasShopkeeper() && !holdDeliveryWindow) {
-      DebugLog.info("[CreateShop] canResolve=false (nobody works in this shop)");
+    if (!shop.acceptsColonyRequests() && !holdDeliveryWindow) {
+      DebugLog.info("[CreateShop] canResolve=false (shop closed: nobody employed or paused)");
       return false;
     }
     chain.sanitizeRequestChain(manager, request);
