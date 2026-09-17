@@ -7,6 +7,10 @@ name: Compat (latest releases)
 # Scheduled runs always use this file from the default branch, so the branch list lives here: the
 # nightly run checks the release line (master) and the development line (develop). A manual run
 # checks only the branch it was started on.
+#
+# Because this file comes from the default branch while the checkout is per-branch, it must not name
+# individual verification tasks: a task renamed on one line and not the other fails the run before a
+# single test starts. It asks for check instead, and every branch wires its own tasks into check.
 on:
   schedule:
     - cron: '17 4 * * *'
@@ -43,4 +47,4 @@ jobs:
           echo "Testing ${{ matrix.ref }} with: $args" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compile and test against latest releases
-        run: ./gradlew compileJava test testStructurizeModernApi testFactoryLogistics testFml ${{ steps.deps.outputs.args }}
+        run: ./gradlew compileJava check -x spotlessCheck ${{ steps.deps.outputs.args }}
