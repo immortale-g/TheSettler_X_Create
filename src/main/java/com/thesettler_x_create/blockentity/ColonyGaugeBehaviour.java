@@ -245,8 +245,13 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   private void onPromiseExpired() {
     String targetAddress = manualAddress != null ? manualAddress : cachedFrogportAddress;
     BuildingCreateShop building = findBuilding();
+    // An empty filter would match every item at this address and take the other slots' orders with
+    // it. resetFilter cancels before it clears, so this only guards against a state nobody sets.
     int stillRunning =
-        building == null || targetAddress == null || targetAddress.isBlank()
+        building == null
+                || targetAddress == null
+                || targetAddress.isBlank()
+                || getFilter().isEmpty()
             ? 0
             : building.cancelStalledGaugeRequests(getFilter(), targetAddress);
     if (stillRunning > 0) {
