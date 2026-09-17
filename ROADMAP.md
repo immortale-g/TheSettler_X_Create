@@ -98,16 +98,20 @@ Branch `feat/inflight-pool` (baut auf `feat/stock-observer` auf), noch nicht im 
 
 ### Offen für 1.0
 
-- `finalizeOrphanDeliveryChild` und `CreateShopDeliveryChildRecoveryService` greifen weiterhin in
-  Warehouse-Queue und Kurier-Tasks ein. Vor dem Entfernen prüfen, ob die Probleme von damals noch
-  reproduzierbar sind.
-- `ShopCourierDiagnostics` verändert per Reflection Citizen-Zustand, sobald `debugLogging` an ist.
-  Eine Diagnose darf nur beobachten.
 - Requests, die mindestens `minimumCount` erhalten haben und bei leerem Create-Netz festhängen,
   blockieren andere Resolver. Klären, ob sie nach einer Frist abgeschlossen oder freigegeben werden.
 - `attemptResolve` umbauen, sobald die Bestandsformeln aus 0.4.0/0.5.0 getestet vorliegen.
-- Kleinkram: ungenutztes `CreateShopTestRequestPayload`, zwei `getSimpleName()`-Stringvergleiche,
-  Helper für den Debug-Log-Guard, Gradle-Task `testModernStructurize` umbenennen.
+- Die drei 0.5.0-Services (`CreateShopNetworkOrderService`, `CreateShopPickupObservationService`,
+  `CreateShopOpenDeliveryTopupService`) haben keine eigenen Verhaltenstests, `ShopGaugeQueue` und die
+  Pakete `building/` und `tileentity/` gar keine.
+- `InflightBook.compact()` verwirft bei unowned Einträgen alles über zwei Segmente pro Tupel, ohne
+  die Restmenge einzufalten. Die verworfene Menge ist echte bestellte Ware; entweder einfalten oder
+  bewusst dokumentieren, warum nicht.
+- `onHutItemsTaken` kann eine Entnahme dem falschen Geschwister-Delivery zuordnen, weil das Spiel
+  keine Akteursidentität liefert. Korrigiert sich selbst, bleibt aber eine bekannte Grenze.
+- `ShopLostPackageRequestCanceller.tryForceCleanRequest` erkennt kaputte Request-Graphen an
+  Teilstrings der Exception-Meldung. Über MineColonies-Versionen hinweg brüchig, kein Test pinnt die
+  Strings.
 - Dedicated-Server-Test und mehrere Shops in einer Colony.
 - Racks und Hütten-Inventar trennen. Die Racks gehören der Create-Seite (Ware aus dem Netz,
   Reservierungen, Einsammeln der Deliveries), das Hütten-Inventar der Kolonie-Seite (Ware, die nach
