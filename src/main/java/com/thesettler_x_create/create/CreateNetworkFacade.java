@@ -25,10 +25,20 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
   // Owned by the shop, not this facade - the facade is constructed fresh at nearly every call
   // site, so a logger living here would never carry its cooldown state past a single call.
   private final CreateNetworkPerfLogger perfLogger;
+  private final ShopSupplyPolicy supplyPolicy;
 
   public CreateNetworkFacade(TileEntityCreateShop shop) {
+    this(shop, ShopSupplyPolicy.ALLOW_EVERYTHING);
+  }
+
+  /**
+   * @param supplyPolicy how much of each item kind the caller may have. Colony requests pass the
+   *     shop's own policy here; the shop's own flows take everything.
+   */
+  public CreateNetworkFacade(TileEntityCreateShop shop, ShopSupplyPolicy supplyPolicy) {
     this.shop = shop;
     this.perfLogger = shop != null ? shop.getPerfLogger() : new CreateNetworkPerfLogger();
+    this.supplyPolicy = supplyPolicy == null ? ShopSupplyPolicy.ALLOW_EVERYTHING : supplyPolicy;
   }
 
   @Override
@@ -43,7 +53,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
         continue;
       }
       if (deliverable.matches(stack.stack)) {
-        total += stack.count;
+        total += allowed(stack);
       }
     }
     int result = Math.max(0, total);
@@ -52,6 +62,11 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
           "[CreateShop] getAvailable={} for {}", result, deliverable);
     }
     return result;
+  }
+
+  /** How many of this network entry the caller may have under its supply policy. */
+  private int allowed(BigItemStack stack) {
+    return Math.max(0, Math.min(stack.count, supplyPolicy.allowanceFor(stack.stack, stack.count)));
   }
 
   @Override
@@ -160,7 +175,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       if (remaining <= 0) {
         break;
       }
-      int available = Math.min(remaining, stack.count);
+      int available = Math.min(remaining, allowed(stack));
       if (available <= 0) {
         continue;
       }

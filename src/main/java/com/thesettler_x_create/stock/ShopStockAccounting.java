@@ -25,6 +25,15 @@ public final class ShopStockAccounting {
     return Math.max(0, rackStock - Math.max(0, reservedForOthers));
   }
 
+  /**
+   * Network stock of one item kind the colony may draw: what is there beyond the minimum the shop
+   * keeps in the network for its own production. A blocked item kind keeps nothing back here, the
+   * caller does not ask about it at all.
+   */
+  public static int drawableFromNetwork(int inNetwork, int keepInNetwork) {
+    return Math.max(0, inNetwork - Math.max(0, keepInNetwork));
+  }
+
   /** Everything the shop can hand out for a request: network, usable rack and pickup stock. */
   public static int totalAvailable(int networkStock, int usableRackStock, int pickupStock) {
     return Math.max(0, networkStock + usableRackStock + pickupStock);

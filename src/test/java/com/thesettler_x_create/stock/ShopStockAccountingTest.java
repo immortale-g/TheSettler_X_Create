@@ -24,6 +24,15 @@ class ShopStockAccountingTest {
   }
 
   @Test
+  void drawableFromNetworkKeepsTheShopsOwnMinimum() {
+    assertEquals(36, ShopStockAccounting.drawableFromNetwork(100, 64));
+    assertEquals(0, ShopStockAccounting.drawableFromNetwork(64, 64));
+    assertEquals(0, ShopStockAccounting.drawableFromNetwork(10, 64));
+    assertEquals(10, ShopStockAccounting.drawableFromNetwork(10, 0));
+    assertEquals(10, ShopStockAccounting.drawableFromNetwork(10, -5));
+  }
+
+  @Test
   void totalAvailableAddsAllSourcesAndNeverGoesNegative() {
     assertEquals(100, ShopStockAccounting.totalAvailable(60, 30, 10));
     assertEquals(0, ShopStockAccounting.totalAvailable(-50, 10, 0));

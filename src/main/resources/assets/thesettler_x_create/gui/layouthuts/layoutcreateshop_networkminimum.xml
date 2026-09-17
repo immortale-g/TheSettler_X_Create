@@ -1,0 +1,20 @@
+<window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd"
+    size="190 244">
+    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="190 244"/>
+    <text id="desc" size="130 11" pos="30 14" color="black" textalign="MIDDLE"/>
+
+    <button id="addMinimum" size="86 17" pos="50 30" color="black"
+            source="minecolonies:textures/gui/builderhut/builder_button_medium.png"
+            label="$(com.thesettler_x_create.gui.createshop.networkminimum.add)"/>
+
+    <list id="minimumList" size="170 180" pos="13 50"
+          emptytext="$(com.thesettler_x_create.gui.createshop.networkminimum.empty)" emptycolor="black">
+        <box size="100% 17" linewidth="1">
+            <itemicon id="itemIcon" size="17 17" pos="0 0"/>
+            <text id="itemName" size="90 12" pos="20 1" color="black"/>
+            <text id="itemAmount" size="20 12" pos="110 1" color="black"/>
+            <button id="removeMinimum" label="X" pos="134 1" size="29 15" color="red"
+                    source="minecolonies:textures/gui/builderhut/builder_button_very_small.png"/>
+        </box>
+    </list>
+</window>
