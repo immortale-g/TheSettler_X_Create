@@ -93,6 +93,26 @@ class CreateShopChainOriginGuardFmlTest {
             manager, (IRequest<? extends IDeliverable>) citizenRequest));
   }
 
+  @Test
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  void aChainTooDeepToWalkIsLeftAloneAsWell() {
+    // Past the walk's own limit the origin cannot be established. Answering "no shop involved"
+    // there is the answer that lets the goods travel in a circle, so the shop stays out.
+    IToken<?> parent = gaugeToken;
+    IRequest<?> deepest = gaugeRequest;
+    for (int i = 0; i < 40; i++) {
+      IToken<?> token = mock(IToken.class);
+      deepest = requestFor(new Stack(new ItemStack(Items.COAL), 16, 16), OTHER_POS, parent);
+      when(((IRequest) deepest).getId()).thenReturn((IToken) token);
+      when(manager.getRequestHandler().getRequest(token)).thenReturn((IRequest) deepest);
+      parent = token;
+    }
+
+    assertTrue(
+        CreateShopChainOriginGuard.servesAShopsOwnOrder(
+            manager, (IRequest<? extends IDeliverable>) deepest));
+  }
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private IRequest<?> requestFor(Stack deliverable, BlockPos requesterPos, IToken<?> parent) {
     IRequest<?> request = mock(IRequest.class);

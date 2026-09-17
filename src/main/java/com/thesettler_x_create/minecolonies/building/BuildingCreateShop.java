@@ -634,6 +634,10 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
     ItemStack requested = stackKey.copy();
     requested.setCount(reorderTarget);
+    // Deliberately without the colony supply policy: this is not the colony drawing stock, it is
+    // the shop replacing a package it already ordered for a request it already took on. A block
+    // list or a minimum the player adds in between applies to the next order, not to finishing
+    // this one, which would otherwise leave the request waiting for goods nobody will send again.
     var reordered =
         new CreateNetworkFacade(tile)
             .requestStacksImmediate(List.of(requested), requesterName, requestUuid);

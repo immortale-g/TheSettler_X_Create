@@ -10,6 +10,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Keeps goods from running in a circle. A Colony Gauge asks the colony for something so it can go
@@ -47,15 +48,27 @@ final class CreateShopChainOriginGuard {
       return false;
     }
     IRequest<?> root = rootOf(standard, request);
+    if (root == null) {
+      // Deeper than the walk goes. Which order this belongs to cannot be said, and saying "not a
+      // shop's" would be the answer that reopens the circle, so the shop stays out of it.
+      return true;
+    }
     if (!isShopRequest(manager.getColony(), root)) {
       return false;
     }
     return wantsTheSameGoods(request.getRequest(), root);
   }
 
+  /**
+   * The request the chain started from, or {@code null} when the walk ran into its own depth limit
+   * before reaching one. A parent that cannot be read is different: the deepest request that could
+   * be read is then the start of everything still known about this chain.
+   */
+  @Nullable
   private static IRequest<?> rootOf(IStandardRequestManager standard, IRequest<?> request) {
     IRequest<?> root = request;
-    for (int depth = 0; depth < MAX_DEPTH && root.hasParent(); depth++) {
+    int depth = 0;
+    for (; depth < MAX_DEPTH && root.hasParent(); depth++) {
       IToken<?> parentToken = root.getParent();
       if (parentToken == null) {
         break;
@@ -72,7 +85,7 @@ final class CreateShopChainOriginGuard {
       }
       root = parent;
     }
-    return root;
+    return depth >= MAX_DEPTH && root.hasParent() ? null : root;
   }
 
   private static boolean isShopRequest(IColony colony, IRequest<?> root) {

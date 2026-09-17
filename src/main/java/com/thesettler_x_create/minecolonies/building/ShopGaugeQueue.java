@@ -134,7 +134,13 @@ final class ShopGaugeQueue {
     }
 
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
-    Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, actualAmount);
+    // The full amount as the minimum is what makes a warehouse that cannot cover it hand the rest
+    // to the crafters, so it belongs on the craftable branch alone. On the other branch the amount
+    // is what a warehouse held a moment ago: asking for that much at minimum would turn a handful
+    // of units drawn by someone else in between into a child request nobody can craft, where
+    // before the gauge simply took what was left.
+    int minimumCount = craftable ? actualAmount : 1;
+    Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, minimumCount);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
     if (token != null) {
       UUID requestId = toRequestId(token);

@@ -32,6 +32,10 @@ handlers for Create blocks the colony builder cannot otherwise place.
   They are deliberately not interoperable with Create's own gauges and packagers.
 - **Inflight tracking** — a mod-side record of what was ordered from the network but has not yet
   arrived, persisted across reloads.
+- **Supply policy** — what a shop lets the colony take out of its Create network. Two per-shop
+  settings feed it: a block list of item kinds the colony may not draw at all, and a minimum of an
+  item kind the shop keeps in the network for the production it supplies. Both apply to colony
+  requests only; the shop's own flows see the network unfiltered.
 
 Perma requests (a curated ore-tag request list, gated by building level) are **disabled as of
 0.3.0**. `BuildingCreateShop.canUsePermaRequests()` returns `false` and the Gauge/Packager pair
@@ -49,6 +53,14 @@ replaces the workflow. The module and its GUI tab still exist but are inert.
 7. Once the parent has no open child, MineColonies calls `resolveRequest`. Like a crafter, the shop
    resolves the parent only when the delivered amount covers the request. Otherwise the parent
    stays `IN_PROGRESS` and the tick orders and delivers the rest.
+
+A Colony Gauge asks the colony for what a warehouse holds, and for what a crafter could make: the
+order names the full amount as its minimum, which is what makes MineColonies hand a warehouse's
+shortfall to the crafting resolvers. Because the shop's own resolver sits above those resolvers, it
+would otherwise take those goods straight back out of the network the gauge is filling, so a shop
+never serves what a shop asked the colony for when it is the same item
+(`CreateShopChainOriginGuard`). What a crafter needs to make it is a different item and may come
+from the network.
 
 Step 5 is a hard boundary, drawn in Phase 3.5 (`e2387bd`). The shop does not finish, cancel or
 otherwise steer courier tasks. See the "No courier injection" constraint in

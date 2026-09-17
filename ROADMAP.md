@@ -96,6 +96,22 @@ Branch `feat/inflight-pool` (baut auf `feat/stock-observer` auf), noch nicht im 
 - Colony Factory Gauge bleibt beim Reservieren beim Bestellen; das löst die Trennung von Racks und
   Hütte in 1.0.
 
+### 0.6.0: Versorgungspolitik und Gauge-Fertigung
+
+Branches `feature/shop-supply-policy` und `feature/gauge-colony-crafting`, zusammen testbar über
+`integration/supply-policy-and-crafting`. Noch nicht ingame getestet.
+
+- Pro Shop eine Sperrliste, welche Items die Kolonie **nicht** aus dem Create-Netz abrufen darf
+  (MineColonies' `ItemListModule`, leere Liste = alles erlaubt).
+- Pro Shop ein Mindestbestand je Item, der im Create-Netz bleibt. Hält nur zurück, bestellt nichts
+  nach. Beides wirkt über `ShopSupplyPolicy` in `CreateShopStockResolver`, eigene Shop-Abläufe
+  bleiben ungefiltert.
+- Die Gauge fragt auch nach Dingen, die die Kolonie herstellen könnte: volle Menge als
+  `minimumCount`, damit MineColonies die Restmenge ans Crafting gibt, plus Vorabprüfung, ob
+  überhaupt jemand das Rezept kennt.
+- `CreateShopChainOriginGuard` verhindert den Warenkreisel: kein Shop bedient das, was ein Shop bei
+  der Kolonie bestellt hat, solange es um dasselbe Item geht.
+
 ### Offen für 1.0
 
 - Requests, die mindestens `minimumCount` erhalten haben und bei leerem Create-Netz festhängen,
