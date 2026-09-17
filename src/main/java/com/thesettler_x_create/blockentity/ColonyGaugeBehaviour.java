@@ -232,6 +232,40 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     return Component.literal(Math.max(0, value.value()) + ((value.row() == 0) ? "" : "▤"));
   }
 
+  /**
+   * The promise lifetime ran out. Create can simply forget its promise: its order lives in the same
+   * stock network and cannot outlive it by much. Ours is a colony request with a courier walking
+   * towards it, so forgetting it would let it arrive later on top of whatever is asked for next.
+   *
+   * <p>So the order is withdrawn instead, the same thing the Clear Promises button does, but only
+   * where nobody is carrying it out yet. A courier already on his way keeps the order and the slot
+   * keeps waiting for another interval: cancelling him would waste the trip, and with a lifetime
+   * shorter than his round trip the slot would cancel and re-place an order forever.
+   */
+  private void onPromiseExpired() {
+    String targetAddress = manualAddress != null ? manualAddress : cachedFrogportAddress;
+    BuildingCreateShop building = findBuilding();
+    int stillRunning =
+        building == null || targetAddress == null || targetAddress.isBlank()
+            ? 0
+            : building.cancelStalledGaugeRequests(getFilter(), targetAddress);
+    if (stillRunning > 0) {
+      promisedSatisfied = true;
+      int expiryTicks = getPromiseExpiryTimeInTicks();
+      promisedUntil = expiryTicks < 0 ? Long.MAX_VALUE : getWorld().getGameTime() + expiryTicks;
+      DebugLog.info(
+          "[ColonyGauge] promise expired slot={} keptRunning={} (waiting another interval)",
+          slot.getSerializedName(),
+          stillRunning);
+      return;
+    }
+    promisedAmount = 0;
+    promisedUntil = 0L;
+    if (!satisfied) {
+      panelBE().updatePowered();
+    }
+  }
+
   private void resetTimerSlightly() {
     timer = REQUEST_INTERVAL / 2;
   }
@@ -251,16 +285,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       if (newPromised != promisedSatisfied) {
         promisedSatisfied = newPromised;
         if (!promisedSatisfied) {
-          // The promise lifetime ran out, so this slot stops counting on that order. Create can
-          // simply forget its promise, because its own order lives in the same stock network and
-          // shrinks as goods arrive. Ours is a colony request with a courier walking towards it: if
-          // it is only forgotten, it still arrives later, on top of whatever is asked for next.
-          // Forgetting it therefore means withdrawing it, the same thing the Clear Promises button
-          // in the gauge UI does.
-          cancelActiveRequests();
-          promisedAmount = 0;
-          promisedUntil = 0L;
-          if (!satisfied) panelBE().updatePowered();
+          onPromiseExpired();
         }
         blockEntity.sendData();
       }

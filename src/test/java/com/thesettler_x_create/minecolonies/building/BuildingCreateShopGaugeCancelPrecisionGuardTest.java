@@ -26,14 +26,15 @@ class BuildingCreateShopGaugeCancelPrecisionGuardTest {
   void cancelDoesNotFallBackToItemOnlyLiveScan() throws Exception {
     String source = Files.readString(Path.of(SOURCE));
 
-    int method = source.indexOf("int cancelPendingGaugeRequests(");
+    // Both cancel entry points run through sweep(), so that is where the filter has to sit.
+    int method = source.indexOf("private GaugeSweepResult sweep(");
     // Bounded lookahead instead of a line-ending-sensitive "end of method" marker - this file is
     // checked out with CRLF line endings, which broke a "\n  }\n" search.
     String body = source.substring(method, Math.min(source.length(), method + 1400));
 
     // The old fallback matched by getRequestsMadeByRequester(...) + ItemStack.isSameItem alone,
-    // with no address check - it must be gone from this method entirely.
-    assertFalse(body.contains("getRequestsMadeByRequester"));
+    // with no address check - it must be gone from this file entirely.
+    assertFalse(source.contains("getRequestsMadeByRequester"));
     // The map-based path (now the only path) must still filter by address.
     assertTrue(body.contains("task.gaugeAddress().equals(gaugeAddress)"));
   }

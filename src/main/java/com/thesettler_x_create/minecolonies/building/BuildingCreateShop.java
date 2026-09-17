@@ -501,6 +501,16 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   /**
+   * Cancels the gauge requests for this item and address that nothing is happening on yet and
+   * leaves the ones a courier is already carrying out.
+   *
+   * @return how many requests were left running
+   */
+  public int cancelStalledGaugeRequests(ItemStack item, String gaugeAddress) {
+    return gaugeQueue.cancelStalledGaugeRequests(item, gaugeAddress);
+  }
+
+  /**
    * Tokens of colony requests this shop currently has open as a requester on behalf of a Colony
    * Factory Gauge (delivery-to-shop, not the shop resolving a customer request) — surfaced in the
    * shop's task UI, which otherwise only shows requests where the shop is the resolver.

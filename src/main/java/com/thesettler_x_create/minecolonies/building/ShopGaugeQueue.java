@@ -172,19 +172,44 @@ final class ShopGaugeQueue {
    * still-wanted request too.
    */
   int cancelPendingGaugeRequests(ItemStack item, String gaugeAddress) {
+    return sweep(item, gaugeAddress, false).cancelled();
+  }
+
+  /**
+   * Cancels only what nothing is happening on yet. A request a courier has already been assigned to
+   * is left alone: taking it away mid-walk wastes the trip, and a gauge whose promise lifetime is
+   * shorter than a courier's round trip would otherwise cancel and re-place an order every time the
+   * lifetime runs out, forever.
+   *
+   * @return how many requests were left running
+   */
+  int cancelStalledGaugeRequests(ItemStack item, String gaugeAddress) {
+    return sweep(item, gaugeAddress, true).keptRunning();
+  }
+
+  /** What one sweep over the tracked gauge requests did. */
+  record GaugeSweepResult(int cancelled, int keptRunning) {}
+
+  private GaugeSweepResult sweep(ItemStack item, String gaugeAddress, boolean keepRunning) {
     if (gaugeAddress == null || gaugeAddress.isBlank() || owner.getColony() == null) {
-      return 0;
+      return new GaugeSweepResult(0, 0);
     }
     if (!(owner.getColony().getRequestManager() instanceof IStandardRequestManager standard)) {
-      return 0;
+      return new GaugeSweepResult(0, 0);
     }
     Set<IToken<?>> toCancel = new LinkedHashSet<>();
+    Set<UUID> keptRequestIds = new LinkedHashSet<>();
     for (var entry : pendingGaugeRequests.entrySet()) {
       GaugePackagingTask task = entry.getValue();
-      if (task.gaugeAddress().equals(gaugeAddress)
-          && (item == null || item.isEmpty() || ItemStack.isSameItem(task.item(), item))) {
-        toCancel.add(entry.getKey());
+      if (!task.gaugeAddress().equals(gaugeAddress)
+          || !(item == null || item.isEmpty() || ItemStack.isSameItem(task.item(), item))) {
+        continue;
       }
+      if (keepRunning && isBeingWorkedOn(standard, entry.getKey())) {
+        keptRequestIds.add(task.requestId());
+        continue;
+      }
+      toCancel.add(entry.getKey());
     }
     CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
     int cancelled = 0;
@@ -205,21 +230,46 @@ final class ShopGaugeQueue {
         pickup.release(toRequestId(token));
       }
     }
-    // Same filter the tokens above were picked with. Matching the address alone would drop the
-    // queued task of a second panel that asked for a different item through the same frogport,
-    // whose request is still open and whose reservation nobody would release afterwards.
+    // Same filter the tokens above were picked with, minus what stays running. Matching the address
+    // alone would drop the queued task of a second panel that asked for a different item through
+    // the same frogport, whose request is still open and whose reservation nobody would release.
     gaugePackagingQueue.removeIf(
         t ->
             t.gaugeAddress().equals(gaugeAddress)
-                && (item == null || item.isEmpty() || ItemStack.isSameItem(t.item(), item)));
+                && (item == null || item.isEmpty() || ItemStack.isSameItem(t.item(), item))
+                && !keptRequestIds.contains(t.requestId()));
     if (cancelled > 0) {
       owner.markDirty();
       DebugLog.info(
-          "[ColonyGauge] cancelPendingGaugeRequests address={} cancelled={}",
+          "[ColonyGauge] cancelPendingGaugeRequests address={} cancelled={} keptRunning={}",
           gaugeAddress,
-          cancelled);
+          cancelled,
+          keptRequestIds.size());
     }
-    return cancelled;
+    return new GaugeSweepResult(cancelled, keptRequestIds.size());
+  }
+
+  /**
+   * Whether MineColonies has put someone on this request already, either by state or by having
+   * handed out a delivery child for it.
+   */
+  private static boolean isBeingWorkedOn(IStandardRequestManager standard, IToken<?> token) {
+    try {
+      IRequest<?> request = standard.getRequestHandler().getRequest(token);
+      if (request == null) {
+        return false;
+      }
+      if (request.hasChildren()) {
+        return true;
+      }
+      RequestState state = request.getState();
+      return state == RequestState.ASSIGNED
+          || state == RequestState.IN_PROGRESS
+          || state == RequestState.FOLLOWUP_IN_PROGRESS;
+    } catch (Exception ignored) {
+      // A token whose request cannot be read is not being worked on by anyone.
+      return false;
+    }
   }
 
   /**
