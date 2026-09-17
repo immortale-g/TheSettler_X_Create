@@ -81,6 +81,22 @@ final class ShopWorkerStatus {
     return hasShopWorker ? "blocked" : "no-assigned-shopworker";
   }
 
+  /**
+   * Whether the shop has a shopkeeper at all. This is what decides if the shop takes a colony
+   * request on, not whether he happens to be awake: a request the shop accepts stays with the shop
+   * and is served once he is back at work, the same way a crafting resolver takes a request while
+   * its crafter sleeps. Only a shop nobody works in has to turn requests away, so MineColonies can
+   * hand them to someone who can.
+   */
+  boolean hasShopkeeper() {
+    for (ICitizenData citizen : shop.getAllAssignedCitizen()) {
+      if (citizen != null && citizen.getJob() instanceof JobCreateShop) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   boolean isWorkerWorking() {
     boolean hasShopWorker = false;
     for (ICitizenData citizen : shop.getAllAssignedCitizen()) {

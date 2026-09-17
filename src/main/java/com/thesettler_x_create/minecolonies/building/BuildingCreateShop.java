@@ -467,6 +467,11 @@ public class BuildingCreateShop extends AbstractBuilding {
     return workerStatus.isWorkerWorking();
   }
 
+  /** Whether anyone is employed as this shop's shopkeeper, awake or not. */
+  public boolean hasShopkeeper() {
+    return workerStatus.hasShopkeeper();
+  }
+
   public boolean hasResolverWork() {
     CreateShopRequestResolver resolver = getOrCreateShopResolver();
     return (resolver != null && resolver.hasProtectedInventoryWindow()) || hasIncomingRackWork();
