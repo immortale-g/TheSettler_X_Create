@@ -110,6 +110,23 @@ final class ShopGaugeQueue {
     }
     int actualAmount = Math.min(amount, available);
 
+    // A gauge asks again once its promise runs out, which happens long before a slow delivery
+    // arrives. Anything still waiting to be packaged for this item and address is that earlier
+    // ask, so report its amount back instead of placing a second colony request: two requests
+    // would draw the warehouse twice and reserve rack stock twice for one gauge slot.
+    GaugePackagingTask queued = findOpenTask(item, gaugeAddress);
+    if (queued != null) {
+      if (DebugLog.enabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=already-requested item={} amount={} openAmount={} address={}",
+            item.getItem(),
+            actualAmount,
+            queued.amount(),
+            gaugeAddress);
+      }
+      return queued.amount();
+    }
+
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
     Stack deliverable = new Stack(item.copyWithCount(1), actualAmount, 1);
     IToken<?> token = manager.createAndAssignRequest(requester, deliverable);
@@ -117,17 +134,8 @@ final class ShopGaugeQueue {
       UUID requestId = toRequestId(token);
       GaugePackagingTask task =
           new GaugePackagingTask(item.copy(), actualAmount, gaugeAddress, requestId);
-      // Queue for packaging (deduplicated by item+address to avoid double-queuing on re-request).
-      boolean alreadyQueued =
-          gaugePackagingQueue.stream()
-              .anyMatch(
-                  t ->
-                      ItemStack.isSameItem(t.item(), item)
-                          && t.gaugeAddress().equals(gaugeAddress));
-      if (!alreadyQueued) {
-        gaugePackagingQueue.add(task);
-        owner.markDirty();
-      }
+      gaugePackagingQueue.add(task);
+      owner.markDirty();
       pendingGaugeRequests.put(token, task);
       // Protect the delivered item from rack housekeeping (which sweeps "unreserved" rack stock
       // back to the warehouse) until CreateShopOutputBlockEntity actually packages it.
@@ -137,13 +145,12 @@ final class ShopGaugeQueue {
       }
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] request created token={} item={} amount={} available={} address={} queued={}",
+            "[ColonyGauge] request created token={} item={} amount={} available={} address={}",
             token,
             item.getItem(),
             actualAmount,
             available,
-            gaugeAddress,
-            !alreadyQueued);
+            gaugeAddress);
       }
     } else if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
@@ -287,9 +294,41 @@ final class ShopGaugeQueue {
 
   /** Cleans up gauge tracking when a request this shop placed for a Gauge completes. */
   void onRequestComplete(@Nullable IRequest<?> request) {
-    if (request != null) {
-      pendingGaugeRequests.remove(request.getId());
+    if (request == null) {
+      return;
     }
+    GaugePackagingTask task = pendingGaugeRequests.remove(request.getId());
+    if (task == null) {
+      return;
+    }
+    // The reservation protects the delivered goods from rack housekeeping until they are packaged,
+    // so it stays while the task is still queued; completeNextGaugeTask releases it then. Without a
+    // queued task nobody would release it anymore and it would sit there until its TTL runs out.
+    if (gaugePackagingQueue.stream().noneMatch(t -> t.requestId().equals(task.requestId()))) {
+      CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
+      if (pickup != null) {
+        pickup.release(task.requestId());
+      }
+    }
+  }
+
+  /**
+   * The gauge task for this item and address that is still waiting for its goods, or {@code null}
+   * when nothing is open for it.
+   */
+  @Nullable
+  private GaugePackagingTask findOpenTask(ItemStack item, String gaugeAddress) {
+    for (GaugePackagingTask task : gaugePackagingQueue) {
+      if (ItemStack.isSameItem(task.item(), item) && task.gaugeAddress().equals(gaugeAddress)) {
+        return task;
+      }
+    }
+    for (GaugePackagingTask task : pendingGaugeRequests.values()) {
+      if (ItemStack.isSameItem(task.item(), item) && task.gaugeAddress().equals(gaugeAddress)) {
+        return task;
+      }
+    }
+    return null;
   }
 
   void load(net.minecraft.core.HolderLookup.Provider provider, CompoundTag compound) {
