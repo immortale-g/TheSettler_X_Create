@@ -237,6 +237,15 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
   private static ControllerKey resolveControllerKey(
       Level level, BlockPos segmentPos, CompoundTag tileEntityData) {
     BlockPos controllerPos = readControllerPos(tileEntityData);
+    if (controllerPos == null) {
+      // Without a controller this segment cannot be grouped with the rest of its run, so it gets a
+      // buffer of its own rather than sharing one with every other controller-less segment.
+      controllerPos = segmentPos;
+      if (DebugLog.enabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateCompat] belt segment at {} has no Controller in its blueprint NBT", segmentPos);
+      }
+    }
     IColony colony = IColonyManager.getInstance().getColonyByPosFromWorld(level, segmentPos);
     int colonyId = colony != null ? colony.getID() : -1;
     return new ControllerKey(level.dimension(), colonyId, controllerPos);
@@ -282,8 +291,18 @@ public class CreateBeltPlacementHandler implements IPlacementHandler {
     }
   }
 
+  /**
+   * The belt run's controller position from its blueprint NBT, or {@code null} when the blueprint
+   * carries no usable one. {@code getIntArray} answers a missing or wrongly-typed tag with an empty
+   * array, so a hand-edited blueprint (or a future Create version renaming the tag) would otherwise
+   * throw out of a Structurize placement callback for every segment it has.
+   */
+  @Nullable
   private static BlockPos readControllerPos(CompoundTag tileEntityData) {
     int[] controller = tileEntityData.getIntArray("Controller");
+    if (controller.length < 3) {
+      return null;
+    }
     return new BlockPos(controller[0], controller[1], controller[2]);
   }
 }

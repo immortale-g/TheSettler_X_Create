@@ -176,19 +176,40 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
   }
 
   /**
-   * Called by ColonyPackagerBlockEntity after unwrapping a box. Tries to match by item; falls back
-   * to first promisedSatisfied slot.
+   * Called by ColonyPackagerBlockEntity after unwrapping a box. Matches the waiting slots by item,
+   * first on item and components, then on the item alone, and only clears the first waiting slot
+   * when neither matches. That last step is a guess: it clears a slot whose goods have not arrived
+   * while the slot the delivery belongs to stays promised and never asks again. The two real
+   * matches keep that guess for the case it is meant for, a delivery of something no slot asked for
+   * at all.
    */
   public void onDeliveryReceived(ItemStack deliveredItem) {
+    if (matchWaitingPanel(deliveredItem, true) || matchWaitingPanel(deliveredItem, false)) {
+      return;
+    }
+    onDeliveryReceived();
+  }
+
+  /**
+   * Tells the first waiting slot whose filter matches {@code deliveredItem} that its delivery
+   * arrived.
+   *
+   * @param withComponents whether the components have to match as well
+   * @return whether a slot was found
+   */
+  private boolean matchWaitingPanel(ItemStack deliveredItem, boolean withComponents) {
     for (ColonyGaugeBehaviour behaviour : panels.values()) {
       if (!behaviour.isActive() || !behaviour.promisedSatisfied) continue;
-      if (ItemStack.isSameItem(behaviour.getFilter(), deliveredItem)) {
+      boolean matches =
+          withComponents
+              ? ItemStack.isSameItemSameComponents(behaviour.getFilter(), deliveredItem)
+              : ItemStack.isSameItem(behaviour.getFilter(), deliveredItem);
+      if (matches) {
         behaviour.onDeliveryReceived();
-        return;
+        return true;
       }
     }
-    // Fallback: no item match — mark first waiting slot as done
-    onDeliveryReceived();
+    return false;
   }
 
   public void onDeliveryReceived() {

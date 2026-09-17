@@ -328,7 +328,7 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
       }
     }
     if (!capacityStalled) {
-      shop.clearCapacityStall();
+      shop.clearCapacityStallFor(consolidated);
     }
     return normalized;
   }

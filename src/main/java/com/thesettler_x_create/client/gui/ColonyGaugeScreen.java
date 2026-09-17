@@ -213,15 +213,13 @@ public class ColonyGaugeScreen extends AbstractSimiScreen {
   }
 
   private void sendConfig() {
-    if (DebugLog.enabled()) {
-      com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-          "[ColonyGauge] sending config pos={} address='{}' promiseClearingInterval={} clearPromises={} reset={}",
-          behaviour.getPanelPosition(),
-          addressBox.getValue(),
-          promiseExpiration.getState(),
-          sendClearPromises,
-          sendReset);
-    }
+    DebugLog.info(
+        "[ColonyGauge] sending config pos={} address='{}' promiseClearingInterval={} clearPromises={} reset={}",
+        behaviour.getPanelPosition(),
+        addressBox.getValue(),
+        promiseExpiration.getState(),
+        sendClearPromises,
+        sendReset);
     PacketDistributor.sendToServer(
         new ColonyGaugeConfigPacket(
             behaviour.getPanelPosition(),

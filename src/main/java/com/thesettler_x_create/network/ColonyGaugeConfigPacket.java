@@ -14,6 +14,12 @@ public record ColonyGaugeConfigPacket(
     boolean clearPromises,
     boolean reset)
     implements CustomPacketPayload {
+
+  public ColonyGaugeConfigPacket {
+    // The encode side writes this straight out, and a null would fail there rather than here.
+    address = address == null ? "" : address;
+  }
+
   // Intentionally not ModNetwork.SHOP_ADDRESS_MAX_LENGTH: the Gauge screen's address field is
   // Create's own AddressEditBox, which hardcodes setMaxLength(25) in its constructor to match
   // Create's package-address convention - this constant must track that, not this mod's own

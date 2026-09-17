@@ -483,7 +483,7 @@ final class CreateShopTestHarnessCommands {
         if (tile == null || pickup == null || tile.getStockNetworkId() == null) {
           continue;
         }
-        return new HarnessShopContext(colony, shop, tile, pickup);
+        return new HarnessShopContext(shop, tile, pickup);
       }
     }
     return null;
@@ -544,10 +544,7 @@ final class CreateShopTestHarnessCommands {
     final CreateShopBlockEntity pickup;
 
     HarnessShopContext(
-        IColony colony,
-        BuildingCreateShop shop,
-        TileEntityCreateShop tile,
-        CreateShopBlockEntity pickup) {
+        BuildingCreateShop shop, TileEntityCreateShop tile, CreateShopBlockEntity pickup) {
       this.shop = shop;
       this.tile = tile;
       this.pickup = pickup;
