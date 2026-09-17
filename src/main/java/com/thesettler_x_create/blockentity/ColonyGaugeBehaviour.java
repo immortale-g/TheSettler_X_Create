@@ -47,6 +47,14 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   private static final int REQUEST_INTERVAL = 100;
 
+  /**
+   * Longest wait between two asks. Every ask that gets as far as the shop scans the racks of every
+   * warehouse in the colony, and a slot whose item the colony simply does not have would do that
+   * every {@link #REQUEST_INTERVAL} ticks forever. Each fruitless ask therefore doubles the wait up
+   * to this, and anything that changes the picture puts it back.
+   */
+  private static final int MAX_REQUEST_INTERVAL = 600;
+
   public final PanelSlot slot;
   public boolean active;
   public boolean satisfied;
@@ -66,6 +74,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   public int promiseClearingInterval = -1;
 
   private int timer = REQUEST_INTERVAL;
+  private int requestInterval = REQUEST_INTERVAL;
   private long promisedUntil = 0L;
 
   /**
@@ -132,6 +141,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     timer = REQUEST_INTERVAL;
     promisedUntil = 0L;
     promisedAmount = 0;
+    requestInterval = REQUEST_INTERVAL;
     setFilter(ItemStack.EMPTY);
     blockEntity.notifyUpdate();
   }
@@ -148,6 +158,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     promisedUntil = 0L;
     promisedAmount = 0;
     timer = REQUEST_INTERVAL;
+    requestInterval = REQUEST_INTERVAL;
     manualAddress = null;
     blockEntity.notifyUpdate();
     panelBE().updatePowered();
@@ -273,6 +284,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
 
   private void resetTimerSlightly() {
     timer = REQUEST_INTERVAL / 2;
+    requestInterval = REQUEST_INTERVAL;
   }
 
   @Override
@@ -300,7 +312,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
       timer--;
       return;
     }
-    timer = REQUEST_INTERVAL;
+    timer = requestInterval;
     tryRequest();
   }
 
@@ -400,6 +412,12 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     }
 
     int requestedAmount = building.requestForGauge(getFilter().copy(), remaining, targetAddress);
+    // This ask reached the shop and had it look through the colony's warehouses. If it came back
+    // empty-handed, wait longer before asking again; if it worked, go back to asking often.
+    requestInterval =
+        requestedAmount > 0
+            ? REQUEST_INTERVAL
+            : Math.min(MAX_REQUEST_INTERVAL, requestInterval * 2);
     if (requestedAmount > 0) {
       int expiryTicks = getPromiseExpiryTimeInTicks();
       promisedUntil = expiryTicks < 0 ? Long.MAX_VALUE : getWorld().getGameTime() + expiryTicks;
