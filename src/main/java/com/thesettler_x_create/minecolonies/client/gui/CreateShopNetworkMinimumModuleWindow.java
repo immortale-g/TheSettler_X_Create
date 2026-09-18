@@ -5,7 +5,6 @@ import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
 import com.ldtteam.blockui.views.ScrollingList;
-import com.ldtteam.structurize.client.gui.WindowSelectRes;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.core.client.gui.AbstractModuleWindow;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -25,10 +24,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 public class CreateShopNetworkMinimumModuleWindow
     extends AbstractModuleWindow<CreateShopNetworkMinimumModuleView> {
-  /** Structurize' picker with a wider amount field; see the layout for why. */
-  private static final ResourceLocation WIDE_PICKER =
-      ResourceLocation.fromNamespaceAndPath(
-          TheSettlerXCreate.MODID, "gui/layoutselectres_wide.xml");
 
   private final CreateShopNetworkMinimumModuleView moduleView;
   private final ScrollingList minimumList;
@@ -60,11 +55,9 @@ public class CreateShopNetworkMinimumModuleWindow
     if (moduleView.hasReachedLimit()) {
       return;
     }
-    new WindowSelectRes(
-            WIDE_PICKER,
+    new WideAmountSelectRes(
             this,
             Component.empty(),
-            null,
             IColonyManager.getInstance().getCompatibilityManager().getListOfAllItems(),
             (stack, amount) -> {
               if (stack == null || stack.isEmpty()) {
@@ -74,7 +67,6 @@ public class CreateShopNetworkMinimumModuleWindow
                   new SetCreateShopNetworkMinimumPayload(
                       buildingView.getPosition(), stack.copyWithCount(1), amount));
             },
-            true,
             Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
         .open();
   }
