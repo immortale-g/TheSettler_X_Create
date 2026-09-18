@@ -3,6 +3,8 @@ package com.thesettler_x_create.minecolonies.building;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.modules.ICraftingBuildingModule;
+import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.TheSettlerXCreate;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -43,8 +45,15 @@ final class ShopColonyCraftingUtil {
           if (module.getFirstRecipe(candidate -> ItemStack.isSameItem(candidate, stack)) != null) {
             return true;
           }
-        } catch (Exception ignored) {
-          // A module that cannot answer is simply not a candidate.
+        } catch (Exception ex) {
+          // A module that cannot answer is simply not a candidate, but silence here means the
+          // look-ahead says "nobody can craft this" with nothing to trace it back to.
+          if (DebugLog.enabled()) {
+            TheSettlerXCreate.LOGGER.info(
+                "[ColonyGauge] canAnyoneCraft skipped a module of {}: {}",
+                building.getBuildingDisplayName(),
+                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+          }
         }
       }
     }

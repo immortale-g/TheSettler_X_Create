@@ -7,6 +7,8 @@ import com.minecolonies.api.colony.requestsystem.requestable.IConcreteDeliverabl
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -39,6 +41,24 @@ final class CreateShopChainOriginGuard {
    * @return true when the shop must leave it alone
    */
   static boolean servesAShopsOwnOrder(
+      IRequestManager manager, IRequest<? extends IDeliverable> request) {
+    try {
+      return walkTheChain(manager, request);
+    } catch (Exception ex) {
+      // Nothing between here and MineColonies catches: this runs on the server tick thread inside
+      // canResolveRequest, and a getter that throws on half torn-down state would take the tick
+      // with it. Declining is the same answer the depth cap gives when the chain cannot be read,
+      // for the same reason: losing a sale is cheaper than a circle.
+      if (DebugLog.enabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] chain-origin guard could not read the chain, staying out: {}",
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+      }
+      return true;
+    }
+  }
+
+  private static boolean walkTheChain(
       IRequestManager manager, IRequest<? extends IDeliverable> request) {
     if (manager == null || request == null) {
       return false;

@@ -70,7 +70,9 @@ final class ShopPickupKeepPolicy {
     ItemStorage kept = findKept(localAlreadyKept, stack);
     int alreadyKept = kept == null ? 0 : kept.getAmount();
     int takeable = ShopStockAccounting.pickupTakeable(stack.getCount(), keepAmount, alreadyKept);
-    if (DebugLog.enabled()) {
+    // One line per occupied slot per housekeeping pass is a lot with debug logging on by default.
+    // What is worth reading is the case that keeps goods where they are.
+    if (takeable <= 0 && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
           "[CreateShop] pickup keep item={} inSlot={} rackStock={} reserved={} keep={} alreadyKept={} takeable={}",
           stack.getItem(),

@@ -95,6 +95,28 @@ final class ShopGaugeQueue {
       }
       return 0;
     }
+    // A gauge asks again once its promise runs out, which happens long before a slow delivery
+    // arrives. Anything still waiting to be packaged for this item and address is that earlier
+    // ask, so report its amount back instead of placing a second colony request: two requests
+    // would draw the warehouse twice and reserve rack stock twice for one gauge slot.
+    //
+    // This comes before the two scans below on purpose. With a promise lifetime set on the gauge,
+    // the promise expires again and again while the task waits for rack stock, and every one of
+    // those asks would otherwise walk every warehouse and every crafting module first, only to
+    // land here.
+    GaugePackagingTask queued = findOpenTask(item, gaugeAddress);
+    if (queued != null) {
+      if (DebugLog.enabled()) {
+        TheSettlerXCreate.LOGGER.info(
+            "[ColonyGauge] requestForGauge skip reason=already-requested item={} amount={} openAmount={} address={}",
+            item.getItem(),
+            amount,
+            queued.amount(),
+            gaugeAddress);
+      }
+      return queued.amount();
+    }
+
     // The gauge pulls from the colony, not from Create's stock network; vanilla Create Factory
     // Gauges already cover that case. So only ask for what the colony has a chance of providing:
     // stock in a warehouse, or a crafter who knows the recipe. Without either, an order would walk
@@ -115,23 +137,6 @@ final class ShopGaugeQueue {
     // the crafters; asking only for what a warehouse holds would never get there. What a crafter
     // cannot make either comes back as a shortfall, not as a stuck order.
     int actualAmount = craftable ? amount : Math.min(amount, available);
-
-    // A gauge asks again once its promise runs out, which happens long before a slow delivery
-    // arrives. Anything still waiting to be packaged for this item and address is that earlier
-    // ask, so report its amount back instead of placing a second colony request: two requests
-    // would draw the warehouse twice and reserve rack stock twice for one gauge slot.
-    GaugePackagingTask queued = findOpenTask(item, gaugeAddress);
-    if (queued != null) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[ColonyGauge] requestForGauge skip reason=already-requested item={} amount={} openAmount={} address={}",
-            item.getItem(),
-            actualAmount,
-            queued.amount(),
-            gaugeAddress);
-      }
-      return queued.amount();
-    }
 
     IStandardRequestManager manager = (IStandardRequestManager) colony.getRequestManager();
     // The full amount as the minimum is what makes a warehouse that cannot cover it hand the rest

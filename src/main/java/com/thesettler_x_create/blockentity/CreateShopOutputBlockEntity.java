@@ -140,14 +140,13 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
       if (extracted.isEmpty()) return ItemStack.EMPTY;
       if (!simulate) building.deliverPartOfNextGaugeTask(extracted.getCount());
-      if (DebugLog.enabled()) {
-        // A preview builds a shippable package without taking anything. If Create ever ships one
-        // of those, the goods stay in the racks and travel at the same time. On 2026-09-18 a
-        // package of 12 torches arrived while only 4 had been booked, which is what that would
-        // look like, so both calls say what they saw.
+      // Only the real pull is logged. Create polls the preview for every pending package, so
+      // logging that one writes a line per tick, and debug logging is on by default until 1.0.
+      // What the preview saw still shows up: a package that leaves without a line here is one
+      // that was never pulled.
+      if (!simulate && DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] gauge package simulate={} taskAmount={} packaged={} address={}",
-            simulate,
+            "[CreateShop] gauge package taskAmount={} packaged={} address={}",
             task.amount(),
             extracted.getCount(),
             task.gaugeAddress());

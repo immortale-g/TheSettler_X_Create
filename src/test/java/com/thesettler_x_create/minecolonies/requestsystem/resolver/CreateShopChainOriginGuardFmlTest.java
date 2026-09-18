@@ -113,6 +113,20 @@ class CreateShopChainOriginGuardFmlTest {
             manager, (IRequest<? extends IDeliverable>) deepest));
   }
 
+  @Test
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  void aChainThatThrowsWhileBeingReadIsLeftAloneAsWell() {
+    // This runs on the server tick thread inside canResolveRequest, and nothing between here and
+    // MineColonies catches. A getter that throws on half torn-down state would take the tick with
+    // it, so the guard answers the same way it does for a chain it cannot walk.
+    IRequest<?> broken = requestFor(new Stack(new ItemStack(Items.TORCH), 8, 8), OTHER_POS, null);
+    when(((IRequest) broken).getRequester()).thenThrow(new IllegalStateException("torn down"));
+
+    assertTrue(
+        CreateShopChainOriginGuard.servesAShopsOwnOrder(
+            manager, (IRequest<? extends IDeliverable>) broken));
+  }
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private IRequest<?> requestFor(Stack deliverable, BlockPos requesterPos, IToken<?> parent) {
     IRequest<?> request = mock(IRequest.class);
