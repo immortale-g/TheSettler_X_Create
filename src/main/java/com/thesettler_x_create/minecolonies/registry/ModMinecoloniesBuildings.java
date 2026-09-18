@@ -9,7 +9,6 @@ import com.minecolonies.api.entity.citizen.Skill;
 import com.minecolonies.apiimp.CommonMinecoloniesAPIImpl;
 import com.minecolonies.core.colony.buildings.modules.ItemListModule;
 import com.minecolonies.core.colony.buildings.modules.WorkerBuildingModule;
-import com.minecolonies.core.colony.buildings.moduleviews.ItemListModuleView;
 import com.minecolonies.core.colony.buildings.moduleviews.WorkerBuildingModuleView;
 import com.minecolonies.core.colony.buildings.views.EmptyView;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -26,6 +25,7 @@ import com.thesettler_x_create.minecolonies.moduleview.CreateShopNetworkMinimumM
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopTaskModuleView;
+import com.thesettler_x_create.minecolonies.moduleview.ShopColonyDeniedListModuleView;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import net.minecraft.network.chat.Component;
@@ -92,7 +92,7 @@ public final class ModMinecoloniesBuildings {
                           () -> new ItemListModule(ShopColonySupplyPolicy.DENIED_LIST_ID),
                           () ->
                               () ->
-                                  new ItemListModuleView(
+                                  new ShopColonyDeniedListModuleView(
                                       ShopColonySupplyPolicy.DENIED_LIST_ID,
                                       Component.translatable(
                                           "com.thesettler_x_create.gui.createshop.coloniesmaydraw"),

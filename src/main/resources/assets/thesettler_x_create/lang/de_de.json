@@ -9,6 +9,7 @@
   "com.thesettler_x_create.gui.createshop.address": "Adresse",
   "com.thesettler_x_create.gui.createshop.stock": "Bestand",
   "com.thesettler_x_create.gui.createshop.coloniesmaydraw": "Fuer Kolonie gesperrt",
+  "com.thesettler_x_create.gui.createshop.coloniesmaydraw.info": "Items auf dieser Liste sind tabu: die Kolonie holt sie nie aus dem Create-Netz\ndieses Shops. Eine leere Liste heisst, sie darf alles abrufen.",
   "com.thesettler_x_create.gui.createshop.networkminimum": "Netz-Mindestbestand",
   "com.thesettler_x_create.gui.createshop.networkminimum.info": "So viel eines Items bleibt im Create-Netz fuer den Shop selbst.\nDie Kolonie kommt nicht daran und bekommt nur, was darueber liegt.",
   "com.thesettler_x_create.gui.createshop.networkminimum.add": "Item hinzufuegen",

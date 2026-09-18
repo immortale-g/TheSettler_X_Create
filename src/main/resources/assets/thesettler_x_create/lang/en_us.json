@@ -24,6 +24,7 @@
   "com.thesettler_x_create.gui.createshop.address": "Address",
   "com.thesettler_x_create.gui.createshop.stock": "Stock",
   "com.thesettler_x_create.gui.createshop.coloniesmaydraw": "Blocked for colony",
+  "com.thesettler_x_create.gui.createshop.coloniesmaydraw.info": "Items on this list are off limits: the colony never draws them from this shop's\nCreate network. An empty list means it may draw everything.",
   "com.thesettler_x_create.gui.createshop.networkminimum": "Network minimum",
   "com.thesettler_x_create.gui.createshop.networkminimum.info": "This much of an item stays in the Create network for the shop itself.\nThe colony cannot draw it and only takes what is above it.",
   "com.thesettler_x_create.gui.createshop.networkminimum.add": "Add item",
@@ -92,4 +93,3 @@
   "com.thesettler_x_create.item.network_link_tuner.tooltip.reset_hint": "Shift + right-click: reset linker",
   "com.thesettler_x_create.item.network_link_tuner.tooltip.store": "Right-click: store network from Stock-Link"
 }
-
