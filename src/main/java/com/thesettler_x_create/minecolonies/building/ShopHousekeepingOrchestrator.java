@@ -166,7 +166,10 @@ final class ShopHousekeepingOrchestrator {
       }
       return;
     }
-    boolean hutHasItems = tile.hasHutInventoryItems();
+    // Not "is anything in there" but "may a courier take any of it". The racks sit in the same
+    // combined inventory, and their stock is kept, so the first question calls a courier over and
+    // over for goods it is never allowed to carry away.
+    boolean hutHasItems = shop.hasItemsAPickupMayTake();
     if (hutHasItems) {
       lastTransferTick = now;
       int pickupPriority = shop.getPickUpPriority();

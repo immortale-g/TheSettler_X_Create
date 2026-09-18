@@ -19,7 +19,12 @@ class BuildingCreateShopHousekeepingPickupRequestGuardTest {
             Path.of(
                 "src/main/java/com/thesettler_x_create/minecolonies/building/BuildingCreateShop.java"));
 
-    assertTrue(orchestratorSource.contains("boolean hutHasItems = tile.hasHutInventoryItems();"));
+    // A pickup is asked for when a courier may take something, not merely when the combined
+    // inventory holds something: the racks are in there too and their stock is kept, so the plain
+    // "is anything there" question called a courier over every 25 seconds for goods it was never
+    // allowed to carry away (seen in game on 2026-09-18).
+    assertTrue(orchestratorSource.contains("boolean hutHasItems = shop.hasItemsAPickupMayTake();"));
+    assertFalse(orchestratorSource.contains("tile.hasHutInventoryItems()"));
     assertTrue(orchestratorSource.contains("if (hutHasItems) {"));
     assertTrue(orchestratorSource.contains("int pickupPriority = shop.getPickUpPriority();"));
     assertTrue(
