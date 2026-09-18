@@ -25,6 +25,7 @@
   "com.thesettler_x_create.gui.createshop.stock": "Stock",
   "com.thesettler_x_create.gui.createshop.coloniesmaydraw": "Blocked for colony",
   "com.thesettler_x_create.gui.createshop.networkminimum": "Network minimum",
+  "com.thesettler_x_create.gui.createshop.networkminimum.info": "This much of an item stays in the Create network for the shop itself.\nThe colony cannot draw it and only takes what is above it.",
   "com.thesettler_x_create.gui.createshop.networkminimum.add": "Add item",
   "com.thesettler_x_create.gui.createshop.networkminimum.empty": "No minimum set. The colony may draw this network down to the last item.",
   "com.thesettler_x_create.gui.createshop.networkminimum.select": "How many stay in the network for this shop?",

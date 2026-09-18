@@ -10,6 +10,7 @@
   "com.thesettler_x_create.gui.createshop.stock": "Bestand",
   "com.thesettler_x_create.gui.createshop.coloniesmaydraw": "Fuer Kolonie gesperrt",
   "com.thesettler_x_create.gui.createshop.networkminimum": "Netz-Mindestbestand",
+  "com.thesettler_x_create.gui.createshop.networkminimum.info": "So viel eines Items bleibt im Create-Netz fuer den Shop selbst.\nDie Kolonie kommt nicht daran und bekommt nur, was darueber liegt.",
   "com.thesettler_x_create.gui.createshop.networkminimum.add": "Item hinzufuegen",
   "com.thesettler_x_create.gui.createshop.networkminimum.empty": "Kein Mindestbestand. Die Kolonie darf das Netz bis zum letzten Item leeren.",
   "com.thesettler_x_create.gui.createshop.networkminimum.select": "Wie viele bleiben im Netz fuer diesen Shop?",

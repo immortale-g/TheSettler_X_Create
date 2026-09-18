@@ -7,7 +7,10 @@
             source="minecolonies:textures/gui/builderhut/builder_button_medium.png"
             label="$(com.thesettler_x_create.gui.createshop.networkminimum.add)"/>
 
-    <list id="minimumList" size="170 180" pos="13 50"
+    <text id="minimumInfo" size="164 34" pos="13 50" textalign="MIDDLE_LEFT" color="black"
+          label="$(com.thesettler_x_create.gui.createshop.networkminimum.info)"/>
+
+    <list id="minimumList" size="170 144" pos="13 86"
           emptytext="$(com.thesettler_x_create.gui.createshop.networkminimum.empty)" emptycolor="black">
         <box size="100% 17" linewidth="1">
             <itemicon id="itemIcon" size="17 17" pos="0 0"/>
