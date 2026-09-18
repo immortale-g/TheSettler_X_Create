@@ -2,17 +2,23 @@ package com.thesettler_x_create.minecolonies.moduleview;
 
 import com.ldtteam.blockui.views.BOWindow;
 import com.minecolonies.api.colony.buildings.modules.AbstractBuildingModuleView;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.client.gui.CreateShopNetworkMinimumModuleWindow;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /** Client side of what the shop keeps in its Create network before the colony may draw. */
 public class CreateShopNetworkMinimumModuleView extends AbstractBuildingModuleView {
   /** One item kind and how many of it stay in the network. */
   public record Entry(ItemStack stack, int amount) {}
+
+  private static final ResourceLocation ICON =
+      ResourceLocation.fromNamespaceAndPath(
+          TheSettlerXCreate.MODID, "textures/gui/modules/network_minimum.png");
 
   private List<Entry> entries = new ArrayList<>();
   private boolean limitReached;
@@ -73,8 +79,10 @@ public class CreateShopNetworkMinimumModuleView extends AbstractBuildingModuleVi
   }
 
   @Override
-  public String getIcon() {
-    return "stock";
+  public ResourceLocation getIconResourceLocation() {
+    // A safe, for the part of the network the colony is not getting. MineColonies' own icons are
+    // named after a plain word and looked up among theirs, and none of them says "kept back".
+    return ICON;
   }
 
   @Override
