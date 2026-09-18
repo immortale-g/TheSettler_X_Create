@@ -61,7 +61,7 @@ final class ShopGaugeQueue {
           "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}", item, amount);
       return 0;
     }
-    int minLevel = Config.permaMinBuildingLevel();
+    int minLevel = Config.gaugeMinBuildingLevel();
     if (owner.getBuildingLevel() < minLevel) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(

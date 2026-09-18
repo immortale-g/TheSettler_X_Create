@@ -33,7 +33,6 @@ class CreateShopMaintenanceCommandsDevGateGuardTest {
     assertGatedBeforeExecutes(source, "auto_test_harness_full_all");
     assertGatedBeforeExecutes(source, "diag_output_block");
     assertGatedBeforeExecutes(source, "test_output_packaging");
-    assertGatedBeforeExecutes(source, "diag_perma_requests");
   }
 
   @Test

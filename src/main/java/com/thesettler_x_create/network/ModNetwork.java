@@ -44,14 +44,6 @@ public final class ModNetwork {
         SetCreateShopAddressPayload.STREAM_CODEC,
         ModNetwork::handleSetAddress);
     registrar.playToServer(
-        SetCreateShopPermaOrePayload.TYPE,
-        SetCreateShopPermaOrePayload.STREAM_CODEC,
-        ModNetwork::handleSetPermaOre);
-    registrar.playToServer(
-        SetCreateShopPermaWaitPayload.TYPE,
-        SetCreateShopPermaWaitPayload.STREAM_CODEC,
-        ModNetwork::handleSetPermaWait);
-    registrar.playToServer(
         CreateShopBatchRequestPayload.TYPE,
         CreateShopBatchRequestPayload.STREAM_CODEC,
         ModNetwork::handleBatchRequest);
@@ -102,30 +94,6 @@ public final class ModNetwork {
           shop.setShopAddress(address);
           BlockState state = shop.getBlockState();
           shop.getLevel().sendBlockUpdated(payload.pos(), state, state, 3);
-        });
-  }
-
-  private static void handleSetPermaOre(
-      SetCreateShopPermaOrePayload payload, IPayloadContext context) {
-    context.enqueueWork(
-        () -> {
-          BuildingCreateShop building = getShopBuilding(context, payload.pos());
-          if (building == null) {
-            return;
-          }
-          building.setPermaOre(payload.oreId(), payload.enabled());
-        });
-  }
-
-  private static void handleSetPermaWait(
-      SetCreateShopPermaWaitPayload payload, IPayloadContext context) {
-    context.enqueueWork(
-        () -> {
-          BuildingCreateShop building = getShopBuilding(context, payload.pos());
-          if (building == null) {
-            return;
-          }
-          building.setPermaWaitFullStack(payload.enabled());
         });
   }
 

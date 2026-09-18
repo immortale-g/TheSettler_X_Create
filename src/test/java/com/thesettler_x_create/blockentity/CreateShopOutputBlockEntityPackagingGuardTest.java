@@ -50,10 +50,12 @@ class CreateShopOutputBlockEntityPackagingGuardTest {
   @Test
   void handlerAlwaysExposesExactlyOneSlot() throws Exception {
     String src = Files.readString(SOURCE);
-    // getSlots() must return the literal 1, not permaItems.size()
+    // One slot, holding one package. Create polls this handler, and a slot count that follows some
+    // list's size would make it poll for packages the shop never builds.
     assertTrue(src.contains("return 1;"), "getSlots() must return 1 (single package slot)");
-    long permaItemsSizeReferences =
-        src.lines().filter(l -> l.contains("getPermaItems().size()")).count();
-    assertEquals(0, permaItemsSizeReferences, "getSlots() must not delegate to permaItems.size()");
+    assertEquals(
+        0,
+        src.lines().filter(l -> l.contains("getSlots()") && l.contains(".size()")).count(),
+        "getSlots() must not derive the slot count from a collection");
   }
 }

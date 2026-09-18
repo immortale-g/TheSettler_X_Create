@@ -632,17 +632,6 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
                         ShopStockAccounting.unreservedStock(
                             budget.remaining, pickup.getReservedFor(budget.key)))
                     <= 0);
-    // Perma-items belong to the output block packager — never move them to the hut via cleanup.
-    if (getBuilding() instanceof BuildingCreateShop shop && shop.canUsePermaRequests()) {
-      java.util.Set<net.minecraft.resources.ResourceLocation> permaOres = shop.getPermaOres();
-      if (!permaOres.isEmpty()) {
-        totals.removeIf(
-            budget ->
-                permaOres.contains(
-                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
-                        budget.key.getItem())));
-      }
-    }
     return totals;
   }
 

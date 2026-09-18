@@ -284,13 +284,6 @@ public final class CreateShopMaintenanceCommands {
                 context ->
                     CreateShopOutputBlockTestCommands.runOutputBlockTest(context.getSource())));
 
-    root.then(
-        Commands.literal("diag_perma_requests")
-            .requires(CreateShopMaintenanceCommands::requiresDevTestCommands)
-            .executes(
-                context ->
-                    CreateShopOutputBlockTestCommands.runPermaRequestDiag(context.getSource())));
-
     dispatcher.register(root);
   }
 }

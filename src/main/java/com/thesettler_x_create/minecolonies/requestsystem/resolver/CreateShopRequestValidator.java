@@ -76,7 +76,7 @@ final class CreateShopRequestValidator {
       return false;
     }
     // Secondary guard: ILocation.equals() may create new objects and fail silently.
-    // Compare BlockPos directly to catch perma-request self-loops.
+    // Compare BlockPos directly to catch self-loops.
     {
       net.minecraft.core.BlockPos requesterPos =
           request.getRequester().getLocation().getInDimensionLocation();

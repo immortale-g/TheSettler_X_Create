@@ -59,8 +59,6 @@ public class BuildingCreateShop extends AbstractBuilding {
 
   private static final String TAG_PICKUP_POS = "PickupPos";
   private static final String TAG_OUTPUT_POS = "OutputPos";
-  static final String TAG_PERMA_ORES = "PermaOres";
-  static final String TAG_PERMA_WAIT_FULL = "PermaWaitFullStack";
   private static final String TAG_BUILDER_HUT_POS = "BuilderHutPos";
   private static final String TAG_FLOW_STATES = "FlowStates";
 
@@ -95,7 +93,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   private final ShopWarehouseRegistrar warehouseRegistrar;
   private final ShopResolverAssignments resolverAssignments;
   private final ShopCourierDiagnostics courierDiagnostics;
-  private final ShopPermaRequestManager permaManager;
   private final ShopWorkerStatus workerStatus;
   private final ShopNetworkNotifier networkNotifier;
   private final ShopResolverFactory resolverFactory;
@@ -116,7 +113,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.warehouseRegistrar = new ShopWarehouseRegistrar(this);
     this.resolverAssignments = new ShopResolverAssignments(this);
     this.courierDiagnostics = new ShopCourierDiagnostics(this);
-    this.permaManager = new ShopPermaRequestManager(this);
     this.workerStatus = new ShopWorkerStatus(this);
     this.networkNotifier = new ShopNetworkNotifier(this);
     this.resolverFactory = new ShopResolverFactory(this);
@@ -229,22 +225,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     this.pickupPos = pickupPos;
   }
 
-  public boolean isPermaWaitFullStack() {
-    return permaManager.isPermaWaitFullStack();
-  }
-
-  public Set<ResourceLocation> getPermaOres() {
-    return permaManager.getPermaOres();
-  }
-
-  public boolean canUsePermaRequests() {
-    return false; // disabled — gauge-based restocking replaces perma requests
-  }
-
-  public java.util.List<String> getPermaPendingDebugLines() {
-    return permaManager.getPendingPermaDebugLines(getColony());
-  }
-
   public boolean hasContainerPosition(BlockPos pos) {
     return containerList.contains(pos) || getLocation().getInDimensionLocation().equals(pos);
   }
@@ -302,7 +282,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     ensureWarehouseRegistration();
     ensurePickupLink();
     resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
-    permaManager.tickPermaRequests(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
       if (DebugLog.enabled() && resolver == null) {
@@ -327,7 +306,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     try {
       super.onRequestedRequestCancelled(manager, request);
-      clearPermaPending(request);
       gaugeQueue.onRequestCancelled(request);
     } catch (Exception ex) {
       String token = request == null ? "<null>" : String.valueOf(request.getId());
@@ -350,7 +328,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     try {
       super.onRequestedRequestComplete(manager, request);
-      clearPermaPending(request);
       gaugeQueue.onRequestComplete(request);
     } catch (Exception ex) {
       String token = request == null ? "<null>" : String.valueOf(request.getId());
@@ -1112,19 +1089,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     resolverAssignments.ensurePickupLink();
   }
 
-  public void setPermaWaitFullStack(boolean enabled) {
-    permaManager.setPermaWaitFullStack(enabled);
-  }
-
-  public void setPermaOre(ResourceLocation itemId, boolean enabled) {
-    permaManager.setPermaOre(itemId, enabled);
-  }
-
-  private void clearPermaPending(
-      com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
-    permaManager.clearPermaPending(request);
-  }
-
   private void migrateLegacyShopCourierAssignments() {
     if (legacyCourierMigrationAttempted) {
       return;
@@ -1201,7 +1165,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     if (compound.contains(TAG_BUILDER_HUT_POS)) {
       builderHutPos = BlockPos.of(compound.getLong(TAG_BUILDER_HUT_POS));
     }
-    permaManager.loadPerma(compound);
     // Buffer FlowStates for lazy application when the resolver connects (setResolverState).
     if (compound.contains(TAG_FLOW_STATES)) {
       net.minecraft.nbt.CompoundTag flowTag = compound.getCompound(TAG_FLOW_STATES);
@@ -1223,7 +1186,6 @@ public class BuildingCreateShop extends AbstractBuilding {
     if (outputPos != null) {
       tag.putLong(TAG_OUTPUT_POS, outputPos.asLong());
     }
-    permaManager.savePerma(tag);
     if (builderHutPos != null) {
       tag.putLong(TAG_BUILDER_HUT_POS, builderHutPos.asLong());
     }

@@ -8,7 +8,6 @@ import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -68,27 +67,6 @@ class NetworkPayloadRoundTripTest {
     RegistryFriendlyByteBuf buf = newBuf();
     SetPackagerAddressPayload.STREAM_CODEC.encode(buf, original);
     SetPackagerAddressPayload decoded = SetPackagerAddressPayload.STREAM_CODEC.decode(buf);
-    assertEquals(original, decoded);
-  }
-
-  @Test
-  void setCreateShopPermaWaitPayloadRoundTrips() {
-    SetCreateShopPermaWaitPayload original =
-        new SetCreateShopPermaWaitPayload(new BlockPos(0, 0, 0), true);
-    RegistryFriendlyByteBuf buf = newBuf();
-    SetCreateShopPermaWaitPayload.STREAM_CODEC.encode(buf, original);
-    SetCreateShopPermaWaitPayload decoded = SetCreateShopPermaWaitPayload.STREAM_CODEC.decode(buf);
-    assertEquals(original, decoded);
-  }
-
-  @Test
-  void setCreateShopPermaOrePayloadRoundTrips() {
-    SetCreateShopPermaOrePayload original =
-        new SetCreateShopPermaOrePayload(
-            new BlockPos(10, 20, 30), ResourceLocation.withDefaultNamespace("iron_ore"), true);
-    RegistryFriendlyByteBuf buf = newBuf();
-    SetCreateShopPermaOrePayload.STREAM_CODEC.encode(buf, original);
-    SetCreateShopPermaOrePayload decoded = SetCreateShopPermaOrePayload.STREAM_CODEC.decode(buf);
     assertEquals(original, decoded);
   }
 }

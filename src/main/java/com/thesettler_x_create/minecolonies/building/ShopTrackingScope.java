@@ -7,8 +7,7 @@ import java.util.Set;
 
 /**
  * The kinds of tracking a Create Shop keeps on its own, each resettable by an operator command.
- * Settings (stock network, shop address, perma ores, linked blocks) are not tracking and are never
- * reset.
+ * Settings (stock network, shop address, linked blocks) are not tracking and are never reset.
  */
 public enum ShopTrackingScope {
   /** Per-request pickup reservations on rack stock. */

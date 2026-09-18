@@ -19,13 +19,11 @@ import com.thesettler_x_create.minecolonies.building.ShopColonySupplyPolicy;
 import com.thesettler_x_create.minecolonies.module.CreateShopAddressModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopNetworkMinimumModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopOutputModule;
-import com.thesettler_x_create.minecolonies.module.CreateShopPermaModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopStockModule;
 import com.thesettler_x_create.minecolonies.module.CreateShopTaskModule;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopAddressModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopNetworkMinimumModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopOutputModuleView;
-import com.thesettler_x_create.minecolonies.moduleview.CreateShopPermaModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopStockModuleView;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopTaskModuleView;
 import java.util.LinkedHashSet;
@@ -79,11 +77,6 @@ public final class ModMinecoloniesBuildings {
                           "createshop_stock",
                           CreateShopStockModule::new,
                           () -> CreateShopStockModuleView::new))
-                  .addBuildingModuleProducer(
-                      new ModuleProducer<>(
-                          "createshop_perma",
-                          CreateShopPermaModule::new,
-                          () -> CreateShopPermaModuleView::new))
                   .addBuildingModuleProducer(
                       new ModuleProducer<>(
                           "createshop_output",

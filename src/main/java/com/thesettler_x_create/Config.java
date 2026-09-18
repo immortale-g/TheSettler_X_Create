@@ -10,15 +10,10 @@ public class Config {
           .comment("Enable extra debug logging for TheSettler_x_Create")
           .define("debugLogging", true);
 
-  public static final ModConfigSpec.IntValue PERMA_MIN_BUILDING_LEVEL =
+  public static final ModConfigSpec.IntValue GAUGE_MIN_BUILDING_LEVEL =
       BUILDER
-          .comment("Minimum Create Shop level required for perma requests.")
-          .defineInRange("permaMinBuildingLevel", 2, 1, 5);
-
-  public static final ModConfigSpec.LongValue PERMA_REQUEST_INTERVAL_TICKS =
-      BUILDER
-          .comment("Ticks between perma request evaluations.")
-          .defineInRange("permaRequestIntervalTicks", 200L, 20L, 24000L);
+          .comment("Minimum Create Shop level required to order for a Colony Factory Gauge.")
+          .defineInRange("gaugeMinBuildingLevel", 2, 1, 5);
 
   public static final ModConfigSpec.LongValue MISSING_NETWORK_WARNING_COOLDOWN =
       BUILDER
@@ -115,11 +110,11 @@ public class Config {
    * not loaded yet. That is the same situation {@link DebugLog#enabled()} covers: early startup,
    * and tests that run without a config file.
    */
-  public static int permaMinBuildingLevel() {
+  public static int gaugeMinBuildingLevel() {
     try {
-      return PERMA_MIN_BUILDING_LEVEL.get();
+      return GAUGE_MIN_BUILDING_LEVEL.get();
     } catch (IllegalStateException notLoaded) {
-      return PERMA_MIN_BUILDING_LEVEL.getDefault();
+      return GAUGE_MIN_BUILDING_LEVEL.getDefault();
     }
   }
 }

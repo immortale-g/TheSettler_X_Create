@@ -37,7 +37,7 @@ public class CreateShopTaskModule extends WarehouseRequestQueueModule {
         || !(shop.getColony().getRequestManager() instanceof IStandardRequestManager manager)) {
       return List.of();
     }
-    // Requests the shop placed as a requester (Gauge/perma deliveries) don't go through the
+    // Requests the shop placed as a requester (gauge deliveries) don't go through the
     // resolver-assignment lookup below, since the shop isn't resolving them — add them directly.
     List<IToken<?>> inflight = new ArrayList<>(shop.getPendingGaugeRequestTokens());
 

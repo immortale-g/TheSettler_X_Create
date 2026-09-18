@@ -37,9 +37,10 @@ handlers for Create blocks the colony builder cannot otherwise place.
   item kind the shop keeps in the network for the production it supplies. Both apply to colony
   requests only; the shop's own flows see the network unfiltered.
 
-Perma requests (a curated ore-tag request list, gated by building level) are **disabled as of
-0.3.0**. `BuildingCreateShop.canUsePermaRequests()` returns `false` and the Gauge/Packager pair
-replaces the workflow. The module and its GUI tab still exist but are inert.
+Perma requests, a curated ore-tag request list gated by building level, were disabled in 0.3.0 when
+the Gauge and Packager pair took over the workflow, and removed entirely in 0.6.0. A world saved
+before that keeps its `PermaOres` and `PermaWaitFullStack` tags until the shop is saved again, and
+they are ignored from the moment 0.6.0 loads it.
 
 ## High-level flow
 
