@@ -1,6 +1,8 @@
 package com.thesettler_x_create.stock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +54,22 @@ class AmountTextTest {
     // the player typed with something he never asked for.
     for (String text : new String[] {"", "   ", "k", "abc", "1.5", "12x", "1..5k", "-3", null}) {
       assertEquals(-1, AmountText.parse(text), "should be rejected: " + text);
+    }
+  }
+
+  @Test
+  void whatMayBeTypedIntoAnAmountFieldIsWhatCanBeRead() {
+    for (char digit = '0'; digit <= '9'; digit++) {
+      assertTrue(AmountText.isTypable(digit), "digit " + digit);
+    }
+    // The zero above is the whole point: Structurize' field ran every key press through a filter
+    // that answered a "0" with nothing, so ten could not be typed anywhere in the game, only
+    // eleven.
+    for (char shorthand : new char[] {'.', ',', 'k', 'K'}) {
+      assertTrue(AmountText.isTypable(shorthand), "shorthand " + shorthand);
+    }
+    for (char rejected : new char[] {'a', '-', ' ', '/', 'm'}) {
+      assertFalse(AmountText.isTypable(rejected), "should not be typable: " + rejected);
     }
   }
 }

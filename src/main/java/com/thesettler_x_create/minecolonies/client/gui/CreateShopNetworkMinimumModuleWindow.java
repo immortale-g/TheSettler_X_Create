@@ -11,23 +11,25 @@ import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopNetworkMinimumModuleView;
 import com.thesettler_x_create.network.SetCreateShopNetworkMinimumPayload;
 import com.thesettler_x_create.stock.AmountText;
-import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Lets the player say how much of an item kind stays in the shop's Create network. The picker is
- * the same one the warehouse uses for its minimum stock, so every item can be chosen, not only what
- * the network happens to hold right now.
+ * Lets the player say how much of an item kind stays in the shop's Create network. Adding one goes
+ * through {@link CreateShopAddMinimumWindow}: every item in the game can be chosen there, not only
+ * what the network happens to hold right now.
+ *
+ * <p>The list shows what is set, and nothing is typed into it; an amount is changed by picking the
+ * item again.
  */
 public class CreateShopNetworkMinimumModuleWindow
     extends AbstractModuleWindow<CreateShopNetworkMinimumModuleView> {
 
   private final CreateShopNetworkMinimumModuleView moduleView;
   private final ScrollingList minimumList;
-  private List<CreateShopNetworkMinimumModuleView.Entry> entries = new ArrayList<>();
 
   public CreateShopNetworkMinimumModuleWindow(CreateShopNetworkMinimumModuleView moduleView) {
     super(
@@ -55,20 +57,23 @@ public class CreateShopNetworkMinimumModuleWindow
     if (moduleView.hasReachedLimit()) {
       return;
     }
-    new WideAmountSelectRes(
+    new CreateShopAddMinimumWindow(
             this,
-            Component.empty(),
             IColonyManager.getInstance().getCompatibilityManager().getListOfAllItems(),
-            (stack, amount) -> {
-              if (stack == null || stack.isEmpty()) {
-                return;
-              }
-              PacketDistributor.sendToServer(
-                  new SetCreateShopNetworkMinimumPayload(
-                      buildingView.getPosition(), stack.copyWithCount(1), amount));
-            },
-            Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
+            moduleView::getMinimum,
+            this::setMinimum)
         .open();
+  }
+
+  /** What the picker settled on: 0 clears the item again, the same as the X in the list. */
+  private void setMinimum(ItemStack stack, int amount) {
+    if (stack == null || stack.isEmpty()) {
+      return;
+    }
+    ItemStack kind = stack.copyWithCount(1);
+    PacketDistributor.sendToServer(
+        new SetCreateShopNetworkMinimumPayload(buildingView.getPosition(), kind, amount));
+    moduleView.previewMinimum(kind, amount);
   }
 
   private void removeMinimum(Button button) {
@@ -76,31 +81,29 @@ public class CreateShopNetworkMinimumModuleWindow
       return;
     }
     int row = minimumList.getListElementIndexByPane(button);
+    List<CreateShopNetworkMinimumModuleView.Entry> entries = moduleView.getEntries();
     if (row < 0 || row >= entries.size()) {
       return;
     }
-    CreateShopNetworkMinimumModuleView.Entry entry = entries.get(row);
-    PacketDistributor.sendToServer(
-        new SetCreateShopNetworkMinimumPayload(
-            buildingView.getPosition(), entry.stack().copyWithCount(1), 0));
-    entries.remove(row);
-    minimumList.refreshElementPanes();
+    setMinimum(entries.get(row).stack(), 0);
   }
 
   private void updateList() {
-    entries = new ArrayList<>(moduleView.getEntries());
     if (minimumList == null) {
       return;
     }
+    // Read straight from the view, not from a copy taken when the window opened: what the server
+    // stored arrives a tick or two later, and a copy would keep showing the state from before.
     minimumList.setDataProvider(
         new ScrollingList.DataProvider() {
           @Override
           public int getElementCount() {
-            return entries.size();
+            return moduleView.getEntries().size();
           }
 
           @Override
           public void updateElement(int index, Pane row) {
+            List<CreateShopNetworkMinimumModuleView.Entry> entries = moduleView.getEntries();
             if (index < 0 || index >= entries.size()) {
               return;
             }

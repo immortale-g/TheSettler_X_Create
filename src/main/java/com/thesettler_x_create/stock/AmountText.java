@@ -35,6 +35,24 @@ public final class AmountText {
   }
 
   /**
+   * Whether this character may be typed into an amount field: a digit, a decimal separator, or the
+   * {@code k} that stands for a thousand. Everything else is turned away at the key press, so the
+   * field only ever holds something {@link #parse} has a chance with.
+   *
+   * <p>Nothing is judged here beyond the single character. A field reading {@code 1..5k} is refused
+   * by {@link #parse}, not by this; a filter that looks at one key press cannot know what the rest
+   * of the field says, and one that swallows keys leaves the player typing into a field that
+   * silently drops what he types.
+   */
+  public static boolean isTypable(char character) {
+    return Character.isDigit(character)
+        || character == '.'
+        || character == ','
+        || character == 'k'
+        || character == 'K';
+  }
+
+  /**
    * The number behind what was typed, or {@code -1} when that is not a number: empty, a stray
    * letter, a second dot, a negative. Nothing is guessed and nothing falls back to a default, so a
    * caller can leave the value alone instead of replacing it with something the player never asked

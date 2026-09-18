@@ -1,0 +1,38 @@
+<window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd"
+        size="440 244">
+    <image source="minecolonies:textures/gui/citizen/colonist_paper.png" size="430 244" pos="10 0"/>
+
+    <text size="300 13" pos="75 14" color="black" textalign="MIDDLE"
+          label="$(com.thesettler_x_create.gui.createshop.networkminimum.addtitle)"/>
+
+    <input id="search" size="160 18" pos="145 30" maxlength="30"/>
+
+    <list id="items" size="260 126" pos="95 52"
+          emptytext="$(com.thesettler_x_create.gui.createshop.networkminimum.nomatch)" emptycolor="black">
+        <box size="100% 18" linewidth="1">
+            <itemicon id="itemIcon" size="17 17" pos="0 0"/>
+            <text id="itemName" size="130 12" pos="20 3" color="black"/>
+            <text id="itemCurrent" size="40 12" pos="150 3" color="black" textalign="MIDDLE_RIGHT"/>
+            <button id="selectItem" pos="194 1" size="64 15" color="black"
+                    source="minecolonies:textures/gui/builderhut/builder_button_small.png"
+                    label="$(com.thesettler_x_create.gui.createshop.networkminimum.pick)"/>
+        </box>
+    </list>
+
+    <itemicon id="chosenIcon" size="17 17" pos="95 181"/>
+    <text id="chosenName" size="115 12" pos="117 184" color="black"/>
+    <text size="40 12" pos="236 184" color="black" textalign="MIDDLE_RIGHT"
+          label="$(com.thesettler_x_create.gui.createshop.networkminimum.amount)"/>
+    <input id="amount" size="60 18" pos="280 180" maxlength="9"/>
+
+    <text id="hint" size="300 18" pos="75 201" color="black" textalign="MIDDLE"
+          label="$(com.thesettler_x_create.gui.createshop.networkminimum.shorthand)"/>
+
+    <button id="confirm" size="64 15" pos="145 222" color="black"
+            source="minecolonies:textures/gui/builderhut/builder_button_small.png"
+            label="$(com.thesettler_x_create.gui.createshop.networkminimum.set)"/>
+    <button id="cancel" size="64 15" pos="231 222" color="black"
+            source="minecolonies:textures/gui/builderhut/builder_button_small.png"
+            label="$(gui.cancel)"/>
+</window>
