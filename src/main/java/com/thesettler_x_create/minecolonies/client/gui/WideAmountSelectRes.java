@@ -40,10 +40,18 @@ public class WideAmountSelectRes extends WindowSelectRes {
   @Override
   protected void secondaryConfirm(Button button) {
     super.secondaryConfirm(button);
-    // The amount field is shown by that call, and it arrives with the thousand cap on it.
     TextField count = findPaneOfTypeByID(COUNT, TextField.class);
-    if (count != null) {
-      count.setFilter(InputFilters.ONLY_NUMBERS);
+    if (count == null) {
+      return;
     }
+    // TextField.writeText hands the filter the typed character alone, not the whole field, and
+    // ONLY_POSITIVE_NUMBERS_MAX1k answers a "0" with an empty string, because the number it parses
+    // is not positive. So a zero could never be typed into this field at all, wherever the cursor
+    // stood, and only 1 to 9 arrived. MineColonies' warehouse minimum has the same field and the
+    // same hole: 10 cannot be entered there either, only 11.
+    //
+    // ONLY_NUMBERS hands the character straight back, and the thousand cap goes with it.
+    count.setFilter(InputFilters.ONLY_NUMBERS);
+    count.setCursorPosition(count.getText().length());
   }
 }

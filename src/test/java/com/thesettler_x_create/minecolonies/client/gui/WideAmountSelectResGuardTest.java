@@ -7,10 +7,17 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /**
- * A Create network minimum runs into the thousands, and Structurize' picker stops that from being
- * typed twice over: its amount field carries ONLY_POSITIVE_NUMBERS_MAX1k, which refuses a keystroke
- * that would take the value past a thousand, and the field is thirty pixels wide, where BlockUI
- * stops typing at the width of the field. Widening alone changes nothing while the cap sits on top.
+ * Structurize' amount field cannot be typed into properly, and a Create network minimum needs five
+ * digits.
+ *
+ * <p>{@code TextField.writeText} hands the filter the typed character on its own, and {@code
+ * ONLY_POSITIVE_NUMBERS_MAX1k} answers a "0" with an empty string, since what it parses is not
+ * positive. A zero therefore never arrives, at any cursor position, and 1 to 9 are all that can be
+ * typed. On top of that the filter caps at 999 and the field is thirty pixels wide, where BlockUI
+ * stops typing at the width of the field.
+ *
+ * <p>MineColonies' warehouse minimum uses the same field and has the same hole, which is how this
+ * was finally pinned down in game on 2026-09-18: 10 could not be entered there either, only 11.
  */
 class WideAmountSelectResGuardTest {
 
@@ -26,6 +33,18 @@ class WideAmountSelectResGuardTest {
     int setFilter = source.indexOf("setFilter(InputFilters.ONLY_NUMBERS)");
     assertTrue(superCall > 0, "the confirm step must still run");
     assertTrue(setFilter > superCall, "the filter has to be replaced after Structurize sets it");
+  }
+
+  @Test
+  void theCursorStartsBehindWhatIsAlreadyInTheField() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/client/gui/WideAmountSelectRes.java"));
+
+    // Not what kept the zero out, but typing in front of the value that is already there reads
+    // backwards all the same.
+    assertTrue(source.contains("setCursorPosition(count.getText().length())"));
   }
 
   @Test
