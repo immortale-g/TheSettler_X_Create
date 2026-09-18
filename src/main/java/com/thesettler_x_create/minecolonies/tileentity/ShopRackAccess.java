@@ -43,6 +43,15 @@ class ShopRackAccess {
       return racks;
     }
     for (BlockPos pos : owner.getBuilding().getContainers()) {
+      // The hut block is in its own container list, and it passes for a rack: MineColonies has
+      // AbstractTileEntityColonyBuilding extend TileEntityRack. Counting it as one made the hut
+      // buffer part of the rack stock, and since rack stock is what a pickup keeps, goods that
+      // landed in the buffer kept themselves there forever (seen in game on 2026-09-18, three
+      // leftover torches no courier would take). The buffer is the colony side; only the separate
+      // racks are the Create side.
+      if (pos.equals(owner.getBlockPos())) {
+        continue;
+      }
       if (!WorldUtil.isBlockLoaded(owner.getLevel(), pos)) {
         continue;
       }
