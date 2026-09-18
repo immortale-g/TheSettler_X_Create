@@ -59,10 +59,14 @@ public class CreateShopNetworkMinimumModuleWindow
             Component.empty(),
             null,
             IColonyManager.getInstance().getCompatibilityManager().getListOfAllItems(),
-            (stack, amount) ->
-                PacketDistributor.sendToServer(
-                    new SetCreateShopNetworkMinimumPayload(
-                        buildingView.getPosition(), stack.copyWithCount(1), amount)),
+            (stack, amount) -> {
+              if (stack == null || stack.isEmpty()) {
+                return;
+              }
+              PacketDistributor.sendToServer(
+                  new SetCreateShopNetworkMinimumPayload(
+                      buildingView.getPosition(), stack.copyWithCount(1), amount));
+            },
             true,
             Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
         .open();
