@@ -108,10 +108,11 @@ public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
     int req = Math.max(1, requested);
     int acc = Math.max(0, accepted);
     int blocked = Math.max(0, req - acc);
+    // Strings, not numbers: see ShopLostPackageInteraction#buildInquiry.
     return Component.translatable(
         "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry",
         itemLabel,
-        blocked,
-        req);
+        String.valueOf(blocked),
+        String.valueOf(req));
   }
 }

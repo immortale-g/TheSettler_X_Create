@@ -163,11 +163,12 @@ public class ShopLostPackageReorderUnavailableInteraction extends ServerCitizenI
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
+    // A String, not a number: see ShopLostPackageInteraction#buildInquiry.
     return Component.translatable(
         "com.thesettler_x_create.interaction.createshop.lost_package.reorder_unavailable.inquiry",
         requester,
         itemLabel,
-        Math.max(1, remaining),
+        String.valueOf(Math.max(1, remaining)),
         destination);
   }
 

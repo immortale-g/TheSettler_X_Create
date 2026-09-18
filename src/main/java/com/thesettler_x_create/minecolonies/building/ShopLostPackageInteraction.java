@@ -341,11 +341,15 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
             : stackKey.getHoverName().getString();
+    // Every argument stays a String on purpose. The inquiry doubles as the key this interaction is
+    // answered by (CitizenData.onResponseTriggered looks it up in a map), and it reaches the client
+    // as JSON: a number comes back as the smallest type that fits it, so an Integer 64 returns as a
+    // Byte 64, the components stop being equal, and the button does nothing at all.
     return Component.translatable(
         "com.thesettler_x_create.interaction.createshop.lost_package.inquiry",
         requester,
         itemLabel,
-        Math.max(1, remaining),
+        String.valueOf(Math.max(1, remaining)),
         destination);
   }
 
