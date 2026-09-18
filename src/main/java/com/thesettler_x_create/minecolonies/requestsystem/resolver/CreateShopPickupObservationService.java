@@ -22,12 +22,20 @@ import net.minecraft.world.level.Level;
 /**
  * Consumes a request's reservation at the moment a courier takes its items out of the shop.
  *
- * <p>The shop hut reports every item taken out of its combined inventory. Items count as picked up
- * when a courier has a delivery from this shop for that item queued; the amount is booked on those
- * deliveries in courier queue order and their parent request's reservation shrinks by exactly that
- * much. Anything else taking items (a player, another worker) consumes nothing.
+ * <p>The shop hut reports every item taken out of its combined inventory, but never who took it.
+ * The delivery an extraction belongs to is therefore read from MineColonies itself: a courier marks
+ * the delivery it is reaching for in its job before touching the inventory (see {@link
+ * CourierOngoingDeliveries}). Only those deliveries are booked, and their parent request's
+ * reservation shrinks by exactly that much.
+ *
+ * <p>When MineColonies does not tell us, nothing is booked. The reservation is then consumed on
+ * arrival, the way it was before the pickup observer existed. Guessing from the courier queue would
+ * book the amount on a sibling delivery and leave the reservation of the real one hanging, so a
+ * later booking is preferred over a wrong one. Anything else taking items (a player, another
+ * worker) consumes nothing either way.
  */
 final class CreateShopPickupObservationService {
+  private final CourierOngoingDeliveries ongoingDeliveries = new CourierOngoingDeliveries();
 
   void onHutItemsTaken(
       CreateShopRequestResolver resolver,
@@ -48,7 +56,7 @@ final class CreateShopPickupObservationService {
     }
     Map<IToken<?>, IToken<?>> parentByDelivery = new HashMap<>();
     List<PickupTracker.QueuedDelivery<IToken<?>>> candidates = new ArrayList<>();
-    collectQueuedShopDeliveries(manager, shop, taken, parentByDelivery, candidates);
+    collectDeliveriesBeingPickedUp(manager, shop, taken, parentByDelivery, candidates);
     tracker.retainOnly(parentByDelivery.keySet());
     if (candidates.isEmpty()) {
       return;
@@ -72,7 +80,11 @@ final class CreateShopPickupObservationService {
     }
   }
 
-  private static void collectQueuedShopDeliveries(
+  /**
+   * The deliveries the colony's couriers are picking up from this shop at this moment, for this
+   * item. A courier that is walking or delivering contributes nothing.
+   */
+  private void collectDeliveriesBeingPickedUp(
       IRequestManager manager,
       BuildingCreateShop shop,
       ItemStack taken,
@@ -86,8 +98,7 @@ final class CreateShopPickupObservationService {
       if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
         continue;
       }
-      // getTaskQueue is a read-only copy; getCurrentTask would pull new work into the courier.
-      for (IToken<?> token : job.getTaskQueue()) {
+      for (IToken<?> token : ongoingDeliveries.of(colony, citizen, job)) {
         IRequest<?> request = requestOrNull(manager, token);
         if (request == null
             || !request.hasParent()
