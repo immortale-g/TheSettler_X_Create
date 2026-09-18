@@ -4,6 +4,7 @@ import com.ldtteam.blockui.Pane;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
+import com.ldtteam.blockui.controls.TextField;
 import com.ldtteam.blockui.views.ScrollingList;
 import com.ldtteam.structurize.client.gui.WindowSelectRes;
 import com.minecolonies.api.colony.IColonyManager;
@@ -11,6 +12,7 @@ import com.minecolonies.core.client.gui.AbstractModuleWindow;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.moduleview.CreateShopNetworkMinimumModuleView;
 import com.thesettler_x_create.network.SetCreateShopNetworkMinimumPayload;
+import com.thesettler_x_create.stock.AmountText;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.chat.Component;
@@ -67,9 +69,31 @@ public class CreateShopNetworkMinimumModuleWindow
                   new SetCreateShopNetworkMinimumPayload(
                       buildingView.getPosition(), stack.copyWithCount(1), amount));
             },
-            true,
+            false,
             Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
         .open();
+  }
+
+  /**
+   * Takes what was typed into a row's amount field, if it is a number above zero.
+   *
+   * <p>Anything else leaves the entry as it was: no number is not a reason to change one, and
+   * silently falling back to some default is worse than doing nothing, because the player does not
+   * see that his input was dropped. Removing an entry is what the X is for.
+   */
+  private void amountTyped(int index, TextField field) {
+    if (index < 0 || index >= entries.size()) {
+      return;
+    }
+    CreateShopNetworkMinimumModuleView.Entry entry = entries.get(index);
+    int typed = AmountText.parse(field.getText());
+    if (typed <= 0 || typed == entry.amount()) {
+      return;
+    }
+    entries.set(index, new CreateShopNetworkMinimumModuleView.Entry(entry.stack(), typed));
+    PacketDistributor.sendToServer(
+        new SetCreateShopNetworkMinimumPayload(
+            buildingView.getPosition(), entry.stack().copyWithCount(1), typed));
   }
 
   private void removeMinimum(Button button) {
@@ -114,9 +138,10 @@ public class CreateShopNetworkMinimumModuleWindow
             if (name != null) {
               name.setText(entry.stack().getHoverName());
             }
-            Text amount = row.findPaneOfTypeByID("itemAmount", Text.class);
+            TextField amount = row.findPaneOfTypeByID("itemAmount", TextField.class);
             if (amount != null) {
-              amount.setText(Component.literal(String.valueOf(entry.amount())));
+              amount.setText(AmountText.format(entry.amount()));
+              amount.setHandler(field -> amountTyped(index, field));
             }
           }
         });

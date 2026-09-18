@@ -1,0 +1,74 @@
+package com.thesettler_x_create.stock;
+
+/**
+ * Item counts as a player reads and types them. A Create network holds thousands of an item, and a
+ * five digit number in a list column is both wide and hard to read, so a thousand is written and
+ * accepted as {@code 1k}.
+ *
+ * <p>Reading and writing are the same mapping in both directions: what {@link #format} produces,
+ * {@link #parse} turns back into the same number. A field can therefore show its own value without
+ * the round trip changing it.
+ *
+ * <p>Knows nothing about Minecraft.
+ */
+public final class AmountText {
+  private static final int THOUSAND = 1000;
+
+  private AmountText() {}
+
+  /** {@code 999} stays 999, {@code 1000} becomes 1k, {@code 1500} becomes 1.5k. */
+  public static String format(int amount) {
+    if (amount < THOUSAND) {
+      return Integer.toString(amount);
+    }
+    int thousands = amount / THOUSAND;
+    int rest = amount % THOUSAND;
+    if (rest == 0) {
+      return thousands + "k";
+    }
+    // One decimal is enough to stay short; anything finer is written out in full so no digit is
+    // lost on the way to the field and back.
+    if (rest % 100 == 0) {
+      return thousands + "." + (rest / 100) + "k";
+    }
+    return Integer.toString(amount);
+  }
+
+  /**
+   * The number behind what was typed, or {@code -1} when that is not a number: empty, a stray
+   * letter, a second dot, a negative. Nothing is guessed and nothing falls back to a default, so a
+   * caller can leave the value alone instead of replacing it with something the player never asked
+   * for.
+   */
+  public static int parse(String text) {
+    if (text == null) {
+      return -1;
+    }
+    String cleaned = text.trim().toLowerCase(java.util.Locale.ROOT).replace(",", ".");
+    if (cleaned.isEmpty()) {
+      return -1;
+    }
+    boolean thousands = cleaned.endsWith("k");
+    if (thousands) {
+      cleaned = cleaned.substring(0, cleaned.length() - 1).trim();
+      if (cleaned.isEmpty()) {
+        return -1;
+      }
+    }
+    double value;
+    try {
+      value = Double.parseDouble(cleaned);
+    } catch (NumberFormatException notANumber) {
+      return -1;
+    }
+    if (!thousands && cleaned.contains(".")) {
+      // "1.5" without a k is half an item, which does not exist.
+      return -1;
+    }
+    double scaled = thousands ? value * THOUSAND : value;
+    if (scaled < 0 || scaled > Integer.MAX_VALUE || scaled != Math.floor(scaled)) {
+      return -1;
+    }
+    return (int) scaled;
+  }
+}
