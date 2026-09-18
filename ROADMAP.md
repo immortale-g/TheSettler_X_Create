@@ -37,6 +37,12 @@ erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen
 zieht bei einem Kurier ohne Aufgaben neue Aufträge aus der Warehouse-Queue; der Shop rief es bei jeder
 Prüfung eines offenen Lieferauftrags für alle Kuriere auf. Gelesen wird jetzt nur noch die Task-Queue.
 
+0.6.0 ist das erste Release seit 0.3.6 und bringt 0.4.0, 0.5.0 und die Shop-Versorgungsregeln auf
+einmal: Sammel-Lieferungen und das Bestands-Ledger (0.4.0), der Unterwegs-Pool mit Bestellungen, die
+dem Shop gehören (0.5.0), und darauf aufbauend die Versorgungsregeln pro Shop (Sperrliste,
+Netz-Mindestbestand), das Gauge-Crafting und die überarbeiteten Hütten-Reiter mit eigenem
+Auswahlfenster und eigenen Icons. `debugLogging` bleibt bis 1.0.0 eingeschaltet.
+
 ## Plan ab 2026-09-13
 
 ### Branches
