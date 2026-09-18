@@ -69,7 +69,10 @@ public class CreateShopNetworkMinimumModuleWindow
                   new SetCreateShopNetworkMinimumPayload(
                       buildingView.getPosition(), stack.copyWithCount(1), amount));
             },
-            false,
+            // The picker keeps its confirm step. Turning it off does not remove its amount field,
+            // it only removes the button that accepts the choice, leaving no way out but cancel.
+            // Its field is thirty pixels wide, so large numbers are typed in the list instead.
+            true,
             Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
         .open();
   }
