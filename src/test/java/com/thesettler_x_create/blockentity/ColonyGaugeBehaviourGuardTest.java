@@ -122,6 +122,21 @@ class ColonyGaugeBehaviourGuardTest {
   }
 
   @Test
+  void aSlotSetInStacksAsksForStacks() throws Exception {
+    String source = source();
+
+    // The value settings have an items row and a stacks row; on the stacks row a 1 means 64. Create
+    // reads it as getAmount() * (upTo ? 1 : maxStackSize). Reading the dialled number as items made
+    // a slot set to one stack ask for one item, which whatever lay in the network already covered,
+    // so it never asked again.
+    assertTrue(source.contains("private int targetInItems()"));
+    assertTrue(source.contains("dialled * filter.getMaxStackSize()"));
+    // and nothing may go back to reading the raw setting as a number of items
+    int start = source.indexOf("void tryRequest() {");
+    assertFalse(source.substring(start).contains("int amount = getAmount();"));
+  }
+
+  @Test
   void whatIsAlreadyOnItsWayIsNotOrderedAgain() throws Exception {
     String source = source();
     int start = source.indexOf("void tryRequest() {");

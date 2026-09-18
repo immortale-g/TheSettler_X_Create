@@ -201,6 +201,22 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     panelBE().updatePowered();
   }
 
+  /**
+   * How many items the slot is set to, which is not the number the player dialled in: the value
+   * settings have two rows, items and stacks, and on the stacks row a 1 means a full stack. Create
+   * reads it as {@code getAmount() * (upTo ? 1 : maxStackSize)} and everything else here counts in
+   * items, so a slot set to one stack asked for a single item and was satisfied by whatever
+   * happened to lie in the network.
+   */
+  private int targetInItems() {
+    int dialled = Math.max(0, getAmount());
+    if (dialled == 0 || upTo) {
+      return dialled;
+    }
+    ItemStack filter = getFilter();
+    return filter.isEmpty() ? dialled : dialled * filter.getMaxStackSize();
+  }
+
   // --- Press-and-hold target amount (parity with FactoryPanelBehaviour) ---
 
   @Override
@@ -326,7 +342,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
    */
   private void tickStorageMonitor() {
     if (getFilter().isEmpty()) return;
-    int amount = getAmount();
+    int amount = targetInItems();
     boolean shouldSatisfy = amount <= 0 || getLevelInStorage() >= amount;
     if (shouldSatisfy == satisfied) return;
     satisfied = shouldSatisfy;
@@ -387,7 +403,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
             promisedSatisfied);
       return;
     }
-    int amount = getAmount();
+    int amount = targetInItems();
     int inStorage = getLevelInStorage();
     // What is on its way counts as covered. Between the shop packaging an order and the goods
     // showing up in the packager's storage they are in neither place, and asking for the gap again
@@ -475,7 +491,7 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
           "[ColonyGauge] onDeliveryReceived slot={} inStorage={} target={} satisfied={}",
           slot.getSerializedName(),
           getLevelInStorage(),
-          getAmount(),
+          targetInItems(),
           satisfied);
     }
   }
