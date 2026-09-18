@@ -140,7 +140,13 @@ public class CreateShopNetworkMinimumModuleWindow
             }
             TextField amount = row.findPaneOfTypeByID("itemAmount", TextField.class);
             if (amount != null) {
-              amount.setText(AmountText.format(entry.amount()));
+              // The list rebuilds its rows while it is open, so writing the value in every pass
+              // would take the field away from the player mid-word: a typed "5" came back as the
+              // old value before the "k" could follow. The field belongs to whoever is typing in
+              // it until he clicks elsewhere.
+              if (!amount.isFocus()) {
+                amount.setText(AmountText.format(entry.amount()));
+              }
               amount.setHandler(field -> amountTyped(index, field));
             }
           }

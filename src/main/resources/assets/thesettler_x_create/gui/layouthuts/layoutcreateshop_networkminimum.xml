@@ -14,9 +14,9 @@
           emptytext="$(com.thesettler_x_create.gui.createshop.networkminimum.empty)" emptycolor="black">
         <box size="100% 17" linewidth="1">
             <itemicon id="itemIcon" size="17 17" pos="0 0"/>
-            <text id="itemName" size="70 12" pos="20 3" color="black"/>
-            <input id="itemAmount" size="42 14" pos="90 1" maxlength="7"/>
-            <button id="removeMinimum" label="X" pos="134 1" size="29 15" color="red"
+            <text id="itemName" size="82 12" pos="20 3" color="black"/>
+            <input id="itemAmount" size="34 14" pos="104 1" maxlength="7"/>
+            <button id="removeMinimum" label="X" pos="142 1" size="21 15" color="red"
                     source="minecolonies:textures/gui/builderhut/builder_button_very_small.png"/>
         </box>
     </list>
