@@ -4,7 +4,6 @@ import com.ldtteam.blockui.Pane;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
-import com.ldtteam.blockui.controls.TextField;
 import com.ldtteam.blockui.views.ScrollingList;
 import com.ldtteam.structurize.client.gui.WindowSelectRes;
 import com.minecolonies.api.colony.IColonyManager;
@@ -26,6 +25,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 public class CreateShopNetworkMinimumModuleWindow
     extends AbstractModuleWindow<CreateShopNetworkMinimumModuleView> {
+  /** Structurize' picker with a wider amount field; see the layout for why. */
+  private static final ResourceLocation WIDE_PICKER =
+      ResourceLocation.fromNamespaceAndPath(
+          TheSettlerXCreate.MODID, "gui/layoutselectres_wide.xml");
+
   private final CreateShopNetworkMinimumModuleView moduleView;
   private final ScrollingList minimumList;
   private List<CreateShopNetworkMinimumModuleView.Entry> entries = new ArrayList<>();
@@ -57,6 +61,7 @@ public class CreateShopNetworkMinimumModuleWindow
       return;
     }
     new WindowSelectRes(
+            WIDE_PICKER,
             this,
             Component.empty(),
             null,
@@ -69,34 +74,9 @@ public class CreateShopNetworkMinimumModuleWindow
                   new SetCreateShopNetworkMinimumPayload(
                       buildingView.getPosition(), stack.copyWithCount(1), amount));
             },
-            // The picker keeps its confirm step. Turning it off does not remove its amount field,
-            // it only removes the button that accepts the choice, leaving no way out but cancel.
-            // Its field is thirty pixels wide, so large numbers are typed in the list instead.
             true,
             Component.translatable("com.thesettler_x_create.gui.createshop.networkminimum.select"))
         .open();
-  }
-
-  /**
-   * Takes what was typed into a row's amount field, if it is a number above zero.
-   *
-   * <p>Anything else leaves the entry as it was: no number is not a reason to change one, and
-   * silently falling back to some default is worse than doing nothing, because the player does not
-   * see that his input was dropped. Removing an entry is what the X is for.
-   */
-  private void amountTyped(int index, TextField field) {
-    if (index < 0 || index >= entries.size()) {
-      return;
-    }
-    CreateShopNetworkMinimumModuleView.Entry entry = entries.get(index);
-    int typed = AmountText.parse(field.getText());
-    if (typed <= 0 || typed == entry.amount()) {
-      return;
-    }
-    entries.set(index, new CreateShopNetworkMinimumModuleView.Entry(entry.stack(), typed));
-    PacketDistributor.sendToServer(
-        new SetCreateShopNetworkMinimumPayload(
-            buildingView.getPosition(), entry.stack().copyWithCount(1), typed));
   }
 
   private void removeMinimum(Button button) {
@@ -141,16 +121,9 @@ public class CreateShopNetworkMinimumModuleWindow
             if (name != null) {
               name.setText(entry.stack().getHoverName());
             }
-            TextField amount = row.findPaneOfTypeByID("itemAmount", TextField.class);
+            Text amount = row.findPaneOfTypeByID("itemAmount", Text.class);
             if (amount != null) {
-              // The list rebuilds its rows while it is open, so writing the value in every pass
-              // would take the field away from the player mid-word: a typed "5" came back as the
-              // old value before the "k" could follow. The field belongs to whoever is typing in
-              // it until he clicks elsewhere.
-              if (!amount.isFocus()) {
-                amount.setText(AmountText.format(entry.amount()));
-              }
-              amount.setHandler(field -> amountTyped(index, field));
+              amount.setText(Component.literal(AmountText.format(entry.amount())));
             }
           }
         });
