@@ -61,7 +61,7 @@ final class ShopGaugeQueue {
           "[ColonyGauge] requestForGauge skip reason=invalid-args item={} amount={}", item, amount);
       return 0;
     }
-    int minLevel = Config.PERMA_MIN_BUILDING_LEVEL.get();
+    int minLevel = Config.permaMinBuildingLevel();
     if (owner.getBuildingLevel() < minLevel) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
@@ -309,6 +309,45 @@ final class ShopGaugeQueue {
       }
       owner.markDirty();
     }
+  }
+
+  /**
+   * Books {@code packaged} items of the next task as sent. A gauge order is filled in parts, the
+   * way Create fills one: what the racks hold travels now and the rest follows, instead of the
+   * whole order waiting for the last item. The task keeps what is still owed, and only a task with
+   * nothing left is removed.
+   *
+   * <p>The reservation shrinks by the same amount, so rack housekeeping may move on whatever is no
+   * longer spoken for, and the rest stays protected until it is packaged too.
+   */
+  void deliverPartOfNextGaugeTask(int packaged) {
+    if (packaged <= 0 || gaugePackagingQueue.isEmpty()) {
+      return;
+    }
+    GaugePackagingTask task = gaugePackagingQueue.get(0);
+    int sent = Math.min(packaged, task.amount());
+    CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
+    int open = task.amount() - sent;
+    if (open <= 0) {
+      gaugePackagingQueue.remove(0);
+      if (pickup != null) {
+        pickup.release(task.requestId());
+      }
+    } else {
+      gaugePackagingQueue.set(
+          0, new GaugePackagingTask(task.item(), open, task.gaugeAddress(), task.requestId()));
+      if (pickup != null) {
+        pickup.consumeReservedForRequest(task.requestId(), task.item(), sent);
+      }
+    }
+    owner.markDirty();
+    DebugLog.info(
+        "[ColonyGauge] packaged {} of {} item={} address={} stillOpen={}",
+        sent,
+        task.amount(),
+        task.item().getItem(),
+        task.gaugeAddress(),
+        open);
   }
 
   /** Request ids whose pickup reservation must stay until the gauge task is packaged. */

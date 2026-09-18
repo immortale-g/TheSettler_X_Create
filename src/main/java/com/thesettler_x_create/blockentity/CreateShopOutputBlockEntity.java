@@ -1,6 +1,8 @@
 package com.thesettler_x_create.blockentity;
 
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
+import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.create.CreatePackageBridge;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -118,6 +120,18 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       return false;
     }
 
+    /**
+     * The package the shop has ready for the next gauge task, or nothing.
+     *
+     * <p>Whatever the racks hold goes out now and the rest follows in a later package, the way
+     * Create ships a partly covered order. A gauge order that waited for its last item would hold
+     * back goods that are already there, sometimes for as long as the colony takes to craft the
+     * remainder.
+     *
+     * <p>Preview and real pull must agree on the amount, or the shop duplicates items: Create reads
+     * this slot, ships what it sees, and asks again. As long as both take what the racks hold, a
+     * shipped package always books itself against the task and the next look finds the racks empty.
+     */
     private ItemStack assemblePackage(boolean simulate) {
       BuildingCreateShop building = getBuilding();
       if (building == null) return ItemStack.EMPTY;
@@ -125,20 +139,31 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       if (task == null) return ItemStack.EMPTY;
       ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
       if (extracted.isEmpty()) return ItemStack.EMPTY;
-      if (!simulate) building.completeNextGaugeTask();
+      if (!simulate) building.deliverPartOfNextGaugeTask(extracted.getCount());
+      if (DebugLog.enabled()) {
+        // A preview builds a shippable package without taking anything. If Create ever ships one
+        // of those, the goods stay in the racks and travel at the same time. On 2026-09-18 a
+        // package of 12 torches arrived while only 4 had been booked, which is what that would
+        // look like, so both calls say what they saw.
+        TheSettlerXCreate.LOGGER.info(
+            "[CreateShop] gauge package simulate={} taskAmount={} packaged={} address={}",
+            simulate,
+            task.amount(),
+            extracted.getCount(),
+            task.gaugeAddress());
+      }
       return CreatePackageBridge.buildPackage(extracted, task.gaugeAddress());
     }
 
     /**
-     * Seam-audit finding s1-6: a non-simulated pull that comes up short (racks only had part of
-     * {@code amount} left, e.g. depleted by something else between the preview and this real call)
-     * used to be treated as a full success anyway - the caller has no "partial" concept, it either
-     * packages what it got and marks the gauge task complete, or does neither. Packaging a partial
-     * amount as if it were the full order silently under-delivers and loses track of the shortfall
-     * forever, since the task is marked done. A real (non-simulated) pull is therefore now
-     * all-or-nothing: if it can't reach {@code amount}, every slot already pulled from this call is
-     * put back before returning empty, so the racks are left exactly as found and the gauge task
-     * stays pending for a later retry instead of quietly shipping less than ordered.
+     * Pulls up to {@code amount} of {@code key} out of the shop's racks, and as much of it as is
+     * there when that is less.
+     *
+     * <p>Seam-audit finding s1-6 made this all-or-nothing, because the caller had no way to say
+     * "part of it": it packaged whatever it got and marked the whole gauge task done, losing the
+     * shortfall. The caller books the amount against the task now, so a short pull is a partial
+     * delivery and the rest stays owed. The important part is that the simulated and the real pull
+     * return the same amount, since Create ships what the preview shows.
      */
     private ItemStack extractFromRacks(ItemStack key, int amount, boolean simulate) {
       TileEntityCreateShop shop = getShopTile();
@@ -148,7 +173,6 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       int remaining = amount;
       ItemStack extracted = key.copy();
       extracted.setCount(0);
-      java.util.List<Pull> pulls = simulate ? null : new java.util.ArrayList<>();
 
       for (TileEntityCreateShop.LoadedRack loaded : shop.getLoadedRacks()) {
         if (remaining <= 0) {
@@ -168,9 +192,6 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
           if (!pulled.isEmpty()) {
             extracted.grow(pulled.getCount());
             remaining -= pulled.getCount();
-            if (pulls != null) {
-              pulls.add(new Pull(handler, slot, pulled.copy()));
-            }
           }
         }
       }
@@ -178,28 +199,10 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       if (extracted.isEmpty()) {
         return ItemStack.EMPTY;
       }
-      if (!simulate && remaining > 0) {
-        rollBack(pulls);
-        return ItemStack.EMPTY;
-      }
       if (!simulate) {
         shop.noteRackStockChange(extracted, -extracted.getCount());
       }
       return extracted;
-    }
-
-    private record Pull(IItemHandler handler, int slot, ItemStack amount) {}
-
-    private void rollBack(java.util.List<Pull> pulls) {
-      for (Pull pull : pulls) {
-        ItemStack leftover = pull.handler().insertItem(pull.slot(), pull.amount(), false);
-        if (!leftover.isEmpty()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
-              "[CreateShop] output rollback could not fully restore {} to rack slot={}",
-              leftover,
-              pull.slot());
-        }
-      }
     }
   }
 }

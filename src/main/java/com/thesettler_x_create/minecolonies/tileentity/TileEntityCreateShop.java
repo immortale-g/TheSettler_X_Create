@@ -407,11 +407,14 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /** Returns true when the hut-internal inventory contains items awaiting native pickup. */
-  public boolean hasHutInventoryItems() {
+  /** The inventory a courier's pickup walks: the hut buffer and the racks combined. */
+  public IItemHandler getHutInventoryForPickup() {
     IItemHandler hut = getInventory();
-    if (hut == null) {
-      hut = getItemHandlerCap((Direction) null);
-    }
+    return hut == null ? getItemHandlerCap((Direction) null) : hut;
+  }
+
+  public boolean hasHutInventoryItems() {
+    IItemHandler hut = getHutInventoryForPickup();
     if (hut == null) {
       return false;
     }

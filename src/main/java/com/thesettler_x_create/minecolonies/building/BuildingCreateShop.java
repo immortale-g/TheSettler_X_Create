@@ -264,6 +264,12 @@ public class BuildingCreateShop extends AbstractBuilding {
     return pickupKeepPolicy.takeableForPickup(stack, localAlreadyKept);
   }
 
+  /** Whether a courier called here would find anything it may take; see ShopPickupKeepPolicy. */
+  public boolean hasItemsAPickupMayTake() {
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    return tile != null && pickupKeepPolicy.anythingToPickUp(tile.getHutInventoryForPickup());
+  }
+
   @Override
   public void requestRepair(BlockPos pos) {
     for (BlockPos containerPos : containerList) {
@@ -533,6 +539,11 @@ public class BuildingCreateShop extends AbstractBuilding {
   /** Removes and returns the next gauge packaging task (call after successfully packaging). */
   public void completeNextGaugeTask() {
     gaugeQueue.completeNextGaugeTask();
+  }
+
+  /** Books part of the next gauge task as packaged and sent; see ShopGaugeQueue. */
+  public void deliverPartOfNextGaugeTask(int packaged) {
+    gaugeQueue.deliverPartOfNextGaugeTask(packaged);
   }
 
   /** Request ids whose pickup reservation must stay until the gauge task is packaged. */

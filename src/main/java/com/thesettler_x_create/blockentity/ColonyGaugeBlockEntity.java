@@ -184,7 +184,9 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
    * at all.
    */
   public void onDeliveryReceived(ItemStack deliveredItem) {
-    if (matchWaitingPanel(deliveredItem, true) || matchWaitingPanel(deliveredItem, false)) {
+    int delivered = deliveredItem == null ? 0 : deliveredItem.getCount();
+    if (matchWaitingPanel(deliveredItem, true, delivered)
+        || matchWaitingPanel(deliveredItem, false, delivered)) {
       return;
     }
     onDeliveryReceived();
@@ -197,7 +199,8 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
    * @param withComponents whether the components have to match as well
    * @return whether a slot was found
    */
-  private boolean matchWaitingPanel(ItemStack deliveredItem, boolean withComponents) {
+  private boolean matchWaitingPanel(
+      ItemStack deliveredItem, boolean withComponents, int delivered) {
     for (ColonyGaugeBehaviour behaviour : panels.values()) {
       if (!behaviour.isActive() || !behaviour.promisedSatisfied) continue;
       boolean matches =
@@ -205,7 +208,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
               ? ItemStack.isSameItemSameComponents(behaviour.getFilter(), deliveredItem)
               : ItemStack.isSameItem(behaviour.getFilter(), deliveredItem);
       if (matches) {
-        behaviour.onDeliveryReceived();
+        behaviour.onDeliveryReceived(delivered);
         return true;
       }
     }

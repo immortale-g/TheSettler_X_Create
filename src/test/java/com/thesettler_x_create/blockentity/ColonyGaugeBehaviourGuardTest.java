@@ -104,20 +104,30 @@ class ColonyGaugeBehaviourGuardTest {
   }
 
   @Test
-  void deliveryReceivedRecomputesSatisfiedFromStorageRatherThanAssumingSuccess() throws Exception {
+  void aDeliveryTakesItsOwnAmountOffThePromiseAndNoMore() throws Exception {
     String source = source();
-    int start = source.indexOf("public void onDeliveryReceived() {");
+    int start = source.indexOf("public void onDeliveryReceived(int delivered) {");
     int end = source.indexOf("private BuildingCreateShop findBuilding()");
     String body = source.substring(start, end);
 
-    // A delivery arriving must clear the promise and then re-derive `satisfied` from the
-    // Packager's actual current stock (tickStorageMonitor) - not set satisfied=true directly,
-    // since the delivered amount could be short of the full target.
-    assertTrue(body.contains("promisedSatisfied = false;"));
-    assertTrue(body.contains("promisedAmount = 0;"));
-    assertTrue(body.contains("promisedUntil = 0L;"));
+    // An order arrives in several packages. Dropping the whole promise on the first one leaves the
+    // slot looking short by everything still on its way, and it orders that amount again: 65
+    // torches became 106 in the in-game test on 2026-09-18.
+    assertTrue(
+        body.contains("promisedAmount = Math.max(0, promisedAmount - Math.max(0, delivered));"));
+    assertTrue(body.contains("if (promisedAmount <= 0) {"));
+    // Only a promise that is used up ends; `satisfied` still comes from the packager's real stock.
     assertTrue(body.contains("tickStorageMonitor();"));
     assertFalse(body.contains("satisfied = true;"));
+  }
+
+  @Test
+  void whatIsAlreadyOnItsWayIsNotOrderedAgain() throws Exception {
+    String source = source();
+    int start = source.indexOf("void tryRequest() {");
+    String body = source.substring(start);
+
+    assertTrue(body.contains("int remaining = amount - inStorage - promisedAmount;"));
   }
 
   @Test

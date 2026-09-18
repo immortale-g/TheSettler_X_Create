@@ -109,4 +109,17 @@ public class Config {
           .define("enableDevTestCommands", false);
 
   static final ModConfigSpec SPEC = BUILDER.build();
+
+  /**
+   * The Create Shop level a gauge request needs, falling back to the default while the config is
+   * not loaded yet. That is the same situation {@link DebugLog#enabled()} covers: early startup,
+   * and tests that run without a config file.
+   */
+  public static int permaMinBuildingLevel() {
+    try {
+      return PERMA_MIN_BUILDING_LEVEL.get();
+    } catch (IllegalStateException notLoaded) {
+      return PERMA_MIN_BUILDING_LEVEL.getDefault();
+    }
+  }
 }

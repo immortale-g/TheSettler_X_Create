@@ -389,7 +389,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     }
     int amount = getAmount();
     int inStorage = getLevelInStorage();
-    int remaining = amount - inStorage;
+    // What is on its way counts as covered. Between the shop packaging an order and the goods
+    // showing up in the packager's storage they are in neither place, and asking for the gap again
+    // orders the same goods twice. Create's panel does the same sum.
+    int remaining = amount - inStorage - promisedAmount;
     if (remaining <= 0) {
       if (debug)
         TheSettlerXCreate.LOGGER.info(
@@ -444,9 +447,23 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   public void onDeliveryReceived() {
-    promisedSatisfied = false;
-    promisedAmount = 0;
-    promisedUntil = 0L;
+    onDeliveryReceived(promisedAmount);
+  }
+
+  /**
+   * Books {@code delivered} items of the promise as arrived. An order is filled in several
+   * packages, so dropping the whole promise on the first one would leave the slot looking short by
+   * everything still on its way, and it would order that amount a second time.
+   *
+   * <p>A promise that is used up ends here; what is left keeps waiting, with its expiry untouched,
+   * because the order behind it has not changed.
+   */
+  public void onDeliveryReceived(int delivered) {
+    promisedAmount = Math.max(0, promisedAmount - Math.max(0, delivered));
+    if (promisedAmount <= 0) {
+      promisedSatisfied = false;
+      promisedUntil = 0L;
+    }
     resetTimerSlightly();
     blockEntity.sendData();
     // satisfied is recomputed from the connected Packager's actual current stock, not from this
