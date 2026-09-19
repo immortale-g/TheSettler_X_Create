@@ -47,7 +47,12 @@ final class CourierOngoingDeliveries {
 
   /**
    * The deliveries this courier currently has in hand or is reaching for, or an empty set when
-   * MineColonies does not tell us. Never guesses.
+   * MineColonies does not tell us. Nothing here is inferred from the courier's queue or from what
+   * the racks are missing; it is read from his job or not answered at all.
+   *
+   * <p>That is exact for one courier. Where two are fetching the same item from the same shop at
+   * the same moment, the extraction itself still carries no actor, so either of their deliveries
+   * may be the one it books against.
    */
   Set<IToken<?>> of(IColony colony, JobDeliveryman job) {
     if (colony == null || job == null) {
