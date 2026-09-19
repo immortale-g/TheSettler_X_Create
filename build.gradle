@@ -391,6 +391,20 @@ tasks.named('check') {
     dependsOn 'testStructurizeModernApi', 'testFactoryLogistics', 'testFml'
 }
 
+// Reads the compiled mod and asks what the upstream API we use looks like elsewhere: in another
+// Minecraft version, or in a newer release of the same mods. Deliberately not wired into check,
+// because it downloads jars. See tools/apidiff/README.md.
+//   gradlew apiDiff                                             what 1.20.1 would be missing
+//   gradlew apiDiff -PapiDiffArgs="behaviour latest-1.21.1"     what a new release changed
+tasks.register('apiDiff', Exec) {
+    group = 'verification'
+    description = 'Compares the upstream API this mod uses against another set of mod jars.'
+    dependsOn 'classes'
+    def python = providers.gradleProperty('apiDiffPython').getOrElse('python')
+    def arguments = providers.gradleProperty('apiDiffArgs').getOrElse('surface 1.20.1')
+    commandLine([python, file('tools/apidiff/apidiff.py').absolutePath] + arguments.tokenize(' '))
+}
+
 spotless {
     java {
         googleJavaFormat('1.17.0')

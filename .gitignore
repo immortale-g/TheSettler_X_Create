@@ -43,3 +43,7 @@ libs/
 docs/agent/
 AGENTS.md
 FEATURE_STATUS.md
+
+# python tooling
+__pycache__/
+*.pyc
