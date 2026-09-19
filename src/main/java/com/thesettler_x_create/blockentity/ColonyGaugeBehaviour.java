@@ -405,9 +405,12 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     }
     int amount = targetInItems();
     int inStorage = getLevelInStorage();
-    // What is on its way counts as covered. Between the shop packaging an order and the goods
-    // showing up in the packager's storage they are in neither place, and asking for the gap again
-    // orders the same goods twice. Create's panel does the same sum.
+    // What is still promised is nothing here: the guard above returns while a promise stands, and
+    // promisedAmount only holds a number in that state. It is in the sum because the two belong
+    // together - what is on its way counts as covered, since between the shop packaging an order
+    // and the goods showing up in the packager's storage they are in neither place. Create's panel
+    // does the same sum. What keeps the same goods from being ordered twice is the promise itself,
+    // which shrinks by what arrives and drops when the package says the order is closed.
     int remaining = amount - inStorage - promisedAmount;
     if (remaining <= 0) {
       if (debug)

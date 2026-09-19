@@ -1,8 +1,5 @@
-# This is an example neoforge.mods.toml file. It contains the data relating to the loading mods.
-# There are several mandatory fields (#mandatory), and many more that are optional (#optional).
-# The overall format is standard TOML format, v0.5.0.
-# Note that there are a couple of TOML lists in this file.
-# Find more information on toml format here:  https://github.com/toml-lang/toml
+# What the mod list shows about this mod, and what it needs to run.
+# TOML v0.5.0. Placeholders are filled in from gradle.properties at build time.
 
 # The name of the mod loader type to load - for regular FML @Mod mods it should be javafml
 modLoader="javafml" #mandatory
@@ -15,7 +12,7 @@ loaderVersion="${loader_version_range}" #mandatory
 license="${mod_license}"
 
 # A URL to refer people to when problems occur with this mod
-#issueTrackerURL="https://change.me.to.your.issue.tracker.example.invalid/" #optional
+issueTrackerURL="${mod_issues_url}"
 
 # A list of mods - how many allowed here is determined by the individual mod loader
 [[mods]] #mandatory
@@ -29,24 +26,24 @@ version="${mod_version}" #mandatory
 # A display name for the mod
 displayName="${mod_name}" #mandatory
 
-# A URL to query for updates for this mod. See the JSON update specification https://docs.neoforged.net/docs/misc/updatechecker/
-#updateJSONURL="https://change.me.example.invalid/updates.json" #optional
+# No updateJSONURL: releases are published on GitHub, and there is no update manifest to point at.
+# See https://docs.neoforged.net/docs/misc/updatechecker/ if one is ever added.
 
 # A URL for the "homepage" for this mod, displayed in the mod UI
-#displayURL="https://change.me.to.your.mods.homepage.example.invalid/" #optional
-
-# A file name (in the root of the mod JAR) containing a logo for display
-#logoFile="examplemod.png" #optional
-
-# A text field displayed in the mod UI
-#credits="" #optional
+displayURL="${mod_homepage_url}"
 
 # The authors of the mod, displayed in the mod UI (optional)
-#authors=""
+authors="${mod_authors}"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Example mod description.
+A bridge between MineColonies and Create. The Create Shop hut registers as a request resolver inside
+the colony: when a colonist or a building asks for something the colony cannot cover, the shop orders
+it from a Create stock network and a courier delivers it. Colonist requests keep their normal
+MineColonies lifecycle throughout.
+
+The Colony Factory Gauge asks the other way round, ordering colony goods into a Create network, and
+the shop can be told which items it may draw and how much of each stays behind.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.

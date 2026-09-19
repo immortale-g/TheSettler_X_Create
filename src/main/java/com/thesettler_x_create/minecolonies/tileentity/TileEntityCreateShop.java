@@ -406,24 +406,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return ItemStack.EMPTY;
   }
 
-  /** Returns true when the hut-internal inventory contains items awaiting native pickup. */
   /** The inventory a courier's pickup walks: the hut buffer and the racks combined. */
   public IItemHandler getHutInventoryForPickup() {
     IItemHandler hut = getInventory();
     return hut == null ? getItemHandlerCap((Direction) null) : hut;
-  }
-
-  public boolean hasHutInventoryItems() {
-    IItemHandler hut = getHutInventoryForPickup();
-    if (hut == null) {
-      return false;
-    }
-    for (int slot = 0; slot < hut.getSlots(); slot++) {
-      if (!hut.getStackInSlot(slot).isEmpty()) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**

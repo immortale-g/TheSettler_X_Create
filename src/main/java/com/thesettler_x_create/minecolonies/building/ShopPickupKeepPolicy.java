@@ -29,9 +29,6 @@ final class ShopPickupKeepPolicy {
   }
 
   /**
-   * @return how much of {@code stack} the pickup may take
-   */
-  /**
    * Whether a courier called to this shop would find anything it may take.
    *
    * <p>The hut's inventory is the racks and the hut buffer combined, and the racks are the Create
