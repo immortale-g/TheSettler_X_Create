@@ -11,6 +11,8 @@ name: Compat (latest releases)
 # Because this file comes from the default branch while the checkout is per-branch, it must not name
 # individual verification tasks: a task renamed on one line and not the other fails the run before a
 # single test starts. It asks for check instead, and every branch wires its own tasks into check.
+# The apiDiff steps at the end are the one exception, because apiDiff downloads jars and so cannot
+# hang off check. They name the task, and therefore check first whether the branch has it at all.
 on:
   schedule:
     - cron: '17 4 * * *'
@@ -48,3 +50,38 @@ jobs:
 
       - name: Compile and test against latest releases
         run: ./gradlew compileJava check -x spotlessCheck ${{ steps.deps.outputs.args }}
+
+      # Compiling only proves the signatures still line up. These two ask what a compile cannot.
+      #
+      # implements fails the run: an upstream interface that gains an abstract method leaves a
+      # compile green and throws AbstractMethodError in play, which is the worst way to find out.
+      #
+      # behaviour only reports. Upstream rewrites its own internals constantly, so a red run for
+      # every such change would train us to ignore this workflow. It goes into the job summary,
+      # where it is read when something is already suspected.
+      #
+      # Both are skipped when the checked out branch predates the tool, because scheduled runs
+      # take this file from the default branch while the checkout is per branch.
+      - name: Check what a compile cannot see
+        run: |
+          if [ ! -f tools/apidiff/apidiff.py ]; then
+            echo "apidiff is not on ${{ matrix.ref }} yet, skipping" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          ./gradlew apiDiff -PapiDiffPython=python3 \
+            -PapiDiffArgs="implements latest-1.21.1 --fail-on-drift" \
+            ${{ steps.deps.outputs.args }}
+
+      - name: Report upstream behaviour drift
+        run: |
+          if [ ! -f tools/apidiff/apidiff.py ]; then
+            exit 0
+          fi
+          {
+            echo "### Upstream behaviour drift (${{ matrix.ref }})"
+            echo '```'
+            ./gradlew apiDiff -q -PapiDiffPython=python3 \
+              -PapiDiffArgs="behaviour latest-1.21.1 --depth 2 --limit 20" \
+              ${{ steps.deps.outputs.args }} 2>&1 | tail -n 60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
