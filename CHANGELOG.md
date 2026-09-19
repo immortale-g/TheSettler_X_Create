@@ -3,7 +3,7 @@
 What changed in each release, for players. Versions are `MAJOR.MINOR.PATCH`; anything ending in
 `-beta` was handed to testers rather than published.
 
-## Unreleased (0.6.1-beta)
+## Unreleased (0.7.0)
 
 Fixes from a review of the 0.6.0 release.
 
@@ -53,7 +53,8 @@ First release since 0.3.6, carrying three version lines at once.
 will be busy.
 
 Note on version numbers: the tester builds counted up to `0.6.20-beta`, and 0.6.0 replaces that
-line. An update checker comparing the two reads 0.6.0 as the older one, which it is not.
+line. Comparing the two reads 0.6.0 as the older one, which it is not. The next version is 0.7.0,
+which is above both, so the question does not come up again.
 
 ## 0.5.2-beta
 
