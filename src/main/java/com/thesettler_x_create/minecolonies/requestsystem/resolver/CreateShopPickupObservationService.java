@@ -98,7 +98,7 @@ final class CreateShopPickupObservationService {
       if (citizen == null || !(citizen.getJob() instanceof JobDeliveryman job)) {
         continue;
       }
-      for (IToken<?> token : ongoingDeliveries.of(colony, citizen, job)) {
+      for (IToken<?> token : ongoingDeliveries.of(colony, job)) {
         IRequest<?> request = requestOrNull(manager, token);
         if (request == null
             || !request.hasParent()

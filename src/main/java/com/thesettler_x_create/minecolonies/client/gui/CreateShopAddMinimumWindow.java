@@ -81,6 +81,24 @@ public class CreateShopAddMinimumWindow extends AbstractWindowSkeleton {
       List<ItemStack> allItems,
       ToIntFunction<ItemStack> currentMinimum,
       BiConsumer<ItemStack, Integer> onChosen) {
+    this(origin, allItems, currentMinimum, onChosen, false);
+  }
+
+  /**
+   * @param origin the hut window, which this returns to
+   * @param allItems every item that may be picked
+   * @param currentMinimum what is guarded for an item today, 0 when nothing is
+   * @param onChosen told about the item and the amount the player settled on
+   * @param atLimit whether the shop already guards as many item kinds as it may, in which case
+   *     {@code allItems} holds only the ones it guards: their amounts can still be changed, and the
+   *     window says why nothing else is on offer
+   */
+  public CreateShopAddMinimumWindow(
+      BOWindow origin,
+      List<ItemStack> allItems,
+      ToIntFunction<ItemStack> currentMinimum,
+      BiConsumer<ItemStack, Integer> onChosen,
+      boolean atLimit) {
     super(origin, LAYOUT);
     this.allItems = allItems;
     this.currentMinimum = currentMinimum;
@@ -108,6 +126,9 @@ public class CreateShopAddMinimumWindow extends AbstractWindowSkeleton {
           });
     }
     showChosen();
+    if (atLimit) {
+      say(BLACK, "com.thesettler_x_create.gui.createshop.networkminimum.limitreached");
+    }
   }
 
   @Override

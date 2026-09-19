@@ -71,6 +71,9 @@ public class TheSettlerXCreate {
     modEventBus.addListener(this::addCreative);
 
     modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+    modEventBus.addListener(
+        (net.neoforged.fml.event.config.ModConfigEvent.Loading event) ->
+            Config.migrateFormerKeys(event.getConfig()));
   }
 
   private void commonSetup(FMLCommonSetupEvent event) {

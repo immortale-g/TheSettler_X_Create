@@ -62,7 +62,7 @@ class CreateShopDeliveryReservationHoldGuardTest {
             "pickupObservationService.onHutItemsTaken(this, pickupTracker, manager, taken)"));
     // Which delivery an extraction belongs to comes from MineColonies' own ongoing set, never
     // from a guess over the courier queue, and reading it must not assign work to the courier.
-    assertTrue(observationSource.contains("ongoingDeliveries.of(colony, citizen, job)"));
+    assertTrue(observationSource.contains("ongoingDeliveries.of(colony, job)"));
     assertFalse(observationSource.contains("job.getTaskQueue()"));
     assertFalse(observationSource.contains(".getCurrentTask()"));
   }

@@ -1,6 +1,5 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
-import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
 import com.minecolonies.api.colony.requestsystem.data.IRequestSystemDeliveryManJobDataStore;
@@ -10,9 +9,9 @@ import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
@@ -33,21 +32,28 @@ import org.jetbrains.annotations.Nullable;
  * rather than rebuilding its decision, which is what keeps the two from drifting apart.
  *
  * <p>Resolving the token means serializing the job, so each courier is resolved once and kept. The
- * token only changes when the job is created anew, and a job that no longer answers is resolved
- * again on the next call.
+ * token belongs to the job, not to the citizen: a courier who is dismissed and later given the job
+ * again keeps his citizen id but gets a new job with a new token, while {@code
+ * JobDeliveryman.onRemoval} deletes the store the old one led to. Keying the cache by the job
+ * itself is what makes that a new lookup. Keying it by citizen id did not, and nothing would have
+ * complained: {@code StandardDataStoreManager.get} answers a token it does not know by creating an
+ * empty store under it rather than by failing, so the shop would have read an empty ongoing set for
+ * that courier forever and left a stray store behind on every call.
+ *
+ * <p>A weak map because the job is the key: once MineColonies lets go of a job, so does this.
  */
 final class CourierOngoingDeliveries {
-  private final Map<Integer, IToken<?>> dataStoreTokenByCitizen = new HashMap<>();
+  private final Map<JobDeliveryman, IToken<?>> dataStoreTokenByJob = new WeakHashMap<>();
 
   /**
    * The deliveries this courier currently has in hand or is reaching for, or an empty set when
    * MineColonies does not tell us. Never guesses.
    */
-  Set<IToken<?>> of(IColony colony, ICitizenData citizen, JobDeliveryman job) {
-    if (colony == null || citizen == null || job == null) {
+  Set<IToken<?>> of(IColony colony, JobDeliveryman job) {
+    if (colony == null || job == null) {
       return Set.of();
     }
-    IRequestSystemDeliveryManJobDataStore store = storeFor(colony, citizen, job);
+    IRequestSystemDeliveryManJobDataStore store = storeFor(colony, job);
     if (store == null || store.getOngoingDeliveries() == null) {
       return Set.of();
     }
@@ -55,19 +61,18 @@ final class CourierOngoingDeliveries {
   }
 
   @Nullable
-  private IRequestSystemDeliveryManJobDataStore storeFor(
-      IColony colony, ICitizenData citizen, JobDeliveryman job) {
+  private IRequestSystemDeliveryManJobDataStore storeFor(IColony colony, JobDeliveryman job) {
     if (colony.getRequestManager() == null
         || colony.getRequestManager().getDataStoreManager() == null) {
       return null;
     }
-    IToken<?> token = dataStoreTokenByCitizen.get(citizen.getId());
+    IToken<?> token = dataStoreTokenByJob.get(job);
     if (token == null) {
       token = readDataStoreToken(colony, job);
       if (token == null) {
         return null;
       }
-      dataStoreTokenByCitizen.put(citizen.getId(), token);
+      dataStoreTokenByJob.put(job, token);
     }
     try {
       return colony
@@ -76,7 +81,7 @@ final class CourierOngoingDeliveries {
           .get(token, TypeConstants.REQUEST_SYSTEM_DELIVERY_MAN_JOB_DATA_STORE);
     } catch (Exception ex) {
       // A store that cannot be read tells us nothing; the delivery books on arrival instead.
-      dataStoreTokenByCitizen.remove(citizen.getId());
+      dataStoreTokenByJob.remove(job);
       return null;
     }
   }
@@ -116,6 +121,6 @@ final class CourierOngoingDeliveries {
 
   /** Forgets the cached tokens, for a shop that is being taken down. */
   void clear() {
-    dataStoreTokenByCitizen.clear();
+    dataStoreTokenByJob.clear();
   }
 }

@@ -1,5 +1,6 @@
 package com.thesettler_x_create;
 
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class Config {
@@ -104,6 +105,56 @@ public class Config {
           .define("enableDevTestCommands", false);
 
   static final ModConfigSpec SPEC = BUILDER.build();
+
+  /** What the setting was called while it gated perma requests, which 0.6.0 removed. */
+  private static final String FORMER_GAUGE_LEVEL_KEY = "permaMinBuildingLevel";
+
+  /**
+   * Carries a hand-edited {@code permaMinBuildingLevel} over to {@code gaugeMinBuildingLevel} the
+   * first time the new config is loaded.
+   *
+   * <p>The two settings mean the same thing: the shop level from which a Colony Factory Gauge may
+   * order. Renaming it dropped the old line on load and started from the default, so a player who
+   * had lowered it to 1 to let a level-1 shop serve gauges was silently back at 2, with nothing but
+   * a debug line saying the building was too low.
+   *
+   * <p>Only a value that differs from the default is carried over, and only while the new setting
+   * still holds its own default, so this never overrides something set on purpose.
+   */
+  public static void migrateFormerKeys(ModConfig config) {
+    if (config == null || config.getSpec() != SPEC) {
+      return;
+    }
+    try {
+      net.neoforged.fml.config.IConfigSpec.ILoadedConfig loaded = config.getLoadedConfig();
+      if (loaded == null || loaded.config() == null) {
+        return;
+      }
+      com.electronwill.nightconfig.core.CommentedConfig data = loaded.config();
+      Object former = data.get(FORMER_GAUGE_LEVEL_KEY);
+      if (!(former instanceof Number oldLevel)) {
+        return;
+      }
+      data.remove(FORMER_GAUGE_LEVEL_KEY);
+      int carried = Math.max(1, Math.min(5, oldLevel.intValue()));
+      if (carried != GAUGE_MIN_BUILDING_LEVEL.getDefault()
+          && GAUGE_MIN_BUILDING_LEVEL.get() == GAUGE_MIN_BUILDING_LEVEL.getDefault()) {
+        GAUGE_MIN_BUILDING_LEVEL.set(carried);
+        TheSettlerXCreate.LOGGER.info(
+            "[Config] carried {}={} over to gaugeMinBuildingLevel",
+            FORMER_GAUGE_LEVEL_KEY,
+            carried);
+      }
+      loaded.save();
+    } catch (Exception ex) {
+      // A config that cannot be read or written is not worth failing startup over; the new setting
+      // keeps its default, which is what would have happened without this.
+      TheSettlerXCreate.LOGGER.info(
+          "[Config] could not carry over {}: {}",
+          FORMER_GAUGE_LEVEL_KEY,
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+    }
+  }
 
   /**
    * The Create Shop level a gauge request needs, falling back to the default while the config is

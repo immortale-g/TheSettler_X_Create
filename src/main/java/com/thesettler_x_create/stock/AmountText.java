@@ -54,9 +54,9 @@ public final class AmountText {
 
   /**
    * The number behind what was typed, or {@code -1} when that is not a number: empty, a stray
-   * letter, a second dot, a negative. Nothing is guessed and nothing falls back to a default, so a
-   * caller can leave the value alone instead of replacing it with something the player never asked
-   * for.
+   * letter, a second dot, a negative, a fraction of an item, or more than a count holds. Nothing is
+   * guessed and nothing falls back to a default, so a caller can leave the value alone instead of
+   * replacing it with something the player never asked for.
    */
   public static int parse(String text) {
     if (text == null) {
@@ -73,20 +73,29 @@ public final class AmountText {
         return -1;
       }
     }
-    double value;
-    try {
-      value = Double.parseDouble(cleaned);
-    } catch (NumberFormatException notANumber) {
-      return -1;
-    }
     if (!thousands && cleaned.contains(".")) {
       // "1.5" without a k is half an item, which does not exist.
       return -1;
     }
-    double scaled = thousands ? value * THOUSAND : value;
-    if (scaled < 0 || scaled > Integer.MAX_VALUE || scaled != Math.floor(scaled)) {
+    java.math.BigDecimal value;
+    try {
+      value = new java.math.BigDecimal(cleaned);
+    } catch (NumberFormatException notANumber) {
       return -1;
     }
-    return (int) scaled;
+    // Decimal, not binary. A double turns 16.1 into a hair more than 16.1, so 16.1k times a
+    // thousand missed being whole by a rounding step and was refused - one of every sixty-odd
+    // values format itself writes, among them what the picker pre-fills a field with.
+    java.math.BigDecimal scaled =
+        thousands ? value.multiply(java.math.BigDecimal.valueOf(THOUSAND)) : value;
+    if (scaled.signum() < 0) {
+      return -1;
+    }
+    try {
+      return scaled.intValueExact();
+    } catch (ArithmeticException notAWholeNumberOfItems) {
+      // A fraction of an item, or more items than a count can hold.
+      return -1;
+    }
   }
 }
