@@ -11,6 +11,23 @@ project, and the feature set is documented in ARCHITECTURE.md.
 If external references, ideas, or sample snippets are used in the future, they will be explicitly
 credited here (with source and scope), along with the corresponding implementation notes.
 
+## Assets
+
+All textures, models and GUI layouts in this repository are authored here. Nothing is copied from
+MineColonies, Structurize or Create, whose assets are not covered by this project's license.
+
+Two points where the resemblance is deliberate and worth naming:
+
+- The module tab icons `colony_denied.png` and `network_minimum.png` are drawn by the scripts in
+  `tools/icons/`, pixel by pixel, at the 20x20 size MineColonies uses for its own module icons.
+  MineColonies' `stock.png` shows the same kind of rack as the first of the two; that is where the
+  idea comes from, and the shapes and palette are written out in the script rather than sampled
+  from theirs.
+- GUI layouts under `assets/thesettler_x_create/gui/` follow the structure of MineColonies' own
+  layout files, because BlockUI resolves panes by id and their windows look those ids up by name.
+  The files are written here, and the ones that keep MineColonies' ids say so in a comment at the
+  top.
+
 ---
 
 ## Design constraints
