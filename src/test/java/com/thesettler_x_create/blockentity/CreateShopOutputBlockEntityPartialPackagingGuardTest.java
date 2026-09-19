@@ -28,9 +28,10 @@ class CreateShopOutputBlockEntityPartialPackagingGuardTest {
   void whatWasPackagedIsBookedAgainstTheGaugeTask() throws Exception {
     String body = methodBody("private ItemStack assemblePackage(");
 
-    assertTrue(body.contains("building.deliverPartOfNextGaugeTask(extracted.getCount())"));
+    assertTrue(
+        body.contains("building.deliverPartOfGaugeTask(task.requestId(), extracted.getCount())"));
     // Completing the whole task on a partial package is what lost the shortfall before.
-    assertFalse(body.contains("building.completeNextGaugeTask();"));
+    assertFalse(body.contains("completeNextGaugeTask"));
   }
 
   @Test

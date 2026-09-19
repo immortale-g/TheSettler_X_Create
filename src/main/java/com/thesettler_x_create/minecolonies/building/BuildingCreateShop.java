@@ -507,20 +507,23 @@ public class BuildingCreateShop extends AbstractBuilding {
     return gaugeQueue.getPendingGaugeRequestTokens();
   }
 
-  /** Returns the next gauge packaging task without removing it, or null if queue is empty. */
+  /** Returns the first gauge packaging task without removing it, or null if queue is empty. */
   @Nullable
   public GaugePackagingTask peekNextGaugeTask() {
     return gaugeQueue.peekNextGaugeTask();
   }
 
-  /** Removes and returns the next gauge packaging task (call after successfully packaging). */
-  public void completeNextGaugeTask() {
-    gaugeQueue.completeNextGaugeTask();
+  /** Every gauge packaging task waiting for its goods, oldest first; see ShopGaugeQueue. */
+  public List<GaugePackagingTask> getGaugeTasks() {
+    return gaugeQueue.getGaugeTasks();
   }
 
-  /** Books part of the next gauge task as packaged and sent; see ShopGaugeQueue. */
-  public void deliverPartOfNextGaugeTask(int packaged) {
-    gaugeQueue.deliverPartOfNextGaugeTask(packaged);
+  /**
+   * Books part of one gauge task as packaged and sent and answers what is still owed on it, or -1
+   * when no such task is queued; see ShopGaugeQueue.
+   */
+  public int deliverPartOfGaugeTask(java.util.UUID requestId, int packaged) {
+    return gaugeQueue.deliverPartOfGaugeTask(requestId, packaged);
   }
 
   /** Request ids whose pickup reservation must stay until the gauge task is packaged. */

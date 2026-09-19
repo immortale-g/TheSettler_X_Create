@@ -463,7 +463,11 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
   }
 
   public void onDeliveryReceived() {
-    onDeliveryReceived(promisedAmount);
+    onDeliveryReceived(promisedAmount, null);
+  }
+
+  public void onDeliveryReceived(int delivered) {
+    onDeliveryReceived(delivered, null);
   }
 
   /**
@@ -473,9 +477,21 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
    *
    * <p>A promise that is used up ends here; what is left keeps waiting, with its expiry untouched,
    * because the order behind it has not changed.
+   *
+   * <p>{@code orderOpen} is what the shop still owes on this order, written on the package it just
+   * shipped. It is how the slot learns that an order closed for less than it asked: the colony
+   * hands over what a drained warehouse has left and closes the request, and a promise counted down
+   * only by what arrived would keep the rest promised forever, leaving the slot satisfied with a
+   * storage that never reaches its target. The number arrives with the goods rather than being
+   * asked for, so goods still on their way are never mistaken for goods that will never come.
+   *
+   * @param orderOpen what is still owed after this delivery, or null when nothing said
    */
-  public void onDeliveryReceived(int delivered) {
+  public void onDeliveryReceived(int delivered, @Nullable Integer orderOpen) {
     promisedAmount = Math.max(0, promisedAmount - Math.max(0, delivered));
+    if (orderOpen != null) {
+      promisedAmount = Math.min(promisedAmount, Math.max(0, orderOpen));
+    }
     if (promisedAmount <= 0) {
       promisedSatisfied = false;
       promisedUntil = 0L;

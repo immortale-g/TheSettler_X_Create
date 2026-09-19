@@ -25,6 +25,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
 
 public class ColonyGaugeBlockEntity extends SmartBlockEntity {
 
@@ -76,7 +77,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
    * Packager's connected inventory (chest/vault/etc.) rather than tracking deliveries by count — so
    * the gauge stays in sync even if items are later removed from that inventory.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   public com.simibubi.create.content.logistics.packager.PackagerBlockEntity getConnectedPackager() {
     if (level == null) return null;
     Direction connectedDir = FactoryPanelBlock.connectedDirection(getBlockState());
@@ -183,10 +184,10 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
    * matches keep that guess for the case it is meant for, a delivery of something no slot asked for
    * at all.
    */
-  public void onDeliveryReceived(ItemStack deliveredItem) {
+  public void onDeliveryReceived(ItemStack deliveredItem, @Nullable Integer orderOpen) {
     int delivered = deliveredItem == null ? 0 : deliveredItem.getCount();
-    if (matchWaitingPanel(deliveredItem, true, delivered)
-        || matchWaitingPanel(deliveredItem, false, delivered)) {
+    if (matchWaitingPanel(deliveredItem, true, delivered, orderOpen)
+        || matchWaitingPanel(deliveredItem, false, delivered, orderOpen)) {
       return;
     }
     onDeliveryReceived();
@@ -197,10 +198,12 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
    * arrived.
    *
    * @param withComponents whether the components have to match as well
+   * @param orderOpen how much of the order is still owed after this delivery, or null when the
+   *     package does not say
    * @return whether a slot was found
    */
   private boolean matchWaitingPanel(
-      ItemStack deliveredItem, boolean withComponents, int delivered) {
+      ItemStack deliveredItem, boolean withComponents, int delivered, @Nullable Integer orderOpen) {
     for (ColonyGaugeBehaviour behaviour : panels.values()) {
       if (!behaviour.isActive() || !behaviour.promisedSatisfied) continue;
       boolean matches =
@@ -208,7 +211,7 @@ public class ColonyGaugeBlockEntity extends SmartBlockEntity {
               ? ItemStack.isSameItemSameComponents(behaviour.getFilter(), deliveredItem)
               : ItemStack.isSameItem(behaviour.getFilter(), deliveredItem);
       if (matches) {
-        behaviour.onDeliveryReceived(delivered);
+        behaviour.onDeliveryReceived(delivered, orderOpen);
         return true;
       }
     }

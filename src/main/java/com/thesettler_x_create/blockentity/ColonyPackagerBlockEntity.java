@@ -27,7 +27,11 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
     // contents — and used below to tell the Gauge WHICH item arrived, so a gauge block with
     // several active panels waiting on different items attributes the delivery correctly
     // instead of always crediting whichever panel happens to be first in iteration order.
-    ItemStack deliveredItem = firstNonEmpty(CreatePackageBridge.readContents(box));
+    ItemStack deliveredItem =
+        CreatePackageBridge.sumOfFirstKind(CreatePackageBridge.readContents(box));
+    // How much of the gauge order is still owed after this package, as the shop wrote it on the
+    // package. Null for anything not shipped by a shop for a gauge.
+    Integer orderOpen = CreatePackageBridge.readGaugeOrderOpen(box);
 
     if (DebugLog.enabled() && !simulate && level != null) {
       Direction facing =
@@ -64,15 +68,11 @@ public class ColonyPackagerBlockEntity extends PackagerBlockEntity {
         if (level != null
             && level.getBlockEntity(neighbor) instanceof ColonyGaugeBlockEntity gauge
             && FactoryPanelBlock.connectedDirection(gauge.getBlockState()) == d) {
-          gauge.onDeliveryReceived(deliveredItem);
+          gauge.onDeliveryReceived(deliveredItem, orderOpen);
         }
       }
     }
     return result;
-  }
-
-  private static ItemStack firstNonEmpty(List<ItemStack> stacks) {
-    return stacks.isEmpty() ? ItemStack.EMPTY : stacks.get(0);
   }
 
   /**

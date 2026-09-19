@@ -27,8 +27,8 @@ class CreateShopOutputBlockEntityPackagingGuardTest {
     // does invoke Create's packaging API rather than stubbing it out.
     String src = Files.readString(SOURCE);
     assertTrue(
-        src.contains("CreatePackageBridge.buildPackage("),
-        "CreatePackageBridge.buildPackage() call missing");
+        src.contains("CreatePackageBridge.buildGaugePackage("),
+        "CreatePackageBridge.buildGaugePackage() call missing");
 
     String bridgeSrc =
         Files.readString(

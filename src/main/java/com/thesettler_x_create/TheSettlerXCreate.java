@@ -12,6 +12,7 @@ import com.thesettler_x_create.create.compat.CreatePlacementHandlers;
 import com.thesettler_x_create.event.StockLinkLinkerEvents;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.init.ModBlocks;
+import com.thesettler_x_create.init.ModDataComponents;
 import com.thesettler_x_create.init.ModItems;
 import com.thesettler_x_create.init.ModMenus;
 import com.thesettler_x_create.minecolonies.command.CreateShopMaintenanceCommands;
@@ -56,6 +57,7 @@ public class TheSettlerXCreate {
     ModBlocks.register(modEventBus);
     ModBlockEntities.register(modEventBus);
     ModItems.register(modEventBus);
+    ModDataComponents.register(modEventBus);
     ModMenus.register(modEventBus);
     ModMinecoloniesBuildings.register(modEventBus);
     ModMinecoloniesJobs.register(modEventBus);
