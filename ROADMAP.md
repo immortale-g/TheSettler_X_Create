@@ -3,7 +3,7 @@
 Erstellt nach Code-Analyse, Juni 2026. Der Analyseteil unten ist der Stand von damals und wird
 bewusst nicht umgeschrieben, damit die Begründungen nachvollziehbar bleiben.
 
-## Status, Stand 2026-09-13
+## Status, Stand 2026-09-19
 
 | Phase | Stand |
 |-------|-------|
@@ -37,11 +37,21 @@ erneut beim Create-Netzwerk. Nach dem Laden bekommen gespeicherte Reservierungen
 zieht bei einem Kurier ohne Aufgaben neue Aufträge aus der Warehouse-Queue; der Shop rief es bei jeder
 Prüfung eines offenen Lieferauftrags für alle Kuriere auf. Gelesen wird jetzt nur noch die Task-Queue.
 
-0.6.0 ist das erste Release seit 0.3.6 und bringt 0.4.0, 0.5.0 und die Shop-Versorgungsregeln auf
-einmal: Sammel-Lieferungen und das Bestands-Ledger (0.4.0), der Unterwegs-Pool mit Bestellungen, die
-dem Shop gehören (0.5.0), und darauf aufbauend die Versorgungsregeln pro Shop (Sperrliste,
-Netz-Mindestbestand), das Gauge-Crafting und die überarbeiteten Hütten-Reiter mit eigenem
-Auswahlfenster und eigenen Icons. `debugLogging` bleibt bis 1.0.0 eingeschaltet.
+0.6.0 ist am 2026-09-19 erschienen, das erste Release seit 0.3.6, und bringt 0.4.0, 0.5.0 und die
+Shop-Versorgungsregeln auf einmal: Sammel-Lieferungen und das Bestands-Ledger (0.4.0), der
+Unterwegs-Pool mit Bestellungen, die dem Shop gehören (0.5.0), und darauf aufbauend die
+Versorgungsregeln pro Shop (Sperrliste, Netz-Mindestbestand), das Gauge-Crafting und die
+überarbeiteten Hütten-Reiter mit eigenem Auswahlfenster und eigenen Icons. `debugLogging` bleibt bis
+1.0.0 eingeschaltet.
+
+Danach ein Review des Releases, abgearbeitet auf `fix/post-0.6.0-review` (Version 0.7.0, noch nicht
+gemergt). Drei Befunde im Gauge-Versand: der Shop bediente nur den Kopf seiner Packliste und hielt
+damit jede Bestellung dahinter auf, eine von der Kolonie kurz geschlossene Bestellung ließ den Gauge
+ewig auf Ware warten, die niemand mehr schuldet, und ein Paket nahm die ganze Menge in einen Slot,
+was beim Speichern zerbricht. Dazu Kleineres: das Mengenfeld las seine eigene Schreibweise nicht
+zurück, der Add-Knopf war am 30er-Limit tot, `permaMinBuildingLevel` wurde beim Umbenennen still
+zurückgesetzt, und der Kurier-Token-Cache wurde stale. Außerdem Metadaten für die Modliste, ein
+CHANGELOG und die fehlenden deutschen Texte.
 
 ## Plan ab 2026-09-13
 
@@ -56,8 +66,8 @@ Auswahlfenster und eigenen Icons. `debugLogging` bleibt bis 1.0.0 eingeschaltet.
 
 ### 0.4.0: große Aufträge schneller ausliefern
 
-Heute legt der Shop pro Request immer nur eine Delivery mit einem Stack an und wartet, bis sie
-abgeschlossen ist. Große Aufträge laufen dadurch Tour für Tour nacheinander, und mehrere Kuriere
+Erledigt und mit 0.6.0 erschienen. Vorher legte der Shop pro Request immer nur eine Delivery mit
+einem Stack an und wartete, bis sie abgeschlossen war. Große Aufträge laufen dadurch Tour für Tour nacheinander, und mehrere Kuriere
 helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf einmal an.
 
 - Extra-Child-Recovery abtrennen (auskommentiert, nicht gelöscht). Sie behandelt jedes zweite aktive
@@ -82,7 +92,7 @@ helfen nicht. Das Warehouse von MineColonies legt dagegen alle Deliveries auf ei
 
 ### 0.5.0: Bestellungen gehören dem Shop
 
-Branch `feat/inflight-pool` (baut auf `feat/stock-observer` auf), noch nicht im Spiel getestet.
+Erledigt und mit 0.6.0 erschienen (Branch `feat/inflight-pool`, auf `feat/stock-observer` aufbauend).
 
 - Inflight-Buchhaltung als `InflightBook` im Paket `stock/` mit Unit-Tests, Speicherformat unverändert.
 - Ankunftserkennung robust: Jede Rack-Bewegung, die der Shop kennt (Hütten-Tür, Housekeeping,
@@ -104,8 +114,8 @@ Branch `feat/inflight-pool` (baut auf `feat/stock-observer` auf), noch nicht im 
 
 ### 0.6.0: Versorgungspolitik und Gauge-Fertigung
 
-Branches `feature/shop-supply-policy` und `feature/gauge-colony-crafting`, zusammen testbar über
-`integration/supply-policy-and-crafting`. Noch nicht ingame getestet.
+Erledigt und mit 0.6.0 erschienen (Branches `feature/shop-supply-policy` und
+`feature/gauge-colony-crafting` über `integration/supply-policy-and-crafting`).
 
 - Pro Shop eine Sperrliste, welche Items die Kolonie **nicht** aus dem Create-Netz abrufen darf
   (MineColonies' `ItemListModule`, leere Liste = alles erlaubt).
@@ -120,21 +130,8 @@ Branches `feature/shop-supply-policy` und `feature/gauge-colony-crafting`, zusam
 
 ### Offen für 1.0
 
-- Requests, die mindestens `minimumCount` erhalten haben und bei leerem Create-Netz festhängen,
-  blockieren andere Resolver. Klären, ob sie nach einer Frist abgeschlossen oder freigegeben werden.
-- `attemptResolve` umbauen, sobald die Bestandsformeln aus 0.4.0/0.5.0 getestet vorliegen.
-- Die drei 0.5.0-Services (`CreateShopNetworkOrderService`, `CreateShopPickupObservationService`,
-  `CreateShopOpenDeliveryTopupService`) haben keine eigenen Verhaltenstests, `ShopGaugeQueue` und die
-  Pakete `building/` und `tileentity/` gar keine.
-- `InflightBook.compact()` verwirft bei unowned Einträgen alles über zwei Segmente pro Tupel, ohne
-  die Restmenge einzufalten. Die verworfene Menge ist echte bestellte Ware; entweder einfalten oder
-  bewusst dokumentieren, warum nicht.
-- `onHutItemsTaken` kann eine Entnahme dem falschen Geschwister-Delivery zuordnen, weil das Spiel
-  keine Akteursidentität liefert. Korrigiert sich selbst, bleibt aber eine bekannte Grenze.
-- `ShopLostPackageRequestCanceller.tryForceCleanRequest` erkennt kaputte Request-Graphen an
-  Teilstrings der Exception-Meldung. Über MineColonies-Versionen hinweg brüchig, kein Test pinnt die
-  Strings.
-- Dedicated-Server-Test und mehrere Shops in einer Colony.
+Stand 2026-09-19, jeder Punkt gegen den Code geprüft.
+
 - Racks und Hütten-Inventar trennen. Die Racks gehören der Create-Seite (Ware aus dem Netz,
   Reservierungen, Einsammeln der Deliveries), das Hütten-Inventar der Kolonie-Seite (Ware, die nach
   Create verschickt wird, und alte Überschüsse für den Warehouse-Pickup). Heute legt ein Kurier, der
@@ -148,6 +145,39 @@ Branches `feature/shop-supply-policy` und `feature/gauge-colony-crafting`, zusam
   - Gauge-Ware nicht mehr im Rack-Reservierungsledger führen; der Pickup lässt stattdessen die Menge
     offener Gauge-Aufgaben in der Hütte. `ShopPickupKeepPolicy` wird dadurch einfacher.
   - Platz: Das Hütten-Inventar hat standardmäßig 27 Plätze.
+
+- `InflightBook.compact()` verwirft bei unowned Einträgen alles über zwei Segmente pro Tupel, ohne
+  die Restmenge einzufalten. Die verworfene Menge ist echte bestellte Ware; entweder einfalten oder
+  bewusst dokumentieren, warum nicht.
+- `ShopLostPackageRequestCanceller.tryForceCleanRequest` erkennt kaputte Request-Graphen an
+  Teilstrings der Exception-Meldung (`haschildren()`, `intvalue()`). Über MineColonies-Versionen
+  hinweg brüchig, kein Test pinnt die Strings.
+- Die drei 0.5.0-Services (`CreateShopNetworkOrderService`, `CreateShopPickupObservationService`,
+  `CreateShopOpenDeliveryTopupService`) haben keine eigenen Verhaltenstests. `building/` und
+  `tileentity/` haben fast nur Quelltext-Guards.
+- `attemptResolve` fertig umbauen. Von 270 auf 120 Zeilen runter, und der Blocker ist weg: die
+  Bestandsformeln liegen in `ShopStockAccounting` mit Tests vor.
+- Dedicated-Server-Test und mehrere Shops in einer Colony.
+- Ingame-Test der Review-Fixes aus `fix/post-0.6.0-review`, vor allem der Gauge-Versand: zwei Gauges
+  am selben Shop, einer davon auf einen Crafter wartend, und eine Bestellung über mehr als ein Paket.
+- Ein Logo für die Modliste (`logoFile` in `neoforge.mods.toml`).
+- Diagnose-Marker `MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL` im Spiel sichten.
+
+Im Release-Commit selbst: `debugLogging` auf `false`, zusammen mit
+`ConfigDebugLoggingDefaultGuardTest` und dem README-Absatz.
+
+### Am 2026-09-19 aus dieser Liste gestrichen
+
+Nicht an diesem Tag erledigt, sondern beim Abgleich mit dem Code als längst erledigt vorgefunden.
+
+- Requests, die mindestens `minimumCount` erhalten haben, hängen nicht mehr fest:
+  `ShopStockAccounting.canCloseShort` schließt sie, sobald nichts mehr reserviert, im Rack oder
+  unterwegs ist (`CreateShopFinishShortOfCountFmlTest`).
+- `onHutItemsTaken` ordnet nicht mehr blind zu: `CourierOngoingDeliveries` liest die laufenden
+  Lieferungen aus MineColonies' eigenem Datenspeicher. Grenze bleibt der Fall zweier Kuriere, die im
+  selben Moment dasselbe Item am selben Shop holen, weil die Entnahme keinen Akteur trägt.
+- `ShopGaugeQueue` hat Verhaltenstests (19 unter FML), dazu `GaugePackageSelection` und
+  `CreatePackageBridge`.
 
 ### Danach
 
