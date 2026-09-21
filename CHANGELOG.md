@@ -29,6 +29,12 @@ branch; that number was never handed out, so they ship as part of 0.7.1.
 - A `permaMinBuildingLevel` set by hand in the config carries over to `gaugeMinBuildingLevel`, which
   replaced it in 0.6.0. Without that, a shop level lowered to 1 was silently back at 2.
 
+### Shop stock
+
+- A shop with many open orders for the same item no longer orders some of them a second time. The
+  shop keeps at most two notes per item so its reports stay readable, and the amount of a note it
+  folds away is now added to the note it keeps instead of vanishing from what counts as on its way.
+
 ### Under the hood
 
 - The courier a pickup is booked against is found again after that courier is dismissed and rehired.

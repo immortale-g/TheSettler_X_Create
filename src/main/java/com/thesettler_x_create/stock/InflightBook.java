@@ -616,6 +616,12 @@ public final class InflightBook<K> {
    * requester/address tuple keeps only its {@link #MAX_OPEN_SEGMENTS_PER_TUPLE} newest segments.
    * Entries of a request are never merged or dropped; each of them is an order the request counts
    * on, and losing one makes the request order again.
+   *
+   * <p>A segment beyond the limit is not thrown away: its remaining amount is folded into the
+   * oldest segment the tuple keeps. The limit only exists so the prompts stay readable, and a sum
+   * does that just as well, while dropping the amount would hide ware that is really on its way and
+   * order it a second time. The oldest kept segment takes the amount because it is the one asked
+   * about first; folding into the newest would let the amount wait out another timeout.
    */
   private void compact() {
     entries.removeIf(entry -> entry.remaining <= 0);
@@ -649,14 +655,22 @@ public final class InflightBook<K> {
     List<Entry<K>> newestFirst = new ArrayList<>(unique.values());
     newestFirst.sort((left, right) -> Long.compare(right.requestedAt, left.requestedAt));
     Map<String, Integer> keptPerTuple = new HashMap<>();
+    Map<String, Entry<K>> oldestKeptPerTuple = new HashMap<>();
     List<Entry<K>> kept = new ArrayList<>(newestFirst.size());
     for (Entry<K> entry : newestFirst) {
       String tuple = itemId.apply(entry.key) + "|" + entry.requester + "|" + entry.address;
       int count = keptPerTuple.getOrDefault(tuple, 0);
-      if (count >= MAX_OPEN_SEGMENTS_PER_TUPLE) {
+      Entry<K> foldInto =
+          count >= MAX_OPEN_SEGMENTS_PER_TUPLE ? oldestKeptPerTuple.get(tuple) : null;
+      if (foldInto != null) {
+        foldInto.remaining += entry.remaining;
+        // The grown amount was never asked about under this segment.
+        foldInto.notified = false;
         continue;
       }
       keptPerTuple.put(tuple, count + 1);
+      // Iteration runs newest first, so the last one kept is the oldest of the tuple.
+      oldestKeptPerTuple.put(tuple, entry);
       kept.add(entry);
     }
     kept.addAll(owned);

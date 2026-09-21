@@ -246,7 +246,37 @@ class InflightBookTest {
     record(book, "iron", 3, 3L, null);
 
     assertEquals(2, book.entryCount());
-    assertEquals(5, book.freeRemaining("iron"));
+    assertEquals(6, book.freeRemaining("iron"));
+  }
+
+  @Test
+  void segmentsBeyondTheLimitKeepTheirAmountInTheOldestKeptSegment() {
+    InflightBook<String> book = book();
+    record(book, "iron", 1, 1L, null);
+    record(book, "iron", 2, 2L, null);
+    record(book, "iron", 4, 3L, null);
+    record(book, "iron", 8, 4L, null);
+
+    assertEquals(2, book.entryCount());
+    assertEquals(15, book.freeRemaining("iron"));
+    assertEquals(7, book.peekOldest(10L).remaining());
+  }
+
+  @Test
+  void foldingMakesTheGrownSegmentPromptableAgain() {
+    InflightBook<String> book = book();
+    long later = TIMEOUT + 100L;
+    record(book, "iron", 1, 0L, null);
+    record(book, "iron", 2, 1L, null);
+    assertEquals(1, book.consumeOverdueNotices(later, TIMEOUT).size());
+    assertEquals(1, book.consumeOverdueNotices(later, TIMEOUT).size());
+    assertTrue(book.consumeOverdueNotices(later, TIMEOUT).isEmpty());
+
+    record(book, "iron", 4, 2L, null);
+
+    List<InflightBook.Notice<String>> notices = book.consumeOverdueNotices(later, TIMEOUT);
+    assertEquals(1, notices.size());
+    assertEquals(3, notices.get(0).remaining());
   }
 
   @Test
