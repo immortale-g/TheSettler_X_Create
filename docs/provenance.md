@@ -28,6 +28,9 @@ Two points where the resemblance is deliberate and worth naming:
   The files are written here, and the ones that keep MineColonies' ids say so in a comment at the
   top.
 
+The mod list logo, `src/main/resources/thesettler_x_create.png`, is drawn the same way, by
+`tools/icons/make_logo.py`. Its palette is sampled from this mod's own block textures.
+
 ---
 
 ## Design constraints

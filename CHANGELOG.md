@@ -34,6 +34,7 @@ branch; that number was never handed out, so they ship as part of 0.7.1.
 - The courier a pickup is booked against is found again after that courier is dismissed and rehired.
 - The mod list shows a description, the authors and links to the project and its issue tracker,
   rather than the mod template's placeholder text.
+- The mod list shows a logo next to the entry.
 
 ## 0.6.0
 

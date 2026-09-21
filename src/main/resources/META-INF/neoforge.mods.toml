@@ -35,6 +35,11 @@ displayURL="${mod_homepage_url}"
 # The authors of the mod, displayed in the mod UI (optional)
 authors="${mod_authors}"
 
+# The logo the mod list shows, from the root of the mod JAR. It is pixel art, so it is handed over
+# unsmoothed; tools/icons/make_logo.py draws it.
+logoFile="${mod_id}.png"
+logoBlur=false
+
 # The description text for the mod (multi line!) (#mandatory)
 description='''
 A bridge between MineColonies and Create. The Create Shop hut registers as a request resolver inside

@@ -38,6 +38,22 @@ class ModsTomlMetadataGuardTest {
   }
 
   @Test
+  void theLogoIsDeclaredAndTheFileItNamesExists() throws Exception {
+    String toml = Files.readString(TOML);
+
+    assertTrue(toml.contains("\nlogoFile=\""), "logoFile is commented out or missing");
+
+    String declared = toml.split("\nlogoFile=\"", 2)[1].split("\"", 2)[0];
+    String modId = Files.readString(PROPERTIES).split("\nmod_id=", 2)[1].split("\\R", 2)[0].trim();
+    Path logo = Path.of("src/main/resources", declared.replace("${mod_id}", modId));
+
+    // NeoForge reads the logo from the root of the jar, so it belongs in the resource root rather
+    // than under assets/, where nothing would ever look for it.
+    assertTrue(
+        Files.isRegularFile(logo), "the mod list points at a logo that is not there: " + logo);
+  }
+
+  @Test
   void everyPlaceholderTheTomlUsesIsExpandedByTheBuild() throws Exception {
     String toml = Files.readString(TOML);
     String properties = Files.readString(PROPERTIES);
