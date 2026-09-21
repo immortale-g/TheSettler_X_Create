@@ -121,37 +121,52 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     }
 
     /**
-     * The package the shop has ready for the next gauge task, or nothing.
+     * The package the shop has ready for a waiting gauge task, or nothing.
      *
      * <p>Whatever the racks hold goes out now and the rest follows in a later package, the way
      * Create ships a partly covered order. A gauge order that waited for its last item would hold
      * back goods that are already there, sometimes for as long as the colony takes to craft the
      * remainder.
      *
+     * <p>Served is the first task the racks can cover, not simply the first task. Tasks are queued
+     * in the order the gauges asked, which says nothing about when their goods arrive: an order
+     * waiting on a crafter would otherwise stand at the head of the queue and hold back every order
+     * behind it, including ones a courier filled minutes ago.
+     *
      * <p>Preview and real pull must agree on the amount, or the shop duplicates items: Create reads
-     * this slot, ships what it sees, and asks again. As long as both take what the racks hold, a
-     * shipped package always books itself against the task and the next look finds the racks empty.
+     * this slot, ships what it sees, and asks again. Both walk the same queue in the same order and
+     * take what the racks hold, so they pick the same task and the same amount, and the next look
+     * finds the racks empty.
      */
     private ItemStack assemblePackage(boolean simulate) {
       BuildingCreateShop building = getBuilding();
       if (building == null) return ItemStack.EMPTY;
-      BuildingCreateShop.GaugePackagingTask task = building.peekNextGaugeTask();
-      if (task == null) return ItemStack.EMPTY;
-      ItemStack extracted = extractFromRacks(task.item(), task.amount(), simulate);
-      if (extracted.isEmpty()) return ItemStack.EMPTY;
-      if (!simulate) building.deliverPartOfNextGaugeTask(extracted.getCount());
-      // Only the real pull is logged. Create polls the preview for every pending package, so
-      // logging that one writes a line per tick, and debug logging is on by default until 1.0.
-      // What the preview saw still shows up: a package that leaves without a line here is one
-      // that was never pulled.
-      if (!simulate && DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] gauge package taskAmount={} packaged={} address={}",
-            task.amount(),
-            extracted.getCount(),
-            task.gaugeAddress());
+      GaugePackageSelection.Choice choice =
+          GaugePackageSelection.select(
+              building.getGaugeTasks(), OutputItemHandler.this::extractFromRacks, simulate);
+      if (choice == null) return ItemStack.EMPTY;
+      BuildingCreateShop.GaugePackagingTask task = choice.task();
+      ItemStack extracted = choice.extracted();
+      int open = task.amount() - extracted.getCount();
+      if (!simulate) {
+        int booked = building.deliverPartOfGaugeTask(task.requestId(), extracted.getCount());
+        // The task was read a moment ago, so it is there. If it is not, the goods are already out
+        // of the racks and travel anyway; saying nothing is owed is the honest answer then.
+        open = booked < 0 ? 0 : booked;
+        // Only the real pull is logged. Create polls the preview for every pending package, so
+        // logging that one writes a line per tick, and debug logging is on by default until 1.0.
+        // What the preview saw still shows up: a package that leaves without a line here is one
+        // that was never pulled.
+        if (DebugLog.enabled()) {
+          TheSettlerXCreate.LOGGER.info(
+              "[CreateShop] gauge package taskAmount={} packaged={} stillOpen={} address={}",
+              task.amount(),
+              extracted.getCount(),
+              open,
+              task.gaugeAddress());
+        }
       }
-      return CreatePackageBridge.buildPackage(extracted, task.gaugeAddress());
+      return CreatePackageBridge.buildGaugePackage(extracted, task.gaugeAddress(), open);
     }
 
     /**

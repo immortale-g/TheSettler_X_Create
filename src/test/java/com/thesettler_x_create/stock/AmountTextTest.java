@@ -39,6 +39,34 @@ class AmountTextTest {
   }
 
   @Test
+  void theRoundTripHoldsAcrossTheWholeRangeThatGetsAbbreviated() {
+    // Nine hand-picked values all happened to be ones a double could scale back exactly. 16,100
+    // was not: "16.1k" came back as -1, and so did 783 further amounts below five million, among
+    // them what the picker pre-fills its field with for a shop that keeps that many.
+    for (int amount = 1000; amount <= 5_000_000; amount += 100) {
+      assertEquals(amount, AmountText.parse(AmountText.format(amount)), "round trip of " + amount);
+    }
+  }
+
+  @Test
+  void aShorthandFinerThanTheFormatWritesIsStillRead() {
+    assertEquals(1005, AmountText.parse("1.005k"));
+    assertEquals(16100, AmountText.parse("16.1k"));
+  }
+
+  @Test
+  void aFractionOfAnItemIsRefused() {
+    assertEquals(-1, AmountText.parse("1.0005k"));
+    assertEquals(-1, AmountText.parse("0.5"));
+  }
+
+  @Test
+  void moreThanACountCanHoldIsRefused() {
+    assertEquals(-1, AmountText.parse("99999999k"));
+    assertEquals(-1, AmountText.parse("99999999999"));
+  }
+
+  @Test
   void shorthandIsAccepted() {
     assertEquals(1000, AmountText.parse("1k"));
     assertEquals(1000, AmountText.parse("1K"));

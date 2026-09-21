@@ -298,49 +298,58 @@ final class ShopGaugeQueue {
     return List.copyOf(pendingGaugeRequests.keySet());
   }
 
-  /** Returns the next gauge packaging task without removing it, or null if queue is empty. */
+  /** Returns the first gauge packaging task without removing it, or null if queue is empty. */
   @Nullable
   GaugePackagingTask peekNextGaugeTask() {
     return gaugePackagingQueue.isEmpty() ? null : gaugePackagingQueue.get(0);
   }
 
-  /** Removes and returns the next gauge packaging task (call after successfully packaging). */
-  void completeNextGaugeTask() {
-    if (!gaugePackagingQueue.isEmpty()) {
-      GaugePackagingTask completed = gaugePackagingQueue.remove(0);
-      CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
-      if (pickup != null) {
-        pickup.release(completed.requestId());
-      }
-      owner.markDirty();
-    }
+  /**
+   * Every task waiting to be packaged, oldest first.
+   *
+   * <p>The shop serves whichever of them the racks can cover, not simply the first. A task is
+   * queued when its colony request is placed, long before its goods arrive, so the order of the
+   * queue is the order of asking. Serving only its head meant one order waiting on a crafter held
+   * back every order behind it, including ones whose goods a courier had already brought in.
+   */
+  List<GaugePackagingTask> getGaugeTasks() {
+    return List.copyOf(gaugePackagingQueue);
   }
 
   /**
-   * Books {@code packaged} items of the next task as sent. A gauge order is filled in parts, the
-   * way Create fills one: what the racks hold travels now and the rest follows, instead of the
-   * whole order waiting for the last item. The task keeps what is still owed, and only a task with
-   * nothing left is removed.
+   * Books {@code packaged} items of the task {@code requestId} belongs to as sent, and answers how
+   * much of it is still owed afterwards, or {@code -1} when no such task is queued.
+   *
+   * <p>A gauge order is filled in parts, the way Create fills one: what the racks hold travels now
+   * and the rest follows, instead of the whole order waiting for the last item. The task keeps what
+   * is still owed, and only a task with nothing left is removed.
+   *
+   * <p>The task is addressed by its request rather than by its place in the queue, because the shop
+   * serves the task whose goods are there and that is not always the first one.
    *
    * <p>The reservation shrinks by the same amount, so rack housekeeping may move on whatever is no
    * longer spoken for, and the rest stays protected until it is packaged too.
    */
-  void deliverPartOfNextGaugeTask(int packaged) {
-    if (packaged <= 0 || gaugePackagingQueue.isEmpty()) {
-      return;
+  int deliverPartOfGaugeTask(UUID requestId, int packaged) {
+    if (packaged <= 0 || requestId == null) {
+      return -1;
     }
-    GaugePackagingTask task = gaugePackagingQueue.get(0);
+    int index = indexOfTask(requestId);
+    if (index < 0) {
+      return -1;
+    }
+    GaugePackagingTask task = gaugePackagingQueue.get(index);
     int sent = Math.min(packaged, task.amount());
     CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
     int open = task.amount() - sent;
     if (open <= 0) {
-      gaugePackagingQueue.remove(0);
+      gaugePackagingQueue.remove(index);
       if (pickup != null) {
         pickup.release(task.requestId());
       }
     } else {
       gaugePackagingQueue.set(
-          0, new GaugePackagingTask(task.item(), open, task.gaugeAddress(), task.requestId()));
+          index, new GaugePackagingTask(task.item(), open, task.gaugeAddress(), task.requestId()));
       if (pickup != null) {
         pickup.consumeReservedForRequest(task.requestId(), task.item(), sent);
       }
@@ -353,6 +362,17 @@ final class ShopGaugeQueue {
         task.item().getItem(),
         task.gaugeAddress(),
         open);
+    return Math.max(0, open);
+  }
+
+  /** Where the task belonging to {@code requestId} sits in the queue, or {@code -1}. */
+  private int indexOfTask(UUID requestId) {
+    for (int i = 0; i < gaugePackagingQueue.size(); i++) {
+      if (gaugePackagingQueue.get(i).requestId().equals(requestId)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
@@ -404,7 +424,21 @@ final class ShopGaugeQueue {
     }
   }
 
-  /** Cleans up gauge tracking when a request this shop placed for a Gauge completes. */
+  /**
+   * Cleans up gauge tracking when a request this shop placed for a Gauge completes, and shrinks its
+   * task to what the colony actually handed over.
+   *
+   * <p>An order can close short of what was asked. The non-craftable branch asks with a minimum of
+   * 1 on purpose, so a warehouse someone else drained in between still gives up what is left, and
+   * MineColonies closes such a request as soon as it delivered that minimum (see {@code
+   * AbstractWarehouseRequestResolver}, which stops making child requests once {@code totalAvailable
+   * >= getMinimumCount()}). Nothing further will arrive for it.
+   *
+   * <p>A task left at its original amount would then wait for goods nobody owes it: it would keep
+   * its rack reservation, stay in the queue, and the gauge behind it would keep its promise for the
+   * missing rest and never ask again. Shrinking it here is what lets the last package of the order
+   * say that the order is closed.
+   */
   void onRequestComplete(@Nullable IRequest<?> request) {
     if (request == null) {
       return;
@@ -413,15 +447,74 @@ final class ShopGaugeQueue {
     if (task == null) {
       return;
     }
+    shrinkTaskToDelivered(task, deliveredAmount(request, task.item()));
     // The reservation protects the delivered goods from rack housekeeping until they are packaged,
-    // so it stays while the task is still queued; completeNextGaugeTask releases it then. Without a
-    // queued task nobody would release it anymore and it would sit there until its TTL runs out.
+    // so it stays while the task is still queued; packaging the last of it releases it then.
+    // Without a queued task nobody would release it anymore and it would sit there until its TTL
+    // runs out.
     if (gaugePackagingQueue.stream().noneMatch(t -> t.requestId().equals(task.requestId()))) {
       CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
       if (pickup != null) {
         pickup.release(task.requestId());
       }
     }
+  }
+
+  /**
+   * How much of {@code item} the completed {@code request} actually delivered.
+   *
+   * <p>Every resolver that hands goods over records them on the request, the warehouse one with the
+   * exact count it could spare. A request that records nothing tells us nothing, which is answered
+   * with {@code -1} rather than with zero: a task is only shrunk on a number that was really read.
+   */
+  private static int deliveredAmount(IRequest<?> request, ItemStack item) {
+    List<ItemStack> deliveries = request.getDeliveries();
+    if (deliveries == null || deliveries.isEmpty()) {
+      return -1;
+    }
+    int delivered = 0;
+    for (ItemStack stack : deliveries) {
+      if (!stack.isEmpty() && ItemStack.isSameItem(stack, item)) {
+        delivered += stack.getCount();
+      }
+    }
+    return delivered;
+  }
+
+  /**
+   * Cuts the queued task down to {@code delivered}, or drops it when the order brought nothing.
+   * Leaves a task alone when the request did not say what it delivered, or when it covered the
+   * whole amount.
+   */
+  private void shrinkTaskToDelivered(GaugePackagingTask task, int delivered) {
+    if (delivered < 0) {
+      return;
+    }
+    int index = indexOfTask(task.requestId());
+    if (index < 0) {
+      return;
+    }
+    GaugePackagingTask queued = gaugePackagingQueue.get(index);
+    if (delivered >= queued.amount()) {
+      return;
+    }
+    if (delivered <= 0) {
+      // The reservation is let go by the caller, which checks for a task of this request either
+      // way. Doing it here as well would release it twice.
+      gaugePackagingQueue.remove(index);
+    } else {
+      gaugePackagingQueue.set(
+          index,
+          new GaugePackagingTask(
+              queued.item(), delivered, queued.gaugeAddress(), queued.requestId()));
+    }
+    owner.markDirty();
+    DebugLog.info(
+        "[ColonyGauge] order closed short item={} asked={} delivered={} address={}",
+        queued.item().getItem(),
+        queued.amount(),
+        delivered,
+        queued.gaugeAddress());
   }
 
   /**

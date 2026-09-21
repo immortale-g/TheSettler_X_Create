@@ -33,20 +33,12 @@ import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -507,20 +499,23 @@ public class BuildingCreateShop extends AbstractBuilding {
     return gaugeQueue.getPendingGaugeRequestTokens();
   }
 
-  /** Returns the next gauge packaging task without removing it, or null if queue is empty. */
+  /** Returns the first gauge packaging task without removing it, or null if queue is empty. */
   @Nullable
   public GaugePackagingTask peekNextGaugeTask() {
     return gaugeQueue.peekNextGaugeTask();
   }
 
-  /** Removes and returns the next gauge packaging task (call after successfully packaging). */
-  public void completeNextGaugeTask() {
-    gaugeQueue.completeNextGaugeTask();
+  /** Every gauge packaging task waiting for its goods, oldest first; see ShopGaugeQueue. */
+  public List<GaugePackagingTask> getGaugeTasks() {
+    return gaugeQueue.getGaugeTasks();
   }
 
-  /** Books part of the next gauge task as packaged and sent; see ShopGaugeQueue. */
-  public void deliverPartOfNextGaugeTask(int packaged) {
-    gaugeQueue.deliverPartOfNextGaugeTask(packaged);
+  /**
+   * Books part of one gauge task as packaged and sent and answers what is still owed on it, or -1
+   * when no such task is queued; see ShopGaugeQueue.
+   */
+  public int deliverPartOfGaugeTask(java.util.UUID requestId, int packaged) {
+    return gaugeQueue.deliverPartOfGaugeTask(requestId, packaged);
   }
 
   /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
@@ -1121,35 +1116,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
           "[CreateShop] legacy shop-courier migration modulePresent=true cleared={}", cleared);
     }
-  }
-
-  public static List<ItemStack> getOreCandidates() {
-    List<ItemStack> stacks = new ArrayList<>();
-    TagKey<Item> primary =
-        TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "ores"));
-    TagKey<Item> fallback =
-        TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("forge", "ores"));
-    if (!collectTagItems(primary, stacks)) {
-      collectTagItems(fallback, stacks);
-    }
-    stacks.sort(
-        Comparator.comparing(stack -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
-    return stacks;
-  }
-
-  private static boolean collectTagItems(TagKey<Item> tag, List<ItemStack> stacks) {
-    var optional = BuiltInRegistries.ITEM.getTag(tag);
-    if (optional.isEmpty()) {
-      return false;
-    }
-    for (Holder<Item> holder : optional.get()) {
-      Item item = holder.value();
-      if (item == null || item == net.minecraft.world.item.Items.AIR) {
-        continue;
-      }
-      stacks.add(new ItemStack(item, 1));
-    }
-    return !stacks.isEmpty();
   }
 
   @Override

@@ -7,9 +7,9 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Small warehouse-stock query shared by any Create Shop flow that needs to know how much of an item
- * the colony's warehouses hold before placing a request against them - both the (disabled) Colony
- * Factory Gauge pipeline needs exactly this check, so a request only gets created when the
- * warehouse actually has the stock to back it.
+ * the colony's warehouses hold before placing a request against them. The Colony Factory Gauge
+ * pipeline needs exactly this check, so a request only gets created when the warehouse actually has
+ * the stock to back it.
  */
 final class ShopWarehouseStockUtil {
   private ShopWarehouseStockUtil() {}

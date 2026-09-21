@@ -40,6 +40,7 @@
   "com.thesettler_x_create.gui.createshop.networkminimum.nomatch": "No item of that name.",
   "com.thesettler_x_create.gui.createshop.networkminimum.shorthand": "1k means 1000, 1.5k means 1500.\n0 clears the item again.",
   "com.thesettler_x_create.gui.createshop.networkminimum.notanumber": "That is not a number. Try 640 or 1.5k.",
+  "com.thesettler_x_create.gui.createshop.networkminimum.limitreached": "All 30 slots are in use. Pick one of them to change its amount,\nor remove one first to guard something else.",
   "com.thesettler_x_create.gui.createshop.stock.storage_empty": "No items in registered shop storage.",
   "com.thesettler_x_create.gui.createshop.stock.network_missing": "No stock network linked.",
   "com.thesettler_x_create.gui.createshop.output": "Output",

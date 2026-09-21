@@ -53,15 +53,21 @@ public class CreateShopNetworkMinimumModuleWindow
     updateList();
   }
 
+  /**
+   * Opens the picker. At the limit it offers only the item kinds the shop already guards, so their
+   * amounts can still be changed: the list itself has nothing to type into, and a dead button was
+   * the only answer a player got who wanted to raise one of thirty minimums. The server draws the
+   * same line, refusing a kind that is not guarded yet rather than any change at all.
+   */
   private void addMinimum() {
-    if (moduleView.hasReachedLimit()) {
-      return;
-    }
-    new CreateShopAddMinimumWindow(
-            this,
-            IColonyManager.getInstance().getCompatibilityManager().getListOfAllItems(),
-            moduleView::getMinimum,
-            this::setMinimum)
+    boolean atLimit = moduleView.hasReachedLimit();
+    List<ItemStack> choices =
+        atLimit
+            ? moduleView.getEntries().stream()
+                .map(CreateShopNetworkMinimumModuleView.Entry::stack)
+                .toList()
+            : IColonyManager.getInstance().getCompatibilityManager().getListOfAllItems();
+    new CreateShopAddMinimumWindow(this, choices, moduleView::getMinimum, this::setMinimum, atLimit)
         .open();
   }
 

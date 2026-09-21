@@ -6,18 +6,21 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.colony.buildings.modules.ICraftingBuildingModule;
 import com.minecolonies.api.colony.buildings.workerbuildings.IWareHouse;
 import com.minecolonies.api.colony.managers.interfaces.IRegisteredStructureManager;
+import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.Stack;
 import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.StandardToken;
@@ -60,6 +63,7 @@ class ShopGaugeQueueFmlTest {
   private List<IWareHouse> warehouses;
   private Map<BlockPos, IBuilding> buildings;
   private ShopGaugeQueue queue;
+  private List<StandardToken> issuedTokens;
 
   @BeforeEach
   void setUp() {
@@ -83,7 +87,13 @@ class ShopGaugeQueueFmlTest {
     when(structures.getBuildings()).thenReturn(buildings);
     // A token of its own per order: two gauges asking for the same item are tracked apart by
     // exactly that.
-    doAnswer(invocation -> new StandardToken(UUID.randomUUID()))
+    issuedTokens = new ArrayList<>();
+    doAnswer(
+            invocation -> {
+              StandardToken token = new StandardToken(UUID.randomUUID());
+              issuedTokens.add(token);
+              return token;
+            })
         .when(manager)
         .createAndAssignRequest(any(), any());
 
@@ -201,7 +211,7 @@ class ShopGaugeQueueFmlTest {
     queue.requestForGauge(TORCH, 64, ADDRESS);
     // The colony delivers in batches, so only part of the order is in the racks when the packager
     // looks. Waiting for the last item would hold back goods that are already there.
-    queue.deliverPartOfNextGaugeTask(12);
+    assertEquals(20 - 12, queue.deliverPartOfGaugeTask(taskId(), 12));
 
     BuildingCreateShop.GaugePackagingTask open = queue.peekNextGaugeTask();
     assertEquals(20 - 12, open.amount());
@@ -214,7 +224,7 @@ class ShopGaugeQueueFmlTest {
     warehouseHolds(TORCH, 20);
     queue.requestForGauge(TORCH, 64, ADDRESS);
 
-    queue.deliverPartOfNextGaugeTask(20);
+    assertEquals(0, queue.deliverPartOfGaugeTask(taskId(), 20));
 
     assertNull(queue.peekNextGaugeTask());
     assertFalse(queue.hasGaugeTask());
@@ -227,9 +237,100 @@ class ShopGaugeQueueFmlTest {
     warehouseHolds(TORCH, 20);
     queue.requestForGauge(TORCH, 64, ADDRESS);
 
-    queue.deliverPartOfNextGaugeTask(999);
+    assertEquals(0, queue.deliverPartOfGaugeTask(taskId(), 999));
 
     assertNull(queue.peekNextGaugeTask());
+  }
+
+  @Test
+  void anOrderTheColonyClosesShortIsCutDownToWhatArrived() {
+    warehouseHolds(TORCH, 10);
+    queue.requestForGauge(TORCH, 10, ADDRESS);
+
+    // Somebody else drew from the warehouse in between. MineColonies hands over what is left and
+    // closes the request, because the minimum of 1 is covered: nothing more will come for it.
+    queue.onRequestComplete(requestFor(issuedTokens.get(0), TORCH, 6));
+
+    assertEquals(6, queue.peekNextGaugeTask().amount());
+  }
+
+  @Test
+  void anOrderTheColonyFillsInFullKeepsItsTask() {
+    warehouseHolds(TORCH, 10);
+    queue.requestForGauge(TORCH, 10, ADDRESS);
+
+    queue.onRequestComplete(requestFor(issuedTokens.get(0), TORCH, 10));
+
+    assertEquals(10, queue.peekNextGaugeTask().amount());
+  }
+
+  @Test
+  void anOrderThatSaysNothingAboutItsDeliveriesLeavesTheTaskAlone() {
+    warehouseHolds(TORCH, 10);
+    queue.requestForGauge(TORCH, 10, ADDRESS);
+
+    // A resolver that records nothing tells us nothing, and a task is only cut down on a number
+    // that was really read.
+    queue.onRequestComplete(requestFor(issuedTokens.get(0), TORCH, -1));
+
+    assertEquals(10, queue.peekNextGaugeTask().amount());
+  }
+
+  @Test
+  void anOrderThatBroughtNothingLeavesTheQueue() {
+    warehouseHolds(TORCH, 10);
+    queue.requestForGauge(TORCH, 10, ADDRESS);
+
+    queue.onRequestComplete(requestFor(issuedTokens.get(0), TORCH, 0));
+
+    assertFalse(queue.hasGaugeTask());
+    verify(pickup).release(any(UUID.class));
+  }
+
+  @Test
+  void aTaskIsServedByItsOwnOrderRatherThanByItsPlaceInTheQueue() {
+    warehouseHolds(TORCH, 20);
+    queue.requestForGauge(TORCH, 20, ADDRESS);
+    queue.requestForGauge(TORCH, 20, "gauge-two");
+
+    // The shop ships whichever task the racks can cover, so the second one can be served while the
+    // first still waits for its goods.
+    List<BuildingCreateShop.GaugePackagingTask> tasks = queue.getGaugeTasks();
+    assertEquals(5, queue.deliverPartOfGaugeTask(tasks.get(1).requestId(), 15));
+
+    assertEquals(20, queue.getGaugeTasks().get(0).amount());
+    assertEquals(5, queue.getGaugeTasks().get(1).amount());
+    assertEquals(ADDRESS, queue.getGaugeTasks().get(0).gaugeAddress());
+  }
+
+  @Test
+  void bookingAgainstATaskThatIsNoLongerQueuedSaysSo() {
+    assertEquals(-1, queue.deliverPartOfGaugeTask(UUID.randomUUID(), 5));
+  }
+
+  /** The request id of the only queued task. */
+  private UUID taskId() {
+    return queue.peekNextGaugeTask().requestId();
+  }
+
+  /**
+   * A completed colony request that delivered {@code delivered} of {@code item}, or one that
+   * records no deliveries at all when {@code delivered} is negative.
+   */
+  private static IRequest<?> requestFor(StandardToken token, ItemStack item, int delivered) {
+    ImmutableList<ItemStack> deliveries;
+    if (delivered < 0) {
+      deliveries = ImmutableList.of();
+    } else if (delivered == 0) {
+      // Something arrived, but nothing of what was asked for.
+      deliveries = ImmutableList.of(new ItemStack(Items.STONE, 1));
+    } else {
+      deliveries = ImmutableList.of(item.copyWithCount(delivered));
+    }
+    IRequest<?> request = mock(IRequest.class);
+    doReturn(token).when(request).getId();
+    doReturn(deliveries).when(request).getDeliveries();
+    return request;
   }
 
   /** The stack the shop handed to MineColonies. */

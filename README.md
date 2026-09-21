@@ -22,9 +22,13 @@ Early and experimental. Expect updates, reworks and the occasional breakage.
   first (available since `0.0.12`).
 - Dedicated server support is progressing, but broader real-world validation is still ongoing.
 
-Debug logging is **on by default** so request and delivery flows can be traced during testing.
-Turn it off in `config/thesettler_x_create-common.toml` with `debugLogging = false` once you are
-done validating.
+Debug logging is **on by default** so request and delivery flows can be traced during testing, and
+it stays that way until 1.0.0. That makes `logs/latest.log` busy: a shop writes a line for every
+order, delivery and package. It is what makes a bug report usable, so please leave it on if you
+intend to report anything. Turn it off in `config/thesettler_x_create-common.toml` with
+`debugLogging = false` once you are done validating.
+
+Release notes for each version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Requirements
 
