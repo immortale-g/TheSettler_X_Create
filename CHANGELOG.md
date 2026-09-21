@@ -3,9 +3,10 @@
 What changed in each release, for players. Versions are `MAJOR.MINOR.PATCH`; anything ending in
 `-beta` was handed to testers rather than published.
 
-## Unreleased (0.7.0)
+## Unreleased (0.7.1)
 
-Fixes from a review of the 0.6.0 release.
+Fixes from a review of the 0.6.0 release. These were counted as 0.7.0 while they sat on their own
+branch; that number was never handed out, so they ship as part of 0.7.1.
 
 ### Colony Factory Gauge
 

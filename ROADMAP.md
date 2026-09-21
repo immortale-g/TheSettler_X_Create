@@ -44,8 +44,8 @@ Versorgungsregeln pro Shop (Sperrliste, Netz-Mindestbestand), das Gauge-Crafting
 überarbeiteten Hütten-Reiter mit eigenem Auswahlfenster und eigenen Icons. `debugLogging` bleibt bis
 1.0.0 eingeschaltet.
 
-Danach ein Review des Releases, abgearbeitet auf `fix/post-0.6.0-review` (Version 0.7.0, noch nicht
-gemergt). Drei Befunde im Gauge-Versand: der Shop bediente nur den Kopf seiner Packliste und hielt
+Danach ein Review des Releases, abgearbeitet auf `fix/post-0.6.0-review` und seit dem 2026-09-21 in
+`develop` (Version 0.7.1). Drei Befunde im Gauge-Versand: der Shop bediente nur den Kopf seiner Packliste und hielt
 damit jede Bestellung dahinter auf, eine von der Kolonie kurz geschlossene Bestellung ließ den Gauge
 ewig auf Ware warten, die niemand mehr schuldet, und ein Paket nahm die ganze Menge in einen Slot,
 was beim Speichern zerbricht. Dazu Kleineres: das Mengenfeld las seine eigene Schreibweise nicht
