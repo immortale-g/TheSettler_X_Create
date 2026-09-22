@@ -127,40 +127,27 @@ Erledigt und mit 0.6.0 erschienen (Branches `feature/shop-supply-policy` und
   überhaupt jemand das Rezept kennt.
 - `CreateShopChainOriginGuard` verhindert den Warenkreisel: kein Shop bedient das, was ein Shop bei
   der Kolonie bestellt hat, solange es um dasselbe Item geht.
+- Einlieferung und Racks sind getrennt: was ein Kurier bringt, geht ins Hütten-Inventar, die
+  Racks bleiben der Rückfall für eine volle Hütte und der Shopkeeper räumt sie ohne Wartezeit
+  wieder frei. Kein Stapel wird mehr getauscht, und der Output-Block liest die Hütte zuerst.
+- Der Flaschenhals der Einlieferung ist bewirtschaftet: Create packt in genau ein Rack aus, und
+  der Shopkeeper hält dieses Rack unter `arrivalRackMinFreeSlots` freien Plätzen frei, indem er
+  Ware in die übrigen Racks trägt. Bei einem Capacity-Stall entfällt zusätzlich die
+  Housekeeping-Wartezeit, und die Stall-Meldung nennt eine auf null gestellte Abholpriorität.
+- Eine Gauge-Bestellung ist keine Rack-Reservierung mehr. Was der Shop seinen Gauges schuldet,
+  steht in der Packliste; der Pickup lässt genau diese Menge stehen, und der Resolver zieht sie vom
+  Rack-Bestand ab. Das Reservierungs-Ledger neben dem Pickup-Block führt damit nur noch die
+  Create-Requests, und die Sonderfälle dafür (Inflight-Ankünfte, Reservierungs-Keep-Alive) sind
+  weg.
 
 ### Offen für 1.0
 
-Stand 2026-09-19, jeder Punkt gegen den Code geprüft.
+Stand 2026-09-22, jeder Punkt gegen den Code geprüft. Es ist nur noch Ingame-Validierung offen;
+alles andere aus dieser Liste steht unten in den Ergebnis-Abschnitten.
 
-- Racks und Hütten-Inventar trennen. Die Racks gehören der Create-Seite (Ware aus dem Netz,
-  Reservierungen, Einsammeln der Deliveries), das Hütten-Inventar der Kolonie-Seite (Ware, die nach
-  Create verschickt wird, und alte Überschüsse für den Warehouse-Pickup). Heute legt ein Kurier, der
-  an den Shop liefert (Colony Gauge), die Ware ins Sammelinventar, und dort kommen die Racks zuerst.
-  - `BuildingCreateShop.getItemHandlerCap` gibt nur das Hütten-Inventar zurück (als
-    `CombinedItemHandler`, damit Sortieren weiter geht). Anlieferung und Pickup sehen dann nur die
-    Hütte; das Einsammeln von Deliveries läuft weiter über den Hütten-Block.
-  - Bei voller Hütte keinen Stapel tauschen lassen (`isItemStackInRequest`), der Kurier wartet.
-  - Output-Block holt Gauge-Ware aus der Hütte, als Übergang für bestehende Welten danach aus den
-    Racks.
-  - Gauge-Ware nicht mehr im Rack-Reservierungsledger führen; der Pickup lässt stattdessen die Menge
-    offener Gauge-Aufgaben in der Hütte. `ShopPickupKeepPolicy` wird dadurch einfacher.
-  - Platz: Das Hütten-Inventar hat standardmäßig 27 Plätze.
-
-- `InflightBook.compact()` verwirft bei unowned Einträgen alles über zwei Segmente pro Tupel, ohne
-  die Restmenge einzufalten. Die verworfene Menge ist echte bestellte Ware; entweder einfalten oder
-  bewusst dokumentieren, warum nicht.
-- `ShopLostPackageRequestCanceller.tryForceCleanRequest` erkennt kaputte Request-Graphen an
-  Teilstrings der Exception-Meldung (`haschildren()`, `intvalue()`). Über MineColonies-Versionen
-  hinweg brüchig, kein Test pinnt die Strings.
-- Die drei 0.5.0-Services (`CreateShopNetworkOrderService`, `CreateShopPickupObservationService`,
-  `CreateShopOpenDeliveryTopupService`) haben keine eigenen Verhaltenstests. `building/` und
-  `tileentity/` haben fast nur Quelltext-Guards.
-- `attemptResolve` fertig umbauen. Von 270 auf 120 Zeilen runter, und der Blocker ist weg: die
-  Bestandsformeln liegen in `ShopStockAccounting` mit Tests vor.
 - Dedicated-Server-Test und mehrere Shops in einer Colony.
 - Ingame-Test der Review-Fixes aus `fix/post-0.6.0-review`, vor allem der Gauge-Versand: zwei Gauges
   am selben Shop, einer davon auf einen Crafter wartend, und eine Bestellung über mehr als ein Paket.
-- Ein Logo für die Modliste (`logoFile` in `neoforge.mods.toml`).
 - Diagnose-Marker `MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL` im Spiel sichten.
 
 Im Release-Commit selbst: `debugLogging` auf `false`, zusammen mit
@@ -178,6 +165,78 @@ Nicht an diesem Tag erledigt, sondern beim Abgleich mit dem Code als längst erl
   selben Moment dasselbe Item am selben Shop holen, weil die Entnahme keinen Akteur trägt.
 - `ShopGaugeQueue` hat Verhaltenstests (19 unter FML), dazu `GaugePackageSelection` und
   `CreatePackageBridge`.
+
+### Am 2026-09-21 aus dieser Liste gestrichen
+
+- `attemptResolve` ist umgebaut. Der Hauptteil war schon am 2026-09-16 in drei Schritte zerlegt
+  worden (`b427b2a`, Eligibility, Bestandsplan, genau ein Ausgang); die Zeile hier hatte den Stand
+  nur nicht nachgezogen. Am 2026-09-21 kamen die letzten zwei Stellen dazu: `checkEligible` gibt
+  seine Torprüfungen an `isCancelled`, `isOpenForAnAttempt` und `findShopParts` ab, und das dreifach
+  ausgeschriebene "bleibt pending" liegt jetzt in `keepPending`. `attemptResolve` selbst ist 27
+  Zeilen, die längste Methode der Klasse ist `deliverFromRacks` mit gut 50.
+
+### Am 2026-09-21 erledigt: S2 bis S5 des 0.7.1-Sammelstands
+
+Die vier Zeilen standen bis 2026-09-22 noch in der Liste oben, obwohl sie am 2026-09-21 abgearbeitet
+wurden.
+
+- Logo für die Modliste: selbst gezeichnet (`tools/icons/make_logo.py`), `logoFile` in der
+  mods.toml, `ModsTomlMetadataGuardTest` prüft, dass die genannte Datei existiert.
+- `InflightBook.compact()` streicht ein verdrängtes Segment nicht mehr, sondern faltet es in das
+  älteste behaltene Segment des Tupels ein und meldet die gewachsene Menge erneut.
+- Die Erkennung eines kaputten Request-Graphen hängt nicht mehr am Text der Fehlermeldung: die
+  Minecraft-freie Klasse `StaleRequestGraphDetector` entscheidet nach Typ und oberstem Stackframe
+  (Text nur noch, wenn der Stacktrace leer ist), Canceller und Command teilen sie sich.
+  `MineColoniesStaleRequestGraphContractFmlTest` meldet im Nightly, wenn die beiden Wurfstellen
+  verschwinden.
+- Die drei 0.5.0-Services haben Verhaltenstests mit geladenem FML statt Quelltext-Guards
+  (`CreateShopNetworkOrderServiceFmlTest`, `CreateShopPickupObservationServiceFmlTest`,
+  `CreateShopOpenDeliveryTopupServiceFmlTest`, dazu `CreateNetworkFacadeAbandonedOrderFmlTest`).
+
+### Am 2026-09-22 erledigt: Reflection-Audit
+
+Die Diagnose-Ausgaben fragen MineColonies wieder über dessen Interfaces statt über Methodennamen.
+19 reflektive Aufrufe sind direkte Aufrufe geworden, einer war hinter einem `instanceof`-Zweig
+unerreichbar und ist ersatzlos weg, 10 weitere sind gestrichen: sie nannten
+Methoden, die es in MineColonies nicht gibt (`getState`/`isWorking` auf einem Job, die drei
+`getCurrentRequest*`, `getEntityId`, `getPosition` auf `CitizenData`, `IRequest.getProvider`,
+`getMinimalCount` statt `getMinimumCount`) und liefen seit dem ersten Commit ins `catch`. Zwei
+Textvergleiche auf Fremdklassennamen sind `instanceof` geworden; der Vergleich auf
+`"WarehouseRequestResolver"` übersah dabei still `WarehouseConcreteRequestResolver`.
+`ShopCourierDiagnostics` liest die Kurier-Warteschlange über `getTaskQueue()`, nicht über
+`getCurrentTask()` — das verteilt Lagerarbeit als Seiteneffekt (siehe 0.3.5). Nebenbei gefunden:
+`logCitizenEntityDiagnostics` lief seit `f319807` nie, weil derselbe Commit den Marker entfernt
+hat, auf den der Aufrufer prüft.
+
+Übrig sind drei Reflection-Stellen, alle berechtigt und alle einmalig auflösend:
+`CreateFactoryLogisticsCompat` (CFL ist optional), `BuildingCreateShop.SuperPickupRequest` (zwei
+API-Varianten) und `CitizenData.citizenChatOptions` — letzteres jetzt in einem `static final`
+Holder mit lautem `WARN` samt MineColonies-Version statt stillem Fehlschlag, und mit
+`CitizenChatOptionsCompatTest` gegen das echte Jar abgesichert.
+`ShopCourierDiagnosticsNoPrivateReflectionGuardTest` prüft jetzt auch auf `getMethod(` — dieser
+blinde Fleck hatte die zehn toten Aufrufe überleben lassen.
+
+### Am 2026-09-22 erledigt: Compat-Tests für jede String-Kopplung
+
+Die offenen Versionsbereiche in der `mods.toml` sind nur ehrlich, wenn ein Bruch im Build auffällt.
+Fünf neue Tests fragen dafür das echte Jar, alle an `check` und damit im Nightly gegen die neueste
+MineColonies-Version:
+
+- `CreateBlockIdCompatTest` -- die elf Create-Ids der Placement-Handler (Casings, Wellen, Zahnräder,
+  Gurt, Gurt-Verbinder) müssen im Create-Jar eine Blockstate- oder Item-Model-Datei haben. Die Ids
+  liest der Test aus dem Produktivcode; `CreatePlacementHandlers.compositeBlockRequiredItems()` und
+  die drei Konstanten in `CreateBeltPlacementHandler` sind dafür paketsichtbar.
+- `CreateBeltNbtCompatTest` -- `Length` und `Controller` müssen weiter als String-Konstanten in
+  Creates `BeltBlockEntity` stehen, sonst puffert der Handler jedes Gurt-Segment für immer.
+- `MineColoniesGuiTextureCompatTest` -- jeder fremde `<modid>:textures/...`-Pfad in unseren Layouts
+  muss im Jar dieser Mod liegen. Der Test liest die Layouts selbst, eine Liste im Test gibt es nicht.
+- `BlockUiLayoutSchemaTest` -- alle Layouts gegen `block_ui.xsd` aus dem BlockUI-Jar, mit
+  `javax.xml.validation` aus dem JDK. Fängt umbenannte Elemente und Attribute auf einmal ab.
+- `ShopLangKeyCompatTest` -- die 67 Schlüssel aus dem Java-Code und die 19 aus den Layouts: eigene in
+  `en_us.json` und `de_de.json`, fremde in der Lang-Datei von MineColonies oder Minecraft.
+
+Geteilt statt kopiert: `CompiledClassFacts` (die ASM-Abfrage aus `CourierOngoingDeliveriesCompatTest`)
+und `ShopGuiLayouts` (findet die Layout-XMLs für alle drei Layout-Tests).
 
 ### Danach
 
@@ -357,7 +416,7 @@ Der Mod läuft aktuell nur client-seitig getestet. Für Server gelten andere Thr
 berücksichtigt wurde – aber es braucht echte Server-Tests.
 
 **5.2 Multi-Shop-Isolation**
-`PROJECT_TODO_LOCAL.md` nennt "multi-shop isolation hardening" als offenen Punkt.
+`docs/agent/TODO_LOCAL.md` nennt "multi-shop isolation hardening" als offenen Punkt.
 Resolver-Instanzen sind instance-local (gut), aber SharedState zwischen mehreren Shops im
 selben Colony ist noch nicht vollständig validiert.
 
