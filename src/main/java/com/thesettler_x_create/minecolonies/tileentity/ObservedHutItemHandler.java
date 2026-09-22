@@ -17,6 +17,11 @@ import org.jetbrains.annotations.Nullable;
  * here. It extends {@link CombinedItemHandler} instead of only implementing the item handler
  * interface because MineColonies' warehouse sort only works on that type. Every method forwards to
  * the inventory MineColonies built; none of the parent's own state is used.
+ *
+ * <p>Insertion is the one thing that does not simply pass through: an {@link InsertPolicy} decides
+ * which slots the colony side may fill, so goods a courier brings end up in the hut buffer rather
+ * than in the racks Create delivers to. Extraction stays open everywhere, which is what keeps the
+ * courier able to gather a delivery out of the racks through the hut block.
  */
 final class ObservedHutItemHandler extends CombinedItemHandler {
   /** Receives the real changes, each with the combined slot it happened in. */
@@ -28,12 +33,21 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
     void changed(int slot, ItemStack key, int delta);
   }
 
+  /** Decides which slots of the combined inventory may be filled from outside the shop. */
+  interface InsertPolicy {
+    /** Whether {@code stack} may go into this combined slot right now. */
+    boolean mayInsert(int slot, ItemStack stack);
+  }
+
   private final CombinedItemHandler delegate;
+  private final InsertPolicy insertPolicy;
   private final ChangeListener listener;
 
-  ObservedHutItemHandler(CombinedItemHandler delegate, ChangeListener listener) {
+  ObservedHutItemHandler(
+      CombinedItemHandler delegate, InsertPolicy insertPolicy, ChangeListener listener) {
     super("");
     this.delegate = delegate;
+    this.insertPolicy = insertPolicy;
     this.listener = listener;
   }
 
@@ -55,6 +69,9 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
   @NotNull
   @Override
   public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
+    if (!insertPolicy.mayInsert(slot, stack)) {
+      return stack;
+    }
     ItemStack leftover = delegate.insertItem(slot, stack, simulate);
     int inserted = stack.getCount() - leftover.getCount();
     if (!simulate && !stack.isEmpty() && inserted > 0) {
@@ -98,7 +115,7 @@ final class ObservedHutItemHandler extends CombinedItemHandler {
 
   @Override
   public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-    return delegate.isItemValid(slot, stack);
+    return insertPolicy.mayInsert(slot, stack) && delegate.isItemValid(slot, stack);
   }
 
   @Override

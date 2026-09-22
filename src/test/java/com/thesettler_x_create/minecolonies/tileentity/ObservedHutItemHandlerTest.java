@@ -27,6 +27,8 @@ class ObservedHutItemHandlerTest {
         public void changed(int slot, ItemStack key, int delta) {}
       };
 
+  private static final ObservedHutItemHandler.InsertPolicy OPEN = (slot, stack) -> true;
+
   @Test
   void reportsOnlyRealNonEmptyExtractions() throws Exception {
     String source =
@@ -74,7 +76,7 @@ class ObservedHutItemHandlerTest {
     when(hut.getSlots()).thenReturn(54);
     when(hut.getLastIndex(10)).thenReturn(27);
     when(hut.getSlotLimit(5)).thenReturn(64);
-    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, NO_OP);
+    ObservedHutItemHandler observed = new ObservedHutItemHandler(hut, OPEN, NO_OP);
 
     assertEquals(54, observed.getSlots());
     assertEquals(27, observed.getLastIndex(10));
@@ -87,8 +89,10 @@ class ObservedHutItemHandlerTest {
     CombinedItemHandler hut = mock(CombinedItemHandler.class);
     CombinedItemHandler otherHut = mock(CombinedItemHandler.class);
 
-    assertEquals(new ObservedHutItemHandler(hut, NO_OP), new ObservedHutItemHandler(hut, NO_OP));
+    assertEquals(
+        new ObservedHutItemHandler(hut, OPEN, NO_OP), new ObservedHutItemHandler(hut, OPEN, NO_OP));
     assertNotEquals(
-        new ObservedHutItemHandler(hut, NO_OP), new ObservedHutItemHandler(otherHut, NO_OP));
+        new ObservedHutItemHandler(hut, OPEN, NO_OP),
+        new ObservedHutItemHandler(otherHut, OPEN, NO_OP));
   }
 }

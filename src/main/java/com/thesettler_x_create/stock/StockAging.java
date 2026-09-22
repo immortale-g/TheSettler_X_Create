@@ -73,6 +73,27 @@ public final class StockAging<K> {
     return changed;
   }
 
+  /**
+   * Books an amount that counts as having waited since {@code sinceGameTime}, ahead of every batch
+   * this item kind already has. For stock that was never meant to sit here: the next {@link
+   * #update} finds it in the total and starts no fresh clock for it, and because it goes in at the
+   * front it is the first to leave when the amount shrinks again.
+   *
+   * @return true when anything was booked
+   */
+  public boolean addAged(K key, int amount, long sinceGameTime) {
+    if (key == null || amount <= 0) {
+      return false;
+    }
+    K stored = findKey(key);
+    if (stored == null) {
+      stored = normalizeKey.apply(key);
+      batches.put(stored, new ArrayDeque<>());
+    }
+    batches.get(stored).addFirst(new MutableBatch(amount, sinceGameTime));
+    return true;
+  }
+
   /** How much of an item kind has been unreserved for at least {@code minAge} ticks. */
   public int agedAmount(K key, long now, long minAge) {
     K stored = key == null ? null : findKey(key);

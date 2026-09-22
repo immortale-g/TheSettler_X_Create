@@ -200,7 +200,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   /**
    * The hut's combined rack inventory, wrapped so the shop sees items that leave it. Couriers
    * gather deliveries starting at the hut through this inventory; the shop's own rack work goes to
-   * the racks directly and is not reported.
+   * the racks directly and is not reported. What comes in from the colony side is steered towards
+   * the hut buffer, see {@link #mayColonyFill}.
    */
   @Override
   public IItemHandler getItemHandlerCap(Direction side) {
@@ -213,6 +214,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
           new ObservedHutItemHandler(
               combined,
               new ObservedHutItemHandler.ChangeListener() {
+              this::mayColonyFill,
                 @Override
                 public void taken(int slot, ItemStack taken) {
                   onHutItemsTaken(slot, taken);
@@ -220,8 +222,12 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
 
                 @Override
                 public void changed(int slot, ItemStack key, int delta) {
-                  if (isRackSlot(slot)) {
-                    noteRackStockChange(key, delta);
+                  if (!isRackSlot(slot)) {
+                    return;
+                  }
+                  noteRackStockChange(key, delta);
+                  if (delta > 0) {
+                    noteColonyStockInRack(key, delta);
                   }
                 }
               });
@@ -230,6 +236,44 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   private void onHutItemsTaken(int slot, ItemStack taken) {
+  /**
+   * Whether the colony side may put {@code stack} into this slot of the combined inventory.
+   *
+   * <p>Create always delivers into the racks, so a rack slot a courier filled is capacity the stock
+   * network cannot deliver to: the goods stay inflight until something frees the rack up again. The
+   * hut buffer is the colony side and takes what a courier brings. The racks stay the fallback for
+   * a full hut rather than letting the courier stand there with goods nobody can store, and {@link
+   * #noteColonyStockInRack} makes sure the shopkeeper clears that again without the usual wait.
+   *
+   * <p>The slot order is deliberately left alone (racks first, hut last). Putting the hut first
+   * would be the simpler way to steer an insertion, but {@link
+   * com.thesettler_x_create.minecolonies.building.ShopPickupKeepPolicy} spends the keep amount in
+   * visiting order, so a courier pickup would then spend it on the hut stacks and carry rack stock
+   * away instead.
+   */
+  private boolean mayColonyFill(int slot, ItemStack stack) {
+    if (!isRackSlot(slot)) {
+      return true;
+    }
+    return !ShopRackAccess.canInsertAtLeastOne(getInventory(), stack);
+  }
+
+  /**
+   * Records goods a courier had to put into a rack because the hut buffer was full, as stock that
+   * has already waited out {@code housekeepingMinAgeTicks}. The shopkeeper then moves it back to
+   * the hut on its next housekeeping pass instead of leaving it to block a rack for five minutes;
+   * it never belonged there in the first place.
+   */
+  private void noteColonyStockInRack(ItemStack key, int amount) {
+    if (level == null || level.isClientSide || key == null || key.isEmpty() || amount <= 0) {
+      return;
+    }
+    long minAge = com.thesettler_x_create.Config.HOUSEKEEPING_MIN_AGE_TICKS.getAsLong();
+    if (stockAging.addAged(key, amount, level.getGameTime() - minAge)) {
+      setChanged();
+    }
+  }
+
     if (level == null
         || level.isClientSide
         || !(getBuilding() instanceof BuildingCreateShop shop)) {

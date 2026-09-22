@@ -34,6 +34,16 @@ final class ShopStockAgingLedger {
     return aging.agedAmount(key, now, minAge);
   }
 
+  /**
+   * Books an amount as having waited since {@code sinceGameTime} already, so housekeeping may move
+   * it right away. Used for goods a courier had to put into a rack because the hut buffer was full.
+   *
+   * @return true when the saved state changed
+   */
+  boolean addAged(ItemStack key, int amount, long sinceGameTime) {
+    return aging.addAged(key, amount, sinceGameTime);
+  }
+
   /** Forgets every age. @return number of item kinds that were tracked */
   int clear() {
     return aging.clear();

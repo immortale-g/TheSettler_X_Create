@@ -26,7 +26,7 @@ class ShopRackStockChangeGuardTest {
         Files.readString(Path.of(MAIN + "minecolonies/tileentity/TileEntityCreateShop.java"));
 
     assertTrue(tile.contains("noteRackStockChange(taken, -taken.getCount());"));
-    assertTrue(tile.contains("if (isRackSlot(slot)) {"));
+    assertTrue(tile.contains("if (!isRackSlot(slot)) {"));
     assertTrue(tile.contains("pickup.noteRackStockChange(key, delta);"));
   }
 

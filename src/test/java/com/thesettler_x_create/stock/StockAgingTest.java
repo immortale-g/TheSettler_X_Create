@@ -32,6 +32,54 @@ class StockAgingTest {
   }
 
   @Test
+  void stockBookedAsAlreadyAgedMayMoveAtOnce() {
+    StockAging<String> aging = aging();
+    aging.addAged("iron", 12, 1_000L - FIVE_MINUTES);
+
+    assertEquals(12, aging.agedAmount("iron", 1_000L, FIVE_MINUTES));
+  }
+
+  @Test
+  void theNextCountDoesNotRestartTheClockOfAlreadyAgedStock() {
+    StockAging<String> aging = aging();
+    aging.addAged("iron", 12, 1_000L - FIVE_MINUTES);
+    // Housekeeping counts the rack a moment later and finds exactly what was booked.
+    aging.update(counts("iron", 12), 1_000L);
+
+    assertEquals(12, aging.agedAmount("iron", 1_000L, FIVE_MINUTES));
+  }
+
+  @Test
+  void whatCameOnTopOfAlreadyAgedStockWaitsItsOwnTime() {
+    StockAging<String> aging = aging();
+    aging.addAged("iron", 12, 1_000L - FIVE_MINUTES);
+    aging.update(counts("iron", 40), 1_000L);
+
+    assertEquals(12, aging.agedAmount("iron", 1_000L, FIVE_MINUTES));
+    assertEquals(40, aging.agedAmount("iron", 1_000L + FIVE_MINUTES, FIVE_MINUTES));
+  }
+
+  @Test
+  void alreadyAgedStockIsTheFirstToLeave() {
+    StockAging<String> aging = aging();
+    aging.update(counts("iron", 30), 0L);
+    aging.addAged("iron", 12, 0L);
+    // The shopkeeper carried the twelve misplaced ones back to the hut, leaving the thirty.
+    aging.update(counts("iron", 30), 1_000L);
+
+    assertEquals(30, aging.agedAmount("iron", FIVE_MINUTES, FIVE_MINUTES));
+  }
+
+  @Test
+  void nothingIsBookedForAnEmptyOrNegativeAmount() {
+    StockAging<String> aging = aging();
+
+    assertFalse(aging.addAged("iron", 0, 0L));
+    assertFalse(aging.addAged(null, 5, 0L));
+    assertEquals(0, aging.keyCount());
+  }
+
+  @Test
   void newArrivalsStartTheirOwnClock() {
     StockAging<String> aging = aging();
     aging.update(counts("iron", 64), 0L);

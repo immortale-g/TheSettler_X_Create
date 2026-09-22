@@ -236,6 +236,38 @@ public class BuildingCreateShop extends AbstractBuilding {
     return pickupKeepPolicy.takeableForPickup(stack, localAlreadyKept);
   }
 
+  /**
+   * Nothing already stored here may be swapped out to make room for a delivery.
+   *
+   * <p>MineColonies calls this from one place only: the fallback in {@code
+   * InventoryUtils.forceItemStackToItemHandler}, which on a full building pulls a stack it believes
+   * nobody needs and hands it to the courier. For this shop every rack stack is Create stock and
+   * every hut stack is either gauge goods or surplus waiting for a pickup, so there is nothing to
+   * give away. Saying yes to everything leaves that fallback with empty slots only; when there are
+   * none, the courier keeps the goods and reports a full building.
+   */
+  @Override
+  public boolean isItemStackInRequest(@Nullable ItemStack stack) {
+    return stack != null && !stack.isEmpty();
+  }
+
+  /**
+   * Sorting is off for this building.
+   *
+   * <p>{@code SortingUtils.sort} empties every slot of the combined inventory and lays the items
+   * out again from the front. The shop's inventory is two halves with different owners, and its
+   * rack half refuses what the colony side tries to put in (see {@code
+   * TileEntityCreateShop.mayColonyFill}), so a re-lay would push everything at the hut buffer and
+   * drop what no longer fits. The shop has no warehouse options module and therefore no sort
+   * button; this override is there so a sort cannot reach it by another route either.
+   */
+  @Override
+  public void sort(
+      net.minecraft.core.HolderLookup.Provider provider,
+      com.minecolonies.api.inventory.api.CombinedItemHandler inventoryHandler) {
+    // Intentionally empty, see javadoc.
+  }
+
   /** Whether a courier called here would find anything it may take; see ShopPickupKeepPolicy. */
   public boolean hasItemsAPickupMayTake() {
     TileEntityCreateShop tile = getCreateShopTileEntity();
