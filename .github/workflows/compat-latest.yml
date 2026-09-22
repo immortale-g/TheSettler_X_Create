@@ -1,12 +1,22 @@
 name: Compat (latest releases)
 
-# Early warning only. Compiles and tests against the newest MineColonies, Structurize, Create and
-# Create Factory Logistics releases instead of the pinned versions, so upstream API breaks show up here before players hit
-# them. A red run does not block anything; it means an adapter or a version bump is needed.
+# Compiles and tests against the newest MineColonies, Structurize, Create and Create Factory
+# Logistics releases instead of the pinned versions.
+#
+# The pinned versions are the floor, not the truth: neoforge.mods.toml declares them as
+# "[version,)", so the jar promises to work with every release from there upward, and that upper end
+# is where players actually sit. Build covers the floor we promise, this run covers the ceiling they
+# run. A release has to be green on both.
+#
+# It runs nightly on master and develop as an early warning, and on anything that reaches master,
+# both a pull request into it and a direct push to it, because shipping a release that is known to
+# break against the current MineColonies only moves the discovery to the bug tracker. Nightly on
+# master matters even when nothing is in development, because that is the build people have
+# installed and upstream keeps releasing underneath it.
 #
 # Scheduled runs always use this file from the default branch, so the branch list lives here: the
-# nightly run checks the release line (master) and the development line (develop). A manual run
-# checks only the branch it was started on.
+# nightly run checks the release line (master) and the development line (develop). Every other event
+# checks out whatever triggered it.
 #
 # Because this file comes from the default branch while the checkout is per-branch, it must not name
 # individual verification tasks: a task renamed on one line and not the other fails the run before a
@@ -16,21 +26,29 @@ name: Compat (latest releases)
 on:
   schedule:
     - cron: '17 4 * * *'
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   compat-latest:
-    name: compat-latest (${{ matrix.ref }})
+    name: compat-latest (${{ matrix.ref || github.head_ref || github.ref_name }})
     runs-on: ubuntu-latest
+    env:
+      LINE: ${{ matrix.ref || github.head_ref || github.ref_name }}
     strategy:
       fail-fast: false
       matrix:
-        ref: ${{ github.event_name == 'schedule' && fromJSON('["master", "develop"]') || fromJSON(format('["{0}"]', github.ref_name)) }}
+        # Only the nightly fans out over both lines. Every other event leaves this empty and falls
+        # back to the commit that triggered the run, which for a pull request is its merge commit.
+        ref: ${{ github.event_name == 'schedule' && fromJSON('["master", "develop"]') || fromJSON('[""]') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.ref }}
+          ref: ${{ matrix.ref || github.sha }}
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -46,7 +64,7 @@ jobs:
         run: |
           args=$(bash .github/scripts/resolve-latest-deps.sh)
           echo "args=$args" >> "$GITHUB_OUTPUT"
-          echo "Testing ${{ matrix.ref }} with: $args" >> "$GITHUB_STEP_SUMMARY"
+          echo "Testing $LINE with: $args" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compile and test against latest releases
         run: ./gradlew compileJava check -x spotlessCheck ${{ steps.deps.outputs.args }}
@@ -65,7 +83,7 @@ jobs:
       - name: Check what a compile cannot see
         run: |
           if [ ! -f tools/apidiff/apidiff.py ]; then
-            echo "apidiff is not on ${{ matrix.ref }} yet, skipping" >> "$GITHUB_STEP_SUMMARY"
+            echo "apidiff is not on $LINE yet, skipping" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           ./gradlew apiDiff -PapiDiffPython=python3 \
@@ -78,7 +96,7 @@ jobs:
             exit 0
           fi
           {
-            echo "### Upstream behaviour drift (${{ matrix.ref }})"
+            echo "### Upstream behaviour drift ($LINE)"
             echo '```'
             ./gradlew apiDiff -q -PapiDiffPython=python3 \
               -PapiDiffArgs="behaviour latest-1.21.1 --depth 2 --limit 20" \

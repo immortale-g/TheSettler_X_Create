@@ -64,7 +64,8 @@ public final class CompiledClassFacts {
     return calls;
   }
 
-  private static void visit(String internalName, ClassVisitor visitor) throws Exception {
+  /** Hands a class off the test classpath to a visitor of your own. */
+  public static void visit(String internalName, ClassVisitor visitor) throws Exception {
     try (InputStream in =
         CompiledClassFacts.class.getResourceAsStream("/" + internalName + ".class")) {
       assertNotNull(in, internalName + " is not on the test classpath");
