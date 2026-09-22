@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -195,14 +196,37 @@ class ShopGaugeQueueFmlTest {
   }
 
   @Test
-  void theReservationCoversWhatWasOrderedNotWhatWasAskedFor() {
+  void whatIsOwedCoversWhatWasOrderedNotWhatWasAskedFor() {
     warehouseHolds(TORCH, 20);
 
     queue.requestForGauge(TORCH, 64, ADDRESS);
 
-    // The reservation keeps rack housekeeping off the delivered goods until they are packaged, so
-    // it has to match the order rather than what the gauge asked for.
-    verify(pickup).reserve(any(UUID.class), any(ItemStack.class), eq(20));
+    // What the shop owes its gauges is what a pickup leaves standing and what the resolver does
+    // not hand out, so it has to match the order rather than what the gauge asked for.
+    assertEquals(20, owedForTorches());
+  }
+
+  @Test
+  void aGaugeOrderIsNotAPickupReservation() {
+    warehouseHolds(TORCH, 20);
+    queue.requestForGauge(TORCH, 64, ADDRESS);
+
+    queue.deliverPartOfGaugeTask(taskId(), 12);
+    queue.deliverPartOfGaugeTask(taskId(), 8);
+
+    // The ledger next to the pickup block is for the Create requests the shop resolves. A gauge
+    // order is colony goods waiting in the hut buffer, and used to sit in that same ledger, where
+    // every reader had to know which reservations were not rack stock.
+    verifyNoInteractions(pickup);
+  }
+
+  @Test
+  void anItemNobodyAskedForIsNotOwed() {
+    warehouseHolds(TORCH, 20);
+    queue.requestForGauge(TORCH, 20, ADDRESS);
+
+    assertEquals(0, queue.owedToGaugeTasks(stack -> stack.is(Items.STONE)));
+    assertEquals(0, queue.owedToGaugeTasks(null));
   }
 
   @Test
@@ -216,7 +240,8 @@ class ShopGaugeQueueFmlTest {
     BuildingCreateShop.GaugePackagingTask open = queue.peekNextGaugeTask();
     assertEquals(20 - 12, open.amount());
     assertEquals(ADDRESS, open.gaugeAddress());
-    verify(pickup).consumeReservedForRequest(any(UUID.class), any(ItemStack.class), eq(12));
+    // Only the rest is still owed; what left the shop is nobody's to keep anymore.
+    assertEquals(20 - 12, owedForTorches());
   }
 
   @Test
@@ -228,8 +253,7 @@ class ShopGaugeQueueFmlTest {
 
     assertNull(queue.peekNextGaugeTask());
     assertFalse(queue.hasGaugeTask());
-    // The whole reservation goes, rather than being consumed piece by piece.
-    verify(pickup).release(any(UUID.class));
+    assertEquals(0, owedForTorches());
   }
 
   @Test
@@ -284,7 +308,7 @@ class ShopGaugeQueueFmlTest {
     queue.onRequestComplete(requestFor(issuedTokens.get(0), TORCH, 0));
 
     assertFalse(queue.hasGaugeTask());
-    verify(pickup).release(any(UUID.class));
+    assertEquals(0, owedForTorches());
   }
 
   @Test
@@ -306,6 +330,11 @@ class ShopGaugeQueueFmlTest {
   @Test
   void bookingAgainstATaskThatIsNoLongerQueuedSaysSo() {
     assertEquals(-1, queue.deliverPartOfGaugeTask(UUID.randomUUID(), 5));
+  }
+
+  /** What the shop still owes its gauges in torches. */
+  private int owedForTorches() {
+    return queue.owedToGaugeTasks(stack -> stack.is(Items.TORCH));
   }
 
   /** The request id of the only queued task. */

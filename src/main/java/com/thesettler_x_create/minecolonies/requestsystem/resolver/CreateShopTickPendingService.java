@@ -146,7 +146,7 @@ final class CreateShopTickPendingService {
     if (pickup == null) {
       return;
     }
-    Set<UUID> activeRequestIds = new HashSet<>(shop.getGaugeReservationRequestIds());
+    Set<UUID> activeRequestIds = new HashSet<>();
     for (IToken<?> token : candidateTokens) {
       IRequest<?> request;
       try {

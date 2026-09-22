@@ -10,7 +10,6 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
-import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop.GaugePackagingTask;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -98,7 +97,7 @@ final class ShopGaugeQueue {
     // A gauge asks again once its promise runs out, which happens long before a slow delivery
     // arrives. Anything still waiting to be packaged for this item and address is that earlier
     // ask, so report its amount back instead of placing a second colony request: two requests
-    // would draw the warehouse twice and reserve rack stock twice for one gauge slot.
+    // would draw the warehouse twice and hold twice as much in the shop for one gauge slot.
     //
     // This comes before the two scans below on purpose. With a promise lifetime set on the gauge,
     // the promise expires again and again while the task waits for rack stock, and every one of
@@ -154,12 +153,6 @@ final class ShopGaugeQueue {
       gaugePackagingQueue.add(task);
       owner.markDirty();
       pendingGaugeRequests.put(token, task);
-      // Protect the delivered item from rack housekeeping (which sweeps "unreserved" rack stock
-      // back to the warehouse) until CreateShopOutputBlockEntity actually packages it.
-      CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
-      if (pickup != null) {
-        pickup.reserve(requestId, item.copy(), actualAmount);
-      }
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[ColonyGauge] request created token={} item={} amount={} available={} address={}",
@@ -228,7 +221,6 @@ final class ShopGaugeQueue {
       }
       toCancel.add(entry.getKey());
     }
-    CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
     int cancelled = 0;
     for (IToken<?> token : toCancel) {
       try {
@@ -243,13 +235,10 @@ final class ShopGaugeQueue {
         }
       }
       pendingGaugeRequests.remove(token);
-      if (pickup != null) {
-        pickup.release(toRequestId(token));
-      }
     }
     // Same filter the tokens above were picked with, minus what stays running. Matching the address
     // alone would drop the queued task of a second panel that asked for a different item through
-    // the same frogport, whose request is still open and whose reservation nobody would release.
+    // the same frogport, whose request is still open and whose goods nobody would package.
     gaugePackagingQueue.removeIf(
         t ->
             t.gaugeAddress().equals(gaugeAddress)
@@ -327,8 +316,8 @@ final class ShopGaugeQueue {
    * <p>The task is addressed by its request rather than by its place in the queue, because the shop
    * serves the task whose goods are there and that is not always the first one.
    *
-   * <p>The reservation shrinks by the same amount, so rack housekeeping may move on whatever is no
-   * longer spoken for, and the rest stays protected until it is packaged too.
+   * <p>What the task still owes shrinks by the same amount, which is what a pickup leaves standing
+   * in the hut buffer; goods nothing owes anymore are free again.
    */
   int deliverPartOfGaugeTask(UUID requestId, int packaged) {
     if (packaged <= 0 || requestId == null) {
@@ -340,19 +329,12 @@ final class ShopGaugeQueue {
     }
     GaugePackagingTask task = gaugePackagingQueue.get(index);
     int sent = Math.min(packaged, task.amount());
-    CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
     int open = task.amount() - sent;
     if (open <= 0) {
       gaugePackagingQueue.remove(index);
-      if (pickup != null) {
-        pickup.release(task.requestId());
-      }
     } else {
       gaugePackagingQueue.set(
           index, new GaugePackagingTask(task.item(), open, task.gaugeAddress(), task.requestId()));
-      if (pickup != null) {
-        pickup.consumeReservedForRequest(task.requestId(), task.item(), sent);
-      }
     }
     owner.markDirty();
     DebugLog.info(
@@ -375,16 +357,33 @@ final class ShopGaugeQueue {
     return -1;
   }
 
-  /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
-  java.util.Set<java.util.UUID> getGaugeReservationRequestIds() {
-    java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+  /**
+   * How much of one item kind the shop still owes its gauges: the open amount of every queued
+   * packaging task the matcher accepts.
+   *
+   * <p>This is what used to be a pickup reservation per gauge order. Those reservations sat in the
+   * same ledger the Create requests use, where every reader had to know that some of them stood for
+   * goods that are not rack stock at all. The amount is read straight off the queue instead, and
+   * the two readers that need it say so themselves: a warehouse pickup leaves that much standing,
+   * and the resolver does not count it as rack stock it may hand out.
+   *
+   * <p>Only the queue is walked. A task enters it when its order is placed and leaves it when it is
+   * packaged, so a task tracked in {@code pendingGaugeRequests} is in the queue as well, and adding
+   * both would count it twice.
+   */
+  int owedToGaugeTasks(java.util.function.Predicate<ItemStack> matches) {
+    if (matches == null) {
+      return 0;
+    }
+    int owed = 0;
     for (GaugePackagingTask task : gaugePackagingQueue) {
-      ids.add(task.requestId());
+      ItemStack item = task.item();
+      if (item.isEmpty() || !matches.test(item)) {
+        continue;
+      }
+      owed += Math.max(0, task.amount());
     }
-    for (GaugePackagingTask task : pendingGaugeRequests.values()) {
-      ids.add(task.requestId());
-    }
-    return ids;
+    return owed;
   }
 
   /**
@@ -416,10 +415,6 @@ final class ShopGaugeQueue {
     GaugePackagingTask task = pendingGaugeRequests.remove(request.getId());
     if (task != null) {
       gaugePackagingQueue.removeIf(t -> t.requestId().equals(task.requestId()));
-      CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
-      if (pickup != null) {
-        pickup.release(task.requestId());
-      }
       owner.markDirty();
     }
   }
@@ -434,10 +429,10 @@ final class ShopGaugeQueue {
    * AbstractWarehouseRequestResolver}, which stops making child requests once {@code totalAvailable
    * >= getMinimumCount()}). Nothing further will arrive for it.
    *
-   * <p>A task left at its original amount would then wait for goods nobody owes it: it would keep
-   * its rack reservation, stay in the queue, and the gauge behind it would keep its promise for the
-   * missing rest and never ask again. Shrinking it here is what lets the last package of the order
-   * say that the order is closed.
+   * <p>A task left at its original amount would then wait for goods nobody owes it: it would stay
+   * in the queue, keep that much standing in the shop, and the gauge behind it would keep its
+   * promise for the missing rest and never ask again. Shrinking it here is what lets the last
+   * package of the order say that the order is closed.
    */
   void onRequestComplete(@Nullable IRequest<?> request) {
     if (request == null) {
@@ -448,16 +443,6 @@ final class ShopGaugeQueue {
       return;
     }
     shrinkTaskToDelivered(task, deliveredAmount(request, task.item()));
-    // The reservation protects the delivered goods from rack housekeeping until they are packaged,
-    // so it stays while the task is still queued; packaging the last of it releases it then.
-    // Without a queued task nobody would release it anymore and it would sit there until its TTL
-    // runs out.
-    if (gaugePackagingQueue.stream().noneMatch(t -> t.requestId().equals(task.requestId()))) {
-      CreateShopBlockEntity pickup = owner.getPickupBlockEntity();
-      if (pickup != null) {
-        pickup.release(task.requestId());
-      }
-    }
   }
 
   /**
@@ -499,8 +484,6 @@ final class ShopGaugeQueue {
       return;
     }
     if (delivered <= 0) {
-      // The reservation is let go by the caller, which checks for a task of this request either
-      // way. Doing it here as well would release it twice.
       gaugePackagingQueue.remove(index);
     } else {
       gaugePackagingQueue.set(

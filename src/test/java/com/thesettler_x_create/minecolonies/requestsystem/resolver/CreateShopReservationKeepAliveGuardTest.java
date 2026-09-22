@@ -21,8 +21,9 @@ class CreateShopReservationKeepAliveGuardTest {
     assertTrue(collect >= 0 && refresh > collect, "keep-alive must use the collected tokens");
     assertTrue(refresh < earlyReturn, "keep-alive must run before the empty-token early return");
     assertTrue(source.contains("isTerminalRequestState(request.getState())"));
-    assertTrue(source.contains("shop.getGaugeReservationRequestIds()"));
     assertTrue(source.contains("pickup.refreshReservations(activeRequestIds)"));
+    // Gauge orders are no longer reservations of their own, so nothing keeps them alive here.
+    assertFalse(source.contains("GaugeReservationRequestIds"));
   }
 
   // Keep-alive and rebasing behavior itself is covered by ReservationBookTest; this pins that the

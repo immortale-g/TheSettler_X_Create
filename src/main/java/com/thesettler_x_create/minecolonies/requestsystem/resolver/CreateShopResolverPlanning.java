@@ -21,6 +21,17 @@ import net.neoforged.neoforge.items.IItemHandler;
 
 /** Helper for computing availability and delivery plans for Create Shop requests. */
 final class CreateShopResolverPlanning {
+  /**
+   * The rack stock a colony request may be served from: what the racks hold, minus what the shop
+   * still owes its Colony Factory Gauges.
+   *
+   * <p>A gauge order is goods the colony already handed over, waiting to be packaged for a Create
+   * address. Since the rack/hut split they wait in the hut buffer, where the racks do not see them
+   * anyway; the subtraction is what keeps a full hut, which puts them into the racks instead, from
+   * turning one colony's gauge order into another citizen's delivery. It stands where a per-gauge
+   * pickup reservation used to, which reached every caller through {@code reservedForOthers} and
+   * made every reader of that ledger deal with reservations that were not rack stock.
+   */
   int getAvailableFromRacks(TileEntityCreateShop tile, IDeliverable deliverable) {
     if (tile == null || tile.getBuilding() == null) {
       return 0;
@@ -29,7 +40,9 @@ final class CreateShopResolverPlanning {
     if (level == null) {
       return 0;
     }
-    if (tile.getBuilding() instanceof BuildingCreateShop shop) {
+    BuildingCreateShop shop =
+        tile.getBuilding() instanceof BuildingCreateShop createShop ? createShop : null;
+    if (shop != null) {
       shop.ensureRackContainers();
     }
     ItemStack expected = deliverable == null ? ItemStack.EMPTY : deliverable.getResult();
@@ -49,18 +62,23 @@ final class CreateShopResolverPlanning {
       total += rack.getItemCount(deliverable::matches);
       sameItemTotal += countSameItemInRack(rack, expected);
     }
-    if (total > 0) {
-      return Math.max(0, total);
+    int owedToGauges =
+        shop == null || deliverable == null ? 0 : shop.getOwedToGauges(deliverable::matches);
+    int available = Math.max(0, total - owedToGauges);
+    if (available > 0) {
+      return available;
     }
     if (DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] rack availability strict=0 expected={} containers={} racksSeen={} sameItem={}",
+          "[CreateShop] rack availability strict=0 expected={} containers={} racksSeen={} sameItem={} inRacks={} owedToGauges={}",
           expected == null || expected.isEmpty() ? "<empty>" : expected.getItem(),
           containerCount,
           rackCount,
-          sameItemTotal);
+          sameItemTotal,
+          total,
+          owedToGauges);
     }
-    return Math.max(0, total);
+    return available;
   }
 
   int getAvailableFromPickup(CreateShopBlockEntity pickup, IDeliverable deliverable) {

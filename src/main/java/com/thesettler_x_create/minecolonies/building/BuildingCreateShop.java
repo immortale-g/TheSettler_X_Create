@@ -569,9 +569,12 @@ public class BuildingCreateShop extends AbstractBuilding {
     return gaugeQueue.deliverPartOfGaugeTask(requestId, packaged);
   }
 
-  /** Request ids whose pickup reservation must stay until the gauge task is packaged. */
-  public Set<java.util.UUID> getGaugeReservationRequestIds() {
-    return gaugeQueue.getGaugeReservationRequestIds();
+  /**
+   * How much of one item kind the shop still owes its gauges; see {@code ShopGaugeQueue}. A
+   * warehouse pickup leaves that much standing, and the resolver does not hand it out.
+   */
+  public int getOwedToGauges(java.util.function.Predicate<ItemStack> matches) {
+    return gaugeQueue.owedToGaugeTasks(matches);
   }
 
   public boolean hasGaugeTask() {

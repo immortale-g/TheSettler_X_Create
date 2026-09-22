@@ -20,6 +20,10 @@ import net.neoforged.neoforge.items.IItemHandler;
  * keeps all rack stock and at least everything reserved, and only takes the rest from the hut
  * buffer. MineColonies visits the racks before the hut inventory and passes the running keep count
  * per item kind in {@code localAlreadyKept}.
+ *
+ * <p>On top of that it leaves standing what the shop still owes its Colony Factory Gauges. That is
+ * exactly the goods the colony sent here, which land in the hut buffer, so a pickup that took them
+ * would carry a gauge order back to the warehouse it came from.
  */
 final class ShopPickupKeepPolicy {
   private final BuildingCreateShop shop;
@@ -62,7 +66,9 @@ final class ShopPickupKeepPolicy {
     CreateShopBlockEntity pickup = shop.getPickupBlockEntity();
     int rackStock = tile == null ? 0 : tile.countInRacks(stack);
     int reserved = pickup == null ? 0 : pickup.getReservedFor(stack);
-    int keepAmount = ShopStockAccounting.pickupKeepAmount(rackStock, reserved);
+    int owedToGauges =
+        shop.getOwedToGauges(candidate -> ItemStack.isSameItemSameComponents(candidate, stack));
+    int keepAmount = ShopStockAccounting.pickupKeepAmount(rackStock, reserved, owedToGauges);
 
     ItemStorage kept = findKept(localAlreadyKept, stack);
     int alreadyKept = kept == null ? 0 : kept.getAmount();
@@ -71,11 +77,12 @@ final class ShopPickupKeepPolicy {
     // What is worth reading is the case that keeps goods where they are.
     if (takeable <= 0 && DebugLog.enabled()) {
       TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] pickup keep item={} inSlot={} rackStock={} reserved={} keep={} alreadyKept={} takeable={}",
+          "[CreateShop] pickup keep item={} inSlot={} rackStock={} reserved={} owedToGauges={} keep={} alreadyKept={} takeable={}",
           stack.getItem(),
           stack.getCount(),
           rackStock,
           reserved,
+          owedToGauges,
           keepAmount,
           alreadyKept,
           takeable);

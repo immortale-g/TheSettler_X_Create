@@ -128,10 +128,19 @@ class ShopStockAccountingTest {
 
   @Test
   void pickupKeepsAllRackStockAndEveryReservedItem() {
-    assertEquals(64, ShopStockAccounting.pickupKeepAmount(64, 16));
+    assertEquals(64, ShopStockAccounting.pickupKeepAmount(64, 16, 0));
     // 16 reserved but only 10 in the racks: 6 reserved items in the hut buffer stay too.
-    assertEquals(16, ShopStockAccounting.pickupKeepAmount(10, 16));
-    assertEquals(0, ShopStockAccounting.pickupKeepAmount(0, -1));
+    assertEquals(16, ShopStockAccounting.pickupKeepAmount(10, 16, 0));
+    assertEquals(0, ShopStockAccounting.pickupKeepAmount(0, -1, 0));
+    assertEquals(0, ShopStockAccounting.pickupKeepAmount(0, 0, -3));
+  }
+
+  @Test
+  void pickupAlsoLeavesWhatTheShopOwesItsGauges() {
+    // A gauge order waits in the hut buffer, next to the racks rather than in them, so it is added
+    // on top instead of competing with the rack stock for the same maximum.
+    assertEquals(64 + 20, ShopStockAccounting.pickupKeepAmount(64, 16, 20));
+    assertEquals(20, ShopStockAccounting.pickupKeepAmount(0, 0, 20));
   }
 
   @Test

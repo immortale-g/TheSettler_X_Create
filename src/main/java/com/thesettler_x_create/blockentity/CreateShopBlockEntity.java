@@ -101,14 +101,6 @@ public class CreateShopBlockEntity extends BlockEntity {
     return reservationLedger.getReservedFor(key);
   }
 
-  /**
-   * Returns the reserved count for a stack key by every request except the given ones, e.g. without
-   * Colony Factory Gauge reservations, which cover goods not in the racks yet.
-   */
-  public int getReservedForExcluding(ItemStack key, java.util.Set<UUID> excludedRequests) {
-    return reservationLedger.getReservedForExcluding(key, excludedRequests);
-  }
-
   /** Returns total reserved count for a deliverable match. */
   public int getReservedForDeliverable(IDeliverable deliverable) {
     return reservationLedger.getReservedForDeliverable(deliverable);

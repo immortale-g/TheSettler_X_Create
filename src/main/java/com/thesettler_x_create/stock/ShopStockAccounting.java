@@ -138,11 +138,18 @@ public final class ShopStockAccounting {
 
   /**
    * What a warehouse pickup must leave in the shop of one item kind: everything in the racks (the
-   * shopkeeper decides what leaves them) and at least everything reserved, even when part of it
-   * sits in the hut buffer.
+   * shopkeeper decides what leaves them), at least everything reserved even when part of it sits in
+   * the hut buffer, and on top of that whatever the shop still owes its gauges.
+   *
+   * <p>The gauge part is added rather than folded into the maximum, because it is stored somewhere
+   * else: goods the colony sends towards Create go into the hut buffer since the rack/hut split,
+   * while rack stock and reservations describe the racks. In a world from before the split a gauge
+   * order still lying in the racks is counted twice, which keeps a little more of that item kind in
+   * the hut buffer than needed until the shopkeeper has moved it; nothing is lost by it, and the
+   * gauge order takes it from the hut buffer first anyway.
    */
-  public static int pickupKeepAmount(int rackStock, int reserved) {
-    return Math.max(0, Math.max(rackStock, reserved));
+  public static int pickupKeepAmount(int rackStock, int reserved, int owedToGauges) {
+    return Math.max(0, Math.max(rackStock, reserved)) + Math.max(0, owedToGauges);
   }
 
   /**

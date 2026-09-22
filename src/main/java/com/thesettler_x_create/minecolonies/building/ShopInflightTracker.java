@@ -11,8 +11,6 @@ import com.thesettler_x_create.stock.InflightBook;
 import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -47,13 +45,11 @@ final class ShopInflightTracker {
     if (arrivals.isEmpty()) {
       return;
     }
-    Set<UUID> gaugeRequests = shop.getGaugeReservationRequestIds();
     for (InflightBook.Arrival<ItemStack> arrival : arrivals) {
       int reserved = 0;
       if (arrival.owner() != null) {
         int rackStock = countFor(currentCounts, arrival.key());
-        // Gauge reservations cover colony goods not in the racks yet; they must not block this.
-        int reservedByRequests = pickup.getReservedForExcluding(arrival.key(), gaugeRequests);
+        int reservedByRequests = pickup.getReservedFor(arrival.key());
         reserved =
             ShopStockAccounting.arrivalReservation(arrival.amount(), rackStock, reservedByRequests);
         if (reserved > 0) {

@@ -85,7 +85,7 @@ class CreateShopNetworkOrderGuardTest {
     int planning = building.indexOf("resolver.tickPendingDeliveries(colony.getRequestManager());");
     assertTrue(arrivals > 0 && planning > arrivals);
     assertTrue(tracker.contains("ShopStockAccounting.arrivalReservation("));
-    assertTrue(tracker.contains("pickup.getReservedForExcluding(arrival.key(), gaugeRequests)"));
+    assertTrue(tracker.contains("pickup.getReservedFor(arrival.key())"));
     assertTrue(tracker.contains("pickup.reserve(arrival.owner(), arrival.key(), reserved);"));
   }
 }
