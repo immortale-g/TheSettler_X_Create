@@ -129,33 +129,95 @@ final class CreateShopAttemptResolveService {
     return Lists.newArrayList();
   }
 
+  /**
+   * The three shop objects an attempt works on: the building, its tile entity, the pickup block.
+   */
+  private record ShopParts(
+      BuildingCreateShop shop, TileEntityCreateShop tile, CreateShopBlockEntity pickup) {}
+
   /** The attempt's inputs, or null when the shop cannot work on the request now. */
   private Attempt checkEligible(
       CreateShopRequestResolver resolver,
       IRequestManager manager,
       IRequest<? extends IDeliverable> request,
       long now) {
+    if (isCancelled(resolver, request)) {
+      return null;
+    }
+    Level level = manager.getColony().getWorld();
+    if (!isOpenForAnAttempt(request, level, now)) {
+      return null;
+    }
+    IDeliverable deliverable = request.getRequest();
+    chain.sanitizeRequestChain(manager, request);
+
+    ShopParts parts = findShopParts(resolver, manager);
+    if (parts == null) {
+      return null;
+    }
+    CreateShopBlockEntity pickup = parts.pickup();
+
+    UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
+    int reservedForRequest = pickup.getReservedForRequest(requestId);
+    int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
+    int reservedForOthers =
+        ShopStockAccounting.reservedForOthers(
+            pickup.getReservedForDeliverable(deliverable), reservedForRequest);
+    if (needed <= 0) {
+      flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
+      DebugLog.info("[CreateShop] attemptResolve skipped (needed<=0)");
+      return null;
+    }
+    return new Attempt(
+        resolver,
+        manager,
+        request,
+        deliverable,
+        level,
+        now,
+        parts.tile(),
+        pickup,
+        requestId,
+        needed,
+        reservedForOthers,
+        parts.shop().isWorkerWorking());
+  }
+
+  /**
+   * Keeps the resolver's own cancelled-request note in step with the request's state and answers
+   * whether the request is cancelled.
+   */
+  private boolean isCancelled(
+      CreateShopRequestResolver resolver, IRequest<? extends IDeliverable> request) {
     if (request.getState() == RequestState.CANCELLED) {
       resolver.markCancelledRequest(request.getId());
     } else {
       resolver.clearCancelledRequest(request.getId());
     }
-    if (resolver.isCancelledRequest(request.getId())) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] attemptResolve skipped (request cancelled) {}",
-            (IToken<?>) request.getId());
-      }
-      return null;
+    if (!resolver.isCancelledRequest(request.getId())) {
+      return false;
     }
-    Level level = manager.getColony().getWorld();
+    if (DebugLog.enabled()) {
+      TheSettlerXCreate.LOGGER.info(
+          "[CreateShop] attemptResolve skipped (request cancelled) {}",
+          (IToken<?>) request.getId());
+    }
+    return true;
+  }
+
+  /**
+   * Server side, not on cooldown from an earlier order, and without children already working on it.
+   * Children mean another attempt is under way, so this one only keeps the flow clock alive.
+   */
+  private boolean isOpenForAnAttempt(
+      IRequest<? extends IDeliverable> request, Level level, long now) {
     if (level.isClientSide) {
       DebugLog.info("[CreateShop] attemptResolve skipped (no level or client)");
-      return null;
+      return false;
     }
     if (cooldown.isRequestOnCooldown(level, request.getId())) {
       DebugLog.info("[CreateShop] attemptResolve skipped (request already ordered)");
-      return null;
+      return false;
     }
     if (request.hasChildren()) {
       flowStateMachine.touch(request.getId(), now, "attemptResolve:has-children");
@@ -164,11 +226,13 @@ final class CreateShopAttemptResolveService {
             "[CreateShop] attemptResolve skipped (has active children) request={}",
             (IToken<?>) request.getId());
       }
-      return null;
+      return false;
     }
-    IDeliverable deliverable = request.getRequest();
-    chain.sanitizeRequestChain(manager, request);
+    return true;
+  }
 
+  /** The shop's parts, or null when one of them is missing or not set up yet. */
+  private ShopParts findShopParts(CreateShopRequestResolver resolver, IRequestManager manager) {
     BuildingCreateShop shop = resolver.getShop(manager);
     if (shop == null) {
       DebugLog.info("[CreateShop] attemptResolve skipped (shop missing)");
@@ -189,31 +253,7 @@ final class CreateShopAttemptResolveService {
       DebugLog.info("[CreateShop] attemptResolve skipped (pickup level missing)");
       return null;
     }
-
-    UUID requestId = CreateShopRequestResolver.toRequestId(request.getId());
-    int reservedForRequest = pickup.getReservedForRequest(requestId);
-    int needed = outstandingNeededService.compute(request, deliverable, reservedForRequest);
-    int reservedForOthers =
-        ShopStockAccounting.reservedForOthers(
-            pickup.getReservedForDeliverable(deliverable), reservedForRequest);
-    if (needed <= 0) {
-      flowStateMachine.touch(request.getId(), now, "attemptResolve:no-needed");
-      DebugLog.info("[CreateShop] attemptResolve skipped (needed<=0)");
-      return null;
-    }
-    return new Attempt(
-        resolver,
-        manager,
-        request,
-        deliverable,
-        level,
-        now,
-        tile,
-        pickup,
-        requestId,
-        needed,
-        reservedForOthers,
-        shop.isWorkerWorking());
+    return new ShopParts(shop, tile, pickup);
   }
 
   /** Plans the rack part first; the network only counts while the shopkeeper works. */
@@ -271,10 +311,7 @@ final class CreateShopAttemptResolveService {
     logPlan(a, plan, null, plan.rackPlanned().size());
     transitionOrdered(a, plan.rackPlanned());
     if (CreateShopRequestResolver.unwrapStandardManager(manager) == null) {
-      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-          a.resolver(), a.level(), request.getId(), a.needed());
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-wrapped-manager");
-      flowStateMachine.touch(request.getId(), a.now(), "attemptResolve:defer-wrapped-manager");
+      keepPending(a, "attemptResolve:defer-wrapped-manager");
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
             "[CreateShop] attemptResolve defer delivery creation (wrapped manager) request={} needed={} rackUsable={}",
@@ -323,7 +360,6 @@ final class CreateShopAttemptResolveService {
    * and reserved when it arrives.
    */
   private void orderRemainder(Attempt a, StockPlan plan) {
-    IRequest<? extends IDeliverable> request = a.request();
     CreateShopNetworkOrderService.OrderResult networkOrder =
         a.workerWorking()
             ? networkOrderService.orderMissing(
@@ -333,33 +369,29 @@ final class CreateShopAttemptResolveService {
                 a.requestId(),
                 plan.remaining(),
                 plan::networkAvailable,
-                messaging.resolveRequesterName(a.manager(), request))
+                messaging.resolveRequesterName(a.manager(), a.request()))
             : null;
     List<ItemStack> networkOrdered = networkOrder == null ? List.of() : networkOrder.ordered();
     List<ItemStack> ordered = Lists.newArrayList(plan.rackPlanned());
     ordered.addAll(networkOrdered);
     logPlan(a, plan, networkOrder, ordered.size());
 
-    if (!ordered.isEmpty()) {
-      transitionOrdered(a, ordered);
-      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-          a.resolver(), a.level(), request.getId(), a.needed());
-      int orderedNow = networkOrder == null ? plan.remaining() : networkOrder.orderedCount();
-      if (orderedNow <= 0) {
-        diagnostics.recordPendingSource(request.getId(), "attemptResolve:wait-existing-inflight");
-        flowStateMachine.touch(request.getId(), a.now(), "attemptResolve:wait-existing-inflight");
-      } else {
-        diagnostics.recordPendingSource(request.getId(), "attemptResolve:defer-network-arrival");
-        flowStateMachine.touch(request.getId(), a.now(), "attemptResolve:defer-network-arrival");
-        messaging.sendShopChat(
-            a.manager(), "com.thesettler_x_create.message.createshop.request_sent", networkOrdered);
+    if (ordered.isEmpty()) {
+      // The rack part is part of `ordered`, so nothing planned also means nothing to reserve.
+      if (networkOrder != null && networkOrder.somethingOnItsWay()) {
+        keepPending(a, "attemptResolve:wait-existing-inflight");
       }
-    } else if (networkOrder != null && networkOrder.somethingOnItsWay()) {
-      requestStateMutatorService.markOrderedWithPendingAtLeastOne(
-          a.resolver(), a.level(), request.getId(), a.needed());
-      diagnostics.recordPendingSource(request.getId(), "attemptResolve:wait-existing-inflight");
-      flowStateMachine.touch(request.getId(), a.now(), "attemptResolve:wait-existing-inflight");
       return;
+    }
+
+    transitionOrdered(a, ordered);
+    int orderedNow = networkOrder == null ? plan.remaining() : networkOrder.orderedCount();
+    if (orderedNow <= 0) {
+      keepPending(a, "attemptResolve:wait-existing-inflight");
+    } else {
+      keepPending(a, "attemptResolve:defer-network-arrival");
+      messaging.sendShopChat(
+          a.manager(), "com.thesettler_x_create.message.createshop.request_sent", networkOrdered);
     }
 
     // Only rack stock is reserved. What was ordered from the network is tracked as on its way and
@@ -371,6 +403,17 @@ final class CreateShopAttemptResolveService {
         pickup.reserve(a.requestId(), stack.copy(), stack.getCount());
       }
     }
+  }
+
+  /**
+   * Leaves the request with the shop for the next tick: at least one item still counts as pending,
+   * the reason is noted for diagnosis and the flow clock is touched so nothing times out.
+   */
+  private void keepPending(Attempt a, String reason) {
+    requestStateMutatorService.markOrderedWithPendingAtLeastOne(
+        a.resolver(), a.level(), a.request().getId(), a.needed());
+    diagnostics.recordPendingSource(a.request().getId(), reason);
+    flowStateMachine.touch(a.request().getId(), a.now(), reason);
   }
 
   private void transitionOrdered(Attempt a, List<ItemStack> ordered) {
