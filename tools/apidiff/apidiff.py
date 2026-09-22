@@ -32,6 +32,21 @@ COMPILED = os.path.join(artifacts.PROJECT, 'build', 'classes', 'java', 'main')
 UPSTREAM = ('com/simibubi/', 'com/ldtteam/', 'net/createmod/', 'dev/engine_room/')
 
 
+BASELINE_HEADER = """# Upstream behaviour drift that has been read and found harmless.
+#
+# Each line is a method whose body differs between the pinned versions and %s, and that
+# somebody looked at and decided we survive. The compat run reports the drift that is NOT in
+# this file and fails on it, so a change upstream is loud exactly once instead of sitting in a
+# job summary nobody opens. What turns out to be dangerous belongs in a test, not in here.
+#
+# Sizes and call lists are deliberately absent: they move with every upstream build and would
+# make this file churn without saying anything.
+#
+# After reading the findings, record them:
+#   gradlew apiDiff -PapiDiffArgs="behaviour %s --baseline tools/apidiff/drift-baseline.txt --write-baseline"
+"""
+
+
 def _our_classes():
     """Every compiled class of this mod.
 
@@ -238,7 +253,58 @@ def command_behaviour(args):
         print('      %-14s %s' % (args.target + ':', there))
     if len(drift) > args.limit:
         print('\n  ... %d more' % (len(drift) - args.limit))
-    return 1 if drift and args.fail_on_drift else 0
+    found = {(kind, owner, name) for kind, _level, owner, name, _here, _there in drift}
+    if args.write_baseline:
+        write_baseline(args.baseline, found, args.target)
+        print()
+        print('  wrote %d entries to %s' % (len(found), args.baseline))
+        return 0
+    if not args.baseline:
+        return 1 if drift and args.fail_on_drift else 0
+
+    known = read_baseline(args.baseline)
+    new = sorted(found - known)
+    print()
+    print('=== new since %s (%d) ===' % (args.baseline, len(new)))
+    for kind, owner, name in new:
+        print('  [%s] %s#%s' % (kind, owner, name))
+    gone = len(known - found)
+    if gone:
+        print()
+        print('  %d baseline entries no longer drift, drop them when convenient' % gone)
+    if new:
+        print()
+        print('  Read each one, then write a guard test for it or record it:')
+        print('    gradlew apiDiff -PapiDiffArgs="behaviour %s --baseline %s'
+              ' --write-baseline"' % (args.target, args.baseline))
+    return 1 if new and args.fail_on_new_drift else 0
+
+
+def read_baseline(path):
+    """The drift somebody has already read and accepted. A missing file reads as none."""
+    known = set()
+    if not os.path.exists(path):
+        return known
+    with open(path, 'r', encoding='utf-8') as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            kind, _separator, member = line.partition(' ')
+            owner, _separator, name = member.strip().rpartition('#')
+            if owner and name:
+                known.add((kind, owner, name))
+    return known
+
+
+def write_baseline(path, found, target):
+    """Record the drift there is now, sorted, so the file only moves when the drift does."""
+    if not path:
+        raise SystemExit('--write-baseline needs --baseline <file>')
+    with open(path, 'w', encoding='utf-8', newline='') as handle:
+        print(BASELINE_HEADER % (target, target), file=handle)
+        for kind, owner, name in sorted(found):
+            print('%s %s#%s' % (kind, owner, name), file=handle)
 
 
 def command_implements(args):
@@ -406,6 +472,12 @@ def main(argv=None):
     behaviour.add_argument('--base', default='current', help='the target to compare from')
     behaviour.add_argument('--depth', type=int, default=2,
                            help='how far to follow the call graph outwards')
+    behaviour.add_argument('--baseline', default=None,
+                           help='drift already read; only what is missing from it counts')
+    behaviour.add_argument('--fail-on-new-drift', action='store_true',
+                           help='exit non-zero on drift the baseline does not list')
+    behaviour.add_argument('--write-baseline', action='store_true',
+                           help='rewrite --baseline with the drift there is now')
     behaviour.set_defaults(run=command_behaviour)
 
     implements = sub.add_parser('implements', parents=[common],

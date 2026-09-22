@@ -57,6 +57,23 @@ they carry both the old and the new signatures.
 `--fail-on-drift` makes any finding a non-zero exit, for use in a workflow. `--limit` caps how
 many findings are printed.
 
+## The drift baseline
+
+Upstream rewrites its internals constantly, so `behaviour` against `latest-1.21.1` is never
+empty for long, and a step that failed on every body change would be ignored within a month.
+`drift-baseline.txt` holds the findings somebody has already read and accepted, one per line,
+keyed by kind and member and deliberately without the numbers, which move with every upstream
+build.
+
+```
+gradlew apiDiff -PapiDiffArgs="behaviour latest-1.21.1 --baseline tools/apidiff/drift-baseline.txt --fail-on-new-drift"
+```
+
+That is what the compat workflow runs: it reports all drift into the job summary as before,
+but fails only on what the baseline does not list. When it fails, read the new findings. What
+is dangerous becomes a test, as the Structurize handler order did; the rest is recorded with
+`--write-baseline` and committed, and that commit is the note saying somebody looked.
+
 ## How `behaviour` decides
 
 For each method it compares three things that survive recompilation: which upstream methods it

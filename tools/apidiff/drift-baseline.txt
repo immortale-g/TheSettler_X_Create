@@ -1,0 +1,14 @@
+# Upstream behaviour drift that has been read and found harmless.
+#
+# Each line is a method whose body differs between the pinned versions and latest-1.21.1, and that
+# somebody looked at and decided we survive. The compat run reports the drift that is NOT in
+# this file and fails on it, so a change upstream is loud exactly once instead of sitting in a
+# job summary nobody opens. What turns out to be dangerous belongs in a test, not in here.
+#
+# Sizes and call lists are deliberately absent: they move with every upstream build and would
+# make this file churn without saying anything.
+#
+# After reading the findings, record them:
+#   gradlew apiDiff -PapiDiffArgs="behaviour latest-1.21.1 --baseline tools/apidiff/drift-baseline.txt --write-baseline"
+
+size com/ldtteam/structurize/placement/handlers/placement/PlacementHandlers#add
