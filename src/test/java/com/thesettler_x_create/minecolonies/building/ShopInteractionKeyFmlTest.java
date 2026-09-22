@@ -90,7 +90,11 @@ class ShopInteractionKeyFmlTest {
     assertSurvivesStorage(
         new ShopLostPackageReorderUnavailableInteraction(
             new ItemStack(Items.TORCH), 64, "Warehouse", "456", 0L, 0L));
-    assertSurvivesStorage(new ShopCapacityStallInteraction(new ItemStack(Items.TORCH), 64, 12));
+    assertSurvivesStorage(
+        new ShopCapacityStallInteraction(new ItemStack(Items.TORCH), 64, 12, false));
+    // The stall has a second wording for a shop whose pickup the player turned off.
+    assertSurvivesStorage(
+        new ShopCapacityStallInteraction(new ItemStack(Items.TORCH), 64, 12, true));
   }
 
   private static void assertSurvivesStorage(

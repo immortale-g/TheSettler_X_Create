@@ -33,7 +33,7 @@ class GaugePackageSelectionFmlTest {
 
   private final List<String> pulls = new ArrayList<>();
 
-  private final GaugePackageSelection.RackSource source =
+  private final GaugePackageSelection.StockSource source =
       (key, amount, simulate) -> {
         pulls.add(key.getItem() + ":" + amount + (simulate ? ":sim" : ":real"));
         int held = racks.getOrDefault(key.getItem().toString(), 0);

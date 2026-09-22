@@ -29,9 +29,10 @@ public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
     super(citizen);
   }
 
-  public ShopCapacityStallInteraction(ItemStack stackKey, int requested, int accepted) {
+  public ShopCapacityStallInteraction(
+      ItemStack stackKey, int requested, int accepted, boolean pickupTurnedOff) {
     super(
-        buildInquiry(stackKey, requested, accepted),
+        buildInquiry(stackKey, requested, accepted, pickupTurnedOff),
         true,
         ChatPriority.IMPORTANT,
         data -> true,
@@ -100,7 +101,13 @@ public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
     active = !tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE);
   }
 
-  private static Component buildInquiry(ItemStack stackKey, int requested, int accepted) {
+  /**
+   * The line the shopkeeper says. A shop whose pickup priority the player set to zero never asks
+   * for a courier at all, so its racks stay full for a reason the usual wording does not name --
+   * and "assign more couriers" would send the player looking in the wrong place.
+   */
+  private static Component buildInquiry(
+      ItemStack stackKey, int requested, int accepted, boolean pickupTurnedOff) {
     String itemLabel =
         stackKey == null || stackKey.isEmpty()
             ? "unknown item"
@@ -108,11 +115,11 @@ public class ShopCapacityStallInteraction extends ServerCitizenInteraction {
     int req = Math.max(1, requested);
     int acc = Math.max(0, accepted);
     int blocked = Math.max(0, req - acc);
+    String key =
+        pickupTurnedOff
+            ? "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry_pickup_off"
+            : "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry";
     // Strings, not numbers: see ShopLostPackageInteraction#buildInquiry.
-    return Component.translatable(
-        "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry",
-        itemLabel,
-        String.valueOf(blocked),
-        String.valueOf(req));
+    return Component.translatable(key, itemLabel, String.valueOf(blocked), String.valueOf(req));
   }
 }

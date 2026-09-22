@@ -36,14 +36,35 @@ class CreateShopOutputBlockEntityPartialPackagingGuardTest {
 
   @Test
   void theSimulatedPullReportsTheSameAmountAsTheRealOne() throws Exception {
-    String body = methodBody("private ItemStack extractFromRacks(");
+    String body = methodBody("private static int pullFrom(");
 
     // Any branch that changes the returned amount for one of the two modes reopens the loop: the
     // packager would ship a preview the real pull never hands out, or hand out more than shown.
     assertFalse(body.contains("!simulate && remaining"));
     assertFalse(body.contains("rollBack("));
-    // simulate stays the flag passed down to the racks, and nothing else.
+    // simulate stays the flag passed down to the inventory, and nothing else.
     assertTrue(body.contains("handler.extractItem(slot, remaining, simulate)"));
+  }
+
+  @Test
+  void onlyWhatCameOutOfARackIsBookedAgainstTheRackLedger() throws Exception {
+    String body = methodBody("private ItemStack extractFromShop(");
+
+    // The hut buffer is not part of the rack ledger. Booking a hut pull there reads as rack stock
+    // leaving that never was, and the resolver plans the next order against that number.
+    assertTrue(body.contains("if (!simulate && fromRacks > 0)"));
+    assertTrue(body.contains("shop.noteRackStockChange(rackPart, -fromRacks)"));
+  }
+
+  @Test
+  void theHutBufferIsAskedBeforeTheRacks() throws Exception {
+    String body = methodBody("private ItemStack extractFromShop(");
+
+    int hut = body.indexOf("pullFrom(shop.getInventory()");
+    int racks = body.indexOf("for (TileEntityCreateShop.LoadedRack");
+    assertTrue(hut > 0, "hut buffer is not read at all");
+    assertTrue(racks > 0, "racks are no longer read; old worlds keep their gauge goods there");
+    assertTrue(hut < racks, "the racks must only be the fallback, not the first source");
   }
 
   private static String methodBody(String signature) throws Exception {

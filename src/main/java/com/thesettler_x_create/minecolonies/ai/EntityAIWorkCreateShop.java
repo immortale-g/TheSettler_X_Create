@@ -28,6 +28,13 @@ public class EntityAIWorkCreateShop
   @Nullable private ItemStack pendingTargetItem;
   @Nullable private ItemStack pendingCarriedItem;
 
+  /**
+   * The rack the carried stack came out of, set only while clearing an arrival rack. Non-null means
+   * the stack goes into another rack rather than into the hut buffer, and it names the one rack
+   * that must not take it back.
+   */
+  @Nullable private BlockPos pendingArrivalRackPos;
+
   @SuppressWarnings("unchecked")
   public EntityAIWorkCreateShop(JobCreateShop job) {
     super(job);
@@ -106,7 +113,7 @@ public class EntityAIWorkCreateShop
       return AIWorkerState.IDLE;
     }
     markWorking();
-    if (building != null && building.hasIncomingRackWork() && building.isHousekeepingAllowed()) {
+    if (building != null && building.hasRackWorkToDo()) {
       return CreateShopAIState.HOUSEKEEPING_FETCH;
     }
     walkToBuilding();
@@ -119,7 +126,7 @@ public class EntityAIWorkCreateShop
       markIdle();
       return AIWorkerState.IDLE;
     }
-    if (building == null || !building.isHousekeepingAllowed()) {
+    if (building == null || !building.hasRackWorkToDo()) {
       clearHousekeepingState();
       return AIWorkerState.START_WORKING;
     }
@@ -129,20 +136,18 @@ public class EntityAIWorkCreateShop
       clearHousekeepingState();
       return AIWorkerState.START_WORKING;
     }
-    if (pendingRackPos == null) {
-      Tuple<BlockPos, ItemStack> next = tile.findNextUnreservedRackItem(pickup);
-      if (next == null) {
-        clearHousekeepingState();
-        return AIWorkerState.START_WORKING;
-      }
-      pendingRackPos = next.getA();
-      pendingTargetItem = next.getB();
+    if (pendingRackPos == null && !pickNextHousekeepingJob(tile, pickup)) {
+      clearHousekeepingState();
+      return AIWorkerState.START_WORKING;
     }
     if (!walkToWorkPos(pendingRackPos)) {
       return CreateShopAIState.HOUSEKEEPING_FETCH;
     }
     ItemStack target = pendingTargetItem != null ? pendingTargetItem : ItemStack.EMPTY;
-    ItemStack extracted = tile.extractFromRack(pendingRackPos, target, pickup);
+    // Clearing an arrival rack only moves goods between racks, and every count the shop keeps
+    // is over all racks together, so reserved stock may travel too: no budget is passed.
+    ItemStack extracted =
+        tile.extractFromRack(pendingRackPos, target, pendingArrivalRackPos == null ? pickup : null);
     pendingRackPos = null;
     pendingTargetItem = null;
     if (extracted.isEmpty()) {
@@ -176,6 +181,10 @@ public class EntityAIWorkCreateShop
       returnCarriedItemToRack();
       return AIWorkerState.START_WORKING;
     }
+    if (pendingArrivalRackPos != null) {
+      depositIntoAnotherRack(tile, carried);
+      return CreateShopAIState.HOUSEKEEPING_FETCH;
+    }
     IItemHandler hut = tile.getInventory();
     if (hut == null) {
       returnCarriedItemToRack();
@@ -191,10 +200,56 @@ public class EntityAIWorkCreateShop
     return CreateShopAIState.HOUSEKEEPING_FETCH;
   }
 
+  /**
+   * Chooses what the shopkeeper carries next, and remembers where it goes.
+   *
+   * <p>Clearing an arrival rack comes first: that rack is the only place Create can unpack into, so
+   * while it is tight nothing new arrives at all. It also runs while a delivery is being gathered,
+   * unlike the move into the hut buffer, because it does not take anything out of the rack pool the
+   * courier reads -- it only spreads it.
+   *
+   * @return false when there is nothing to carry
+   */
+  private boolean pickNextHousekeepingJob(TileEntityCreateShop tile, CreateShopBlockEntity pickup) {
+    Tuple<BlockPos, ItemStack> arrival = tile.findNextArrivalRackItem();
+    if (arrival != null) {
+      pendingArrivalRackPos = arrival.getA();
+      pendingRackPos = arrival.getA();
+      pendingTargetItem = arrival.getB();
+      return true;
+    }
+    pendingArrivalRackPos = null;
+    if (building == null || !building.isHousekeepingAllowed()) {
+      return false;
+    }
+    Tuple<BlockPos, ItemStack> next = tile.findNextUnreservedRackItem(pickup);
+    if (next == null) {
+      return false;
+    }
+    pendingRackPos = next.getA();
+    pendingTargetItem = next.getB();
+    return true;
+  }
+
+  /** Puts a stack carried out of an arrival rack into any other rack, or back if none takes it. */
+  private void depositIntoAnotherRack(TileEntityCreateShop tile, ItemStack carried) {
+    java.util.List<ItemStack> leftovers =
+        tile.insertIntoOtherRacks(pendingArrivalRackPos, java.util.List.of(carried));
+    worker.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+    pendingCarriedItem = null;
+    if (!leftovers.isEmpty()) {
+      // Every other rack filled up while the shopkeeper walked. Back where it came from, so the
+      // goods are never held in a hand across a save.
+      tile.insertIntoRacks(leftovers);
+    }
+    pendingArrivalRackPos = null;
+  }
+
   private void clearHousekeepingState() {
     pendingRackPos = null;
     pendingTargetItem = null;
     pendingCarriedItem = null;
+    pendingArrivalRackPos = null;
     if (worker != null) {
       worker.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
     }

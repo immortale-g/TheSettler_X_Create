@@ -71,6 +71,7 @@
   "com.thesettler_x_create.message.createshop.flow_timeout": "[Create-Laden Ablauf] %s Anfrage lief ab und wurde zurückgesetzt: %s x%d",
   "com.thesettler_x_create.interaction.createshop.missing_output_address.id": "createshop_missing_output_address",
   "com.thesettler_x_create.interaction.createshop.missing_output_address": "Am Output-Block ist keine Paket-Adresse eingetragen. Items werden nicht exportiert, bis eine Adresse im Adress-Tab gesetzt wurde.",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry_pickup_off": "Im Create-Laden ist kein Regalplatz mehr für %s frei. %s von %s Gegenständen sind blockiert. Die Abholpriorität dieser Hütte steht auf null, deshalb kommt kein Kurier vorbei. Stelle sie höher, damit die Überschüsse abfließen können.",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry": "Im Create-Laden ist kein Regalplatz mehr für %s frei. %s von %s Gegenständen sind blockiert. Baue die Hütte aus, um Regale zu bekommen, oder setze mehr Kuriere ein, damit die Lieferungen abfließen.",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.id": "createshop_capacity_stall",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.response_upgrade": "Ich baue die Regale aus",

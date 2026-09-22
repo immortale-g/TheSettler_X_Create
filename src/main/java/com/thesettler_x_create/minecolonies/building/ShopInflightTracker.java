@@ -197,6 +197,7 @@ final class ShopInflightTracker {
       return;
     }
     citizen.triggerInteraction(
-        new ShopCapacityStallInteraction(notice.stackKey, notice.requested, notice.accepted));
+        new ShopCapacityStallInteraction(
+            notice.stackKey, notice.requested, notice.accepted, shop.getPickUpPriority() <= 0));
   }
 }

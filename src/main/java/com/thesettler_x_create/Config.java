@@ -29,6 +29,15 @@ public class Config {
   public static final ModConfigSpec.LongValue HOUSEKEEPING_MIN_AGE_TICKS =
       BUILDER
           .comment(
+  public static final ModConfigSpec.IntValue ARRIVAL_RACK_MIN_FREE_SLOTS =
+      BUILDER
+          .comment(
+              "Free slots the shopkeeper keeps in the rack a Create packager unpacks into. Create",
+              "unpacks an arriving package into exactly one rack, so that one rack is the shop's",
+              "inbound bottleneck: once it is full, nothing else arrives and the goods wait in the",
+              "network. Below this many free slots the shopkeeper carries goods from it into the",
+              "shop's other racks. 0 turns it off.")
+          .defineInRange("arrivalRackMinFreeSlots", 5, 0, 27);
               "Ticks unreserved stock must sit in the Create Shop racks before the shopkeeper",
               "moves it to the hut for a warehouse pickup.")
           .defineInRange("housekeepingMinAgeTicks", 20L * 60L * 5L, 0L, 72000L);

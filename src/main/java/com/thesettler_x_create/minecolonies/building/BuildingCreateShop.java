@@ -493,6 +493,25 @@ public class BuildingCreateShop extends AbstractBuilding {
    * Warehouse actually holds (partial deliveries are allowed). Returns the amount actually
    * requested, or 0 if no request was created — the caller must use this returned amount (not the
    * requested {@code amount}) for "promised" UI display, since it can be smaller.
+  /**
+   * Whether the shopkeeper has any rack carrying to do: clearing an arrival rack, or moving
+   * unreserved stock into the hut buffer.
+   *
+   * <p>Clearing an arrival rack is not held back by {@link #isHousekeepingAllowed}. That gate keeps
+   * the shopkeeper from taking goods out of the rack pool while a courier is gathering a delivery
+   * or the resolver has just planned one. Moving a stack from one rack to another takes nothing
+   * out: every count the shop keeps is over all racks together, and the courier reads them all
+   * through the hut block. Holding it back would mean the arrival rack stays shut exactly when the
+   * shop is busiest.
+   */
+  public boolean hasRackWorkToDo() {
+    TileEntityCreateShop tile = getCreateShopTileEntity();
+    if (tile == null || !hasHousekeepingAvailableWorker()) {
+      return false;
+    }
+    return tile.hasArrivalRackWork() || (isHousekeepingAllowed() && hasIncomingRackWork());
+  }
+
    */
   public int requestForGauge(ItemStack item, int amount, String gaugeAddress) {
     return gaugeQueue.requestForGauge(item, amount, gaugeAddress);

@@ -14,6 +14,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Low-level rack scanning/insertion/extraction engine for a {@link TileEntityCreateShop} - finding
@@ -139,7 +140,7 @@ class ShopRackAccess {
    * <p>Used for manual package handover recovery.
    */
   List<ItemStack> insertIntoRacks(List<ItemStack> stacks) {
-    return insertIntoRacksInternal(stacks, true);
+    return insertIntoRacksInternal(stacks, true, null);
   }
 
   /**
@@ -148,11 +149,20 @@ class ShopRackAccess {
    * <p>Used for lost-package handover so rack-only delivery flow stays consistent.
    */
   List<ItemStack> insertIntoRacksOnly(List<ItemStack> stacks) {
-    return insertIntoRacksInternal(stacks, false);
+    return insertIntoRacksInternal(stacks, false, null);
+  }
+
+  /**
+   * Like {@link #insertIntoRacksOnly}, but the rack at {@code excluded} is passed over. The carry
+   * out of an arrival rack needs that: without it the goods would land straight back where they
+   * came from, because that rack is the one holding a matching stack.
+   */
+  List<ItemStack> insertIntoRacksExcept(@Nullable BlockPos excluded, List<ItemStack> stacks) {
+    return insertIntoRacksInternal(stacks, false, excluded);
   }
 
   private List<ItemStack> insertIntoRacksInternal(
-      List<ItemStack> stacks, boolean allowHutFallback) {
+      List<ItemStack> stacks, boolean allowHutFallback, @Nullable BlockPos excluded) {
     List<ItemStack> leftovers = new ArrayList<>();
     if (stacks == null || stacks.isEmpty()) {
       return leftovers;
@@ -166,7 +176,7 @@ class ShopRackAccess {
           owner.getBuilding() == null ? 1 : Math.max(1, owner.getBuilding().getContainers().size());
       int guard = containerCount + 2;
       while (!remaining.isEmpty() && guard-- > 0) {
-        AbstractTileEntityRack rack = getRackForStack(remaining);
+        AbstractTileEntityRack rack = getRackForStack(remaining, excluded);
         if (rack == null) {
           break;
         }
@@ -203,7 +213,7 @@ class ShopRackAccess {
     }
     ItemStack probe = stack.copy();
     probe.setCount(1);
-    AbstractTileEntityRack rack = getRackForStack(probe);
+    AbstractTileEntityRack rack = getRackForStack(probe, null);
     if (rack != null && canInsertAtLeastOne(rack.getItemHandlerCap(), probe)) {
       return true;
     }
@@ -213,9 +223,14 @@ class ShopRackAccess {
 
   /**
    * Computes how much of the requested inbound stacks can fit right now using a virtual slot
-   * simulation across racks and hut buffer.
+   * simulation across the shop's racks.
    *
-   * <p>This prevents over-ordering when only limited free slots are available for new item types.
+   * <p>This prevents over-ordering when only limited free slots are available for new item types:
+   * the shop orders only what it can store and reports the rest as a capacity stall.
+   *
+   * <p>Racks only, on purpose. A packager unpacks an arriving package into one rack, so the hut
+   * buffer is no help to inbound goods however much room it has. (It said "racks and hut buffer"
+   * until the colony side moved into the hut buffer; the text was wrong, not the code.)
    */
   List<ItemStack> planInboundAcceptedStacks(List<ItemStack> requestedStacks) {
     if (requestedStacks == null || requestedStacks.isEmpty()) {
@@ -430,19 +445,33 @@ class ShopRackAccess {
   }
 
   AbstractTileEntityRack getRackForStack(ItemStack stack) {
-    AbstractTileEntityRack rack = getPositionOfChestWithItemStack(stack);
-    if (rack != null) {
-      return rack;
-    }
-    rack = getPositionOfChestWithSimilarItemStack(stack);
-    if (rack != null) {
-      return rack;
-    }
-    return searchMostEmptyRack();
+    return getRackForStack(stack, null);
   }
 
-  private AbstractTileEntityRack getPositionOfChestWithItemStack(ItemStack stack) {
+  /** The rack this stack should go into, never the one at {@code excluded}. */
+  AbstractTileEntityRack getRackForStack(ItemStack stack, @Nullable BlockPos excluded) {
+    AbstractTileEntityRack rack = getPositionOfChestWithItemStack(stack, excluded);
+    if (rack != null) {
+      return rack;
+    }
+    rack = getPositionOfChestWithSimilarItemStack(stack, excluded);
+    if (rack != null) {
+      return rack;
+    }
+    return searchMostEmptyRack(excluded);
+  }
+
+  private static boolean isExcluded(
+      TileEntityCreateShop.LoadedRack loaded, @Nullable BlockPos excluded) {
+    return excluded != null && excluded.equals(loaded.pos());
+  }
+
+  private AbstractTileEntityRack getPositionOfChestWithItemStack(
+      ItemStack stack, @Nullable BlockPos excluded) {
     for (TileEntityCreateShop.LoadedRack loaded : getLoadedRacks()) {
+      if (isExcluded(loaded, excluded)) {
+        continue;
+      }
       AbstractTileEntityRack rack = loaded.rack();
       if (rack.getFreeSlots() <= 0) {
         continue;
@@ -454,8 +483,12 @@ class ShopRackAccess {
     return null;
   }
 
-  private AbstractTileEntityRack getPositionOfChestWithSimilarItemStack(ItemStack stack) {
+  private AbstractTileEntityRack getPositionOfChestWithSimilarItemStack(
+      ItemStack stack, @Nullable BlockPos excluded) {
     for (TileEntityCreateShop.LoadedRack loaded : getLoadedRacks()) {
+      if (isExcluded(loaded, excluded)) {
+        continue;
+      }
       AbstractTileEntityRack rack = loaded.rack();
       if (rack.getFreeSlots() <= 0) {
         continue;
@@ -467,10 +500,13 @@ class ShopRackAccess {
     return null;
   }
 
-  private AbstractTileEntityRack searchMostEmptyRack() {
+  private AbstractTileEntityRack searchMostEmptyRack(@Nullable BlockPos excluded) {
     int bestFree = 0;
     AbstractTileEntityRack bestRack = null;
     for (TileEntityCreateShop.LoadedRack loaded : getLoadedRacks()) {
+      if (isExcluded(loaded, excluded)) {
+        continue;
+      }
       AbstractTileEntityRack rack = loaded.rack();
       if (rack.isEmpty()) {
         return rack;

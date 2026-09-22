@@ -71,6 +71,7 @@
   "com.thesettler_x_create.message.createshop.flow_timeout": "[Create Shop Flow] %s request timed out and was reset: %s x%d",
   "com.thesettler_x_create.interaction.createshop.missing_output_address.id": "createshop_missing_output_address",
   "com.thesettler_x_create.interaction.createshop.missing_output_address": "The output block has no package address configured. Items will not be exported until an address is set in the Address tab.",
+  "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry_pickup_off": "Create Shop is out of free rack space for %s. %s of %s item(s) are blocked. This hut's pickup priority is set to zero, so no courier is coming. Raise it so the surplus can leave.",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.inquiry": "Create Shop is out of free rack space for %s. %s of %s item(s) are blocked. Upgrade the hut to add racks or assign more couriers to clear deliveries.",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.id": "createshop_capacity_stall",
   "com.thesettler_x_create.interaction.createshop.capacity_stall.response_upgrade": "I will expand racks",

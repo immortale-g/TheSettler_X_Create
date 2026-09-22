@@ -10,6 +10,7 @@ import com.minecolonies.api.util.Tuple;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkPerfLogger;
+import com.thesettler_x_create.create.CreatePackagerBridge;
 import com.thesettler_x_create.init.ModBlockEntities;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.stock.ShopStockAccounting;
@@ -213,8 +214,8 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       observedHut =
           new ObservedHutItemHandler(
               combined,
-              new ObservedHutItemHandler.ChangeListener() {
               this::mayColonyFill,
+              new ObservedHutItemHandler.ChangeListener() {
                 @Override
                 public void taken(int slot, ItemStack taken) {
                   onHutItemsTaken(slot, taken);
@@ -235,7 +236,6 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     return observedHut;
   }
 
-  private void onHutItemsTaken(int slot, ItemStack taken) {
   /**
    * Whether the colony side may put {@code stack} into this slot of the combined inventory.
    *
@@ -274,6 +274,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     }
   }
 
+  private void onHutItemsTaken(int slot, ItemStack taken) {
     if (level == null
         || level.isClientSide
         || !(getBuilding() instanceof BuildingCreateShop shop)) {
@@ -403,8 +404,97 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
+   * Whether the shopkeeper should carry goods out of an arrival rack right now.
+   *
+   * <p>An arrival rack is one a Create packager unpacks into, and Create unpacks into exactly one
+   * block. That rack is therefore the shop's inbound bottleneck: once it is full, nothing else
+   * arrives however much room the other racks have. Below {@code arrivalRackMinFreeSlots} free
+   * slots the shopkeeper spreads its contents over the shop's other racks.
+   */
+  public boolean hasArrivalRackWork() {
+    return findNextArrivalRackItem() != null;
+  }
+
+  /**
+   * The arrival rack and the stack the shopkeeper should carry out of it next, or null when no
+   * arrival rack is tight or nothing in it fits anywhere else.
+   *
+   * <p>Unlike the move into the hut buffer this ignores reservations. Every count the shop keeps is
+   * over all racks together — a reservation names an item and an amount, never a rack — so a stack
+   * that moves from one rack to another changes no number anyone reads, and the courier gathering a
+   * delivery walks to the hut block and reads all racks through its inventory either way.
+   */
+  @Nullable
+  public Tuple<BlockPos, ItemStack> findNextArrivalRackItem() {
+    int minFree = com.thesettler_x_create.Config.ARRIVAL_RACK_MIN_FREE_SLOTS.get();
+    if (minFree <= 0 || getLevel() == null) {
+      return null;
+    }
+    List<AbstractTileEntityRack> racks = collectRacksForHousekeeping();
+    if (racks.size() < 2) {
+      // With a single rack there is nowhere to spread to.
+      return null;
+    }
+    for (AbstractTileEntityRack rack : racks) {
+      if (rack == null || rack.getFreeSlots() >= minFree) {
+        continue;
+      }
+      if (!CreatePackagerBridge.isPackagerUnpackingInto(getLevel(), rack.getBlockPos())) {
+        continue;
+      }
+      ItemStack movable = findStackAnotherRackCanTake(rack, racks);
+      if (movable != null) {
+        return new Tuple<>(rack.getBlockPos(), movable);
+      }
+    }
+    return null;
+  }
+
+  /** The first stack of {@code source} that any other rack of this shop could still accept. */
+  @Nullable
+  private ItemStack findStackAnotherRackCanTake(
+      AbstractTileEntityRack source, List<AbstractTileEntityRack> racks) {
+    IItemHandler handler = source.getItemHandlerCap();
+    if (handler == null) {
+      handler = source.getInventory();
+    }
+    if (handler == null) {
+      return null;
+    }
+    for (int slot = 0; slot < handler.getSlots(); slot++) {
+      ItemStack inSlot = handler.getStackInSlot(slot);
+      if (inSlot.isEmpty()) {
+        continue;
+      }
+      ItemStack probe = inSlot.copy();
+      probe.setCount(1);
+      for (AbstractTileEntityRack other : racks) {
+        if (other == null || other.getBlockPos().equals(source.getBlockPos())) {
+          continue;
+        }
+        if (ShopRackAccess.canInsertAtLeastOne(other.getItemHandlerCap(), probe)) {
+          return inSlot.copy();
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Puts stacks into this shop's racks, leaving out the one at {@code excluded}, and returns what
+   * did not fit. Used for the carry out of an arrival rack, which must not put the goods straight
+   * back where they came from.
+   */
+  public List<ItemStack> insertIntoOtherRacks(@Nullable BlockPos excluded, List<ItemStack> stacks) {
+    return rackAccess.insertIntoRacksExcept(excluded, stacks);
+  }
+
+  /**
    * Extracts one stack of {@code target} item type from the rack at {@code rackPos}, respecting the
    * remaining unreserved budget. Returns the extracted stack, or empty if nothing could be taken.
+   *
+   * <p>A {@code null} pickup means no budget at all: every stack may go, reserved or not. The carry
+   * out of an arrival rack uses that, because it only moves goods between racks.
    */
   public ItemStack extractFromRack(
       BlockPos rackPos, ItemStack target, @Nullable CreateShopBlockEntity pickup) {
@@ -616,10 +706,10 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   }
 
   /**
-   * Computes how much of the requested inbound stacks can fit right now using a virtual slot
-   * simulation across racks and hut buffer.
+   * Computes how much of the requested inbound stacks can fit right now, simulated over the shop's
+   * racks. The shop orders only this much; what is left over becomes a capacity stall.
    *
-   * <p>This prevents over-ordering when only limited free slots are available for new item types.
+   * <p>Racks only, on purpose: a packager unpacks into a rack, never into the hut buffer.
    */
   public List<ItemStack> planInboundAcceptedStacks(List<ItemStack> requestedStacks) {
     return rackAccess.planInboundAcceptedStacks(requestedStacks);
@@ -683,7 +773,13 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (stockAging.update(unreserved, now)) {
       setChanged();
     }
-    long minAge = com.thesettler_x_create.Config.HOUSEKEEPING_MIN_AGE_TICKS.getAsLong();
+    // A stall means the network could not deliver for want of room. Waiting out the age on top of
+    // that keeps the racks shut for another five minutes over goods nobody asked to keep there,
+    // and the pickup that would take them away only sees what reached the hut buffer.
+    long minAge =
+        hasCapacityStall()
+            ? 0L
+            : com.thesettler_x_create.Config.HOUSEKEEPING_MIN_AGE_TICKS.getAsLong();
     for (RackStackBudget budget : budgets) {
       budget.remaining = Math.min(budget.remaining, stockAging.agedAmount(budget.key, now, minAge));
     }

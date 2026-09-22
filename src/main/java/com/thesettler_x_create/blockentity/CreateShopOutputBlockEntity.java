@@ -123,27 +123,27 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     /**
      * The package the shop has ready for a waiting gauge task, or nothing.
      *
-     * <p>Whatever the racks hold goes out now and the rest follows in a later package, the way
+     * <p>Whatever the shop holds goes out now and the rest follows in a later package, the way
      * Create ships a partly covered order. A gauge order that waited for its last item would hold
      * back goods that are already there, sometimes for as long as the colony takes to craft the
      * remainder.
      *
-     * <p>Served is the first task the racks can cover, not simply the first task. Tasks are queued
+     * <p>Served is the first task the shop can cover, not simply the first task. Tasks are queued
      * in the order the gauges asked, which says nothing about when their goods arrive: an order
      * waiting on a crafter would otherwise stand at the head of the queue and hold back every order
      * behind it, including ones a courier filled minutes ago.
      *
      * <p>Preview and real pull must agree on the amount, or the shop duplicates items: Create reads
      * this slot, ships what it sees, and asks again. Both walk the same queue in the same order and
-     * take what the racks hold, so they pick the same task and the same amount, and the next look
-     * finds the racks empty.
+     * take what the shop holds, so they pick the same task and the same amount, and the next look
+     * finds nothing left.
      */
     private ItemStack assemblePackage(boolean simulate) {
       BuildingCreateShop building = getBuilding();
       if (building == null) return ItemStack.EMPTY;
       GaugePackageSelection.Choice choice =
           GaugePackageSelection.select(
-              building.getGaugeTasks(), OutputItemHandler.this::extractFromRacks, simulate);
+              building.getGaugeTasks(), OutputItemHandler.this::extractFromShop, simulate);
       if (choice == null) return ItemStack.EMPTY;
       BuildingCreateShop.GaugePackagingTask task = choice.task();
       ItemStack extracted = choice.extracted();
@@ -151,7 +151,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
       if (!simulate) {
         int booked = building.deliverPartOfGaugeTask(task.requestId(), extracted.getCount());
         // The task was read a moment ago, so it is there. If it is not, the goods are already out
-        // of the racks and travel anyway; saying nothing is owed is the honest answer then.
+        // of the shop and travel anyway; saying nothing is owed is the honest answer then.
         open = booked < 0 ? 0 : booked;
         // Only the real pull is logged. Create polls the preview for every pending package, so
         // logging that one writes a line per tick, and debug logging is on by default until 1.0.
@@ -170,8 +170,17 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
     }
 
     /**
-     * Pulls up to {@code amount} of {@code key} out of the shop's racks, and as much of it as is
-     * there when that is less.
+     * Pulls up to {@code amount} of {@code key} out of the shop, and as much of it as is there when
+     * that is less.
+     *
+     * <p>The hut buffer comes first, the racks after. Goods the colony sends towards Create land in
+     * the hut buffer since the rack/hut split, because a rack a courier filled is capacity the
+     * stock network cannot deliver into. The racks are still read for two reasons: a world from
+     * before the split has its gauge goods lying in them, and a full hut still makes them the
+     * fallback a courier delivers into.
+     *
+     * <p>Only what really came out of a rack is reported to the rack ledger. The hut buffer is not
+     * part of it, and booking a hut pull there would look like rack stock leaving that never was.
      *
      * <p>Seam-audit finding s1-6 made this all-or-nothing, because the caller had no way to say
      * "part of it": it packaged whatever it got and marked the whole gauge task done, losing the
@@ -179,44 +188,62 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
      * delivery and the rest stays owed. The important part is that the simulated and the real pull
      * return the same amount, since Create ships what the preview shows.
      */
-    private ItemStack extractFromRacks(ItemStack key, int amount, boolean simulate) {
+    private ItemStack extractFromShop(ItemStack key, int amount, boolean simulate) {
       TileEntityCreateShop shop = getShopTile();
       if (shop == null || shop.getBuilding() == null || shop.getLevel() == null) {
         return ItemStack.EMPTY;
       }
-      int remaining = amount;
-      ItemStack extracted = key.copy();
-      extracted.setCount(0);
+      int fromHut = pullFrom(shop.getInventory(), key, amount, simulate);
+      int fromRacks = 0;
 
       for (TileEntityCreateShop.LoadedRack loaded : shop.getLoadedRacks()) {
+        int remaining = amount - fromHut - fromRacks;
         if (remaining <= 0) {
           break;
         }
         AbstractTileEntityRack rack = loaded.rack();
-        IItemHandler handler = rack.getItemHandlerCap();
-        if (handler == null) {
-          continue;
-        }
-        for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
-          ItemStack slotStack = handler.getStackInSlot(slot);
-          if (slotStack.isEmpty() || !ItemStack.isSameItemSameComponents(slotStack, key)) {
-            continue;
-          }
-          ItemStack pulled = handler.extractItem(slot, remaining, simulate);
-          if (!pulled.isEmpty()) {
-            extracted.grow(pulled.getCount());
-            remaining -= pulled.getCount();
-          }
-        }
+        fromRacks += pullFrom(rack.getItemHandlerCap(), key, remaining, simulate);
       }
 
-      if (extracted.isEmpty()) {
+      int total = fromHut + fromRacks;
+      if (total <= 0) {
         return ItemStack.EMPTY;
       }
-      if (!simulate) {
-        shop.noteRackStockChange(extracted, -extracted.getCount());
+      ItemStack extracted = key.copy();
+      extracted.setCount(total);
+      if (!simulate && fromRacks > 0) {
+        ItemStack rackPart = key.copy();
+        rackPart.setCount(fromRacks);
+        shop.noteRackStockChange(rackPart, -fromRacks);
       }
       return extracted;
+    }
+
+    /**
+     * Takes up to {@code remaining} of {@code key} out of one inventory and says how much came.
+     *
+     * <p>{@code simulate} is passed straight down and nothing else depends on it, which is what
+     * keeps the preview and the real pull on the same amount.
+     */
+    private static int pullFrom(
+        @Nullable IItemHandler handler, ItemStack key, int remaining, boolean simulate) {
+      if (handler == null || remaining <= 0) {
+        return 0;
+      }
+      int pulled = 0;
+      for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
+        ItemStack slotStack = handler.getStackInSlot(slot);
+        if (slotStack.isEmpty() || !ItemStack.isSameItemSameComponents(slotStack, key)) {
+          continue;
+        }
+        ItemStack taken = handler.extractItem(slot, remaining, simulate);
+        if (taken.isEmpty()) {
+          continue;
+        }
+        pulled += taken.getCount();
+        remaining -= taken.getCount();
+      }
+      return pulled;
     }
   }
 }

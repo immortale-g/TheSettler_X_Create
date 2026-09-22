@@ -49,7 +49,9 @@ class ShopRackStockChangeGuardTest {
     String virtual =
         Files.readString(Path.of(MAIN + "create/VirtualCreateNetworkItemHandler.java"));
 
-    assertTrue(output.contains("shop.noteRackStockChange(extracted, -extracted.getCount());"));
+    // Since the rack/hut split a package may be part hut buffer and part rack. Only the rack part
+    // belongs in the rack ledger; the hut buffer was never in it.
+    assertTrue(output.contains("shop.noteRackStockChange(rackPart, -fromRacks);"));
     assertTrue(
         virtual.contains("shopBlockEntity.noteRackStockChange(extracted, -extracted.getCount());"));
   }
