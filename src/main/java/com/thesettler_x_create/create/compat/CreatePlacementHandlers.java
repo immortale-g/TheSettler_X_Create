@@ -16,13 +16,7 @@ public final class CreatePlacementHandlers {
 
   public static void register() {
     Map<ResourceLocation, ResourceLocation> compositeBlockRequiredItems =
-        Map.of(
-            create("andesite_encased_shaft"), create("shaft"),
-            create("brass_encased_shaft"), create("shaft"),
-            create("andesite_encased_cogwheel"), create("cogwheel"),
-            create("brass_encased_cogwheel"), create("cogwheel"),
-            create("andesite_encased_large_cogwheel"), create("large_cogwheel"),
-            create("brass_encased_large_cogwheel"), create("large_cogwheel"));
+        compositeBlockRequiredItems();
 
     PlacementHandlers.add(new CompositeBlockItemRemapHandler(compositeBlockRequiredItems));
     PlacementHandlers.add(new CreateBeltPlacementHandler());
@@ -32,6 +26,22 @@ public final class CreatePlacementHandlers {
           "[CreateCompat] registered Structurize placement handlers for {} composite Create blocks + belts",
           compositeBlockRequiredItems.size());
     }
+  }
+
+  /**
+   * The composite casings and the item each one really costs. Package-visible so {@code
+   * CreateBlockIdCompatTest} can hold these ids against the Create jar instead of keeping a second
+   * copy of them: none of these is a compile-time reference, so a rename upstream leaves the
+   * handler registered and silently unable to help the builder.
+   */
+  static Map<ResourceLocation, ResourceLocation> compositeBlockRequiredItems() {
+    return Map.of(
+        create("andesite_encased_shaft"), create("shaft"),
+        create("brass_encased_shaft"), create("shaft"),
+        create("andesite_encased_cogwheel"), create("cogwheel"),
+        create("brass_encased_cogwheel"), create("cogwheel"),
+        create("andesite_encased_large_cogwheel"), create("large_cogwheel"),
+        create("brass_encased_large_cogwheel"), create("large_cogwheel"));
   }
 
   private static ResourceLocation create(String path) {

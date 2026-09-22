@@ -5,14 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.minecolonies.api.colony.requestsystem.data.IRequestSystemDeliveryManJobDataStore;
 import com.minecolonies.api.util.constant.NbtTagConstants;
-import java.io.InputStream;
-import java.util.HashSet;
+import com.thesettler_x_create.CompiledClassFacts;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 
 /**
  * Pins the two things in MineColonies that {@link CourierOngoingDeliveries} rests on, and that a
@@ -38,7 +33,7 @@ class CourierOngoingDeliveriesCompatTest {
 
   @Test
   void theCourierJobStillKnowsItsDataStoreTagByThatName() throws Exception {
-    Set<String> constants = stringConstantsOf(JOB);
+    Set<String> constants = CompiledClassFacts.stringConstantsOf(JOB);
 
     assertTrue(
         constants.contains(NbtTagConstants.TAG_RS_DMANJOB_DATASTORE),
@@ -52,7 +47,7 @@ class CourierOngoingDeliveriesCompatTest {
 
   @Test
   void theCourierStillRecordsWhatItIsFetching() throws Exception {
-    Set<String> calls = methodCallsOf(COURIER_AI);
+    Set<String> calls = CompiledClassFacts.methodCallsOf(COURIER_AI);
 
     assertTrue(
         calls.contains("addConcurrentDelivery"),
@@ -66,55 +61,5 @@ class CourierOngoingDeliveriesCompatTest {
     assertNotNull(
         IRequestSystemDeliveryManJobDataStore.class.getMethod("getOngoingDeliveries"),
         "the courier job data store no longer exposes getOngoingDeliveries()");
-  }
-
-  private static Set<String> stringConstantsOf(String internalName) throws Exception {
-    Set<String> constants = new HashSet<>();
-    visit(
-        internalName,
-        new ClassVisitor(Opcodes.ASM9) {
-          @Override
-          public MethodVisitor visitMethod(
-              int access, String name, String descriptor, String signature, String[] exceptions) {
-            return new MethodVisitor(Opcodes.ASM9) {
-              @Override
-              public void visitLdcInsn(Object value) {
-                if (value instanceof String text) {
-                  constants.add(text);
-                }
-              }
-            };
-          }
-        });
-    return constants;
-  }
-
-  private static Set<String> methodCallsOf(String internalName) throws Exception {
-    Set<String> calls = new HashSet<>();
-    visit(
-        internalName,
-        new ClassVisitor(Opcodes.ASM9) {
-          @Override
-          public MethodVisitor visitMethod(
-              int access, String name, String descriptor, String signature, String[] exceptions) {
-            return new MethodVisitor(Opcodes.ASM9) {
-              @Override
-              public void visitMethodInsn(
-                  int opcode, String owner, String called, String descriptor, boolean isInterface) {
-                calls.add(called);
-              }
-            };
-          }
-        });
-    return calls;
-  }
-
-  private static void visit(String internalName, ClassVisitor visitor) throws Exception {
-    try (InputStream in =
-        CourierOngoingDeliveriesCompatTest.class.getResourceAsStream(
-            "/" + internalName + ".class")) {
-      assertNotNull(in, internalName + " is not on the test classpath");
-      new ClassReader(in).accept(visitor, ClassReader.SKIP_FRAMES);
-    }
   }
 }

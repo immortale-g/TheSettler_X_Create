@@ -61,11 +61,11 @@ import org.jetbrains.annotations.Nullable;
  * change; each Structurize version only ever calls the set its own interface declares.
  */
 public class CreateBeltPlacementHandler implements IPlacementHandler {
-  private static final ResourceLocation BELT_ID =
-      ResourceLocation.fromNamespaceAndPath("create", "belt");
-  private static final ResourceLocation SHAFT_ID =
-      ResourceLocation.fromNamespaceAndPath("create", "shaft");
-  private static final ResourceLocation BELT_CONNECTOR_ID =
+  // Package-visible so CreateBlockIdCompatTest can check them against the Create jar rather than
+  // keeping its own copy; none of the three is a compile-time reference to Create.
+  static final ResourceLocation BELT_ID = ResourceLocation.fromNamespaceAndPath("create", "belt");
+  static final ResourceLocation SHAFT_ID = ResourceLocation.fromNamespaceAndPath("create", "shaft");
+  static final ResourceLocation BELT_CONNECTOR_ID =
       ResourceLocation.fromNamespaceAndPath("create", "belt_connector");
 
   private record BeltSegment(
