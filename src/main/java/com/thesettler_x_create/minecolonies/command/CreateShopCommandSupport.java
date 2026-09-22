@@ -9,6 +9,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.StaleRequestGraphDetector;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 
@@ -116,25 +117,10 @@ final class CreateShopCommandSupport {
   /**
    * Detects the "request graph went stale underneath us" failure mode (a request/resolver was
    * concurrently removed by MineColonies while we were mid-traversal) so callers can clean up and
-   * move on instead of logging it as a real error.
-   *
-   * <p>This used to match on exact substrings of the exception message (e.g. {@code
-   * "hasChildren()"}), but that text is JVM-generated helpful-NPE detail, not a MineColonies
-   * contract - it can change with the JDK or with unrelated MineColonies refactors and silently
-   * stop matching. Instead, match on the exception's type (the two known failure shapes are both
-   * NPE/ISE from dereferencing a request that vanished mid-traversal) and on the exception having
-   * actually originated inside MineColonies' own request-system code, which is what makes it "a
-   * stale request graph" rather than an unrelated failure in our own code.
+   * move on instead of logging it as a real error. The classification itself is shared with the
+   * shop's lost-package cancel path; see {@link StaleRequestGraphDetector}.
    */
   static boolean isStaleRequestGraphException(Exception ex) {
-    if (!(ex instanceof NullPointerException) && !(ex instanceof IllegalStateException)) {
-      return false;
-    }
-    StackTraceElement[] trace = ex.getStackTrace();
-    if (trace == null || trace.length == 0) {
-      return false;
-    }
-    String originClass = trace[0].getClassName();
-    return originClass != null && originClass.startsWith("com.minecolonies.");
+    return StaleRequestGraphDetector.isStaleRequestGraph(ex);
   }
 }

@@ -10,6 +10,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.CreateShopRequestResolver;
 import com.thesettler_x_create.minecolonies.requestsystem.resolver.RequestStateUtil;
+import com.thesettler_x_create.minecolonies.requestsystem.resolver.StaleRequestGraphDetector;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -112,32 +113,38 @@ final class ShopLostPackageRequestCanceller {
     return cancelled;
   }
 
+  /**
+   * A cancel can fail because MineColonies' own graph is already broken - the token points at a
+   * request that is gone, or the building has forgotten which citizen asked for it. Those throws
+   * come out of MineColonies code and leave a token behind that nothing will ever resolve, so we
+   * drop its data instead of logging the same failure every tick. Classification lives in {@link
+   * StaleRequestGraphDetector}; anything else is a real error and is logged as one.
+   */
   private boolean tryForceCleanRequest(
       IStandardRequestManager standard, IToken<?> token, Exception cause) {
     if (standard == null || token == null || cause == null) {
       return false;
     }
-    String message = cause.getMessage();
-    if (message == null || message.isEmpty()) {
-      return false;
-    }
-    String normalized = message.toLowerCase(Locale.ROOT);
-    boolean staleGraph =
-        (normalized.contains("haschildren()") && normalized.contains("request"))
-            || normalized.contains("intvalue()");
-    if (!staleGraph) {
+    if (!StaleRequestGraphDetector.isStaleRequestGraph(cause)) {
       return false;
     }
     try {
       standard.getRequestHandler().cleanRequestData(token);
       if (DebugLog.enabled()) {
         com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package cancel force-clean token={} reason={}", token, message);
+            "[CreateShop] lost-package cancel force-clean token={} reason={}",
+            token,
+            describeFailure(cause));
       }
       return true;
     } catch (Exception ignored) {
       return false;
     }
+  }
+
+  private static String describeFailure(Exception cause) {
+    String message = cause.getMessage();
+    return message == null || message.isEmpty() ? cause.getClass().getSimpleName() : message;
   }
 
   private boolean isLocalResolver(IRequestResolver<?> owner, CreateShopRequestResolver resolver) {

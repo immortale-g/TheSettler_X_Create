@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test;
  * substrings (e.g. {@code "haschildren()"}) - JVM-generated helpful-NPE text, not a MineColonies
  * contract, so it could silently stop matching after an unrelated JDK or MineColonies change. Fixed
  * to classify by exception type (NPE/ISE) plus whether the failure actually originated inside
- * MineColonies' own code (top stack frame in {@code com.minecolonies.}), which is what "stale
- * request graph" actually means and is far more stable than message text.
+ * MineColonies' own code (top stack frame in {@code com.minecolonies.}).
+ *
+ * <p>The classification now lives in {@code StaleRequestGraphDetector}, shared with the shop's
+ * lost-package cancel path, and is covered by its own behaviour test. What stays pinned here is
+ * that the commands do not grow a second, text-based copy of it.
  */
 class CreateShopResetCommandsStaleExceptionGuardTest {
 
@@ -32,9 +35,22 @@ class CreateShopResetCommandsStaleExceptionGuardTest {
     assertFalse(body.contains("toLowerCase"));
     assertFalse(body.contains("haschildren()"));
     assertFalse(body.contains("intvalue()"));
-    assertTrue(body.contains("instanceof NullPointerException"));
-    assertTrue(body.contains("instanceof IllegalStateException"));
-    assertTrue(body.contains("getStackTrace()"));
-    assertTrue(body.contains("startsWith(\"com.minecolonies.\")"));
+    assertTrue(body.contains("StaleRequestGraphDetector.isStaleRequestGraph("));
+  }
+
+  @Test
+  void theSharedDetectorAsksTheStackBeforeTheMessage() throws Exception {
+    String source =
+        Files.readString(
+            Path.of(
+                "src/main/java/com/thesettler_x_create/minecolonies/requestsystem/resolver/StaleRequestGraphDetector.java"));
+
+    assertTrue(source.contains("instanceof NullPointerException"));
+    assertTrue(source.contains("instanceof IllegalStateException"));
+    assertTrue(source.contains("getStackTrace()"));
+    assertTrue(source.contains("startsWith(MINECOLONIES_PACKAGE)"));
+    assertTrue(
+        source.indexOf("getStackTrace()") < source.indexOf("namesKnownStaleGraphMember(failure"),
+        "the message text is the fallback for a stack-trace-less exception, not the first question");
   }
 }
