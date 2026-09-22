@@ -201,7 +201,7 @@ adressiert ankommen.
 
 ### Phase 8: Ingame-Test (3 bis 5 Tage)
 
-Der Teil, der sich nicht planen lässt. Die Tester-Checkliste aus `docs/testing` durchspielen,
+Der Teil, der sich nicht planen lässt. Die Tester-Checkliste durchspielen,
 mit Schwerpunkt auf den Stellen, an denen uns 1.21.1 schon Bugs geliefert hat: Verhalten nach
 Weltneuladen, Inflight-Verfall, doppelte Bestellungen, Courier-Übergabe.
 

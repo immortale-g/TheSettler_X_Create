@@ -47,3 +47,7 @@ FEATURE_STATUS.md
 # python tooling
 __pycache__/
 *.pyc
+
+# Test-Unterlagen (lokal, nicht fuer git)
+docs/testing/
+docs/test_tasks_refactor.md
