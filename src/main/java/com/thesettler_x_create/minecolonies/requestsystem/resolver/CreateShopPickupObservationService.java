@@ -35,7 +35,16 @@ import net.minecraft.world.level.Level;
  * worker) consumes nothing either way.
  */
 final class CreateShopPickupObservationService {
-  private final CourierOngoingDeliveries ongoingDeliveries = new CourierOngoingDeliveries();
+  private final CourierOngoingDeliveries ongoingDeliveries;
+
+  CreateShopPickupObservationService() {
+    this(new CourierOngoingDeliveries());
+  }
+
+  /** Lets a test say what MineColonies reports without building a courier's job data store. */
+  CreateShopPickupObservationService(CourierOngoingDeliveries ongoingDeliveries) {
+    this.ongoingDeliveries = ongoingDeliveries;
+  }
 
   void onHutItemsTaken(
       CreateShopRequestResolver resolver,
