@@ -4,6 +4,7 @@ import com.minecolonies.api.colony.ICitizen;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.util.Tuple;
+import com.minecolonies.core.colony.CitizenData;
 import com.minecolonies.core.colony.interactionhandling.ServerCitizenInteraction;
 import com.thesettler_x_create.DebugLog;
 import java.lang.reflect.Field;
@@ -16,6 +17,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 /** Shopkeeper chat interaction for lost package recovery actions. */
@@ -389,17 +391,20 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
    * player-close callback, not a programmatic removal). If a future MineColonies version adds a
    * public removal API, prefer it over this method; until then there is no non-reflective
    * alternative, so don't "clean this up" without one.
+   *
+   * <p>The field is resolved once per JVM by {@link ChatOptionsField}, which says so out loud if
+   * MineColonies ever takes it away. {@code CitizenChatOptionsCompatTest} asks the same question at
+   * build time.
    */
   private void removeQueuedLostPackageInteractions(ICitizenData citizen, boolean includeSelf) {
     if (citizen == null) {
       return;
     }
-    Field field = findField(citizen.getClass(), "citizenChatOptions");
+    Field field = ChatOptionsField.FIELD;
     if (field == null) {
       return;
     }
     try {
-      field.setAccessible(true);
       Object raw = field.get(citizen);
       if (!(raw instanceof Map<?, ?> rawMap)) {
         return;
@@ -427,16 +432,49 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
     }
   }
 
-  private static Field findField(Class<?> type, String name) {
-    Class<?> current = type;
-    while (current != null) {
+  /**
+   * Resolves {@code CitizenData.citizenChatOptions} once per JVM. A failure is a real loss of
+   * function - stale lost-package dialogs then pile up on the shopkeeper - so it is logged as a
+   * warning with the MineColonies version, not hidden behind {@link DebugLog}, which is off in a
+   * release build.
+   */
+  private static final class ChatOptionsField {
+    @Nullable private static final Field FIELD = resolve();
+
+    private ChatOptionsField() {}
+
+    @Nullable
+    private static Field resolve() {
       try {
-        return current.getDeclaredField(name);
-      } catch (NoSuchFieldException ignored) {
-        current = current.getSuperclass();
+        Field field = CitizenData.class.getDeclaredField("citizenChatOptions");
+        field.setAccessible(true);
+        return field;
+      } catch (NoSuchFieldException | RuntimeException | LinkageError ex) {
+        com.thesettler_x_create.TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] MineColonies {} no longer exposes CitizenData.citizenChatOptions ({})."
+                + " Stale lost-package dialogs can no longer be removed from a shopkeeper and will"
+                + " stay in the citizen's chat until a player answers them. This build of"
+                + " TheSettler_x_Create needs an update for this MineColonies version.",
+            minecoloniesVersion(),
+            ex.toString());
+        return null;
       }
     }
-    return null;
+
+    private static String minecoloniesVersion() {
+      try {
+        ModList mods = ModList.get();
+        if (mods == null) {
+          return "<unknown version>";
+        }
+        return mods.getModContainerById("minecolonies")
+            .map(container -> container.getModInfo().getVersion().toString())
+            .orElse("<unknown version>");
+      } catch (RuntimeException | LinkageError noModLoader) {
+        // Unit tests run without FML.
+        return "<unknown version>";
+      }
+    }
   }
 
   private boolean isSameLostPackageInteraction(

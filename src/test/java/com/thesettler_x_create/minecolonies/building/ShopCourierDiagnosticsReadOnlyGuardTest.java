@@ -39,9 +39,10 @@ class ShopCourierDiagnosticsReadOnlyGuardTest {
   }
 
   @Test
-  void diagnosticDumpingReflectionIsKept() throws Exception {
+  void aCourierQueueIsReadThroughTheQueueItself() throws Exception {
     String source = Files.readString(SOURCE);
-    // tryInvoke reflects into heterogeneous citizen/job types for display only.
-    assertTrue(source.contains("private Object tryInvoke(Object target, String methodName)"));
+    // The replacement for the three dead getCurrentRequest* reflection calls. getTaskQueue() is
+    // the same task without getCurrentTask()'s side effect of pulling warehouse work.
+    assertTrue(source.contains("courier.getTaskQueue()"));
   }
 }

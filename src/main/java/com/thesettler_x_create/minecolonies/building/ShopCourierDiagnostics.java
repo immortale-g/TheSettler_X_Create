@@ -2,15 +2,16 @@ package com.thesettler_x_create.minecolonies.building;
 
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.jobs.IJob;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
+import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import net.minecraft.world.level.Level;
 
 /**
@@ -21,9 +22,6 @@ import net.minecraft.world.level.Level;
  * and changed colony state only when debug logging was on.
  */
 final class ShopCourierDiagnostics {
-  private static final Set<String> REFLECTION_WARNED =
-      java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-
   private final BuildingCreateShop shop;
   private long lastCourierDebugTime;
   private long lastCourierEntityDebugTime;
@@ -78,19 +76,12 @@ final class ShopCourierDiagnostics {
           var resolver = standardManager.getResolverHandler().getResolver(resolverToken);
           if (!(resolver
               instanceof
-              com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver)) {
+              com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver
+              deliveryResolver)) {
             continue;
           }
-          String info = "<unknown>";
-          try {
-            var getLocation = resolver.getClass().getMethod("getLocation");
-            Object location = getLocation.invoke(resolver);
-            if (location != null) {
-              info = location.toString();
-            }
-          } catch (Exception ignored) {
-            // Ignore.
-          }
+          var location = deliveryResolver.getLocation();
+          String info = location == null ? "<unknown>" : location.toString();
           var assignedRequests = assignments == null ? null : assignments.get(resolverToken);
           int assignedCount = assignedRequests == null ? 0 : assignedRequests.size();
           debugLines.add(
@@ -137,29 +128,8 @@ final class ShopCourierDiagnostics {
       String name = citizen.getName() == null ? "<unknown>" : citizen.getName();
       var job = citizen.getJob();
       String jobName = job == null ? "<none>" : job.getClass().getName();
-      String jobState = "<unknown>";
+      String jobState = describeJobState(citizen, job);
       String citizenPos = describeCitizenPosition(citizen);
-      if (job != null) {
-        try {
-          var method = job.getClass().getMethod("getState");
-          Object state = method.invoke(job);
-          jobState = state == null ? "<null>" : state.toString();
-        } catch (Exception ignored) {
-          // Fallback below.
-        }
-        if ("<unknown>".equals(jobState)) {
-          try {
-            var method = job.getClass().getMethod("isWorking");
-            Object state = method.invoke(job);
-            jobState = state == null ? "<null>" : "isWorking=" + state;
-          } catch (Exception ignored) {
-            // Ignore.
-          }
-        }
-        jobState = appendJobDetail(job, jobState, "getCurrentRequest");
-        jobState = appendJobDetail(job, jobState, "getCurrentRequestToken");
-        jobState = appendJobDetail(job, jobState, "getRequestToken");
-      }
       debugLines.add(
           "citizen=" + name + " job=" + jobName + " state=" + jobState + " pos=" + citizenPos);
       if ("<entity-null>".equals(citizenPos) && shouldLogCourierEntity(level)) {
@@ -179,7 +149,7 @@ final class ShopCourierDiagnostics {
   }
 
   void logAccessCheck(ICitizenData citizen, boolean result) {
-    int key = citizen == null ? -1 : safeCitizenId(citizen);
+    int key = citizen == null ? -1 : citizen.getId();
     Boolean last = lastAccessResult.get(key);
     if (last != null && last == result) {
       return;
@@ -232,11 +202,10 @@ final class ShopCourierDiagnostics {
     }
     java.util.List<String> entries = new java.util.ArrayList<>();
     for (var citizen : colony.getCitizenManager().getCitizens()) {
-      String job = citizen.getJob() == null ? "<none>" : citizen.getJob().getClass().getName();
-      if (!job.contains("Deliveryman")) {
+      if (!(citizen.getJob() instanceof JobDeliveryman)) {
         continue;
       }
-      Object workBuilding = tryInvoke(citizen, "getWorkBuilding");
+      var workBuilding = citizen.getWorkBuilding();
       String workPos = workBuilding == null ? "<null>" : String.valueOf(workBuilding);
       boolean isWarehouse = warehousePos.contains(workPos);
       entries.add(
@@ -258,8 +227,8 @@ final class ShopCourierDiagnostics {
     if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
       return;
     }
-    Object uuidValue = tryInvoke(citizen, "getUUID");
-    if (!(uuidValue instanceof java.util.UUID uuid)) {
+    java.util.UUID uuid = citizen.getUUID();
+    if (uuid == null) {
       return;
     }
     var entity = serverLevel.getEntity(uuid);
@@ -283,18 +252,14 @@ final class ShopCourierDiagnostics {
       return "<null-citizen>";
     }
     String name = citizen.getName() == null ? "<unknown>" : citizen.getName();
-    Object idValue = tryInvoke(citizen, "getId");
-    Object entityIdValue = tryInvoke(citizen, "getEntityId");
-    Object uuidValue = tryInvoke(citizen, "getUUID");
+    java.util.UUID uuid = citizen.getUUID();
     String jobName = citizen.getJob() == null ? "<none>" : citizen.getJob().getClass().getName();
     return "name="
         + name
         + " id="
-        + (idValue == null ? "<null>" : idValue)
-        + " entityId="
-        + (entityIdValue == null ? "<null>" : entityIdValue)
+        + citizen.getId()
         + " uuid="
-        + (uuidValue == null ? "<null>" : uuidValue)
+        + (uuid == null ? "<null>" : uuid)
         + " job="
         + jobName;
   }
@@ -303,11 +268,8 @@ final class ShopCourierDiagnostics {
     if (citizen == null) {
       return "<null-citizen>";
     }
-    Object idValue = tryInvoke(citizen, "getId");
-    Object uuidValue = tryInvoke(citizen, "getUUID");
-    String id = idValue == null ? "<null>" : String.valueOf(idValue);
-    String uuid = uuidValue == null ? "<null>" : String.valueOf(uuidValue);
-    return id + ":" + uuid;
+    java.util.UUID uuid = citizen.getUUID();
+    return citizen.getId() + ":" + (uuid == null ? "<null>" : uuid);
   }
 
   private String describeCitizenAssignmentDetail(ICitizenData citizen) {
@@ -320,11 +282,11 @@ final class ShopCourierDiagnostics {
   }
 
   private String describeCitizenWorkBuilding(ICitizenData citizen) {
-    Object workBuilding = tryInvoke(citizen, "getWorkBuilding");
+    var workBuilding = citizen.getWorkBuilding();
     if (workBuilding == null) {
       return "<none>";
     }
-    Object location = tryInvoke(workBuilding, "getLocation");
+    var location = workBuilding.getLocation();
     if (location != null) {
       return workBuilding.getClass().getName() + "@" + location;
     }
@@ -368,12 +330,31 @@ final class ShopCourierDiagnostics {
         changedDump);
   }
 
-  private int safeCitizenId(ICitizenData citizen) {
-    Object idValue = tryInvoke(citizen, "getId");
-    if (idValue instanceof Number number) {
-      return number.intValue();
+  /**
+   * Describes what a citizen's job is doing. Deliberately does not ask the job: MineColonies has no
+   * {@code getState}, {@code isWorking}, {@code getCurrentRequest}, {@code getCurrentRequestToken}
+   * or {@code getRequestToken} on {@link IJob}, so the reflective versions of these lines only ever
+   * printed {@code <unknown>}. {@code isWorking()} lives on the citizen, and a courier's queue is
+   * read through {@link JobDeliveryman#getTaskQueue()} - never {@code getCurrentTask()}, which
+   * assigns warehouse work as a side effect.
+   */
+  private String describeJobState(ICitizenData citizen, IJob<?> job) {
+    if (job == null) {
+      return "<none>";
     }
-    return -1;
+    StringBuilder state = new StringBuilder("isWorking=").append(citizen.isWorking());
+    if (job instanceof JobDeliveryman courier) {
+      var queue = courier.getTaskQueue();
+      if (queue == null) {
+        state.append(" taskQueue=<null>");
+      } else {
+        state.append(" taskQueue=").append(queue.size());
+        if (!queue.isEmpty()) {
+          state.append(" firstTask=").append(queue.get(0));
+        }
+      }
+    }
+    return state.toString();
   }
 
   private boolean shouldLogCourierEntity(Level level) {
@@ -390,22 +371,9 @@ final class ShopCourierDiagnostics {
     if (citizen == null || level == null) {
       return;
     }
-    Object idValue = tryInvoke(citizen, "getId");
-    Object entityIdValue = tryInvoke(citizen, "getEntityId");
-    Object uuidValue = tryInvoke(citizen, "getUUID");
-    int entityId = -1;
-    if (entityIdValue instanceof Number number) {
-      entityId = number.intValue();
-    }
-    String entityLookup = "<unknown>";
-    if (entityId >= 0 && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-      var entity = serverLevel.getEntity(entityId);
-      entityLookup = entity == null ? "<missing>" : entity.getClass().getName();
-    }
-    String uuidInfo = uuidValue == null ? "<null>" : uuidValue.toString();
+    java.util.UUID uuid = citizen.getUUID();
     String uuidLookup = "<n/a>";
-    if (uuidValue instanceof java.util.UUID uuid
-        && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+    if (uuid != null && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
       var entity = serverLevel.getEntity(uuid);
       if (entity != null) {
         uuidLookup =
@@ -420,13 +388,9 @@ final class ShopCourierDiagnostics {
     }
     String dump =
         "id="
-            + (idValue == null ? "<null>" : idValue)
-            + " entityId="
-            + (entityId >= 0 ? entityId : "<null>")
+            + citizen.getId()
             + " uuid="
-            + uuidInfo
-            + " idLookup="
-            + entityLookup
+            + (uuid == null ? "<null>" : uuid)
             + " uuidLookup="
             + uuidLookup;
     if (!dump.equals(lastCourierEntityDump)) {
@@ -447,59 +411,6 @@ final class ShopCourierDiagnostics {
       var dim = mcEntity.level().dimension();
       return "pos=" + pos + " dim=" + dim.location();
     }
-    try {
-      var method = citizen.getClass().getMethod("getPosition");
-      Object pos = method.invoke(citizen);
-      if (pos != null) {
-        return pos.toString();
-      }
-    } catch (Exception ignored) {
-      // Ignore.
-    }
-    return "<unknown>";
-  }
-
-  private Object tryInvoke(Object target, String methodName) {
-    if (target == null) {
-      return null;
-    }
-    try {
-      var method = target.getClass().getMethod(methodName);
-      return method.invoke(target);
-    } catch (Exception ex) {
-      logReflectionFailure(target, methodName, ex);
-      return null;
-    }
-  }
-
-  private void logReflectionFailure(Object target, String methodName, Exception ex) {
-    if (!DebugLog.enabled() || target == null) {
-      return;
-    }
-    String key =
-        target.getClass().getName() + "#" + methodName + ":" + ex.getClass().getSimpleName();
-    if (!REFLECTION_WARNED.add(key)) {
-      return;
-    }
-    TheSettlerXCreate.LOGGER.info(
-        "[CreateShop] reflection call failed {} err={}",
-        key,
-        ex.getMessage() == null ? "<null>" : ex.getMessage());
-  }
-
-  private String appendJobDetail(Object job, String base, String methodName) {
-    if (job == null) {
-      return base;
-    }
-    try {
-      var method = job.getClass().getMethod(methodName);
-      Object value = method.invoke(job);
-      if (value != null) {
-        return base + " " + methodName + "=" + value;
-      }
-    } catch (Exception ignored) {
-      // Ignore.
-    }
-    return base;
+    return "<entity-null>";
   }
 }

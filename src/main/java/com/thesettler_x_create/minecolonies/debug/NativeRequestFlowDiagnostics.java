@@ -1,9 +1,12 @@
 package com.thesettler_x_create.minecolonies.debug;
 
 import com.minecolonies.api.colony.IColony;
+import com.minecolonies.api.colony.requestsystem.location.ILocation;
 import com.minecolonies.api.colony.requestsystem.management.IRequestHandler;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
+import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
+import com.minecolonies.api.colony.requestsystem.requester.IRequester;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.buildings.modules.WarehouseRequestQueueModule;
@@ -100,7 +103,6 @@ public final class NativeRequestFlowDiagnostics {
         }
         String payload = describePayload(req.getRequest());
         String requester = describeRequester(req);
-        String provider = describeProvider(req);
         String childSummary = describeChildren(handler, req);
         requestStates.add(
             token
@@ -116,8 +118,6 @@ public final class NativeRequestFlowDiagnostics {
                 + resolver
                 + ",rq="
                 + requester
-                + ",pv="
-                + provider
                 + ",pl="
                 + payload
                 + ",ch="
@@ -224,28 +224,10 @@ public final class NativeRequestFlowDiagnostics {
     if (request == null || request.getRequester() == null) {
       return "<none>";
     }
-    Object requester = request.getRequester();
+    IRequester requester = request.getRequester();
     String clazz = requester.getClass().getSimpleName();
-    String loc = invokeLocation(requester);
-    return loc == null ? clazz : clazz + "@" + loc;
-  }
-
-  private String describeProvider(IRequest<?> request) {
-    if (request == null) {
-      return "<none>";
-    }
-    Object provider = tryInvoke(request, "getProvider");
-    if (provider == null) {
-      return "<none>";
-    }
-    String clazz = provider.getClass().getSimpleName();
-    String loc = invokeLocation(provider);
-    return loc == null ? clazz : clazz + "@" + loc;
-  }
-
-  private String invokeLocation(Object target) {
-    Object location = tryInvoke(target, "getLocation");
-    return location == null ? null : String.valueOf(location);
+    ILocation location = requester.getLocation();
+    return location == null ? clazz : clazz + "@" + location;
   }
 
   private String describePayload(Object payload) {
@@ -268,36 +250,17 @@ public final class NativeRequestFlowDiagnostics {
           + delivery.getTarget()
           + ")";
     }
-    Object result = tryInvoke(payload, "getResult");
-    Object count = tryInvoke(payload, "getCount");
-    Object min = tryInvoke(payload, "getMinimalCount");
-    if (result != null || count != null || min != null) {
+    if (payload instanceof IDeliverable deliverable) {
       return payload.getClass().getSimpleName()
           + "(result="
-          + shorten(String.valueOf(result))
+          + shorten(String.valueOf(deliverable.getResult()))
           + ",count="
-          + String.valueOf(count)
+          + deliverable.getCount()
           + ",min="
-          + String.valueOf(min)
+          + deliverable.getMinimumCount()
           + ")";
     }
-    Object stack = tryInvoke(payload, "getStack");
-    if (stack != null) {
-      return payload.getClass().getSimpleName() + "(stack=" + shorten(String.valueOf(stack)) + ")";
-    }
     return shorten(payload.toString());
-  }
-
-  private Object tryInvoke(Object target, String methodName) {
-    if (target == null) {
-      return null;
-    }
-    try {
-      var method = target.getClass().getMethod(methodName);
-      return method.invoke(target);
-    } catch (Exception ignored) {
-      return null;
-    }
   }
 
   private String shorten(String input) {

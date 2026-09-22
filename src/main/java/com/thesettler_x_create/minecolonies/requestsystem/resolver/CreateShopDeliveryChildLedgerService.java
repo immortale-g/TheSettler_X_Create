@@ -341,10 +341,8 @@ final class CreateShopDeliveryChildLedgerService {
       if (entityOpt == null || entityOpt.isEmpty()) {
         return false;
       }
-      Object entity = entityOpt.get();
-      var method = entity.getClass().getMethod("getInventoryCitizen");
-      Object invObj = method.invoke(entity);
-      if (!(invObj instanceof IItemHandler inv)) {
+      IItemHandler inv = entityOpt.get().getInventoryCitizen();
+      if (inv == null) {
         return false;
       }
       int found = 0;
@@ -362,6 +360,8 @@ final class CreateShopDeliveryChildLedgerService {
     } catch (Exception ignored) {
       return false;
     }
+  }
+
   /**
    * The three {@code MC_} codes below say a delivery is stuck: the token left the warehouse queue
    * without ever reaching a terminal state, no terminal callback arrived within the timeout, or the
@@ -392,14 +392,12 @@ final class CreateShopDeliveryChildLedgerService {
         entry.diagnosisDetail);
   }
 
-  }
-
   private void logLedger(
       CreateShopRequestResolver resolver,
       CreateShopDeliveryChildLedgerEntry entry,
-    reportProblemDiagnosis(entry);
       long now,
       String source) {
+    reportProblemDiagnosis(entry);
     if (!DebugLog.enabled()) {
       return;
     }

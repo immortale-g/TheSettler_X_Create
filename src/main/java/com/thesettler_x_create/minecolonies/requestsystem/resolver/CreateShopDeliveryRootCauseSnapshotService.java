@@ -4,6 +4,8 @@ import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.deliveryman.Delivery;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
+import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
+import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import java.util.ArrayList;
@@ -47,9 +49,12 @@ final class CreateShopDeliveryRootCauseSnapshotService {
       try {
         Object assignedResolver = manager.getResolverHandler().getResolver(assignedResolverToken);
         assignedResolverClass = resolver.tryDescribeResolver(assignedResolver);
+        // Against the class, not its name: WarehouseConcreteRequestResolver does not contain
+        // "WarehouseRequestResolver" and used to fall through here as assignedResolverDelivery
+        // =false while a warehouse resolver was in fact assigned.
         assignedResolverDelivery =
-            assignedResolverClass.contains("DeliveryRequestResolver")
-                || assignedResolverClass.contains("WarehouseRequestResolver");
+            assignedResolver instanceof DeliveryRequestResolver
+                || assignedResolver instanceof AbstractWarehouseRequestResolver;
       } catch (Exception ignored) {
         assignedResolverClass = "<missing>";
       }
@@ -112,24 +117,12 @@ final class CreateShopDeliveryRootCauseSnapshotService {
                 taskQueue = "<error>";
               }
             }
-            Object id;
-            Object uuid;
-            try {
-              id = citizen.getClass().getMethod("getId").invoke(citizen);
-            } catch (Exception ignored) {
-              id = "<na>";
-            }
-            try {
-              uuid = citizen.getClass().getMethod("getUUID").invoke(citizen);
-            } catch (Exception ignored) {
-              uuid = "<na>";
-            }
             courierInfo.add(
                 name
                     + "{id="
-                    + id
+                    + citizen.getId()
                     + ",uuid="
-                    + uuid
+                    + citizen.getUUID()
                     + ",job="
                     + job
                     + ",deliveryman="
@@ -141,13 +134,7 @@ final class CreateShopDeliveryRootCauseSnapshotService {
                     + "}");
           }
         }
-        String location = "<unknown>";
-        try {
-          Object locObj = warehouse.getClass().getMethod("getLocation").invoke(warehouse);
-          location = String.valueOf(locObj);
-        } catch (Exception ignored) {
-          // Best-effort debug only.
-        }
+        String location = String.valueOf(warehouse.getLocation());
         warehouseDebug.add(
             "warehouse{loc="
                 + location
