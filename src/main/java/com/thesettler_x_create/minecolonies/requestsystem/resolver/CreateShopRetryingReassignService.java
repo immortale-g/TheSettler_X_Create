@@ -6,7 +6,7 @@ import com.minecolonies.api.colony.requestsystem.resolver.retrying.IRetryingRequ
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.DebugLog;
-import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.ProblemLog;
 import java.util.Map;
 import net.minecraft.world.level.Level;
 
@@ -85,13 +85,13 @@ final class CreateShopRetryingReassignService {
               deliveryWindowHold);
           return;
         } catch (Exception ex) {
-          if (DebugLog.enabled()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[CreateShop] retrying reassign failed token={} from={} error={}",
-                requestToken,
-                ownerToken,
-                ex.getMessage() == null ? "<null>" : ex.getMessage());
-          }
+          ProblemLog.once(
+              "reassign-failed:" + requestToken,
+              "could not hand request {} on from resolver {} ({}). It stays with a resolver that"
+                  + " has already given up on it and will not be served.",
+              requestToken,
+              ownerToken,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }
       }
     }

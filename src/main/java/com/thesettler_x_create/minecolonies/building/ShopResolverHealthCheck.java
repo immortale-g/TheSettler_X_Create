@@ -97,11 +97,12 @@ final class ShopResolverHealthCheck {
     try {
       colony.getRequestManager().onProviderAddedToColony(shop);
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] resolver provider repair failed: {}",
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      com.thesettler_x_create.ProblemLog.once(
+          "provider-repair-failed:" + shop.getLocation().getInDimensionLocation(),
+          "could not register the shop at {} with the colony's request system again ({}). Until"
+              + " that works the shop answers no request.",
+          shop.getLocation().getInDimensionLocation(),
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return;
     }
     if (DebugLog.enabled()) {

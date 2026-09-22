@@ -6,6 +6,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 
 /**
@@ -103,9 +104,16 @@ final class CreateShopResolverChain {
       stack.push(child);
       itStack.push(child.getChildren().iterator());
     }
-    if (steps >= resolver.getMaxChainSanitizeNodes() && DebugLog.enabled()) {
-      TheSettlerXCreate.LOGGER.info(
-          "[CreateShop] request chain sanitize aborted after {} steps for {}", steps, rootToken);
+    if (steps >= resolver.getMaxChainSanitizeNodes()) {
+      // The cap exists so a circular graph cannot take the tick with it. Hitting it means the
+      // rest of the chain was never checked, so a stale child can survive down there.
+      ProblemLog.once(
+          "chain-sanitize-capped:" + rootToken,
+          "stopped walking the request chain below {} after {} steps. The chain is either circular"
+              + " or larger than the mod checks, and stale deliveries further down are not cleaned"
+              + " up.",
+          rootToken,
+          steps);
     }
   }
 

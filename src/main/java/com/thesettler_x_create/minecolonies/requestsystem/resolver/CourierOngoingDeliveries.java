@@ -7,8 +7,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.util.constant.NbtTagConstants;
 import com.minecolonies.api.util.constant.TypeConstants;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
-import com.thesettler_x_create.DebugLog;
-import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.ProblemLog;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -105,21 +104,24 @@ final class CourierOngoingDeliveries {
       HolderLookup.Provider provider = colony.getWorld().registryAccess();
       CompoundTag nbt = job.serializeNBT(provider);
       if (nbt == null || !nbt.contains(NbtTagConstants.TAG_RS_DMANJOB_DATASTORE)) {
-        if (DebugLog.enabled()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] courier job has no {} tag; pickups book on arrival instead",
-              NbtTagConstants.TAG_RS_DMANJOB_DATASTORE);
-        }
+        ProblemLog.once(
+            "courier-store-tag-missing",
+            "a courier job carries no {} tag, so the shop cannot tell which delivery an item"
+                + " leaving it belongs to and books pickups on arrival instead. Reservations can"
+                + " then be consumed for the wrong order. This usually means MineColonies changed"
+                + " that tag.",
+            NbtTagConstants.TAG_RS_DMANJOB_DATASTORE);
         return null;
       }
       return StandardFactoryController.getInstance()
           .deserializeTag(provider, nbt.getCompound(NbtTagConstants.TAG_RS_DMANJOB_DATASTORE));
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] could not read the courier's data store token: {}",
-            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-      }
+      ProblemLog.once(
+          "courier-store-unreadable:" + ex.getClass().getName(),
+          "could not read a courier's delivery data store ({}), so the shop books pickups on"
+              + " arrival instead of on collection. Reservations can be consumed for the wrong"
+              + " order.",
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return null;
     }
   }

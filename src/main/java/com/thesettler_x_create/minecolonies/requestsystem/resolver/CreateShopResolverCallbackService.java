@@ -7,6 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -128,13 +129,13 @@ final class CreateShopResolverCallbackService {
     try {
       manager.updateRequestState(request.getId(), RequestState.RESOLVED);
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] finish parent={} source={} failed: {}",
-            request.getId(),
-            source,
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      ProblemLog.once(
+          "finish-parent-failed:" + request.getId(),
+          "could not close request {} after its goods were delivered (source={}, {}). The"
+              + " requester keeps waiting for something it already has.",
+          request.getId(),
+          source,
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return false;
     }
     resolver.transitionFlow(

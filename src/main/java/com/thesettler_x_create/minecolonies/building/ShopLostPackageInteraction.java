@@ -419,12 +419,11 @@ public class ShopLostPackageInteraction extends ServerCitizenInteraction {
             removed);
       }
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] lost-package interaction immediate-remove failed debugId={} err={}",
-            debugInstanceId,
-            ex.getClass().getSimpleName());
-      }
+      com.thesettler_x_create.ProblemLog.once(
+          "lost-package-dialog-remove-failed:" + ex.getClass().getName(),
+          "could not remove stale lost-package dialogs from a shopkeeper ({}). Dialogs about"
+              + " packages that are no longer missing stay in its chat.",
+          ex.toString());
     }
   }
 

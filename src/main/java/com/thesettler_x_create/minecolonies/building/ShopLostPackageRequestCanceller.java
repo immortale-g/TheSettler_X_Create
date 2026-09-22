@@ -84,12 +84,12 @@ final class ShopLostPackageRequestCanceller {
           cancelled++;
           continue;
         }
-        if (DebugLog.enabled()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package cancel request failed token={} error={}",
-              token,
-              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        }
+        com.thesettler_x_create.ProblemLog.once(
+            "lost-package-cancel-failed:" + token,
+            "could not cancel request {} for a lost package ({}). The shopkeeper will keep asking"
+                + " about it.",
+            token,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       }
     }
     if (cancelled == 0 && tupleScoped && fallbackTupleCandidate != null) {
@@ -102,12 +102,12 @@ final class ShopLostPackageRequestCanceller {
               (IToken<?>) fallbackTupleCandidate.getId());
         }
       } catch (Exception ex) {
-        if (DebugLog.enabled()) {
-          com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-              "[CreateShop] lost-package cancel fallback failed token={} error={}",
-              fallbackTupleCandidate.getId(),
-              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        }
+        com.thesettler_x_create.ProblemLog.once(
+            "lost-package-cancel-fallback-failed:" + fallbackTupleCandidate.getId(),
+            "could not cancel request {} for a lost package, on the fallback path either ({}). The"
+                + " shopkeeper will keep asking about it.",
+            (IToken<?>) fallbackTupleCandidate.getId(),
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       }
     }
     return cancelled;

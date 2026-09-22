@@ -8,6 +8,7 @@ import com.minecolonies.core.colony.buildings.modules.BuildingModules;
 import com.minecolonies.core.colony.jobs.JobDeliveryman;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -361,11 +362,42 @@ final class CreateShopDeliveryChildLedgerService {
     } catch (Exception ignored) {
       return false;
     }
+  /**
+   * The three {@code MC_} codes below say a delivery is stuck: the token left the warehouse queue
+   * without ever reaching a terminal state, no terminal callback arrived within the timeout, or the
+   * request handler lost the token outright. For the player that is an order whose goods are
+   * reserved and never arrive, so it is reported whatever debug logging says. The full ledger line
+   * stays a debug trace.
+   */
+  private void reportProblemDiagnosis(CreateShopDeliveryChildLedgerEntry entry) {
+    String consequence =
+        switch (entry.diagnosisCode) {
+          case "MC_QUEUE_DEQUEUED_WITHOUT_TERMINAL" -> "the delivery left the warehouse queue but never finished, and no courier holds it";
+          case "MC_NO_TERMINAL_CALLBACK" -> "the delivery has been in progress past the timeout without MineColonies reporting it"
+              + " finished or cancelled";
+          case "MC_HANDLER_LOST_TOKEN" -> "MineColonies no longer knows this delivery, so nothing will report it finished";
+          default -> null;
+        };
+    if (consequence == null) {
+      return;
+    }
+    ProblemLog.once(
+        entry.diagnosisCode + ":" + entry.childToken,
+        "{} for parent={} child={}: {}. The goods stay reserved for it and the order waits."
+            + " Details: {}",
+        entry.diagnosisCode,
+        entry.parentToken,
+        entry.childToken,
+        consequence,
+        entry.diagnosisDetail);
+  }
+
   }
 
   private void logLedger(
       CreateShopRequestResolver resolver,
       CreateShopDeliveryChildLedgerEntry entry,
+    reportProblemDiagnosis(entry);
       long now,
       String source) {
     if (!DebugLog.enabled()) {

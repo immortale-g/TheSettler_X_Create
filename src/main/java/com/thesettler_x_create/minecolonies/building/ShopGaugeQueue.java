@@ -9,6 +9,7 @@ import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.thesettler_x_create.Config;
 import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop.GaugePackagingTask;
 import java.nio.charset.StandardCharsets;
@@ -227,12 +228,12 @@ final class ShopGaugeQueue {
         standard.updateRequestState(token, RequestState.CANCELLED);
         cancelled++;
       } catch (Exception ex) {
-        if (DebugLog.enabled()) {
-          TheSettlerXCreate.LOGGER.info(
-              "[ColonyGauge] cancelPendingGaugeRequests failed token={} error={}",
-              token,
-              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-        }
+        ProblemLog.once(
+            "gauge-cancel-failed:" + token,
+            "could not cancel the colony request {} behind a gauge order that is gone ({}). The"
+                + " request stays in the colony's list and may still be delivered.",
+            token,
+            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       }
       pendingGaugeRequests.remove(token);
     }
@@ -558,12 +559,14 @@ final class ShopGaugeQueue {
                 token, new GaugePackagingTask(item, amount, address, requestId));
           }
         } catch (Exception ex) {
-          if (DebugLog.enabled()) {
-            TheSettlerXCreate.LOGGER.info(
-                "[ColonyGauge] failed to restore pendingGaugeRequests entry {}: {}",
-                i,
-                ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-          }
+          // The task is gone for good once this throws: it was in the save file and is not in
+          // memory now, so the gauge waits for goods nobody is fetching any more.
+          ProblemLog.once(
+              "gauge-task-restore-failed:" + i,
+              "could not restore queued gauge task {} from the save ({}). That gauge order is lost;"
+                  + " set the gauge again to re-place it.",
+              i,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }
       }
     }

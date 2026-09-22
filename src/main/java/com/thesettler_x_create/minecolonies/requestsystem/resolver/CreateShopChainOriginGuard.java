@@ -7,8 +7,7 @@ import com.minecolonies.api.colony.requestsystem.requestable.IConcreteDeliverabl
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
-import com.thesettler_x_create.DebugLog;
-import com.thesettler_x_create.TheSettlerXCreate;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -49,11 +48,11 @@ final class CreateShopChainOriginGuard {
       // canResolveRequest, and a getter that throws on half torn-down state would take the tick
       // with it. Declining is the same answer the depth cap gives when the chain cannot be read,
       // for the same reason: losing a sale is cheaper than a circle.
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] chain-origin guard could not read the chain, staying out: {}",
-            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-      }
+      ProblemLog.once(
+          "chain-origin-unreadable:" + ex.getClass().getName(),
+          "could not read a request's chain ({}), so the shop declined the request to rule out a"
+              + " loop. Requests the shop could serve are being passed over.",
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return true;
     }
   }

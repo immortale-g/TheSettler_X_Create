@@ -8,7 +8,10 @@ public class Config {
 
   public static final ModConfigSpec.BooleanValue DEBUG_LOGGING =
       BUILDER
-          .comment("Enable extra debug logging for TheSettler_x_Create")
+          .comment(
+              "Enable extra debug logging for TheSettler_x_Create.",
+              "This is the flow trace only. Problems the mod could not handle are logged as",
+              "warnings tagged [CreateShop][problem] whether this is on or off.")
           .define("debugLogging", true);
 
   public static final ModConfigSpec.IntValue GAUGE_MIN_BUILDING_LEVEL =
@@ -26,9 +29,6 @@ public class Config {
           .comment("Cooldown (ticks) between rack-full warning messages.")
           .defineInRange("rackFullWarningCooldown", 6000L, 20L, 24000L);
 
-  public static final ModConfigSpec.LongValue HOUSEKEEPING_MIN_AGE_TICKS =
-      BUILDER
-          .comment(
   public static final ModConfigSpec.IntValue ARRIVAL_RACK_MIN_FREE_SLOTS =
       BUILDER
           .comment(
@@ -38,6 +38,9 @@ public class Config {
               "network. Below this many free slots the shopkeeper carries goods from it into the",
               "shop's other racks. 0 turns it off.")
           .defineInRange("arrivalRackMinFreeSlots", 5, 0, 27);
+  public static final ModConfigSpec.LongValue HOUSEKEEPING_MIN_AGE_TICKS =
+      BUILDER
+          .comment(
               "Ticks unreserved stock must sit in the Create Shop racks before the shopkeeper",
               "moves it to the hut for a warehouse pickup.")
           .defineInRange("housekeepingMinAgeTicks", 20L * 60L * 5L, 0L, 72000L);
@@ -158,8 +161,10 @@ public class Config {
     } catch (Exception ex) {
       // A config that cannot be read or written is not worth failing startup over; the new setting
       // keeps its default, which is what would have happened without this.
-      TheSettlerXCreate.LOGGER.info(
-          "[Config] could not carry over {}: {}",
+      ProblemLog.once(
+          "config-carry-over:" + FORMER_GAUGE_LEVEL_KEY,
+          "could not carry {} over to gaugeMinBuildingLevel ({}). If you set that value by hand it"
+              + " is being ignored and the default applies; set gaugeMinBuildingLevel instead.",
           FORMER_GAUGE_LEVEL_KEY,
           ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
     }

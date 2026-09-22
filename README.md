@@ -28,6 +28,18 @@ order, delivery and package. It is what makes a bug report usable, so please lea
 intend to report anything. Turn it off in `config/thesettler_x_create-common.toml` with
 `debugLogging = false` once you are done validating.
 
+Turning it off does not hide problems. Anything the mod could not handle - an order whose delivery
+never finishes, a gauge task lost on world load, a config value it could not read - is written as a
+warning either way, tagged `[CreateShop][problem]`. If something is not working, search the log for
+that tag first:
+
+```
+grep "\[CreateShop\]\[problem\]" logs/latest.log
+```
+
+Each of those lines says what broke and what you will notice in game, so it is worth pasting into
+an issue even without the full trace.
+
 Release notes for each version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Requirements

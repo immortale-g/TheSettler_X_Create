@@ -308,9 +308,14 @@ public class BuildingCreateShop extends AbstractBuilding {
     resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
     if (colony != null) {
       CreateShopRequestResolver resolver = resolverHealthCheck.resolveTickResolver(colony);
-      if (DebugLog.enabled() && resolver == null) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] tick: resolver missing for shop {}",
+      if (resolver == null) {
+        // Not a trace: without a resolver the shop answers no request at all, which reads as a
+        // shop that simply does nothing.
+        com.thesettler_x_create.ProblemLog.once(
+            "resolver-missing:" + getLocation().getInDimensionLocation(),
+            "the shop at {} has no request resolver, so it cannot serve any request. Breaking and"
+                + " replacing the hut block, or /thesettlerxcreate reset_live_state, re-registers"
+                + " it.",
             getLocation().getInDimensionLocation());
       }
       // Arrivals first: goods that came in are reserved for their request before anyone plans.
@@ -489,11 +494,6 @@ public class BuildingCreateShop extends AbstractBuilding {
   }
 
   /**
-   * Attempts to request {@code amount} of {@code item} for a Gauge, clamped to what the Colony
-   * Warehouse actually holds (partial deliveries are allowed). Returns the amount actually
-   * requested, or 0 if no request was created — the caller must use this returned amount (not the
-   * requested {@code amount}) for "promised" UI display, since it can be smaller.
-  /**
    * Whether the shopkeeper has any rack carrying to do: clearing an arrival rack, or moving
    * unreserved stock into the hut buffer.
    *
@@ -512,6 +512,11 @@ public class BuildingCreateShop extends AbstractBuilding {
     return tile.hasArrivalRackWork() || (isHousekeepingAllowed() && hasIncomingRackWork());
   }
 
+  /**
+   * Attempts to request {@code amount} of {@code item} for a Gauge, clamped to what the Colony
+   * Warehouse actually holds (partial deliveries are allowed). Returns the amount actually
+   * requested, or 0 if no request was created — the caller must use this returned amount (not the
+   * requested {@code amount}) for "promised" UI display, since it can be smaller.
    */
   public int requestForGauge(ItemStack item, int amount, String gaugeAddress) {
     return gaugeQueue.requestForGauge(item, amount, gaugeAddress);
@@ -1080,14 +1085,14 @@ public class BuildingCreateShop extends AbstractBuilding {
                 : "assign");
       }
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] pickup request repair failed token={} state={} resolver={} error={}",
-            token,
-            state,
-            resolver == null ? "<null>" : resolver.getClass().getSimpleName(),
-            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-      }
+      com.thesettler_x_create.ProblemLog.once(
+          "pickup-repair-failed:" + token,
+          "could not repair the warehouse pickup request {} (state={}, resolver={}): {}. The shop"
+              + " keeps goods a courier was meant to collect.",
+          token,
+          state,
+          resolver == null ? "<null>" : resolver.getClass().getSimpleName(),
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
     }
   }
 

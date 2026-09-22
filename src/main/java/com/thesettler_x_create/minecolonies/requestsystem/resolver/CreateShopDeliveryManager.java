@@ -19,6 +19,7 @@ import com.minecolonies.core.colony.requestsystem.management.IStandardRequestMan
 import com.minecolonies.core.colony.requestsystem.resolvers.DeliveryRequestResolver;
 import com.minecolonies.core.colony.requestsystem.resolvers.core.AbstractWarehouseRequestResolver;
 import com.thesettler_x_create.DebugLog;
+import com.thesettler_x_create.ProblemLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
@@ -143,13 +144,12 @@ final class CreateShopDeliveryManager {
     try {
       token = manager.createRequest(deliveryRequester, delivery);
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery create failed requester={} parentRequester={} error={}",
-            deliveryRequester == null ? "<null>" : deliveryRequester.getClass().getName(),
-            requester == null ? "<null>" : requester.getClass().getName(),
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      ProblemLog.once(
+          "delivery-create-failed:" + request.getId(),
+          "MineColonies refused to create the delivery for request {} ({}). The goods stay"
+              + " reserved in the shop and no courier is sent for them.",
+          request.getId(),
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return null;
     }
     try {
@@ -194,13 +194,13 @@ final class CreateShopDeliveryManager {
       } catch (Exception ignored) {
         // Best-effort rollback only.
       }
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery link failed parent={} child={} error={}",
-            request.getId(),
-            token,
-            ex.getMessage() == null ? "<null>" : ex.getMessage());
-      }
+      ProblemLog.once(
+          "delivery-link-failed:" + request.getId(),
+          "could not attach delivery {} to request {} ({}); the delivery was cancelled again and"
+              + " the order waits with its goods reserved.",
+          token,
+          request.getId(),
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return null;
     }
     request.addDelivery(selected.copy());
@@ -306,12 +306,12 @@ final class CreateShopDeliveryManager {
       manager.assignRequest(token);
       return true;
     } catch (Exception ex) {
-      if (DebugLog.enabled()) {
-        TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] delivery assign immediate token={} result=failed error={}",
-            token,
-            ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
-      }
+      ProblemLog.once(
+          "delivery-assign-failed:" + token,
+          "could not hand delivery {} to a courier ({}). Without a courier the goods stay in the"
+              + " shop; check that the colony has a warehouse with couriers assigned.",
+          token,
+          ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
       return false;
     }
   }
