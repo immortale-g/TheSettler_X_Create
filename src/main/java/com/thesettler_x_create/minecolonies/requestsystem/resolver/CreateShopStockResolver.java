@@ -1,7 +1,6 @@
 package com.thesettler_x_create.minecolonies.requestsystem.resolver;
 
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
-import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.create.CreateNetworkFacade;
 import com.thesettler_x_create.create.ICreateNetworkFacade;
 import com.thesettler_x_create.create.ShopSupplyPolicy;
@@ -22,19 +21,15 @@ import org.jetbrains.annotations.Nullable;
 final class CreateShopStockResolver {
   CreateShopStockSnapshot getAvailability(
       TileEntityCreateShop tile,
-      CreateShopBlockEntity pickup,
       IDeliverable deliverable,
       int reservedForOthers,
       CreateShopResolverPlanning planning) {
     ICreateNetworkFacade network = colonyView(tile);
     int networkAvailable = network.getAvailable(deliverable);
     int rackAvailable = planning.getAvailableFromRacks(tile, deliverable);
-    int pickupAvailable = planning.getAvailableFromPickup(pickup, deliverable);
     int rackUsable = ShopStockAccounting.usableRackStock(rackAvailable, reservedForOthers);
-    int available =
-        ShopStockAccounting.totalAvailable(networkAvailable, rackUsable, pickupAvailable);
-    return new CreateShopStockSnapshot(
-        networkAvailable, rackAvailable, pickupAvailable, rackUsable, available);
+    int available = ShopStockAccounting.totalAvailable(networkAvailable, rackUsable);
+    return new CreateShopStockSnapshot(networkAvailable, rackAvailable, rackUsable, available);
   }
 
   /**

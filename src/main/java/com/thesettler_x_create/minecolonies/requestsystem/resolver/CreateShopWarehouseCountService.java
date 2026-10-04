@@ -62,8 +62,7 @@ final class CreateShopWarehouseCountService {
         ShopStockAccounting.reservedForOthers(
             pickup.getReservedForDeliverable(deliverable), reservedForRequest);
     CreateShopStockSnapshot snapshot =
-        stockResolver.getAvailability(tile, pickup, deliverable, reservedForOthers, planning);
-    return ShopStockAccounting.totalAvailable(
-        snapshot.networkAvailable(), snapshot.rackUsable(), 0);
+        stockResolver.getAvailability(tile, deliverable, reservedForOthers, planning);
+    return ShopStockAccounting.totalAvailable(snapshot.networkAvailable(), snapshot.rackUsable());
   }
 }

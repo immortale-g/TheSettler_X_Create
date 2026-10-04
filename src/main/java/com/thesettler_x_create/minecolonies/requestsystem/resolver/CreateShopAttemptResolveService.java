@@ -259,11 +259,10 @@ final class CreateShopAttemptResolveService {
   /** Plans the rack part first; the network only counts while the shopkeeper works. */
   private StockPlan planStock(Attempt a) {
     CreateShopStockSnapshot snapshot =
-        stockResolver.getAvailability(
-            a.tile(), a.pickup(), a.deliverable(), a.reservedForOthers(), planning);
+        stockResolver.getAvailability(a.tile(), a.deliverable(), a.reservedForOthers(), planning);
     int rackUsable = snapshot.rackUsable();
     int networkAvailable = a.workerWorking() ? snapshot.networkAvailable() : 0;
-    int available = ShopStockAccounting.totalAvailable(networkAvailable, rackUsable, 0);
+    int available = ShopStockAccounting.totalAvailable(networkAvailable, rackUsable);
     int provide = Math.min(available, a.needed());
     if (provide <= 0) {
       return new StockPlan(

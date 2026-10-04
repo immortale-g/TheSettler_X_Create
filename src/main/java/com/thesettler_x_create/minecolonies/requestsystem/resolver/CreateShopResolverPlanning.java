@@ -5,7 +5,6 @@ import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.Tool;
 import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
-import com.minecolonies.api.util.WorldUtil;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
@@ -16,7 +15,6 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 
 /** Helper for computing availability and delivery plans for Create Shop requests. */
@@ -50,20 +48,18 @@ final class CreateShopResolverPlanning {
     int sameItemTotal = 0;
     int rackCount = 0;
     int containerCount = tile.getBuilding().getContainers().size();
-    for (BlockPos pos : tile.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(level, pos)) {
-        continue;
-      }
-      BlockEntity entity = level.getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
+    for (TileEntityCreateShop.LoadedRack loaded : tile.getLoadedRacks()) {
+      AbstractTileEntityRack rack = loaded.rack();
       rackCount++;
       total += rack.getItemCount(deliverable::matches);
       sameItemTotal += countSameItemInRack(rack, expected);
     }
+    // Owed goods wait in the hut buffer, which is not rack stock. Only what spilled over into the
+    // racks because the buffer was full lowers what the racks can give.
     int owedToGauges =
         shop == null || deliverable == null ? 0 : shop.getOwedToGauges(deliverable::matches);
+    int inHutBuffer = deliverable == null ? 0 : tile.getItemCount(deliverable::matches);
+    owedToGauges = Math.max(0, owedToGauges - inHutBuffer);
     int available = Math.max(0, total - owedToGauges);
     if (available > 0) {
       return available;
@@ -79,27 +75,6 @@ final class CreateShopResolverPlanning {
           owedToGauges);
     }
     return available;
-  }
-
-  int getAvailableFromPickup(CreateShopBlockEntity pickup, IDeliverable deliverable) {
-    if (pickup == null) {
-      return 0;
-    }
-    IItemHandler handler = pickup.getItemHandler(null);
-    if (handler == null) {
-      return 0;
-    }
-    int total = 0;
-    for (int i = 0; i < handler.getSlots(); i++) {
-      ItemStack stack = handler.getStackInSlot(i);
-      if (stack.isEmpty()) {
-        continue;
-      }
-      if (deliverable.matches(stack)) {
-        total += stack.getCount();
-      }
-    }
-    return Math.max(0, total);
   }
 
   List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromRacksWithPositions(

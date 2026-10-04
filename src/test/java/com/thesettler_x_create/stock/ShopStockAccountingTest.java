@@ -34,8 +34,8 @@ class ShopStockAccountingTest {
 
   @Test
   void totalAvailableAddsAllSourcesAndNeverGoesNegative() {
-    assertEquals(100, ShopStockAccounting.totalAvailable(60, 30, 10));
-    assertEquals(0, ShopStockAccounting.totalAvailable(-50, 10, 0));
+    assertEquals(90, ShopStockAccounting.totalAvailable(60, 30));
+    assertEquals(0, ShopStockAccounting.totalAvailable(-50, 10));
   }
 
   @Test
@@ -155,8 +155,11 @@ class ShopStockAccountingTest {
   }
 
   @Test
-  void extractablePrefersTheReservationWhenThereIsOne() {
-    assertEquals(16, ShopStockAccounting.extractable(64, 16, 128));
+  void extractableNeverTouchesReservedStock() {
+    assertEquals(64, ShopStockAccounting.extractable(64, 16, 128));
+    assertEquals(112, ShopStockAccounting.extractable(200, 16, 128));
+    assertEquals(0, ShopStockAccounting.extractable(64, 128, 128));
+    assertEquals(0, ShopStockAccounting.extractable(64, 200, 128));
     assertEquals(64, ShopStockAccounting.extractable(64, 0, 128));
     assertEquals(20, ShopStockAccounting.extractable(64, 0, 20));
   }

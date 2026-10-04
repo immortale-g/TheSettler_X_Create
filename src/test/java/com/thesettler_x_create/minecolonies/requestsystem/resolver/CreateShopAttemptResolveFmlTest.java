@@ -128,7 +128,7 @@ class CreateShopAttemptResolveFmlTest {
     when(resolver.isCancelledRequest(request.getId())).thenReturn(true);
 
     assertTrue(attempt().isEmpty());
-    verify(stockResolver, never()).getAvailability(any(), any(), any(), anyInt(), any());
+    verify(stockResolver, never()).getAvailability(any(), any(), anyInt(), any());
   }
 
   @Test
@@ -136,7 +136,7 @@ class CreateShopAttemptResolveFmlTest {
     when(cooldown.isRequestOnCooldown(level, request.getId())).thenReturn(true);
 
     assertTrue(attempt().isEmpty());
-    verify(stockResolver, never()).getAvailability(any(), any(), any(), anyInt(), any());
+    verify(stockResolver, never()).getAvailability(any(), any(), anyInt(), any());
   }
 
   @Test
@@ -144,7 +144,7 @@ class CreateShopAttemptResolveFmlTest {
     when(request.hasChildren()).thenReturn(true);
 
     assertTrue(attempt().isEmpty());
-    verify(stockResolver, never()).getAvailability(any(), any(), any(), anyInt(), any());
+    verify(stockResolver, never()).getAvailability(any(), any(), anyInt(), any());
   }
 
   @Test
@@ -152,7 +152,7 @@ class CreateShopAttemptResolveFmlTest {
     when(outstanding.compute(any(), any(), anyInt())).thenReturn(0);
 
     assertTrue(attempt().isEmpty());
-    verify(stockResolver, never()).getAvailability(any(), any(), any(), anyInt(), any());
+    verify(stockResolver, never()).getAvailability(any(), any(), anyInt(), any());
     verify(mutator, never()).markOrderedWithPending(any(), any(), any(), anyInt());
   }
 
@@ -300,9 +300,9 @@ class CreateShopAttemptResolveFmlTest {
   }
 
   private void stock(int network, int rackUsable) {
-    when(stockResolver.getAvailability(eq(tile), eq(pickup), eq(deliverable), anyInt(), any()))
+    when(stockResolver.getAvailability(eq(tile), eq(deliverable), anyInt(), any()))
         .thenReturn(
-            new CreateShopStockSnapshot(network, rackUsable, 0, rackUsable, network + rackUsable));
+            new CreateShopStockSnapshot(network, rackUsable, rackUsable, network + rackUsable));
   }
 
   private List<Tuple<ItemStack, BlockPos>> rackPlan(int count) {

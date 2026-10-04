@@ -34,9 +34,9 @@ public final class ShopStockAccounting {
     return Math.max(0, inNetwork - Math.max(0, keepInNetwork));
   }
 
-  /** Everything the shop can hand out for a request: network, usable rack and pickup stock. */
-  public static int totalAvailable(int networkStock, int usableRackStock, int pickupStock) {
-    return Math.max(0, networkStock + usableRackStock + pickupStock);
+  /** Everything the shop can hand out for a request: network and usable rack stock. */
+  public static int totalAvailable(int networkStock, int usableRackStock) {
+    return Math.max(0, networkStock + usableRackStock);
   }
 
   /**
@@ -162,10 +162,11 @@ public final class ShopStockAccounting {
   }
 
   /**
-   * How much an extraction through the shop's item handler may take: reserved stock when there is a
-   * reservation for the item, otherwise what the racks hold.
+   * How much an extraction through the shop's item handler may take: what the racks hold beyond the
+   * reservations. Reserved goods belong to a colony request, so a hopper or funnel on the pickup
+   * block must not be able to drain them.
    */
   public static int extractable(int requested, int reserved, int available) {
-    return reserved > 0 ? Math.min(requested, reserved) : Math.min(requested, available);
+    return Math.max(0, Math.min(requested, available - Math.max(0, reserved)));
   }
 }

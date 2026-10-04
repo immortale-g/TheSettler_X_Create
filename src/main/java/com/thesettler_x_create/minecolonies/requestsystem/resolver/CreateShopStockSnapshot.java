@@ -5,4 +5,4 @@ package com.thesettler_x_create.minecolonies.requestsystem.resolver;
  * from each source (Create network, racks, pickup reservation) and the combined total.
  */
 record CreateShopStockSnapshot(
-    int networkAvailable, int rackAvailable, int pickupAvailable, int rackUsable, int available) {}
+    int networkAvailable, int rackAvailable, int rackUsable, int available) {}
