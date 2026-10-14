@@ -250,6 +250,16 @@ class InflightBookTest {
   }
 
   @Test
+  void identicalUnownedSegmentsAddUpInsteadOfDroppingAnAmount() {
+    InflightBook<String> book = book();
+    record(book, "iron", 8, 1L, null);
+    record(book, "iron", 8, 1L, null);
+    record(book, "iron", 1, 2L, null);
+
+    assertEquals(17, book.freeRemaining("iron"));
+  }
+
+  @Test
   void segmentsBeyondTheLimitKeepTheirAmountInTheOldestKeptSegment() {
     InflightBook<String> book = book();
     record(book, "iron", 1, 1L, null);

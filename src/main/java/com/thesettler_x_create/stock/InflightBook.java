@@ -612,10 +612,11 @@ public final class InflightBook<K> {
   }
 
   /**
-   * Keeps notice prompts stable for unowned entries: identical segments collapse into one, and a
-   * requester/address tuple keeps only its {@link #MAX_OPEN_SEGMENTS_PER_TUPLE} newest segments.
-   * Entries of a request are never merged or dropped; each of them is an order the request counts
-   * on, and losing one makes the request order again.
+   * Keeps notice prompts stable for unowned entries: identical segments merge into one with their
+   * amounts summed, and a requester/address tuple keeps only its {@link
+   * #MAX_OPEN_SEGMENTS_PER_TUPLE} newest segments. Entries of a request are never merged or
+   * dropped; each of them is an order the request counts on, and losing one makes the request order
+   * again.
    *
    * <p>A segment beyond the limit is not thrown away: its remaining amount is folded into the
    * oldest segment the tuple keeps. The limit only exists so the prompts stay readable, and a sum
@@ -649,6 +650,8 @@ public final class InflightBook<K> {
       if (existing == null) {
         unique.put(segment, entry);
       } else {
+        // Two orders of the same size in the same tick are two orders on their way, not one.
+        existing.remaining += entry.remaining;
         existing.notified = existing.notified || entry.notified;
       }
     }

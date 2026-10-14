@@ -39,6 +39,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
@@ -160,6 +161,11 @@ public class TheSettlerXCreate {
     if (DebugLog.enabled()) {
       LOGGER.info("TheSettler_x_Create server starting");
     }
+  }
+
+  @SubscribeEvent
+  public void onServerStopping(ServerStoppingEvent event) {
+    CreateNetworkFacade.abandonQueuedRequests();
   }
 
   private void onServerTick(ServerTickEvent.Post event) {

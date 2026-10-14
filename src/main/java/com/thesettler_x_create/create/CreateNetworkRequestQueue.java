@@ -78,6 +78,30 @@ final class CreateNetworkRequestQueue {
     return before - QUEUED_REQUESTS.size();
   }
 
+  /**
+   * Server shutdown: forgets every order that was queued but never broadcast, so the saved world
+   * does not wait out the in-flight timeout for goods nobody sent, and drops the references to the
+   * old world.
+   */
+  static void abandonAll() {
+    var snapshot = new ArrayList<>(QUEUED_REQUESTS.entrySet());
+    QUEUED_REQUESTS.clear();
+    flushCounter = 0;
+    for (var entry : snapshot) {
+      QueuedRequestKey key = entry.getKey();
+      QueuedRequestBucket bucket = entry.getValue();
+      if (bucket == null || bucket.facade == null || bucket.stacks.isEmpty()) {
+        continue;
+      }
+      try {
+        bucket.facade.forgetAbandonedOrder(key.requestUuid(), key.requesterName(), bucket.stacks);
+      } catch (RuntimeException e) {
+        TheSettlerXCreate.LOGGER.warn(
+            "[CreateShop] could not forget a queued order on shutdown: {}", e.toString());
+      }
+    }
+  }
+
   static void flush() {
     if (QUEUED_REQUESTS.isEmpty()) {
       return;

@@ -79,6 +79,12 @@ public class StockLinkLinkerItem extends Item {
       return InteractionResult.CONSUME;
     }
 
+    // Create's own network lock decides who may read or re-route a link.
+    Player player = context.getPlayer();
+    if (!behaviour.mayInteractMessage(player)) {
+      return InteractionResult.CONSUME;
+    }
+
     CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
 
     if (!tag.hasUUID(FREQ_TAG)) {
@@ -101,6 +107,13 @@ public class StockLinkLinkerItem extends Item {
               Component.translatable(
                   "com.thesettler_x_create.message.network_link_tuner.already_linked"),
               true);
+      return InteractionResult.CONSUME;
+    }
+
+    if (!behaviour.mayAdministrate(player)
+        || (Create.LOGISTICS != null && !Create.LOGISTICS.mayInteract(newFreq, player))) {
+      player.displayClientMessage(
+          Component.translatable("create.logistically_linked.protected"), true);
       return InteractionResult.CONSUME;
     }
 

@@ -280,6 +280,10 @@ public final class ModNetwork {
    * reconfigure or drain a building the player has no relation to.
    */
   private static boolean isAuthorized(ServerPlayer player, BlockPos pos) {
+    // A crafted packet must not be able to force a chunk load by naming a far-away position.
+    if (!player.level().isLoaded(pos)) {
+      return false;
+    }
     IColony colony = IColonyManager.getInstance().getColonyByPosFromWorld(player.level(), pos);
     return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
   }

@@ -10,7 +10,7 @@ final class ShopWarehouseRegistrar {
     this.shop = shop;
   }
 
-  void ensureWarehouseRegistration() {
+  void removeLegacyWarehouseRegistration() {
     IColony colony = shop.getColony();
     if (colony == null) {
       return;
