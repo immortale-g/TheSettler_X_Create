@@ -375,10 +375,20 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
     return DELIVERY_CHILD_STALE_TIMEOUT_FLOOR_TICKS;
   }
 
+  /** Log-dedupe sets gain a key per delivery child; past this size the oldest dedupe is let go. */
+  private static final int MAX_LOG_DEDUPE_KEYS = 2048;
+
+  private static boolean addBounded(java.util.Set<String> seen, String key) {
+    if (seen.size() >= MAX_LOG_DEDUPE_KEYS) {
+      seen.clear();
+    }
+    return seen.add(key);
+  }
+
   void logDeliveryLinkState(
       String stage, IStandardRequestManager manager, IToken<?> parentToken, IToken<?> childToken) {
     String key = stage + ":" + childToken;
-    if (!deliveryLinkLogged.add(key)) {
+    if (!addBounded(deliveryLinkLogged, key)) {
       return;
     }
     try {
@@ -417,7 +427,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   boolean markChainCycleLogged(String key) {
-    return chainCycleLogged.add(key);
+    return addBounded(chainCycleLogged, key);
   }
 
   void markCancelledRequest(IToken<?> token) {
@@ -447,7 +457,7 @@ public class CreateShopRequestResolver extends AbstractWarehouseRequestResolver 
   }
 
   boolean markDeliveryCreateLogged(String key) {
-    return deliveryCreateLogged.add(key);
+    return addBounded(deliveryCreateLogged, key);
   }
 
   IToken<?> getResolverToken() {

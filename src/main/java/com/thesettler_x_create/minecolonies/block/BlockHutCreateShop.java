@@ -3,6 +3,7 @@ package com.thesettler_x_create.minecolonies.block;
 import com.minecolonies.api.blocks.AbstractBlockHut;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
+import com.simibubi.create.Create;
 import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.block.ColonyGaugeBlockItem;
 import com.thesettler_x_create.block.GaugeLinkData;
@@ -88,6 +89,9 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
                 Component.translatable(
                     "com.thesettler_x_create.message.network_link_tuner.no_network_stored"),
                 true);
+          } else if (Create.LOGISTICS != null && !Create.LOGISTICS.mayInteract(stored, player)) {
+            player.displayClientMessage(
+                Component.translatable("create.logistically_linked.protected"), true);
           } else {
             shop.setStockNetworkId(stored);
             level.sendBlockUpdated(pos, state, state, 3);

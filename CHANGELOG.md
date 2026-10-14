@@ -9,6 +9,16 @@ Fixes from a review of the 0.6.0 release, and the shop storage rework that follo
 counted as 0.7.0 and 0.7.1 while they sat on their own branches; neither number was handed out, so
 everything ships as 0.7.2.
 
+### Safer on shared servers
+
+- The Network Link Tuner and the shop hut now respect Create's network lock. A locked network can
+  no longer be copied, re-tuned or attached to a shop by players without access.
+- The pickup block hands out at most one real stack per call, so hoppers no longer receive
+  over-stacked items.
+- Identical orders on their way from the same tick are now added up instead of merged into one,
+  whenever the shop books an order or loads a save. Before, one of them was forgotten and the shop
+  could order the goods a second time.
+
 ### Requests the shop can really fill
 
 - The shop counted the same goods twice when deciding whether it could serve a request: once in the

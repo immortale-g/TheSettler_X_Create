@@ -39,21 +39,20 @@ public class StockLinkLinkerItem extends Item {
   @Override
   public InteractionResult useOn(UseOnContext context) {
     Level level = context.getLevel();
-    if (context.getPlayer() == null) {
-      return InteractionResult.FAIL;
+    Player player = context.getPlayer();
+    if (player == null) {
+      return InteractionResult.PASS;
     }
 
     BlockPos pos = context.getClickedPos();
     ItemStack stack = context.getItemInHand();
 
-    if (context.getPlayer().isShiftKeyDown()) {
+    if (player.isShiftKeyDown()) {
       if (!level.isClientSide) {
         stack.remove(DataComponents.CUSTOM_DATA);
-        context
-            .getPlayer()
-            .displayClientMessage(
-                Component.translatable("com.thesettler_x_create.message.network_link_tuner.reset"),
-                true);
+        player.displayClientMessage(
+            Component.translatable("com.thesettler_x_create.message.network_link_tuner.reset"),
+            true);
       }
       return InteractionResult.CONSUME;
     }
@@ -79,28 +78,35 @@ public class StockLinkLinkerItem extends Item {
       return InteractionResult.CONSUME;
     }
 
+    // Create's own network lock decides who may read or re-route a link.
+    if (!behaviour.mayInteractMessage(player)) {
+      return InteractionResult.CONSUME;
+    }
+
     CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
 
     if (!tag.hasUUID(FREQ_TAG)) {
       tag.putUUID(FREQ_TAG, behaviour.freqId);
       stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-      context
-          .getPlayer()
-          .displayClientMessage(
-              Component.translatable("com.thesettler_x_create.message.network_link_tuner.stored"),
-              true);
+      player.displayClientMessage(
+          Component.translatable("com.thesettler_x_create.message.network_link_tuner.stored"),
+          true);
       return InteractionResult.CONSUME;
     }
 
     UUID newFreq = tag.getUUID(FREQ_TAG);
     UUID oldFreq = behaviour.freqId;
     if (newFreq.equals(oldFreq)) {
-      context
-          .getPlayer()
-          .displayClientMessage(
-              Component.translatable(
-                  "com.thesettler_x_create.message.network_link_tuner.already_linked"),
-              true);
+      player.displayClientMessage(
+          Component.translatable(
+              "com.thesettler_x_create.message.network_link_tuner.already_linked"),
+          true);
+      return InteractionResult.CONSUME;
+    }
+
+    if (Create.LOGISTICS != null && !Create.LOGISTICS.mayInteract(newFreq, player)) {
+      player.displayClientMessage(
+          Component.translatable("create.logistically_linked.protected"), true);
       return InteractionResult.CONSUME;
     }
 
@@ -128,11 +134,9 @@ public class StockLinkLinkerItem extends Item {
 
     DebugLog.info("Retuned stock link at {} to {}", pos, newFreq);
 
-    context
-        .getPlayer()
-        .displayClientMessage(
-            Component.translatable("com.thesettler_x_create.message.network_link_tuner.relinked"),
-            true);
+    player.displayClientMessage(
+        Component.translatable("com.thesettler_x_create.message.network_link_tuner.relinked"),
+        true);
     return InteractionResult.CONSUME;
   }
 

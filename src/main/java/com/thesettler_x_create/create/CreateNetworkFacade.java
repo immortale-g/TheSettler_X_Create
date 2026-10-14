@@ -282,6 +282,10 @@ public class CreateNetworkFacade implements ICreateNetworkFacade {
     CreateNetworkRequestQueue.flush();
   }
 
+  public static void abandonQueuedRequests() {
+    CreateNetworkRequestQueue.abandonAll();
+  }
+
   /**
    * Operator reset: drops this shop's orders that were queued this tick but not broadcast yet.
    *

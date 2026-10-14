@@ -65,8 +65,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       String gaugeAddress,
       java.util.UUID requestId) {}
 
-  private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
-
   private final ShopGaugeQueue gaugeQueue = new ShopGaugeQueue(this);
 
   boolean warehouseRegistered;
@@ -292,18 +290,18 @@ public class BuildingCreateShop extends AbstractBuilding {
   @Override
   public void onPlacement() {
     super.onPlacement();
-    ensureWarehouseRegistration();
+    removeLegacyWarehouseRegistration();
     ensurePickupLink();
   }
 
   // No onUpgradeComplete override: its signature differs between MineColonies versions, and
-  // onColonyTick already re-runs ensureWarehouseRegistration and ensurePickupLink.
+  // onColonyTick already re-runs removeLegacyWarehouseRegistration and ensurePickupLink.
 
   @Override
   public void onColonyTick(IColony colony) {
     super.onColonyTick(colony);
     migrateLegacyShopCourierAssignments();
-    ensureWarehouseRegistration();
+    removeLegacyWarehouseRegistration();
     ensurePickupLink();
     resolverHealthCheck.ensureResolverRegistrationHealthy(colony);
     if (colony != null) {
@@ -335,18 +333,13 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     try {
       super.onRequestedRequestCancelled(manager, request);
-      gaugeQueue.onRequestCancelled(request);
     } catch (Exception ex) {
-      String token = request == null ? "<null>" : String.valueOf(request.getId());
-      String msg =
-          ex.getClass().getSimpleName()
-              + ":"
-              + (ex.getMessage() == null ? "<null>" : ex.getMessage());
-      String key = "cancel:" + token;
-      String last = lastRequesterError.put(key, msg);
-      if (!msg.equals(last)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] requester cancel error {} -> {}", token, msg);
+      reportRequesterError("cancel", request, ex);
+    } finally {
+      try {
+        gaugeQueue.onRequestCancelled(request);
+      } catch (Exception ex) {
+        reportRequesterError("cancel", request, ex);
       }
     }
   }
@@ -357,20 +350,32 @@ public class BuildingCreateShop extends AbstractBuilding {
       com.minecolonies.api.colony.requestsystem.request.IRequest<?> request) {
     try {
       super.onRequestedRequestComplete(manager, request);
-      gaugeQueue.onRequestComplete(request);
     } catch (Exception ex) {
-      String token = request == null ? "<null>" : String.valueOf(request.getId());
-      String msg =
-          ex.getClass().getSimpleName()
-              + ":"
-              + (ex.getMessage() == null ? "<null>" : ex.getMessage());
-      String key = "complete:" + token;
-      String last = lastRequesterError.put(key, msg);
-      if (!msg.equals(last)) {
-        com.thesettler_x_create.TheSettlerXCreate.LOGGER.info(
-            "[CreateShop] requester complete error {} -> {}", token, msg);
+      reportRequesterError("complete", request, ex);
+    } finally {
+      try {
+        gaugeQueue.onRequestComplete(request);
+      } catch (Exception ex) {
+        reportRequesterError("complete", request, ex);
       }
     }
+  }
+
+  private void reportRequesterError(
+      String stage,
+      com.minecolonies.api.colony.requestsystem.request.IRequest<?> request,
+      Exception ex) {
+    String token = request == null ? "<null>" : String.valueOf(request.getId());
+    String msg =
+        ex.getClass().getSimpleName()
+            + ":"
+            + (ex.getMessage() == null ? "<null>" : ex.getMessage());
+    com.thesettler_x_create.ProblemLog.once(
+        "requester-" + stage + ":" + token + ":" + msg,
+        "requester {} callback failed for {}: {} - the gauge task may not be updated",
+        stage,
+        token,
+        msg);
   }
 
   @Override
@@ -888,8 +893,8 @@ public class BuildingCreateShop extends AbstractBuilding {
     NO_NETWORK_STOCK
   }
 
-  private void ensureWarehouseRegistration() {
-    warehouseRegistrar.ensureWarehouseRegistration();
+  private void removeLegacyWarehouseRegistration() {
+    warehouseRegistrar.removeLegacyWarehouseRegistration();
   }
 
   /**

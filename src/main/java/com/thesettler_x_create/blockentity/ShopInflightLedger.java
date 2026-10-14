@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
@@ -35,10 +34,7 @@ class ShopInflightLedger {
   private final LedgerHost host;
   private final InflightBook<ItemStack> book =
       new InflightBook<>(
-          ItemStack::isSameItemSameComponents,
-          ItemStack::isSameItem,
-          ShopInflightLedger::makeKey,
-          ShopInflightLedger::itemId);
+          ItemStack::isSameItemSameComponents, ItemStack::isSameItem, ShopInflightLedger::makeKey);
   private long lastInflightLogTime;
 
   ShopInflightLedger(LedgerHost host) {
@@ -386,10 +382,6 @@ class ShopInflightLedger {
     ItemStack copy = stack.copy();
     copy.setCount(1);
     return copy;
-  }
-
-  private static String itemId(ItemStack stack) {
-    return String.valueOf(BuiltInRegistries.ITEM.getKey(stack.getItem()));
   }
 
   private static String sanitize(@Nullable String value) {

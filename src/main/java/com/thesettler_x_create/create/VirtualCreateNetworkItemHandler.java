@@ -59,7 +59,8 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     }
     ItemStack base = cachedStacks.get(slot);
     ItemStack display = base.copy();
-    int count = Math.min(MAX_DISPLAY, Math.max(1, base.getCount()));
+    int count =
+        Math.min(Math.min(MAX_DISPLAY, base.getMaxStackSize()), Math.max(1, base.getCount()));
     display.setCount(count);
     return display;
   }
@@ -82,7 +83,8 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
       return ItemStack.EMPTY;
     }
 
-    int available = getAvailableFromRacks(key);
+    List<RackSlot> rackSlots = findRackSlots(key);
+    int available = totalOf(rackSlots);
     if (available <= 0) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
@@ -96,7 +98,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     }
 
     int reserved = shopBlockEntity.getReservedFor(key);
-    int extractable = ShopStockAccounting.extractable(amount, reserved, available);
+    int extractable = cappedExtractable(key, amount, reserved, available);
     if (extractable <= 0) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
@@ -110,7 +112,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
       return ItemStack.EMPTY;
     }
 
-    ItemStack extracted = tryExtractFromRacks(key, extractable, simulate);
+    ItemStack extracted = tryExtractFromRacks(key, rackSlots, extractable, simulate);
     if (extracted.isEmpty()) {
       if (DebugLog.enabled()) {
         TheSettlerXCreate.LOGGER.info(
@@ -143,6 +145,9 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
   @Override
   public int getSlotLimit(int slot) {
+    if (slot >= 0 && slot < cachedStacks.size()) {
+      return Math.min(MAX_DISPLAY, Math.max(1, cachedStacks.get(slot).getMaxStackSize()));
+    }
     return MAX_DISPLAY;
   }
 
@@ -214,39 +219,59 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     }
   }
 
-  private ItemStack tryExtractFromRacks(ItemStack key, int amount, boolean simulate) {
-    int[] remaining = {amount};
-    ItemStack[] extracted = {ItemStack.EMPTY};
-    scanRacks(
-        (handler, slot, stack) -> {
-          if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, key)) {
-            return false;
-          }
-          int toTake = Math.min(remaining[0], stack.getCount());
-          ItemStack taken = handler.extractItem(slot, toTake, simulate);
-          if (!taken.isEmpty()) {
-            if (extracted[0].isEmpty()) {
-              extracted[0] = taken.copy();
-            } else {
-              extracted[0].grow(taken.getCount());
-            }
-            remaining[0] -= taken.getCount();
-          }
-          return remaining[0] <= 0;
-        });
-    return extracted[0];
+  /** One call hands out at most one real stack; callers ask again for the rest. */
+  static int cappedExtractable(ItemStack key, int amount, int reserved, int available) {
+    return Math.min(
+        ShopStockAccounting.extractable(amount, reserved, available), key.getMaxStackSize());
   }
 
-  private int getAvailableFromRacks(ItemStack key) {
-    int[] total = {0};
+  /** One rack slot holding the wanted item, found by the single scan of {@link #findRackSlots}. */
+  record RackSlot(IItemHandler handler, int slot, int count) {}
+
+  /**
+   * Walks the racks once and returns every slot holding {@code key}. Counting and extracting both
+   * work from this list, so an extract call touches each rack slot once instead of twice.
+   */
+  private List<RackSlot> findRackSlots(ItemStack key) {
+    List<RackSlot> found = new ArrayList<>();
     scanRacks(
         (handler, slot, stack) -> {
           if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, key)) {
-            total[0] += stack.getCount();
+            found.add(new RackSlot(handler, slot, stack.getCount()));
           }
           return false;
         });
-    return Math.max(0, total[0]);
+    return found;
+  }
+
+  private static int totalOf(List<RackSlot> slots) {
+    int total = 0;
+    for (RackSlot slot : slots) {
+      total += slot.count();
+    }
+    return Math.max(0, total);
+  }
+
+  static ItemStack tryExtractFromRacks(
+      ItemStack key, List<RackSlot> slots, int amount, boolean simulate) {
+    int remaining = amount;
+    ItemStack extracted = ItemStack.EMPTY;
+    for (RackSlot rackSlot : slots) {
+      int toTake = Math.min(remaining, rackSlot.count());
+      ItemStack taken = rackSlot.handler().extractItem(rackSlot.slot(), toTake, simulate);
+      if (!taken.isEmpty()) {
+        if (extracted.isEmpty()) {
+          extracted = taken.copy();
+        } else {
+          extracted.grow(taken.getCount());
+        }
+        remaining -= taken.getCount();
+      }
+      if (remaining <= 0) {
+        break;
+      }
+    }
+    return extracted;
   }
 
   private List<ItemStack> getAvailableStacksFromRacks() {
