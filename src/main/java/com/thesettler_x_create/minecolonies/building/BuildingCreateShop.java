@@ -65,8 +65,6 @@ public class BuildingCreateShop extends AbstractBuilding {
       String gaugeAddress,
       java.util.UUID requestId) {}
 
-  private final java.util.Map<String, String> lastRequesterError = new java.util.HashMap<>();
-
   private final ShopGaugeQueue gaugeQueue = new ShopGaugeQueue(this);
 
   boolean warehouseRegistered;
@@ -372,18 +370,12 @@ public class BuildingCreateShop extends AbstractBuilding {
         ex.getClass().getSimpleName()
             + ":"
             + (ex.getMessage() == null ? "<null>" : ex.getMessage());
-    if (lastRequesterError.size() >= 256) {
-      lastRequesterError.clear();
-    }
-    String last = lastRequesterError.put(stage + ":" + token, msg);
-    if (!msg.equals(last)) {
-      com.thesettler_x_create.ProblemLog.once(
-          "requester-" + stage + ":" + token + ":" + msg,
-          "requester {} callback failed for {}: {} - the gauge task may not be updated",
-          stage,
-          token,
-          msg);
-    }
+    com.thesettler_x_create.ProblemLog.once(
+        "requester-" + stage + ":" + token + ":" + msg,
+        "requester {} callback failed for {}: {} - the gauge task may not be updated",
+        stage,
+        token,
+        msg);
   }
 
   @Override

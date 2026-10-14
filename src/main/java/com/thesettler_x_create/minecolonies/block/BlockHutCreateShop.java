@@ -88,6 +88,10 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
                 Component.translatable(
                     "com.thesettler_x_create.message.network_link_tuner.no_network_stored"),
                 true);
+          } else if (com.simibubi.create.Create.LOGISTICS != null
+              && !com.simibubi.create.Create.LOGISTICS.mayInteract(stored, player)) {
+            player.displayClientMessage(
+                Component.translatable("create.logistically_linked.protected"), true);
           } else {
             shop.setStockNetworkId(stored);
             level.sendBlockUpdated(pos, state, state, 3);

@@ -110,7 +110,7 @@ public class StockLinkLinkerItem extends Item {
       return InteractionResult.CONSUME;
     }
 
-    if (!behaviour.mayAdministrate(player)
+    if (!behaviour.mayInteract(player)
         || (Create.LOGISTICS != null && !Create.LOGISTICS.mayInteract(newFreq, player))) {
       player.displayClientMessage(
           Component.translatable("create.logistically_linked.protected"), true);
