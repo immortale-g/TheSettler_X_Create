@@ -15,8 +15,8 @@ everything ships as 0.7.2.
   no longer be copied, re-tuned or attached to a shop by players without access.
 - The pickup block hands out at most one real stack per call, so hoppers no longer receive
   over-stacked items.
-- Identical orders on their way from the same tick are now added up when the shop saves and loads.
-  Before, one of them was forgotten and the shop could order the goods a second time.
+- Identical orders on their way from the same tick are now added up instead of merged into one,
+  whenever the shop books an order or loads a save. Before, one of them was forgotten and the shop could order the goods a second time.
 
 ### Requests the shop can really fill
 

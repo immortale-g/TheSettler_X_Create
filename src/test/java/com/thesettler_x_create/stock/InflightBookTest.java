@@ -260,6 +260,29 @@ class InflightBookTest {
   }
 
   @Test
+  void variantsOfOneItemInTheSameTickStaySeparate() {
+    InflightBook<String> book = book();
+    record(book, "book#sharpness", 1, 1L, null);
+    record(book, "book#mending", 1, 1L, null);
+
+    assertEquals(2, book.entryCount());
+    assertEquals(1, book.freeRemaining("book#sharpness"));
+    assertEquals(1, book.freeRemaining("book#mending"));
+  }
+
+  @Test
+  void foldingNeverMovesAnAmountOntoAnotherVariant() {
+    InflightBook<String> book = book();
+    record(book, "book#sharpness", 1, 1L, null);
+    record(book, "book#sharpness", 2, 2L, null);
+    record(book, "book#mending", 4, 3L, null);
+    record(book, "book#sharpness", 8, 4L, null);
+
+    assertEquals(4, book.freeRemaining("book#mending"));
+    assertEquals(11, book.freeRemaining("book#sharpness"));
+  }
+
+  @Test
   void segmentsBeyondTheLimitKeepTheirAmountInTheOldestKeptSegment() {
     InflightBook<String> book = book();
     record(book, "iron", 1, 1L, null);

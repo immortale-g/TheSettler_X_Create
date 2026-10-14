@@ -2,7 +2,6 @@ package com.thesettler_x_create.stock;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -629,51 +628,56 @@ public final class InflightBook<K> {
     if (entries.size() <= 1) {
       return;
     }
-    Map<String, Entry<K>> unique = new LinkedHashMap<>();
+    List<Entry<K>> unique = new ArrayList<>();
     List<Entry<K>> owned = new ArrayList<>();
     for (Entry<K> entry : entries) {
       if (entry.owner != null) {
         owned.add(entry);
         continue;
       }
-      String segment =
-          itemId.apply(entry.key)
-              + "|"
-              + entry.requester
-              + "|"
-              + entry.address
-              + "|"
-              + entry.requestedAt
-              + "|"
-              + entry.remaining;
-      Entry<K> existing = unique.get(segment);
+      Entry<K> existing = null;
+      for (Entry<K> candidate : unique) {
+        if (sameSegment(candidate, entry)) {
+          existing = candidate;
+          break;
+        }
+      }
       if (existing == null) {
-        unique.put(segment, entry);
+        unique.add(entry);
       } else {
         // Two orders of the same size in the same tick are two orders on their way, not one.
         existing.remaining += entry.remaining;
-        existing.notified = existing.notified || entry.notified;
+        // The grown amount was never asked about under this segment.
+        existing.notified = false;
       }
     }
-    List<Entry<K>> newestFirst = new ArrayList<>(unique.values());
+    List<Entry<K>> newestFirst = new ArrayList<>(unique);
     newestFirst.sort((left, right) -> Long.compare(right.requestedAt, left.requestedAt));
-    Map<String, Integer> keptPerTuple = new HashMap<>();
-    Map<String, Entry<K>> oldestKeptPerTuple = new HashMap<>();
+    List<TupleGroup<K>> groups = new ArrayList<>();
     List<Entry<K>> kept = new ArrayList<>(newestFirst.size());
     for (Entry<K> entry : newestFirst) {
-      String tuple = itemId.apply(entry.key) + "|" + entry.requester + "|" + entry.address;
-      int count = keptPerTuple.getOrDefault(tuple, 0);
-      Entry<K> foldInto =
-          count >= MAX_OPEN_SEGMENTS_PER_TUPLE ? oldestKeptPerTuple.get(tuple) : null;
-      if (foldInto != null) {
-        foldInto.remaining += entry.remaining;
+      TupleGroup<K> group = null;
+      for (TupleGroup<K> candidate : groups) {
+        if (sameKey.test(candidate.oldestKept.key, entry.key)
+            && candidate.oldestKept.requester.equals(entry.requester)
+            && candidate.oldestKept.address.equals(entry.address)) {
+          group = candidate;
+          break;
+        }
+      }
+      if (group != null && group.count >= MAX_OPEN_SEGMENTS_PER_TUPLE) {
+        group.oldestKept.remaining += entry.remaining;
         // The grown amount was never asked about under this segment.
-        foldInto.notified = false;
+        group.oldestKept.notified = false;
         continue;
       }
-      keptPerTuple.put(tuple, count + 1);
+      if (group == null) {
+        group = new TupleGroup<>();
+        groups.add(group);
+      }
+      group.count++;
       // Iteration runs newest first, so the last one kept is the oldest of the tuple.
-      oldestKeptPerTuple.put(tuple, entry);
+      group.oldestKept = entry;
       kept.add(entry);
     }
     kept.addAll(owned);
@@ -681,6 +685,20 @@ public final class InflightBook<K> {
     kept.sort((left, right) -> Long.compare(left.requestedAt, right.requestedAt));
     entries.clear();
     entries.addAll(kept);
+  }
+
+  private boolean sameSegment(Entry<K> left, Entry<K> right) {
+    return left.requestedAt == right.requestedAt
+        && left.remaining == right.remaining
+        && left.requester.equals(right.requester)
+        && left.address.equals(right.address)
+        && sameKey.test(left.key, right.key);
+  }
+
+  /** The open segments one requester/address keeps for one exact item. */
+  private static final class TupleGroup<K> {
+    int count;
+    Entry<K> oldestKept;
   }
 
   private void pruneBaselines() {

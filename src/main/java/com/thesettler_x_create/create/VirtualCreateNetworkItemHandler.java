@@ -145,6 +145,9 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
   @Override
   public int getSlotLimit(int slot) {
+    if (slot >= 0 && slot < cachedStacks.size()) {
+      return Math.min(MAX_DISPLAY, Math.max(1, cachedStacks.get(slot).getMaxStackSize()));
+    }
     return MAX_DISPLAY;
   }
 
