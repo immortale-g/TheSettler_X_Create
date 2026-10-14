@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiPredicate;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
@@ -63,7 +62,6 @@ public final class InflightBook<K> {
   private final BiPredicate<K, K> sameKey;
   private final BiPredicate<K, K> sameItem;
   private final UnaryOperator<K> normalizeKey;
-  private final Function<K, String> itemId;
   private final List<Entry<K>> entries = new ArrayList<>();
   private final List<Baseline<K>> baselines = new ArrayList<>();
 
@@ -71,17 +69,12 @@ public final class InflightBook<K> {
    * @param sameKey whether two keys are exactly the same item, components included
    * @param sameItem whether two keys are the same item type, components ignored
    * @param normalizeKey the form a key is stored in (for item stacks: a copy of count one)
-   * @param itemId a stable id of the item type, used to group notices
    */
   public InflightBook(
-      BiPredicate<K, K> sameKey,
-      BiPredicate<K, K> sameItem,
-      UnaryOperator<K> normalizeKey,
-      Function<K, String> itemId) {
+      BiPredicate<K, K> sameKey, BiPredicate<K, K> sameItem, UnaryOperator<K> normalizeKey) {
     this.sameKey = sameKey;
     this.sameItem = sameItem;
     this.normalizeKey = normalizeKey;
-    this.itemId = itemId;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -689,7 +682,6 @@ public final class InflightBook<K> {
 
   private boolean sameSegment(Entry<K> left, Entry<K> right) {
     return left.requestedAt == right.requestedAt
-        && left.remaining == right.remaining
         && left.requester.equals(right.requester)
         && left.address.equals(right.address)
         && sameKey.test(left.key, right.key);

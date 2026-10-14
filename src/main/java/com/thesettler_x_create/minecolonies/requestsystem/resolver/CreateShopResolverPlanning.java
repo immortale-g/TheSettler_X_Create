@@ -7,7 +7,6 @@ import com.minecolonies.api.equipment.registry.EquipmentTypeEntry;
 import com.minecolonies.api.tileentities.AbstractTileEntityRack;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
-import com.thesettler_x_create.blockentity.CreateShopBlockEntity;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
 import java.util.Comparator;
@@ -15,7 +14,6 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.items.IItemHandler;
 
 /** Helper for computing availability and delivery plans for Create Shop requests. */
 final class CreateShopResolverPlanning {
@@ -112,38 +110,6 @@ final class CreateShopResolverPlanning {
       ItemStack copy = stack.copy();
       copy.setCount(toTake);
       planned.add(new com.minecolonies.api.util.Tuple<>(copy, tuple.getB()));
-      remaining -= toTake;
-    }
-    return planned;
-  }
-
-  List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planFromPickupWithPositions(
-      CreateShopBlockEntity pickup, IDeliverable deliverable, int amount) {
-    if (amount <= 0 || pickup == null) {
-      return Lists.newArrayList();
-    }
-    IItemHandler handler = pickup.getItemHandler(null);
-    if (handler == null) {
-      return Lists.newArrayList();
-    }
-    int remaining = amount;
-    List<com.minecolonies.api.util.Tuple<ItemStack, BlockPos>> planned = Lists.newArrayList();
-    BlockPos pickupPos = pickup.getBlockPos();
-    for (int i = 0; i < handler.getSlots(); i++) {
-      if (remaining <= 0) {
-        break;
-      }
-      ItemStack stack = handler.getStackInSlot(i);
-      if (stack.isEmpty()) {
-        continue;
-      }
-      if (!deliverable.matches(stack)) {
-        continue;
-      }
-      int toTake = Math.min(remaining, stack.getCount());
-      ItemStack copy = stack.copy();
-      copy.setCount(toTake);
-      planned.add(new com.minecolonies.api.util.Tuple<>(copy, pickupPos));
       remaining -= toTake;
     }
     return planned;

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -163,7 +164,8 @@ public class TheSettlerXCreate {
     }
   }
 
-  @SubscribeEvent
+  // Early, so the shops are still intact when their queued orders are forgotten.
+  @SubscribeEvent(priority = EventPriority.HIGH)
   public void onServerStopping(ServerStoppingEvent event) {
     CreateNetworkFacade.abandonQueuedRequests();
   }

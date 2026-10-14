@@ -20,10 +20,7 @@ class InflightBookTest {
   /** Keys like "book#sharpness": the part before '#' is the item type. */
   private static InflightBook<String> book() {
     return new InflightBook<>(
-        String::equals,
-        (a, b) -> itemType(a).equals(itemType(b)),
-        key -> key,
-        InflightBookTest::itemType);
+        String::equals, (a, b) -> itemType(a).equals(itemType(b)), key -> key);
   }
 
   private static String itemType(String key) {
@@ -257,6 +254,17 @@ class InflightBookTest {
     record(book, "iron", 1, 2L, null);
 
     assertEquals(17, book.freeRemaining("iron"));
+  }
+
+  @Test
+  void threeIdenticalSegmentsEndUpAsOne() {
+    InflightBook<String> book = book();
+    record(book, "iron", 8, 1L, null);
+    record(book, "iron", 8, 1L, null);
+    record(book, "iron", 8, 1L, null);
+
+    assertEquals(1, book.entryCount());
+    assertEquals(24, book.freeRemaining("iron"));
   }
 
   @Test
