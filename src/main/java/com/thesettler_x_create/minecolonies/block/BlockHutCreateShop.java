@@ -56,9 +56,14 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
     if (stack.getItem() instanceof ColonyGaugeBlockItem) {
       if (!level.isClientSide) {
         BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof TileEntityCreateShop shop
-            && shop.getColony() != null
-            && shop.getColony().getPermissions().hasPermission(player, Action.MANAGE_HUTS)) {
+        if (be instanceof TileEntityCreateShop shop && shop.getColony() != null) {
+          if (!shop.getColony().getPermissions().hasPermission(player, Action.MANAGE_HUTS)) {
+            player.displayClientMessage(
+                Component.translatable(
+                    "com.thesettler_x_create.message.colony_gauge.no_permission"),
+                true);
+            return ItemInteractionResult.SUCCESS;
+          }
           CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
           GaugeLinkData.writeTo(tag, shop.getColony().getID(), pos);
           stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));

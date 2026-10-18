@@ -463,7 +463,11 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       ItemStack probe = inSlot.copy();
       probe.setCount(1);
       for (AbstractTileEntityRack other : racks) {
-        if (other == null || other.getBlockPos().equals(source.getBlockPos())) {
+        // The other half of a double rack is the same unpack target for a packager, so moving goods
+        // there frees nothing.
+        if (other == null
+            || other.getBlockPos().equals(source.getBlockPos())
+            || other == source.getOtherChest()) {
           continue;
         }
         if (ShopRackAccess.canInsertAtLeastOne(other.getInventory(), probe)) {

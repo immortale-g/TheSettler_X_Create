@@ -161,8 +161,7 @@ public final class ModNetwork {
           }
           // The gauge stands on a factory container that is often outside any claim, so the right
           // to
-          // steer it is the right in the colony it orders from, not in whatever colony it stands
-          // in.
+          // steer it is the right in the colony it orders from, not where it happens to stand.
           if (!isAuthorizedInColony(player, behaviour.getColonyId())) {
             if (debug) {
               TheSettlerXCreate.LOGGER.info(
@@ -236,20 +235,20 @@ public final class ModNetwork {
    * with permission to manage huts, so a crafted packet naming an arbitrary {@link BlockPos} cannot
    * reconfigure or drain a building the player has no relation to.
    */
-  /**
-   * Same permission rule as {@link #isAuthorized}, for a colony known by id rather than position.
-   */
-  private static boolean isAuthorizedInColony(ServerPlayer player, int colonyId) {
-    IColony colony = IColonyManager.getInstance().getColonyByWorld(colonyId, player.level());
-    return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
-  }
-
   private static boolean isAuthorized(ServerPlayer player, BlockPos pos) {
     // A crafted packet must not be able to force a chunk load by naming a far-away position.
     if (!player.level().isLoaded(pos)) {
       return false;
     }
     IColony colony = IColonyManager.getInstance().getColonyByPosFromWorld(player.level(), pos);
+    return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
+  }
+
+  /**
+   * Same permission rule as {@link #isAuthorized}, for a colony known by id rather than position.
+   */
+  private static boolean isAuthorizedInColony(ServerPlayer player, int colonyId) {
+    IColony colony = IColonyManager.getInstance().getColonyByWorld(colonyId, player.level());
     return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
   }
 }
