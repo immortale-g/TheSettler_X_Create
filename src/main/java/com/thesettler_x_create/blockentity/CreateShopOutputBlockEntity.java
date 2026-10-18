@@ -202,7 +202,7 @@ public class CreateShopOutputBlockEntity extends BlockEntity {
           break;
         }
         AbstractTileEntityRack rack = loaded.rack();
-        fromRacks += pullFrom(rack.getItemHandlerCap(), key, remaining, simulate);
+        fromRacks += pullFrom(rack.getInventory(), key, remaining, simulate);
       }
 
       int total = fromHut + fromRacks;

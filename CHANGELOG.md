@@ -3,11 +3,9 @@
 What changed in each release, for players. Versions are `MAJOR.MINOR.PATCH`; anything ending in
 `-beta` was handed to testers rather than published.
 
-## 0.7.2
+## 0.7.3
 
-Fixes from a review of the 0.6.0 release, and the shop storage rework that followed. These were
-counted as 0.7.0 and 0.7.1 while they sat on their own branches; neither number was handed out, so
-everything ships as 0.7.2.
+Fixes from a full review of the 0.7.2 code.
 
 ### Safer on shared servers
 
@@ -18,6 +16,32 @@ everything ships as 0.7.2.
 - Identical orders on their way from the same tick are now added up instead of merged into one,
   whenever the shop books an order or loads a save. Before, one of them was forgotten and the shop
   could order the goods a second time.
+- Removed an unused batch order packet that let any hut manager order any amount from the network
+  and skip the lock, block list and capacity checks.
+- Colony Gauge settings are now checked against the colony the gauge orders from, not the colony it
+  happens to stand in. Linking a gauge at the hut needs the right to manage huts as well.
+
+### Storage
+
+- The pickup block counted every rack slot twice, because the hut and each half of a double rack
+  hand out a combined view. Reserved goods could leave through the pickup block. Racks are now read
+  one by one.
+- Housekeeping, inbound planning and the pickup preview no longer double-count double racks.
+- Items the hut could not take back during housekeeping are dropped at the hut instead of vanishing.
+
+### Colony Gauges and saves
+
+- Two gauges ordering variants of one item (potions, enchanted books) no longer share or cancel each
+  other's orders.
+- A broken packaging entry in a save loses only that entry instead of aborting the whole building
+  load.
+- Request history saved right after loading, before the shop reconnected, is kept.
+
+## 0.7.2
+
+Fixes from a review of the 0.6.0 release, and the shop storage rework that followed. These were
+counted as 0.7.0 and 0.7.1 while they sat on their own branches; neither number was handed out, so
+everything ships as 0.7.2.
 
 ### Requests the shop can really fill
 

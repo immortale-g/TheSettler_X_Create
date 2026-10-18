@@ -1,7 +1,5 @@
 package com.thesettler_x_create.create;
 
-import com.minecolonies.api.tileentities.AbstractTileEntityRack;
-import com.minecolonies.api.util.WorldUtil;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.ItemStackDataUtil;
 import com.thesettler_x_create.TheSettlerXCreate;
@@ -11,10 +9,8 @@ import com.thesettler_x_create.stock.ShopStockAccounting;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 
 /**
@@ -199,15 +195,10 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
     if (shop == null) {
       return;
     }
-    for (BlockPos pos : shop.getBuilding().getContainers()) {
-      if (!WorldUtil.isBlockLoaded(shop.getLevel(), pos)) {
-        continue;
-      }
-      BlockEntity entity = shop.getLevel().getBlockEntity(pos);
-      if (!(entity instanceof AbstractTileEntityRack rack)) {
-        continue;
-      }
-      IItemHandler handler = rack.getItemHandlerCap();
+    for (TileEntityCreateShop.LoadedRack loaded : shop.getLoadedRacks()) {
+      // getLoadedRacks leaves out the hut block, and getInventory is the single rack: the hut and
+      // each half of a double rack hand out combined handlers that would count slots twice.
+      IItemHandler handler = loaded.rack().getInventory();
       if (handler == null) {
         continue;
       }

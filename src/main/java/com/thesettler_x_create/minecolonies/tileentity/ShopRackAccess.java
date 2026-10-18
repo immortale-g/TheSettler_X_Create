@@ -291,7 +291,7 @@ class ShopRackAccess {
   private List<VirtualItemHandler> collectVirtualRacks() {
     List<VirtualItemHandler> racks = new ArrayList<>();
     for (TileEntityCreateShop.LoadedRack loaded : getLoadedRacks()) {
-      VirtualItemHandler virtual = createVirtualHandler(loaded.rack().getItemHandlerCap());
+      VirtualItemHandler virtual = createVirtualHandler(loaded.rack().getInventory());
       if (virtual != null) {
         racks.add(virtual);
       }

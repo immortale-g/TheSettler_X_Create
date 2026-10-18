@@ -381,10 +381,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       if (rack == null) {
         continue;
       }
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        handler = rack.getInventory();
-      }
+      IItemHandler handler = rack.getInventory();
       if (handler == null) {
         continue;
       }
@@ -454,10 +451,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
   @Nullable
   private ItemStack findStackAnotherRackCanTake(
       AbstractTileEntityRack source, List<AbstractTileEntityRack> racks) {
-    IItemHandler handler = source.getItemHandlerCap();
-    if (handler == null) {
-      handler = source.getInventory();
-    }
+    IItemHandler handler = source.getInventory();
     if (handler == null) {
       return null;
     }
@@ -472,7 +466,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
         if (other == null || other.getBlockPos().equals(source.getBlockPos())) {
           continue;
         }
-        if (ShopRackAccess.canInsertAtLeastOne(other.getItemHandlerCap(), probe)) {
+        if (ShopRackAccess.canInsertAtLeastOne(other.getInventory(), probe)) {
           return inSlot.copy();
         }
       }
@@ -505,10 +499,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
     if (!(entity instanceof AbstractTileEntityRack rack)) {
       return ItemStack.EMPTY;
     }
-    IItemHandler handler = rack.getItemHandlerCap();
-    if (handler == null) {
-      handler = rack.getInventory();
-    }
+    IItemHandler handler = rack.getInventory();
     if (handler == null) {
       return ItemStack.EMPTY;
     }
@@ -592,10 +583,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       if (movedStacks >= maxStacks || rack == null) {
         continue;
       }
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        handler = rack.getInventory();
-      }
+      IItemHandler handler = rack.getInventory();
       if (handler == null) {
         continue;
       }
@@ -624,8 +612,15 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
             InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(extracted, hut);
         int inserted = insertable - (leftover.isEmpty() ? 0 : leftover.getCount());
         if (!leftover.isEmpty()) {
-          InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
-              leftover, handler);
+          ItemStack unplaced =
+              InventoryUtils.transferItemStackIntoNextBestSlotInItemHandlerWithResult(
+                  leftover, handler);
+          if (!unplaced.isEmpty() && getLevel() != null) {
+            // The slot was refilled in between; drop the rest at the hut instead of deleting it.
+            BlockPos at = getBlockPos();
+            InventoryUtils.spawnItemStack(
+                getLevel(), at.getX() + 0.5D, at.getY() + 1.0D, at.getZ() + 0.5D, unplaced);
+          }
         }
         if (inserted <= 0) {
           continue;
@@ -721,10 +716,7 @@ public class TileEntityCreateShop extends AbstractTileEntityWareHouse {
       return totals;
     }
     for (AbstractTileEntityRack rack : collectRacksForHousekeeping()) {
-      IItemHandler handler = rack.getItemHandlerCap();
-      if (handler == null) {
-        handler = rack.getInventory();
-      }
+      IItemHandler handler = rack.getInventory();
       if (handler == null) {
         continue;
       }

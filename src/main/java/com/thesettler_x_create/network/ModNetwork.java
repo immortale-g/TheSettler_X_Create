@@ -4,19 +4,15 @@ import com.minecolonies.api.colony.IColony;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
-import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
 import com.thesettler_x_create.DebugLog;
 import com.thesettler_x_create.TheSettlerXCreate;
 import com.thesettler_x_create.blockentity.ColonyGaugeBehaviour;
 import com.thesettler_x_create.blockentity.ColonyGaugeBlockEntity;
 import com.thesettler_x_create.blockentity.CreateShopOutputBlockEntity;
-import com.thesettler_x_create.create.CreateLogisticsBridge;
 import com.thesettler_x_create.minecolonies.building.BuildingCreateShop;
 import com.thesettler_x_create.minecolonies.module.CreateShopNetworkMinimumModule;
 import com.thesettler_x_create.minecolonies.tileentity.TileEntityCreateShop;
-import java.util.List;
-import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -43,10 +39,6 @@ public final class ModNetwork {
         SetCreateShopAddressPayload.TYPE,
         SetCreateShopAddressPayload.STREAM_CODEC,
         ModNetwork::handleSetAddress);
-    registrar.playToServer(
-        CreateShopBatchRequestPayload.TYPE,
-        CreateShopBatchRequestPayload.STREAM_CODEC,
-        ModNetwork::handleBatchRequest);
     registrar.playToServer(
         CreateShopStockRefreshPayload.TYPE,
         CreateShopStockRefreshPayload.STREAM_CODEC,
@@ -94,51 +86,6 @@ public final class ModNetwork {
           shop.setShopAddress(address);
           BlockState state = shop.getBlockState();
           shop.getLevel().sendBlockUpdated(payload.pos(), state, state, 3);
-        });
-  }
-
-  private static void handleBatchRequest(
-      CreateShopBatchRequestPayload payload, IPayloadContext context) {
-    context.enqueueWork(
-        () -> {
-          TileEntityCreateShop shop = getShop(context, payload.pos());
-          if (shop == null) {
-            return;
-          }
-
-          UUID networkId = shop.getStockNetworkId();
-          if (networkId == null) {
-            return;
-          }
-
-          if (payload.stacks() == null || payload.stacks().isEmpty()) {
-            return;
-          }
-
-          List<BigItemStack> orderStacks =
-              payload.stacks().stream()
-                  .filter(
-                      stack ->
-                          stack != null
-                              && stack.stack != null
-                              && !stack.stack.isEmpty()
-                              && stack.count > 0)
-                  .toList();
-
-          if (orderStacks.isEmpty()) {
-            return;
-          }
-
-          CreateLogisticsBridge.Outcome outcome =
-              CreateLogisticsBridge.broadcastPackageRequest(
-                  networkId, orderStacks, shop.getShopAddress());
-          if (!outcome.dispatched()) {
-            TheSettlerXCreate.LOGGER.warn(
-                "[CreateShop] batch request not dispatched ({}) network={} address='{}'",
-                outcome,
-                networkId,
-                shop.getShopAddress());
-          }
         });
   }
 
@@ -190,11 +137,8 @@ public final class ModNetwork {
             return;
           }
           FactoryPanelPosition position = payload.position();
-          if (!isAuthorized(player, position.pos())) {
-            if (debug) {
-              TheSettlerXCreate.LOGGER.info(
-                  "[ColonyGauge] config packet skip reason=not-authorized pos={}", position.pos());
-            }
+          // A crafted packet must not be able to force a chunk load by naming a far-away position.
+          if (!player.level().isLoaded(position.pos())) {
             return;
           }
           if (!(player.level().getBlockEntity(position.pos())
@@ -212,6 +156,19 @@ public final class ModNetwork {
                   "[ColonyGauge] config packet skip reason=behaviour-inactive-or-null pos={} slot={}",
                   position.pos(),
                   position.slot());
+            }
+            return;
+          }
+          // The gauge stands on a factory container that is often outside any claim, so the right
+          // to
+          // steer it is the right in the colony it orders from, not in whatever colony it stands
+          // in.
+          if (!isAuthorizedInColony(player, behaviour.getColonyId())) {
+            if (debug) {
+              TheSettlerXCreate.LOGGER.info(
+                  "[ColonyGauge] config packet skip reason=not-authorized pos={} colony={}",
+                  position.pos(),
+                  behaviour.getColonyId());
             }
             return;
           }
@@ -279,6 +236,14 @@ public final class ModNetwork {
    * with permission to manage huts, so a crafted packet naming an arbitrary {@link BlockPos} cannot
    * reconfigure or drain a building the player has no relation to.
    */
+  /**
+   * Same permission rule as {@link #isAuthorized}, for a colony known by id rather than position.
+   */
+  private static boolean isAuthorizedInColony(ServerPlayer player, int colonyId) {
+    IColony colony = IColonyManager.getInstance().getColonyByWorld(colonyId, player.level());
+    return colony != null && colony.getPermissions().hasPermission(player, Action.MANAGE_HUTS);
+  }
+
   private static boolean isAuthorized(ServerPlayer player, BlockPos pos) {
     // A crafted packet must not be able to force a chunk load by naming a far-away position.
     if (!player.level().isLoaded(pos)) {

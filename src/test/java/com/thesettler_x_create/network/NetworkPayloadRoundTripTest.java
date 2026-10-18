@@ -14,10 +14,8 @@ import org.junit.jupiter.api.Test;
  * Real encode/decode round-trip tests for the custom network payloads that don't touch ItemStack.
  * Unlike this project's usual source-text GuardTests, these actually run the StreamCodec against a
  * live buffer - possible here because BlockPos/String/boolean/int/ ResourceLocation all resolve
- * through {@link RegistryAccess#EMPTY} with no live-game bootstrap. {@code
- * CreateShopBatchRequestPayload} carries item stacks, whose STREAM_CODEC throws outside a
- * bootstrapped game instance (ExceptionInInitializerError under the plain test runner); it is
- * covered by ItemStackNetworkPayloadGuardTest instead.
+ * through {@link RegistryAccess#EMPTY} with no live-game bootstrap. ItemStack payloads are left
+ * out: their STREAM_CODEC throws outside a bootstrapped game instance.
  */
 class NetworkPayloadRoundTripTest {
 

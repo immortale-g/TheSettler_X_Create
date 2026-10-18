@@ -2,6 +2,7 @@ package com.thesettler_x_create.minecolonies.block;
 
 import com.minecolonies.api.blocks.AbstractBlockHut;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
+import com.minecolonies.api.colony.permissions.Action;
 import com.minecolonies.core.network.messages.client.colony.ColonyViewBuildingViewMessage;
 import com.simibubi.create.Create;
 import com.thesettler_x_create.ItemStackDataUtil;
@@ -55,7 +56,9 @@ public class BlockHutCreateShop extends AbstractBlockHut<BlockHutCreateShop> {
     if (stack.getItem() instanceof ColonyGaugeBlockItem) {
       if (!level.isClientSide) {
         BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof TileEntityCreateShop shop && shop.getColony() != null) {
+        if (be instanceof TileEntityCreateShop shop
+            && shop.getColony() != null
+            && shop.getColony().getPermissions().hasPermission(player, Action.MANAGE_HUTS)) {
           CompoundTag tag = ItemStackDataUtil.copyCustomData(stack);
           GaugeLinkData.writeTo(tag, shop.getColony().getID(), pos);
           stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));

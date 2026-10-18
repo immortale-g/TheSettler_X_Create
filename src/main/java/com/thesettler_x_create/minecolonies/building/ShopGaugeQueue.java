@@ -213,7 +213,9 @@ final class ShopGaugeQueue {
     for (var entry : pendingGaugeRequests.entrySet()) {
       GaugePackagingTask task = entry.getValue();
       if (!task.gaugeAddress().equals(gaugeAddress)
-          || !(item == null || item.isEmpty() || ItemStack.isSameItem(task.item(), item))) {
+          || !(item == null
+              || item.isEmpty()
+              || ItemStack.isSameItemSameComponents(task.item(), item))) {
         continue;
       }
       if (keepRunning && isBeingWorkedOn(standard, entry.getKey())) {
@@ -243,7 +245,9 @@ final class ShopGaugeQueue {
     gaugePackagingQueue.removeIf(
         t ->
             t.gaugeAddress().equals(gaugeAddress)
-                && (item == null || item.isEmpty() || ItemStack.isSameItem(t.item(), item))
+                && (item == null
+                    || item.isEmpty()
+                    || ItemStack.isSameItemSameComponents(t.item(), item))
                 && !keptRequestIds.contains(t.requestId()));
     if (cancelled > 0) {
       owner.markDirty();
@@ -460,7 +464,7 @@ final class ShopGaugeQueue {
     }
     int delivered = 0;
     for (ItemStack stack : deliveries) {
-      if (!stack.isEmpty() && ItemStack.isSameItem(stack, item)) {
+      if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, item)) {
         delivered += stack.getCount();
       }
     }
@@ -508,12 +512,14 @@ final class ShopGaugeQueue {
   @Nullable
   private GaugePackagingTask findOpenTask(ItemStack item, String gaugeAddress) {
     for (GaugePackagingTask task : gaugePackagingQueue) {
-      if (ItemStack.isSameItem(task.item(), item) && task.gaugeAddress().equals(gaugeAddress)) {
+      if (ItemStack.isSameItemSameComponents(task.item(), item)
+          && task.gaugeAddress().equals(gaugeAddress)) {
         return task;
       }
     }
     for (GaugePackagingTask task : pendingGaugeRequests.values()) {
-      if (ItemStack.isSameItem(task.item(), item) && task.gaugeAddress().equals(gaugeAddress)) {
+      if (ItemStack.isSameItemSameComponents(task.item(), item)
+          && task.gaugeAddress().equals(gaugeAddress)) {
         return task;
       }
     }
@@ -526,15 +532,23 @@ final class ShopGaugeQueue {
       ListTag list = compound.getList("GaugePackagingQueue", 10);
       for (int i = 0; i < list.size(); i++) {
         CompoundTag t = list.getCompound(i);
-        ItemStack item = ItemStack.parseOptional(provider, t.getCompound("Item"));
-        int amount = t.getInt("Amount");
-        String address = t.getString("Address");
-        if (!item.isEmpty() && amount > 0 && !address.isEmpty()) {
-          UUID requestId =
-              t.contains("RequestId")
-                  ? UUID.fromString(t.getString("RequestId"))
-                  : UUID.randomUUID();
-          gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address, requestId));
+        try {
+          ItemStack item = ItemStack.parseOptional(provider, t.getCompound("Item"));
+          int amount = t.getInt("Amount");
+          String address = t.getString("Address");
+          if (!item.isEmpty() && amount > 0 && !address.isEmpty()) {
+            UUID requestId =
+                t.contains("RequestId")
+                    ? UUID.fromString(t.getString("RequestId"))
+                    : UUID.randomUUID();
+            gaugePackagingQueue.add(new GaugePackagingTask(item, amount, address, requestId));
+          }
+        } catch (Exception ex) {
+          ProblemLog.once(
+              "gauge-packaging-restore-failed:" + i,
+              "could not restore packaging task {} from the save ({}). That task is lost.",
+              i,
+              ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
         }
       }
     }

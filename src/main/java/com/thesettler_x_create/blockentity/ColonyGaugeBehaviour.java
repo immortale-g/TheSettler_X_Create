@@ -98,6 +98,10 @@ public class ColonyGaugeBehaviour extends FilteringBehaviour implements MenuProv
     return active;
   }
 
+  public int getColonyId() {
+    return colonyId;
+  }
+
   public boolean isLinked() {
     return active && colonyId >= 0 && shopPos != null;
   }

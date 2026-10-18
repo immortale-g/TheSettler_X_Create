@@ -19,7 +19,9 @@ class TileEntityCreateShopHousekeepingGuardTest {
     assertTrue(source.contains("simulateInsertCount("));
     assertTrue(source.contains("IItemHandler hut = getInventory();"));
     assertTrue(source.contains("hut = getItemHandlerCap((Direction) null);"));
-    assertTrue(source.contains("handler = rack.getItemHandlerCap();"));
+    // Single rack, not the combined view a double rack or the hut hands out (counts slots twice).
+    assertTrue(source.contains("IItemHandler handler = rack.getInventory();"));
+    assertTrue(!source.contains("rack.getItemHandlerCap()"));
     assertTrue(!source.contains("probe.copy(), hut"));
   }
 }

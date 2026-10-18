@@ -73,7 +73,8 @@ class ModNetworkGuardTest {
       // getShopBuilding(...) is a thin delegate over getShop(...) - see the test above, which
       // pins that delegation so this alternative can't become an authorization bypass.
       boolean routesThroughGetShop = body.contains("getShop(") || body.contains("getShopBuilding(");
-      boolean checksDirectly = body.contains("isAuthorized(");
+      boolean checksDirectly =
+          body.contains("isAuthorized(") || body.contains("isAuthorizedInColony(");
       assertTrue(
           routesThroughGetShop || checksDirectly,
           matcher.group(1)
@@ -82,7 +83,7 @@ class ModNetworkGuardTest {
     }
     // Sanity check: fail loudly instead of silently passing if the handler count ever drops to
     // zero (e.g. a refactor renames the handleXxx convention this test relies on).
-    assertEquals(6, handlerCount);
+    assertEquals(5, handlerCount);
   }
 
   private static int findMatchingBraceEnd(String source, int openBraceIndex) {

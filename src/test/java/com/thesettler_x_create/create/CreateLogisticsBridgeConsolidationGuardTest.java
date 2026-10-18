@@ -27,29 +27,4 @@ class CreateLogisticsBridgeConsolidationGuardTest {
     assertFalse(source.contains("LogisticsManager.broadcastPackageRequest("));
     assertFalse(source.contains("PackageOrderWithCrafts.simple("));
   }
-
-  @Test
-  void modNetworkBatchHandlerRoutesThroughTheSharedBridge() throws Exception {
-    String source =
-        Files.readString(Path.of("src/main/java/com/thesettler_x_create/network/ModNetwork.java"));
-
-    int bridgeCalls = countOccurrences(source, "CreateLogisticsBridge.broadcastPackageRequest(");
-    assertTrue(
-        bridgeCalls == 1,
-        "expected handleBatchRequest to route through the bridge, found "
-            + bridgeCalls
-            + " call(s)");
-    assertFalse(source.contains("LogisticsManager.broadcastPackageRequest("));
-    assertFalse(source.contains("PackageOrderWithCrafts.simple("));
-  }
-
-  private static int countOccurrences(String source, String needle) {
-    int count = 0;
-    int index = 0;
-    while ((index = source.indexOf(needle, index)) != -1) {
-      count++;
-      index += needle.length();
-    }
-    return count;
-  }
 }

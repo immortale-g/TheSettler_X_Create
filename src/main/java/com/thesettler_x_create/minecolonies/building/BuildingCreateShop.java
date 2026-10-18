@@ -1221,6 +1221,9 @@ public class BuildingCreateShop extends AbstractBuilding {
     }
     if (shopResolver != null) {
       shopResolver.saveFlowStatesToNbt(tag);
+    } else if (pendingFlowStatesTag != null) {
+      // Loaded but not yet handed to a resolver: a save in that window must not drop them.
+      tag.put(TAG_FLOW_STATES, pendingFlowStatesTag.copy());
     }
     gaugeQueue.save(provider, tag);
     return tag;
