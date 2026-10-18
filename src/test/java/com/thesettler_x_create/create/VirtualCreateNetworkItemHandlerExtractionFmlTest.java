@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,34 @@ import org.junit.jupiter.api.Test;
  */
 @Tag("fml")
 class VirtualCreateNetworkItemHandlerExtractionFmlTest {
+  @Test
+  void reservedStockStaysOnTheRackWhenEachRackIsReadOnce() {
+    ItemStackHandler rack = new ItemStackHandler(2);
+    rack.setStackInSlot(0, new ItemStack(Items.IRON_INGOT, 64));
+    ItemStack key = new ItemStack(Items.IRON_INGOT);
+
+    var slots = VirtualCreateNetworkItemHandler.findSlotsIn(List.of((IItemHandler) rack), key);
+    int available = slots.stream().mapToInt(s -> s.count()).sum();
+
+    assertEquals(64, available);
+    assertEquals(0, VirtualCreateNetworkItemHandler.cappedExtractable(key, 64, 64, available));
+  }
+
+  @Test
+  void aCombinedViewOfTheSameRackWouldDoubleTheCountAndReleaseReservedStock() {
+    ItemStackHandler rack = new ItemStackHandler(2);
+    rack.setStackInSlot(0, new ItemStack(Items.IRON_INGOT, 64));
+    ItemStack key = new ItemStack(Items.IRON_INGOT);
+
+    // What the hut or a double-rack half used to hand out: the same slots a second time.
+    var slots =
+        VirtualCreateNetworkItemHandler.findSlotsIn(List.of((IItemHandler) rack, rack), key);
+    int available = slots.stream().mapToInt(s -> s.count()).sum();
+
+    assertEquals(128, available);
+    assertEquals(64, VirtualCreateNetworkItemHandler.cappedExtractable(key, 64, 64, available));
+  }
+
   @Test
   void aNonStackableItemIsCappedAtOne() {
     ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);

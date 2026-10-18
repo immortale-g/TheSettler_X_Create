@@ -159,9 +159,8 @@ public final class ModNetwork {
             }
             return;
           }
-          // The gauge stands on a factory container that is often outside any claim, so the right
-          // to
-          // steer it is the right in the colony it orders from, not where it happens to stand.
+          // The gauge stands on a factory container that is often outside any claim, so the
+          // right to steer it is the right in the colony it orders from, not where it stands.
           if (!isAuthorizedInColony(player, behaviour.getColonyId())) {
             if (debug) {
               TheSettlerXCreate.LOGGER.info(

@@ -181,7 +181,7 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
 
   /** Visits one rack slot during {@link #scanRacks}. Return {@code true} to stop the scan early. */
   @FunctionalInterface
-  private interface RackSlotVisitor {
+  interface RackSlotVisitor {
     boolean visit(IItemHandler handler, int slot, ItemStack stack);
   }
 
@@ -191,17 +191,31 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
    * stop early.
    */
   private void scanRacks(RackSlotVisitor visitor) {
+    scanHandlers(rackHandlers(), visitor);
+  }
+
+  /**
+   * One handler per loaded rack. getLoadedRacks leaves out the hut block, and getInventory is the
+   * single rack: the hut and each half of a double rack hand out combined handlers that would count
+   * slots twice.
+   */
+  private List<IItemHandler> rackHandlers() {
     var shop = getReadyShop();
     if (shop == null) {
-      return;
+      return List.of();
     }
+    List<IItemHandler> handlers = new ArrayList<>();
     for (TileEntityCreateShop.LoadedRack loaded : shop.getLoadedRacks()) {
-      // getLoadedRacks leaves out the hut block, and getInventory is the single rack: the hut and
-      // each half of a double rack hand out combined handlers that would count slots twice.
       IItemHandler handler = loaded.rack().getInventory();
-      if (handler == null) {
-        continue;
+      if (handler != null) {
+        handlers.add(handler);
       }
+    }
+    return handlers;
+  }
+
+  static void scanHandlers(List<IItemHandler> handlers, RackSlotVisitor visitor) {
+    for (IItemHandler handler : handlers) {
       for (int slot = 0; slot < handler.getSlots(); slot++) {
         if (visitor.visit(handler, slot, handler.getStackInSlot(slot))) {
           return;
@@ -224,8 +238,13 @@ public class VirtualCreateNetworkItemHandler implements IItemHandler {
    * work from this list, so an extract call touches each rack slot once instead of twice.
    */
   private List<RackSlot> findRackSlots(ItemStack key) {
+    return findSlotsIn(rackHandlers(), key);
+  }
+
+  static List<RackSlot> findSlotsIn(List<IItemHandler> handlers, ItemStack key) {
     List<RackSlot> found = new ArrayList<>();
-    scanRacks(
+    scanHandlers(
+        handlers,
         (handler, slot, stack) -> {
           if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, key)) {
             found.add(new RackSlot(handler, slot, stack.getCount()));
